@@ -1,0 +1,43 @@
+/* 
+  Localizable.strings (简体中文)
+  footBall
+  
+  Created on 2026/1/15.
+*/
+
+/* Common */
+"app_name" = "FootBall";
+"ok" = "确定";
+"cancel" = "取消";
+"confirm" = "确认";
+"save" = "保存";
+"delete" = "删除";
+"edit" = "编辑";
+"back" = "返回";
+"next" = "下一步";
+"done" = "完成";
+"loading" = "加载中...";
+"error" = "错误";
+"success" = "成功";
+"network_error" = "网络错误";
+"unknown_error" = "未知错误";
+
+/* Home */
+"home_title" = "首页";
+"welcome" = "欢迎";
+
+/* Settings */
+"settings_title" = "设置";
+"language_settings" = "语言设置";
+"theme_settings" = "主题设置";
+"about" = "关于";
+
+/* Theme */
+"theme_light" = "浅色";
+"theme_dark" = "深色";
+"theme_auto" = "跟随系统";
+
+/* Language Names */
+"language_system" = "跟随系统";
+"language_chinese" = "简体中文";
+"language_traditional_chinese" = "繁體中文";

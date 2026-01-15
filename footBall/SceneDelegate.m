@@ -2,22 +2,61 @@
 //  SceneDelegate.m
 //  footBall
 //
-//  Created by 张玮 on 2026/1/15.
+//  Created on 2026/1/15.
 //
 
 #import "SceneDelegate.h"
+#import "HomeViewController.h"
+#import "ThemeObserverView.h"
+#import <DoraemonKit/DoraemonManager.h>
+#ifdef DEBUG
+#import "BVAPPDebugTool.h"
+#import "BVAPPEnvironmentHostManager.h"
+#endif
 
 @interface SceneDelegate ()
+
+@property (nonatomic, strong) ThemeObserverView *themeObserverView; // 用于监听主题变化的透明视图
 
 @end
 
 @implementation SceneDelegate
 
-
 - (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions {
-    // Use this method to optionally configure and attach the UIWindow `window` to the provided UIWindowScene `scene`.
-    // If using a storyboard, the `window` property will automatically be initialized and attached to the scene.
-    // This delegate does not imply the connecting scene or session are new (see `application:configurationForConnectingSceneSession` instead).
+    if ([scene isKindOfClass:[UIWindowScene class]]) {
+        UIWindowScene *windowScene = (UIWindowScene *)scene;
+        self.window = [[UIWindow alloc] initWithWindowScene:windowScene];
+        
+        // 设置根视图控制器
+        HomeViewController *homeVC = [[HomeViewController alloc] init];
+        UINavigationController *navController = [[UINavigationController alloc] initWithRootViewController:homeVC];
+        self.window.rootViewController = navController;
+        
+        [self.window makeKeyAndVisible];
+        
+        // 添加主题监听视图（透明，仅用于监听主题变化）
+        [self setupThemeObserver];
+        
+        // 初始化 DoKit（仅在Debug模式下，且非生产环境）
+        // 注意：必须在 window makeKeyAndVisible 之后初始化
+        #ifdef DEBUG
+            // 延迟一下确保 window 完全显示
+            dispatch_async(dispatch_get_main_queue(), ^{
+                // 检查是否为生产环境
+                BOOL isProduction = [BVAPPEnvironmentHostManager shareInstance].productFlag;
+                NSLog(@"🔍 当前环境 productFlag: %@", isProduction ? @"YES (生产环境)" : @"NO (非生产环境)");
+                
+                if (!isProduction) {
+                    // 非生产环境，初始化调试工具
+                    NSLog(@"✅ 开始初始化 DoKit...");
+                    [BVAPPDebugTool setup];
+                } else {
+                    // 生产环境，不显示 DoKit
+                    NSLog(@"⚠️ 生产环境，DoKit 已禁用");
+                }
+            });
+        #endif
+    }
 }
 
 
@@ -53,5 +92,15 @@
     // to restore the scene back to its current state.
 }
 
+#pragma mark - Theme Observer
+
+- (void)setupThemeObserver {
+    // 创建一个透明的视图用于监听主题变化
+    // 这个视图会被添加到 window 上，但不会显示，仅用于监听 traitCollection 变化
+    self.themeObserverView = [[ThemeObserverView alloc] initWithFrame:self.window.bounds];
+    self.themeObserverView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [self.window addSubview:self.themeObserverView];
+    [self.window sendSubviewToBack:self.themeObserverView];
+}
 
 @end

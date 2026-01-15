@@ -6,7 +6,14 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		3DEEB6700E8034D8C41273A3 /* Pods_footBall.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 614D00EBBC7FB6B3BBF1EB91 /* Pods_footBall.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
+		04008F0DC8AC2D78B78E99DE /* Pods-footBall.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-footBall.release.xcconfig"; path = "Target Support Files/Pods-footBall/Pods-footBall.release.xcconfig"; sourceTree = "<group>"; };
+		575CC89D54DAD4AA4C85A83B /* Pods-footBall.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-footBall.debug.xcconfig"; path = "Target Support Files/Pods-footBall/Pods-footBall.debug.xcconfig"; sourceTree = "<group>"; };
+		614D00EBBC7FB6B3BBF1EB91 /* Pods_footBall.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_footBall.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		721F63562F187C9C009D3215 /* footBall.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = footBall.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -36,6 +43,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3DEEB6700E8034D8C41273A3 /* Pods_footBall.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -47,6 +55,8 @@
 			children = (
 				721F63582F187C9C009D3215 /* footBall */,
 				721F63572F187C9C009D3215 /* Products */,
+				E95EF427AE2F39DE47530208 /* Pods */,
+				786E32F0ABC4812EA4497FA2 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -58,6 +68,23 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		786E32F0ABC4812EA4497FA2 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				614D00EBBC7FB6B3BBF1EB91 /* Pods_footBall.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		E95EF427AE2F39DE47530208 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				575CC89D54DAD4AA4C85A83B /* Pods-footBall.debug.xcconfig */,
+				04008F0DC8AC2D78B78E99DE /* Pods-footBall.release.xcconfig */,
+			);
+			path = Pods;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -65,9 +92,11 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 721F636E2F187C9E009D3215 /* Build configuration list for PBXNativeTarget "footBall" */;
 			buildPhases = (
+				4E24503B8DD7E77224B85159 /* [CP] Check Pods Manifest.lock */,
 				721F63522F187C9C009D3215 /* Sources */,
 				721F63532F187C9C009D3215 /* Frameworks */,
 				721F63542F187C9C009D3215 /* Resources */,
+				52229122249BC30B86BB5ADC /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -77,8 +106,6 @@
 				721F63582F187C9C009D3215 /* footBall */,
 			);
 			name = footBall;
-			packageProductDependencies = (
-			);
 			productName = footBall;
 			productReference = 721F63562F187C9C009D3215 /* footBall.app */;
 			productType = "com.apple.product-type.application";
@@ -103,6 +130,8 @@
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hans",
+				"zh-Hant",
 			);
 			mainGroup = 721F634D2F187C9C009D3215;
 			minimizedProjectReferenceProxies = 1;
@@ -126,6 +155,52 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		4E24503B8DD7E77224B85159 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-footBall-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		52229122249BC30B86BB5ADC /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-footBall/Pods-footBall-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			inputPaths = (
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-footBall/Pods-footBall-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-footBall/Pods-footBall-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		721F63522F187C9C009D3215 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -139,11 +214,14 @@
 /* Begin XCBuildConfiguration section */
 		721F636F2F187C9E009D3215 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 575CC89D54DAD4AA4C85A83B /* Pods-footBall.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 99LCQ2RCS7;
+				GCC_PREFIX_HEADER = "footBall/footBall-Prefix.pch";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = footBall/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -166,11 +244,14 @@
 		};
 		721F63702F187C9E009D3215 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 04008F0DC8AC2D78B78E99DE /* Pods-footBall.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 99LCQ2RCS7;
+				GCC_PREFIX_HEADER = "footBall/footBall-Prefix.pch";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = footBall/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -228,7 +309,7 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -243,7 +324,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -289,7 +370,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -298,7 +379,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;

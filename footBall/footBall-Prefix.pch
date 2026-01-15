@@ -1,0 +1,101 @@
+//
+//  footBall-Prefix.pch
+//  footBall
+//
+//  Created on 2026/1/15.
+//  预编译头文件 - 自动包含常用系统框架、第三方库和项目核心类
+//
+
+#ifdef __OBJC__
+
+#pragma mark - 系统框架
+#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
+
+#pragma mark - 第三方库
+// QMUI 框架
+#import <QMUIKit/QMUIKit.h>
+
+// 网络请求
+#import <AFNetworking/AFNetworking.h>
+
+// 自动布局
+#import <Masonry/Masonry.h>
+
+// 下拉刷新
+#import <MJRefresh/MJRefresh.h>
+
+// 加载提示
+#import <MBProgressHUD/MBProgressHUD.h>
+
+// 图片加载
+#import <SDWebImage/SDWebImage.h>
+
+// WebSocket
+#import <SocketRocket/SocketRocket.h>
+
+// 动画库
+#import <libpag/PAGView.h>
+
+// 工具类
+#import <YYCategories/YYCategories.h>
+
+// 调试工具（仅在Debug模式下）
+#ifdef DEBUG
+#import <DoraemonKit/DoraemonManager.h>
+#endif
+
+#pragma mark - 项目核心类 - Base
+#import "QMBaseViewController.h"
+
+#pragma mark - 项目核心类 - Theme & Design
+#import "ThemeManager.h"
+#import "ColorManager.h"
+#import "FontManager.h"
+
+#pragma mark - 项目核心类 - Language
+#import "LanguageManager.h"
+
+#pragma mark - 项目核心类 - Network
+#import "APIManager.h"
+#import "APIEnvironmentManager.h"
+#import "APIRequestInterceptor.h"
+#import "APIError.h"
+#import "WebSocketManager.h"
+#import "NetworkEnvironmentManager.h"
+#import "WebSocketEnvironmentManager.h"
+
+#pragma mark - 项目核心类 - Network Config
+#import "APIServerConfig.h"
+#import "APIPathConfig.h"
+#import "APIPathNames.h"
+#import "APIPathValues.h"
+#import "WebSocketPathConfig.h"
+#import "WebSocketPathNames.h"
+#import "WebSocketPathValues.h"
+
+#pragma mark - 项目核心类 - Auth
+#import "AuthManager.h"
+
+#pragma mark - 项目核心类 - Image
+#import "SDImageManager.h"
+#import "ThemeImageManager.h"
+// UIImage+Theme 是 Category，无需在 PCH 中导入
+
+#pragma mark - 项目核心类 - UI
+#import "LoadingManager.h"
+#import "PagFilePreloader.h"
+#import "RefreshPagHeader.h"
+
+#pragma mark - 项目核心类 - Debug (仅在Debug模式下)
+#ifdef DEBUG
+#import "BVAPPDebugTool.h"
+#import "BVAPPEnvironmentHostManager.h"
+#import "BVDebugMemoryLeakController.h"
+#import "BVDebugMemoryLeakPlugin.h"
+#import "BVDebugNetworkSwitchPlugin.h"
+#import "BVSwitchNewworkViewController.h"
+#import "NSObject+BVDebugMemoryLeak.h"
+#endif
+
+#endif /* __OBJC__ */

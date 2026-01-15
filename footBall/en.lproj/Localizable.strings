@@ -1,0 +1,43 @@
+/* 
+  Localizable.strings (English)
+  footBall
+  
+  Created on 2026/1/15.
+*/
+
+/* Common */
+"app_name" = "FootBall";
+"ok" = "OK";
+"cancel" = "Cancel";
+"confirm" = "Confirm";
+"save" = "Save";
+"delete" = "Delete";
+"edit" = "Edit";
+"back" = "Back";
+"next" = "Next";
+"done" = "Done";
+"loading" = "Loading...";
+"error" = "Error";
+"success" = "Success";
+"network_error" = "Network Error";
+"unknown_error" = "Unknown Error";
+
+/* Home */
+"home_title" = "Home";
+"welcome" = "Welcome";
+
+/* Settings */
+"settings_title" = "Settings";
+"language_settings" = "Language";
+"theme_settings" = "Theme";
+"about" = "About";
+
+/* Theme */
+"theme_light" = "Light";
+"theme_dark" = "Dark";
+"theme_auto" = "Follow System";
+
+/* Language Names */
+"language_system" = "Follow System";
+"language_chinese" = "Simplified Chinese";
+"language_traditional_chinese" = "Traditional Chinese";
