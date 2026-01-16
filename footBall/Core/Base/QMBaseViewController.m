@@ -8,6 +8,8 @@
 #import "QMBaseViewController.h"
 #import "LanguageManager.h"
 #import "ThemeManager.h"
+#import "NavigationBarManager.h"
+#import "UINavigationController+NavigationBar.h"
 #import <MBProgressHUD/MBProgressHUD.h>
 
 @interface QMBaseViewController ()
@@ -57,6 +59,11 @@
         navController.navigationBarHidden = !self.shouldShowNavigationBar;
     } else {
         [self.navigationController setNavigationBarHidden:!self.shouldShowNavigationBar animated:animated];
+    }
+    
+    // 应用导航栏样式（每次出现时应用，确保主题切换后样式正确）
+    if (self.shouldShowNavigationBar && self.navigationController) {
+        [self.navigationController applyDefaultNavigationBarStyle];
     }
 }
 
@@ -207,12 +214,9 @@
     // 子类重写
     self.view.backgroundColor = [ThemeManager sharedManager].backgroundColor;
     
-    // QMUI 导航栏配置
-    if (self.navigationController && [self.navigationController isKindOfClass:[QMUINavigationController class]]) {
-        QMUINavigationController *navController = (QMUINavigationController *)self.navigationController;
-        navController.navigationBar.tintColor = [ThemeManager sharedManager].primaryColor;
-    } else if (self.navigationController) {
-        self.navigationController.navigationBar.tintColor = [ThemeManager sharedManager].primaryColor;
+    // 使用导航栏管理器统一配置导航栏样式
+    if (self.shouldShowNavigationBar && self.navigationController) {
+        [self.navigationController applyDefaultNavigationBarStyle];
     }
 }
 
@@ -234,12 +238,9 @@
     ThemeManager *themeManager = [ThemeManager sharedManager];
     self.view.backgroundColor = themeManager.backgroundColor;
     
-    // 更新导航栏样式
-    if (self.navigationController && [self.navigationController isKindOfClass:[QMUINavigationController class]]) {
-        QMUINavigationController *navController = (QMUINavigationController *)self.navigationController;
-        navController.navigationBar.tintColor = themeManager.primaryColor;
-    } else if (self.navigationController) {
-        self.navigationController.navigationBar.tintColor = themeManager.primaryColor;
+    // 使用导航栏管理器更新导航栏样式（适配主题切换）
+    if (self.shouldShowNavigationBar && self.navigationController) {
+        [self.navigationController applyDefaultNavigationBarStyle];
     }
     
     // 更新空状态视图样式
