@@ -47,16 +47,20 @@
     if (self) {
         _pathConfigs = [NSMutableDictionary dictionary];
         
-        // 加载默认路径配置
-        [self loadDefaultPathConfigs];
+        // 设置默认路径前缀
+        _defaultPathPrefix = @"/ws";
+        
+        // 不再自动加载默认路径配置
+        // 路径配置改为按需注册，或直接使用路径字符串
+        // 如果需要预加载某些常用路径，可以手动调用 loadDefaultPathConfigs
     }
     return self;
 }
 
+/// 加载默认路径配置（可选，按需调用）
+/// 注意：此方法已废弃，建议直接使用路径字符串，无需预注册
 - (void)loadDefaultPathConfigs {
-    // 注册默认WebSocket路径
-    // 使用路径名称常量和路径值常量，实现配置分离
-    
+    // 仅保留常用路径的注册，其他路径可以直接使用路径字符串
     // 聊天模块
     [self registerPathWithName:WebSocketPathNameChat path:WebSocketPathValueChat description:@"聊天WebSocket"];
     [self registerPathWithName:WebSocketPathNameChatRoom path:WebSocketPathValueChatRoom description:@"聊天室WebSocket"];
@@ -75,19 +79,41 @@
     // 然后在这里注册： [self registerPathWithName:WebSocketPathNameLive path:WebSocketPathValueLive description:@"直播WebSocket"];
 }
 
+/// 获取路径（智能解析）
+/// 1. 如果 pathName 已注册，返回注册的路径
+/// 2. 如果 pathName 以 / 开头，直接作为路径使用
+/// 3. 否则，按照约定转换为路径（如 @"chat" -> @"/ws/chat"）
 - (NSString *)pathForPathName:(NSString *)pathName {
     if (!pathName || pathName.length == 0) {
         NSLog(@"⚠️ WebSocket路径名称为空");
         return @"";
     }
     
+    // 1. 优先查找已注册的路径
     WebSocketPathConfig *config = self.pathConfigs[pathName];
-    if (!config) {
-        NSLog(@"⚠️ 未找到WebSocket路径名称: %@", pathName);
-        return @"";
+    if (config && config.path.length > 0) {
+        return config.path;
     }
     
-    return config.path ?: @"";
+    // 2. 如果 pathName 以 / 开头，直接作为路径使用
+    if ([pathName hasPrefix:@"/"]) {
+        return pathName;
+    }
+    
+    // 3. 按照约定转换为路径：pathName -> {defaultPathPrefix}/pathName
+    // 例如：如果 defaultPathPrefix 为 @"/ws"，则 @"chat" -> @"/ws/chat"
+    // 如果 defaultPathPrefix 为 @"/websocket/v2"，则 @"chat" -> @"/websocket/v2/chat"
+    NSString *prefix = self.defaultPathPrefix ?: @"/ws";
+    // 确保前缀以 / 开头，不以 / 结尾
+    if (![prefix hasPrefix:@"/"]) {
+        prefix = [NSString stringWithFormat:@"/%@", prefix];
+    }
+    if ([prefix hasSuffix:@"/"]) {
+        prefix = [prefix substringToIndex:prefix.length - 1];
+    }
+    NSString *convertedPath = [NSString stringWithFormat:@"%@/%@", prefix, pathName];
+    NSLog(@"ℹ️ WebSocket路径名称 %@ 未注册，使用约定路径: %@ (前缀: %@)", pathName, convertedPath, prefix);
+    return convertedPath;
 }
 
 - (NSDictionary<NSString *, WebSocketPathConfig *> *)allPathConfigs {

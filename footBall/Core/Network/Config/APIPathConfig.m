@@ -47,16 +47,20 @@
     if (self) {
         _pathConfigs = [NSMutableDictionary dictionary];
         
-        // 加载默认路径配置
-        [self loadDefaultPathConfigs];
+        // 设置默认路径前缀
+        _defaultPathPrefix = @"/api/v1";
+        
+        // 不再自动加载默认路径配置
+        // 路径配置改为按需注册，或直接使用路径字符串
+        // 如果需要预加载某些常用路径，可以手动调用 loadDefaultPathConfigs
     }
     return self;
 }
 
+/// 加载默认路径配置（可选，按需调用）
+/// 注意：此方法已废弃，建议直接使用路径字符串，无需预注册
 - (void)loadDefaultPathConfigs {
-    // 注册默认API路径
-    // 使用路径名称常量和路径值常量，实现配置分离
-    
+    // 仅保留常用路径的注册，其他路径可以直接使用路径字符串
     // 用户模块
     [self registerPathWithName:APIPathNameUser path:APIPathValueUser description:@"用户相关接口"];
     [self registerPathWithName:APIPathNameUserProfile path:APIPathValueUserProfile description:@"用户资料"];
@@ -71,26 +75,43 @@
     // 文件模块
     [self registerPathWithName:APIPathNameUpload path:APIPathValueUpload description:@"文件上传"];
     [self registerPathWithName:APIPathNameDownload path:APIPathValueDownload description:@"文件下载"];
-    
-    // 其他模块可以根据需要添加
-    // 在 APIPathNames.h/m 中添加路径名称常量
-    // 在 APIPathValues.h/m 中添加路径值常量
-    // 然后在这里注册： [self registerPathWithName:APIPathNameOrder path:APIPathValueOrder description:@"订单相关接口"];
 }
 
+/// 获取路径（智能解析）
+/// 1. 如果 pathName 已注册，返回注册的路径
+/// 2. 如果 pathName 以 / 开头，直接作为路径使用
+/// 3. 否则，按照约定转换为路径（如 @"user" -> @"/api/v1/user"）
 - (NSString *)pathForPathName:(NSString *)pathName {
     if (!pathName || pathName.length == 0) {
         NSLog(@"⚠️ 路径名称为空");
         return @"";
     }
     
+    // 1. 优先查找已注册的路径
     APIPathConfig *config = self.pathConfigs[pathName];
-    if (!config) {
-        NSLog(@"⚠️ 未找到路径名称: %@", pathName);
-        return @"";
+    if (config && config.path.length > 0) {
+        return config.path;
     }
     
-    return config.path ?: @"";
+    // 2. 如果 pathName 以 / 开头，直接作为路径使用
+    if ([pathName hasPrefix:@"/"]) {
+        return pathName;
+    }
+    
+    // 3. 按照约定转换为路径：pathName -> {defaultPathPrefix}/pathName
+    // 例如：如果 defaultPathPrefix 为 @"/api/v1"，则 @"user" -> @"/api/v1/user"
+    // 如果 defaultPathPrefix 为 @"/api/v2"，则 @"user" -> @"/api/v2/user"
+    NSString *prefix = self.defaultPathPrefix ?: @"/api/v1";
+    // 确保前缀以 / 开头，不以 / 结尾
+    if (![prefix hasPrefix:@"/"]) {
+        prefix = [NSString stringWithFormat:@"/%@", prefix];
+    }
+    if ([prefix hasSuffix:@"/"]) {
+        prefix = [prefix substringToIndex:prefix.length - 1];
+    }
+    NSString *convertedPath = [NSString stringWithFormat:@"%@/%@", prefix, pathName];
+    NSLog(@"ℹ️ 路径名称 %@ 未注册，使用约定路径: %@ (前缀: %@)", pathName, convertedPath, prefix);
+    return convertedPath;
 }
 
 - (NSDictionary<NSString *, APIPathConfig *> *)allPathConfigs {

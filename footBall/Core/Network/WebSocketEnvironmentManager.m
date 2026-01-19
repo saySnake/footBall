@@ -78,22 +78,9 @@
         }
     #endif
     
-    // 从 APIServerConfigManager 获取服务器地址
-    // 注意：WebSocket 使用 ws:// 或 wss:// 协议
-    NSString *httpURL = [[APIServerConfigManager sharedManager] serverURLForEnvironment:environment];
-    
-    // 将 http:// 或 https:// 转换为 ws:// 或 wss://
-    NSString *wsURL = httpURL;
-    if ([wsURL hasPrefix:@"https://"]) {
-        wsURL = [wsURL stringByReplacingOccurrencesOfString:@"https://" withString:@"wss://"];
-    } else if ([wsURL hasPrefix:@"http://"]) {
-        wsURL = [wsURL stringByReplacingOccurrencesOfString:@"http://" withString:@"ws://"];
-    } else {
-        // 如果没有协议前缀，默认使用 wss://
-        wsURL = [NSString stringWithFormat:@"wss://%@", wsURL];
-    }
-    
-    return wsURL;
+    // 从 APIServerConfigManager 获取WebSocket服务器地址（统一管理）
+    // 如果未配置WebSocket地址，会自动从HTTP地址转换
+    return [[APIServerConfigManager sharedManager] webSocketURLForEnvironment:environment];
 }
 
 - (NSString *)fullWebSocketURLForPathName:(NSString *)pathName {

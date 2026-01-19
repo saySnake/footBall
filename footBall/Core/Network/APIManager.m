@@ -33,6 +33,7 @@
 - (instancetype)init {
     self = [super init];
     if (self) {
+        // baseURL 已废弃，统一使用 APIEnvironmentManager 管理环境配置
         _baseURL = @"";
         _timeoutInterval = 30.0;
         _maxRetryCount = 3; // 默认最大重试3次
@@ -91,10 +92,8 @@
     
     // 构建完整URL
     NSString *fullURL = URLString;
-    // 优先使用APIEnvironmentManager，如果baseURL为空则使用环境管理器
-    if (self.baseURL.length > 0 && ![URLString hasPrefix:@"http"]) {
-        fullURL = [self.baseURL stringByAppendingPathComponent:URLString];
-    } else if (![URLString hasPrefix:@"http"]) {
+    // 统一使用 APIEnvironmentManager 管理环境配置（baseURL 已废弃）
+    if (![URLString hasPrefix:@"http"]) {
         // 使用环境管理器的Base URL
         NSString *baseURL = [APIEnvironmentManager sharedManager].currentBaseURL;
         if (baseURL.length > 0) {
@@ -389,9 +388,20 @@
                               success:(nullable APISuccessBlock)success
                               failure:(nullable APIFailureBlock)failure {
     
+    // 统一使用 APIEnvironmentManager 管理环境配置（baseURL 已废弃）
     NSString *fullURL = URLString;
-    if (self.baseURL.length > 0 && ![URLString hasPrefix:@"http"]) {
-        fullURL = [self.baseURL stringByAppendingPathComponent:URLString];
+    if (![URLString hasPrefix:@"http"]) {
+        NSString *baseURL = [APIEnvironmentManager sharedManager].currentBaseURL;
+        if (baseURL.length > 0) {
+            // 确保baseURL不以/结尾，URLString以/开头
+            if ([baseURL hasSuffix:@"/"]) {
+                baseURL = [baseURL substringToIndex:baseURL.length - 1];
+            }
+            if (![URLString hasPrefix:@"/"]) {
+                URLString = [NSString stringWithFormat:@"/%@", URLString];
+            }
+            fullURL = [NSString stringWithFormat:@"%@%@", baseURL, URLString];
+        }
     }
     
     // 合并请求头
@@ -443,9 +453,20 @@
                                     success:(nullable void(^)(NSURL *filePath))success
                                     failure:(nullable APIFailureBlock)failure {
     
+    // 统一使用 APIEnvironmentManager 管理环境配置（baseURL 已废弃）
     NSString *fullURL = URLString;
-    if (self.baseURL.length > 0 && ![URLString hasPrefix:@"http"]) {
-        fullURL = [self.baseURL stringByAppendingPathComponent:URLString];
+    if (![URLString hasPrefix:@"http"]) {
+        NSString *baseURL = [APIEnvironmentManager sharedManager].currentBaseURL;
+        if (baseURL.length > 0) {
+            // 确保baseURL不以/结尾，URLString以/开头
+            if ([baseURL hasSuffix:@"/"]) {
+                baseURL = [baseURL substringToIndex:baseURL.length - 1];
+            }
+            if (![URLString hasPrefix:@"/"]) {
+                URLString = [NSString stringWithFormat:@"/%@", URLString];
+            }
+            fullURL = [NSString stringWithFormat:@"%@%@", baseURL, URLString];
+        }
     }
     
     NSURLRequest *request = [self.sessionManager.requestSerializer requestWithMethod:@"GET"
@@ -514,14 +535,10 @@
     APIEnvironmentManager *envManager = [APIEnvironmentManager sharedManager];
     NSString *basePath = [envManager pathForPathName:pathName];
     
+    // 移除强制检查，允许直接使用路径字符串
     if (!basePath || basePath.length == 0) {
-        if (failure) {
-            NSError *error = [NSError errorWithDomain:@"APIManagerErrorDomain"
-                                                  code:-1
-                                              userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"未找到路径名称: %@", pathName]}];
-            failure(error);
-        }
-        return nil;
+        // 如果路径为空，使用 pathName 作为路径（向后兼容）
+        basePath = pathName;
     }
     
     // 拼接完整路径
@@ -562,14 +579,10 @@
     APIEnvironmentManager *envManager = [APIEnvironmentManager sharedManager];
     NSString *basePath = [envManager pathForPathName:pathName];
     
+    // 移除强制检查，允许直接使用路径字符串
     if (!basePath || basePath.length == 0) {
-        if (failure) {
-            NSError *error = [NSError errorWithDomain:@"APIManagerErrorDomain"
-                                                  code:-1
-                                              userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"未找到路径名称: %@", pathName]}];
-            failure(error);
-        }
-        return nil;
+        // 如果路径为空，使用 pathName 作为路径（向后兼容）
+        basePath = pathName;
     }
     
     // 拼接完整路径

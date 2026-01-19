@@ -112,7 +112,13 @@ typedef void(^APIProgressBlock)(NSProgress *progress);
                           failure:(nullable APIFailureBlock)failure;
 
 /// 使用路径名称发起GET请求（推荐使用）
-/// @param pathName 路径名称（如：@"user"）
+/// 
+/// 使用方式：
+/// 1. 直接使用路径字符串：@"/api/v1/user/profile"
+/// 2. 使用约定路径：@"user" 会自动转换为 @"/api/v1/user"
+/// 3. 使用已注册的路径名称：APIPathNameUser（如果已注册）
+/// 
+/// @param pathName 路径名称或路径字符串（如：@"user" 或 @"/api/v1/user"）
 /// @param subPath 子路径（可选，如：@"/profile"）
 /// @param parameters 请求参数
 /// @param headers 请求头
@@ -126,7 +132,13 @@ typedef void(^APIProgressBlock)(NSProgress *progress);
                                    failure:(nullable APIFailureBlock)failure;
 
 /// 使用路径名称发起POST请求（推荐使用）
-/// @param pathName 路径名称（如：@"user"）
+/// 
+/// 使用方式：
+/// 1. 直接使用路径字符串：@"/api/v1/auth/login"
+/// 2. 使用约定路径：@"auth" 会自动转换为 @"/api/v1/auth"
+/// 3. 使用已注册的路径名称：APIPathNameAuthLogin（如果已注册）
+/// 
+/// @param pathName 路径名称或路径字符串（如：@"auth" 或 @"/api/v1/auth"）
 /// @param subPath 子路径（可选，如：@"/login"）
 /// @param parameters 请求参数
 /// @param headers 请求头

@@ -35,13 +35,44 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 /// API路径配置管理器 - 统一管理所有API路径
+/// 
+/// 使用说明：
+/// 1. 【推荐】直接使用路径字符串，无需预注册：
+///    - 使用完整路径：@"/api/v1/user/profile"
+///    - 使用约定路径：@"user" 会自动转换为 {defaultPathPrefix}/user（默认 @"/api/v1/user"）
+///
+/// 2. 【可选】修改API路径前缀（当API版本变化时）：
+///    [APIPathConfigManager sharedManager].defaultPathPrefix = @"/api/v2";
+///    之后 @"user" 会自动转换为 @"/api/v2/user"
+///
+/// 3. 【可选】按需注册特殊路径（仅当路径不符合约定时）：
+///    [[APIPathConfigManager sharedManager] registerPathWithName:@"custom" path:@"/custom/path"];
+///
+/// 4. 【已废弃】不再需要预加载所有路径配置，避免维护200+个接口的注册代码
 @interface APIPathConfigManager : NSObject
 
 /// 单例
 + (instancetype)sharedManager;
 
-/// 获取指定路径名称的路径值
-/// @param pathName 路径名称（如：@"user"）
+/// API路径前缀（用于自动转换路径名称）
+/// 默认值：@"/api/v1"
+/// 
+/// 示例：
+/// - 设置 prefix 为 @"/api/v2" 时，@"user" 会转换为 @"/api/v2/user"
+/// - 设置 prefix 为 @"/v3" 时，@"user" 会转换为 @"/v3/user"
+/// 
+/// 注意：会自动处理前缀格式（确保以 / 开头，不以 / 结尾）
+@property (nonatomic, strong) NSString *defaultPathPrefix;
+
+/// 获取指定路径名称的路径值（智能解析）
+/// @param pathName 路径名称或路径字符串
+/// @return 解析后的路径
+/// 
+/// 解析规则：
+/// 1. 如果 pathName 已注册，返回注册的路径
+/// 2. 如果 pathName 以 / 开头，直接作为路径使用
+/// 3. 否则，按照约定转换为路径：{defaultPathPrefix}/pathName
+///    （默认：@"user" -> @"/api/v1/user"，可通过 defaultPathPrefix 修改）
 - (NSString *)pathForPathName:(NSString *)pathName;
 
 /// 获取所有路径配置

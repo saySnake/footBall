@@ -80,7 +80,7 @@
 }
 
 - (NSString *)pathForPathName:(NSString *)pathName {
-    // 从 APIPathConfigManager 获取路径
+    // 从 APIPathConfigManager 获取路径（支持智能解析）
     return [[APIPathConfigManager sharedManager] pathForPathName:pathName];
 }
 
