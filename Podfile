@@ -18,6 +18,7 @@ target 'footBall' do
   pod 'DoraemonKit'
   pod 'libpag'
   pod 'SocketRocket'
+  pod 'QMUIKit'
   # EasyDebug - 使用本地路径
   # pod 'easydebug', :path => './EasyDebug'
 
