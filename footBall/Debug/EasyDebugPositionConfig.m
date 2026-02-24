@@ -8,7 +8,6 @@
 #import "EasyDebugPositionConfig.h"
 
 #ifdef DEBUG
-#import <easydebug/EasyDebug.h>
 #import <objc/runtime.h>
 #import <UIKit/UIKit.h>
 

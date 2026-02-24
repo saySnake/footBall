@@ -17,7 +17,6 @@
 #import <DoraemonKit/DoraemonManager.h>
 
 #ifdef DEBUG
-#import <easydebug/EasyDebug.h>
 #import "EasyDebugPositionConfig.h"
 #endif
 
@@ -102,11 +101,6 @@
     #ifdef DEBUG
         NSLog(@"✅ AppDelegate: DoKit 将在 SceneDelegate 中初始化");
         
-        // 初始化 EasyDebug
-        [EasyDebug shared].isOn = YES;
-        // 配置模块：网络监控 + 性能监控
-        EasyDebugModule modules = EasyDebugNetMonitor | EasyDebugPerformance;
-        [EasyDebug config:modules];
         
 //        [EasyDebugPositionConfig configButtonPosition:1  // 1=右下角
 //                                           offsetX:0
