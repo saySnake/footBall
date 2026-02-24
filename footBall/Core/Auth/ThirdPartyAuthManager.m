@@ -7,16 +7,11 @@
 
 #import "ThirdPartyAuthManager.h"
 #import <AuthenticationServices/AuthenticationServices.h>
-#import <WechatOpenSDK/WXApi.h>
 
-@interface ThirdPartyAuthManager () <ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding, WXApiDelegate>
+@interface ThirdPartyAuthManager () <ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding>
 
 @property (nonatomic, strong, nullable) ThirdPartyAuthSuccessBlock appleSuccessBlock;
 @property (nonatomic, strong, nullable) ThirdPartyAuthFailureBlock appleFailureBlock;
-@property (nonatomic, strong, nullable) ThirdPartyAuthSuccessBlock weChatSuccessBlock;
-@property (nonatomic, strong, nullable) ThirdPartyAuthFailureBlock weChatFailureBlock;
-@property (nonatomic, copy, nullable) NSString *weChatAppId;
-@property (nonatomic, copy, nullable) NSString *weChatUniversalLink;
 
 @end
 
@@ -40,19 +35,6 @@
 }
 
 #pragma mark - Public Methods
-
-- (void)registerWeChatAppId:(NSString *)appId universalLink:(NSString *)universalLink {
-    self.weChatAppId = appId;
-    self.weChatUniversalLink = universalLink;
-    
-    // 注册微信SDK
-    BOOL success = [WXApi registerApp:appId universalLink:universalLink];
-    if (success) {
-        NSLog(@"✅ 微信SDK注册成功 - AppID: %@", appId);
-    } else {
-        NSLog(@"❌ 微信SDK注册失败 - AppID: %@", appId);
-    }
-}
 
 - (void)loginWithAppleSuccess:(ThirdPartyAuthSuccessBlock)success
                        failure:(ThirdPartyAuthFailureBlock)failure {
@@ -85,75 +67,6 @@
     [controller performRequests];
     
     NSLog(@"🍎 发起苹果登录请求");
-}
-
-- (void)loginWithWeChatSuccess:(ThirdPartyAuthSuccessBlock)success
-                        failure:(ThirdPartyAuthFailureBlock)failure {
-    
-    if (![self isWeChatInstalled]) {
-        if (failure) {
-            NSError *error = [NSError errorWithDomain:@"ThirdPartyAuthErrorDomain"
-                                                  code:-1
-                                              userInfo:@{NSLocalizedDescriptionKey: @"未安装微信，请先安装微信"}];
-            failure(ThirdPartyAuthTypeWeChat, error);
-        }
-        return;
-    }
-    
-    if (!self.weChatAppId || self.weChatAppId.length == 0) {
-        if (failure) {
-            NSError *error = [NSError errorWithDomain:@"ThirdPartyAuthErrorDomain"
-                                                  code:-1
-                                              userInfo:@{NSLocalizedDescriptionKey: @"微信AppID未配置，请先调用registerWeChatAppId:universalLink:"}];
-            failure(ThirdPartyAuthTypeWeChat, error);
-        }
-        return;
-    }
-    
-    // 保存回调
-    self.weChatSuccessBlock = success;
-    self.weChatFailureBlock = failure;
-    
-    // 创建微信登录请求
-    SendAuthReq *req = [[SendAuthReq alloc] init];
-    req.scope = @"snsapi_userinfo";
-    req.state = @"wechat_login_state";
-    
-    // 发起微信登录
-    BOOL success_send = [WXApi sendReq:req completion:^(BOOL success) {
-        if (success) {
-            NSLog(@"✅ 微信登录请求已发送");
-        } else {
-            NSLog(@"❌ 微信登录请求发送失败");
-            if (failure) {
-                NSError *error = [NSError errorWithDomain:@"ThirdPartyAuthErrorDomain"
-                                                      code:-1
-                                                  userInfo:@{NSLocalizedDescriptionKey: @"微信登录请求发送失败"}];
-                failure(ThirdPartyAuthTypeWeChat, error);
-            }
-        }
-    }];
-    
-    if (!success_send) {
-        if (failure) {
-            NSError *error = [NSError errorWithDomain:@"ThirdPartyAuthErrorDomain"
-                                                  code:-1
-                                              userInfo:@{NSLocalizedDescriptionKey: @"微信登录请求发送失败"}];
-            failure(ThirdPartyAuthTypeWeChat, error);
-        }
-    }
-}
-
-- (BOOL)handleWeChatOpenURL:(NSURL *)url {
-    return [WXApi handleOpenURL:url delegate:self];
-}
-
-- (BOOL)handleWeChatUniversalLink:(NSUserActivity *)userActivity {
-    return [WXApi handleOpenUniversalLink:userActivity delegate:self];
-}
-
-- (BOOL)isWeChatInstalled {
-    return [WXApi isWXAppInstalled];
 }
 
 - (BOOL)isAppleSignInAvailable {
@@ -251,59 +164,6 @@
         window = [UIApplication sharedApplication].keyWindow;
     }
     return window;
-}
-
-#pragma mark - WXApiDelegate
-
-- (void)onResp:(BaseResp *)resp {
-    if ([resp isKindOfClass:[SendAuthResp class]]) {
-        SendAuthResp *authResp = (SendAuthResp *)resp;
-        
-        if (resp.errCode == WXSuccess) {
-            // 微信登录成功，获取code
-            NSString *code = authResp.code;
-            NSString *state = authResp.state;
-            
-            NSLog(@"✅ 微信登录授权成功 - Code: %@", code);
-            
-            // 构建认证信息
-            NSMutableDictionary *authInfo = [NSMutableDictionary dictionary];
-            if (code) authInfo[@"code"] = code;
-            if (state) authInfo[@"state"] = state;
-            authInfo[@"authType"] = @(ThirdPartyAuthTypeWeChat);
-            
-            if (self.weChatSuccessBlock) {
-                self.weChatSuccessBlock(ThirdPartyAuthTypeWeChat, authInfo);
-            }
-        } else {
-            // 微信登录失败
-            NSString *errorMsg = @"微信登录失败";
-            if (resp.errCode == WXErrCodeUserCancel) {
-                errorMsg = @"用户取消微信登录";
-            } else if (resp.errCode == WXErrCodeAuthDeny) {
-                errorMsg = @"用户拒绝微信登录";
-            } else if (resp.errCode == WXErrCodeUnsupport) {
-                errorMsg = @"微信不支持该操作";
-            }
-            
-            NSLog(@"❌ 微信登录失败 - Code: %d, Msg: %@", resp.errCode, errorMsg);
-            
-            if (self.weChatFailureBlock) {
-                NSError *error = [NSError errorWithDomain:@"ThirdPartyAuthErrorDomain"
-                                                      code:resp.errCode
-                                                  userInfo:@{NSLocalizedDescriptionKey: errorMsg}];
-                self.weChatFailureBlock(ThirdPartyAuthTypeWeChat, error);
-            }
-        }
-        
-        // 清除回调
-        self.weChatSuccessBlock = nil;
-        self.weChatFailureBlock = nil;
-    }
-}
-
-- (void)onReq:(BaseReq *)req {
-    // 微信请求回调（登录不需要处理）
 }
 
 @end
