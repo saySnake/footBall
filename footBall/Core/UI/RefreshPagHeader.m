@@ -9,6 +9,7 @@
 #import "PagFilePreloader.h"
 #import <libpag/PAGView.h>
 #import <QuartzCore/QuartzCore.h>
+#import <math.h>
 #define BALLOON_GIF_DURATION 0.15
 
 @interface RefreshPagHeader()
@@ -321,9 +322,24 @@ static NSString * const kEndName = @"loading_1";
     
     CGFloat width = self.mj_w;
     CGFloat height = self.mj_h;
-    if (width <= 0) width = [UIScreen mainScreen].bounds.size.width;
+    // 关键：mj_w / mj_h 在某些时刻可能出现 NaN/Inf（比较运算对 NaN 恒为 false），
+    // 需要先做 isfinite 保护，否则会把 NaN frame 传给 CoreGraphics / CALayer 触发系统警告。
+    if (!isfinite(width) || width <= 0) {
+        width = UIScreen.mainScreen.bounds.size.width;
+    }
+    if (!isfinite(height) || height <= 0) {
+        // 优先用自身 bounds 的高度兜底；若仍不可用再用屏幕高度
+        height = self.bounds.size.height;
+        if (!isfinite(height) || height <= 0) {
+            height = UIScreen.mainScreen.bounds.size.height;
+        }
+    }
     
-    CGRect pagFrame = CGRectMake((width - pagW) * 0.5f, (height - pagH) * 0.5f, pagW, pagH);
+    CGFloat x = (width - pagW) * 0.5f;
+    CGFloat y = (height - pagH) * 0.5f;
+    if (!isfinite(x)) x = 0;
+    if (!isfinite(y)) y = 0;
+    CGRect pagFrame = CGRectMake(x, y, pagW, pagH);
     
     // 只有当 frame 发生变化时才更新（优化性能）
     // 在状态转换时避免不必要的布局更新，减少掉帧
@@ -331,10 +347,16 @@ static NSString * const kEndName = @"loading_1";
         // 使用 CATransaction 批量更新，减少重绘次数
         [CATransaction begin];
         [CATransaction setDisableActions:YES]; // 禁用隐式动画，避免掉帧
-        self.beginPagView.frame = pagFrame;
-        self.endPagView.frame = pagFrame;
+        // 再次保险：避免把非有限数写入 frame（会触发 CoreGraphics 警告）
+        if (isfinite(CGRectGetMinX(pagFrame)) &&
+            isfinite(CGRectGetMinY(pagFrame)) &&
+            isfinite(CGRectGetWidth(pagFrame)) &&
+            isfinite(CGRectGetHeight(pagFrame))) {
+            self.beginPagView.frame = pagFrame;
+            self.endPagView.frame = pagFrame;
+            self.lastPagFrame = pagFrame;
+        }
         [CATransaction commit];
-        self.lastPagFrame = pagFrame;
     }
 }
 

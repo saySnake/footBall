@@ -26,6 +26,47 @@
 "home_title" = "首页";
 "welcome" = "欢迎";
 
+/* Login - Common */
+"login_nav_title" = "登录注册";
+"login_welcome_title" = "欢迎来到Pass Nomad";
+"login_with_phone_button" = "使用手机号登录";
+
+/* Login - Phone Input */
+"phone_subtitle_auto_create" = "未注册手机号注册后自动创建账号";
+"phone_country_code_default" = "+86";
+"phone_input_placeholder" = "请输入手机号";
+"phone_get_code_button" = "获取验证码";
+"phone_agreement_text" = "同意《法律条款和隐私协议》";
+
+/* Login - Other Methods */
+"login_other_methods_title" = "其他登录方式";
+"login_method_apple" = "使用 Apple 登录";
+"login_method_wechat" = "使用微信登录";
+
+/* Login - Verify Code */
+"verify_title" = "请输入验证码";
+"verify_subtitle_format" = "我们已给手机号 %@ 发送了一个6位数验证码，输入验证码即可登录。";
+"verify_code_placeholder" = "请输入6位验证码";
+"verify_login_button" = "登录";
+"verify_resend_button" = "重新获取验证码";
+
+/* Team Selection */
+"team_select_title" = "请选择你喜欢的球队";
+"team_search_placeholder" = "请输入球队名称";
+"team_skip_button" = "跳过";
+"team_confirm_button" = "确定";
+"team_message_none_selected" = "还没有选择任何球队";
+"team_message_selected" = "已经选定的球队";
+"team_name_manutd" = "曼联";
+"team_name_liverpool" = "利物浦";
+"team_name_chelsea" = "切尔西";
+"team_name_arsenal" = "阿森纳";
+"team_name_mancity" = "曼城";
+"team_name_spurs" = "热刺";
+"team_name_brentford" = "布伦特福德";
+"team_name_wolves" = "狼队";
+"team_name_brighton" = "布莱顿";
+
 /* Settings */
 "settings_title" = "设置";
 "language_settings" = "语言设置";

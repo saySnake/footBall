@@ -26,6 +26,47 @@
 "home_title" = "首頁";
 "welcome" = "歡迎";
 
+/* Login - Common */
+"login_nav_title" = "登入註冊";
+"login_welcome_title" = "歡迎來到Pass Nomad";
+"login_with_phone_button" = "使用手機號登入";
+
+/* Login - Phone Input */
+"phone_subtitle_auto_create" = "未註冊手機號註冊後自動建立帳號";
+"phone_country_code_default" = "+86";
+"phone_input_placeholder" = "請輸入手機號";
+"phone_get_code_button" = "取得驗證碼";
+"phone_agreement_text" = "同意《法律條款和隱私協議》";
+
+/* Login - Other Methods */
+"login_other_methods_title" = "其他登入方式";
+"login_method_apple" = "使用 Apple 登入";
+"login_method_wechat" = "使用微信登入";
+
+/* Login - Verify Code */
+"verify_title" = "請輸入驗證碼";
+"verify_subtitle_format" = "我們已給手機號 %@ 傳送一組 6 位數驗證碼，輸入驗證碼即可登入。";
+"verify_code_placeholder" = "請輸入 6 位驗證碼";
+"verify_login_button" = "登入";
+"verify_resend_button" = "重新取得驗證碼";
+
+/* Team Selection */
+"team_select_title" = "請選擇你喜歡的球隊";
+"team_search_placeholder" = "請輸入球隊名稱";
+"team_skip_button" = "略過";
+"team_confirm_button" = "確定";
+"team_message_none_selected" = "還沒有選擇任何球隊";
+"team_message_selected" = "已經選定的球隊";
+"team_name_manutd" = "曼聯";
+"team_name_liverpool" = "利物浦";
+"team_name_chelsea" = "切爾西";
+"team_name_arsenal" = "阿森納";
+"team_name_mancity" = "曼城";
+"team_name_spurs" = "熱刺";
+"team_name_brentford" = "布倫特福德";
+"team_name_wolves" = "狼隊";
+"team_name_brighton" = "布萊頓";
+
 /* Settings */
 "settings_title" = "設定";
 "language_settings" = "語言設定";

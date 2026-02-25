@@ -26,6 +26,47 @@
 "home_title" = "Home";
 "welcome" = "Welcome";
 
+/* Login - Common */
+"login_nav_title" = "Login / Sign Up";
+"login_welcome_title" = "Welcome to Pass Nomad";
+"login_with_phone_button" = "Log in with phone";
+
+/* Login - Phone Input */
+"phone_subtitle_auto_create" = "If this phone is not registered, an account will be created automatically.";
+"phone_country_code_default" = "+86";
+"phone_input_placeholder" = "Please enter phone number";
+"phone_get_code_button" = "Get verification code";
+"phone_agreement_text" = "Agree to Terms and Privacy Policy";
+
+/* Login - Other Methods */
+"login_other_methods_title" = "Other login methods";
+"login_method_apple" = "Login with Apple";
+"login_method_wechat" = "Login with WeChat";
+
+/* Login - Verify Code */
+"verify_title" = "Please enter verification code";
+"verify_subtitle_format" = "We have sent a 6-digit code to %@. Enter the code to log in.";
+"verify_code_placeholder" = "Please enter 6-digit code";
+"verify_login_button" = "Log in";
+"verify_resend_button" = "Resend code";
+
+/* Team Selection */
+"team_select_title" = "Choose your favorite teams";
+"team_search_placeholder" = "Please enter team name";
+"team_skip_button" = "Skip";
+"team_confirm_button" = "Confirm";
+"team_message_none_selected" = "No teams selected yet";
+"team_message_selected" = "Selected teams";
+"team_name_manutd" = "Manchester United";
+"team_name_liverpool" = "Liverpool";
+"team_name_chelsea" = "Chelsea";
+"team_name_arsenal" = "Arsenal";
+"team_name_mancity" = "Manchester City";
+"team_name_spurs" = "Tottenham Hotspur";
+"team_name_brentford" = "Brentford";
+"team_name_wolves" = "Wolves";
+"team_name_brighton" = "Brighton & Hove Albion";
+
 /* Settings */
 "settings_title" = "Settings";
 "language_settings" = "Language";

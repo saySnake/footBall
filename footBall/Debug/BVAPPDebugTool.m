@@ -9,6 +9,7 @@
 #import "BVAPPDebugTool.h"
 #ifdef DEBUG
 @import DoraemonKit;
+#import <math.h>
 #if __has_include(<MLeaksFinder/MLeaksFinder.h>)
 @import MLeaksFinder;
 #endif
@@ -96,7 +97,11 @@
     
     // 使用 frame.size.width 获取宽度
     CGFloat windowWidth = logoWindow.frame.size.width;
-    logoWindow.layer.cornerRadius = windowWidth / 2;
+    if (!isfinite(windowWidth) || windowWidth <= 0) {
+        logoWindow.layer.cornerRadius = 0;
+    } else {
+        logoWindow.layer.cornerRadius = windowWidth / 2;
+    }
     logoWindow.layer.borderWidth = 4;
     logoWindow.layer.borderColor = UIColor.greenColor.CGColor;
     logoWindow.clipsToBounds = YES;

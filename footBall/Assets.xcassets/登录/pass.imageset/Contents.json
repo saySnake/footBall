@@ -1,15 +1,16 @@
 {
   "images" : [
     {
-      "filename" : "截屏2026-01-15 16.41.02.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
+      "filename" : "Local News, Teams &@2x.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
+      "filename" : "Local News, Teams &@3x.png",
       "idiom" : "universal",
       "scale" : "3x"
     }
