@@ -25,6 +25,17 @@
 /* Home */
 "home_title" = "首頁";
 "welcome" = "歡迎";
+"home_view_matches" = "查看賽事";
+"tab_home" = "首頁";
+"tab_discover" = "發現";
+"tab_location" = "位置";
+"tab_profile" = "我的";
+"home_all_teams" = "全部";
+"home_more" = "更多";
+"home_challenger" = "CHALLENGER";
+"home_match_time_pill" = "06:30";
+"team_name_burnley" = "伯恩利";
+"team_name_nforest" = "諾丁漢森林";
 
 /* Login - Common */
 "login_nav_title" = "登入註冊";
@@ -57,6 +68,8 @@
 "team_confirm_button" = "確定";
 "team_message_none_selected" = "還沒有選擇任何球隊";
 "team_message_selected" = "已經選定的球隊";
+"welcome_explore_button" = "立即探索";
+"welcome_subtitle" = "開始記錄你的觀賽經歷,記錄自己觀看比賽的情況吧~";
 "team_name_manutd" = "曼聯";
 "team_name_liverpool" = "利物浦";
 "team_name_chelsea" = "切爾西";

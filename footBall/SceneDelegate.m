@@ -6,7 +6,7 @@
 //
 
 #import "SceneDelegate.h"
-#import "HomeViewController.h"
+#import "MainTabBarController.h"
 #import "AuthManager.h"
 #import "ThemeObserverView.h"
 #import <DoraemonKit/DoraemonManager.h>
@@ -31,21 +31,19 @@
         // 根据登录状态直接决定根视图控制器（不再使用 SplashViewController）
         UIViewController *rootVC = nil;
         if ([AuthManager sharedManager].isLoggedIn) {
-            // 已登录，进入首页
-            rootVC = [[HomeViewController alloc] init];
+            // 已登录，进入底部 4 个 Tab 的主界面
+            self.window.rootViewController = [[MainTabBarController alloc] init];
         } else {
-            // 未登录，进入登录流程的第一个页面
+            // 未登录，进入登录流程的第一个页面（需要 Nav 以便 push）
             Class loginClass = NSClassFromString(@"LoginChoiceViewController");
             if (loginClass) {
                 rootVC = [loginClass new];
+                UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:rootVC];
+                self.window.rootViewController = nav;
             } else {
-                // 兜底：如果登录入口类不存在，则进入首页，避免白屏
-                rootVC = [[HomeViewController alloc] init];
+                self.window.rootViewController = [[MainTabBarController alloc] init];
             }
         }
-        
-        UINavigationController *navController = [[UINavigationController alloc] initWithRootViewController:rootVC];
-        self.window.rootViewController = navController;
         
         [self.window makeKeyAndVisible];
         

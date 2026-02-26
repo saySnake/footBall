@@ -4,7 +4,7 @@
 //
 
 #import "TeamSelectionViewController.h"
-#import "HomeViewController.h"
+#import "MainTabBarController.h"
 #import <Masonry/Masonry.h>
 #import <math.h>
 
@@ -14,6 +14,99 @@
 @end
 
 @implementation TeamModel
+@end
+
+/// 选择球队确认后展示的「欢迎来到 Pass Nomad」中间页，点击「立即探索」后执行 onExploreBlock 并关闭
+@interface PassNomadWelcomeViewController : UIViewController
+@property (nonatomic, copy) void (^onExploreBlock)(void);
+@end
+
+@implementation PassNomadWelcomeViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [UIColor whiteColor];
+    self.view.layer.cornerRadius = 10;
+    self.view.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+    self.view.layer.masksToBounds = YES;
+    self.modalPresentationStyle = UIModalPresentationPageSheet;
+    self.modalTransitionStyle = UIModalTransitionStyleCoverVertical;
+    if (@available(iOS 15.0, *)) {
+        UISheetPresentationController *sheet = self.sheetPresentationController;
+        if (sheet) {
+            sheet.detents = @[ [UISheetPresentationControllerDetent mediumDetent], [UISheetPresentationControllerDetent largeDetent] ];
+            sheet.prefersGrabberVisible = YES;
+        }
+    }
+
+    // 设计图：上方为 discover 地图图（队徽与地点名）
+    UIImageView *discoverImageView = [[UIImageView alloc] init];
+    discoverImageView.image = [UIImage imageNamed:@"discover"];
+    discoverImageView.contentMode = UIViewContentModeScaleAspectFill;
+    discoverImageView.clipsToBounds = YES;
+    discoverImageView.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:discoverImageView];
+
+    UILabel *titleLabel = [[UILabel alloc] init];
+    titleLabel.text = NSLocalizedString(@"login_welcome_title", nil);
+    titleLabel.font = [UIFont boldSystemFontOfSize:24];
+    titleLabel.textColor = [UIColor blackColor];
+    titleLabel.textAlignment = NSTextAlignmentCenter;
+    titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:titleLabel];
+
+    UILabel *subtitleLabel = [[UILabel alloc] init];
+    subtitleLabel.text = NSLocalizedString(@"welcome_subtitle", nil);
+    subtitleLabel.font = [UIFont systemFontOfSize:15];
+    subtitleLabel.textColor = [UIColor darkGrayColor];
+    subtitleLabel.textAlignment = NSTextAlignmentCenter;
+    subtitleLabel.numberOfLines = 0;
+    subtitleLabel.preferredMaxLayoutWidth = UIScreen.mainScreen.bounds.size.width - 48;
+    subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [subtitleLabel setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisVertical];
+    [self.view addSubview:subtitleLabel];
+
+    UIButton *exploreBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    [exploreBtn setTitle:NSLocalizedString(@"welcome_explore_button", nil) forState:UIControlStateNormal];
+    [exploreBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    exploreBtn.backgroundColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+    exploreBtn.layer.cornerRadius = 26;
+    exploreBtn.translatesAutoresizingMaskIntoConstraints = NO;
+    [exploreBtn addTarget:self action:@selector(exploreTapped) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:exploreBtn];
+
+    [discoverImageView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.view.mas_safeAreaLayoutGuideTop).offset(38);
+        make.leading.equalTo(self.view).offset(24);
+        make.trailing.equalTo(self.view).offset(-24);
+        make.height.mas_equalTo(255);
+    }];
+    [titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(discoverImageView.mas_bottom).offset(23);
+        make.leading.equalTo(self.view).offset(24);
+        make.trailing.equalTo(self.view).offset(-24);
+        make.height.mas_equalTo(28);
+    }];
+    [subtitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(titleLabel.mas_bottom).offset(10);
+        make.leading.equalTo(self.view).offset(24);
+        make.trailing.equalTo(self.view).offset(-24);
+        make.height.mas_greaterThanOrEqualTo(36);
+    }];
+    [exploreBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(subtitleLabel.mas_bottom).offset(30.5);
+        make.leading.equalTo(self.view).offset(24);
+        make.trailing.equalTo(self.view).offset(-24);
+        make.height.mas_equalTo(52);
+        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-42);
+    }];
+}
+
+- (void)exploreTapped {
+    if (self.onExploreBlock) self.onExploreBlock();
+    [self.presentingViewController dismissViewControllerAnimated:YES completion:nil];
+}
+
 @end
 
 @interface TeamCell : UICollectionViewCell
@@ -395,7 +488,7 @@
     [okBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     okBtn.backgroundColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
     okBtn.layer.cornerRadius = 25;
-    [okBtn addTarget:self action:@selector(goToHome) forControlEvents:UIControlEventTouchUpInside];
+    [okBtn addTarget:self action:@selector(onConfirmSheetOkTapped) forControlEvents:UIControlEventTouchUpInside];
     
     [self.view addSubview:overlay];
     [overlay addSubview:sheet];
@@ -539,13 +632,24 @@
     self.bottomSheet = nil;
 }
 
+/// 底部弹层「确认」：先关闭弹层，再弹出「欢迎来到 Pass Nomad」页，点击「立即探索」后再进入首页
+- (void)onConfirmSheetOkTapped {
+    [self hideBottomSheet];
+    __weak typeof(self) wself = self;
+    PassNomadWelcomeViewController *welcomeVC = [[PassNomadWelcomeViewController alloc] init];
+    welcomeVC.onExploreBlock = ^{
+        [wself goToHome];
+    };
+    [self presentViewController:welcomeVC animated:YES completion:nil];
+}
+
 - (void)goToHome {
-    HomeViewController *homeVC = [[HomeViewController alloc] init];
-    UINavigationController *nav = self.navigationController;
-    if (nav) {
-        [nav setViewControllers:@[homeVC] animated:YES];
+    MainTabBarController *tabBar = [[MainTabBarController alloc] init];
+    UIWindow *window = self.view.window ?: [UIApplication sharedApplication].windows.firstObject;
+    if (window) {
+        window.rootViewController = tabBar;
     } else {
-        [self presentViewController:homeVC animated:YES completion:nil];
+        [self presentViewController:tabBar animated:YES completion:nil];
     }
 }
 

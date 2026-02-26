@@ -25,6 +25,17 @@
 /* Home */
 "home_title" = "Home";
 "welcome" = "Welcome";
+"home_view_matches" = "View Matches";
+"tab_home" = "Home";
+"tab_discover" = "Discover";
+"tab_location" = "Location";
+"tab_profile" = "Profile";
+"home_all_teams" = "All";
+"home_more" = "More";
+"home_challenger" = "CHALLENGER";
+"home_match_time_pill" = "06:30";
+"team_name_burnley" = "Burnley";
+"team_name_nforest" = "N Forest";
 
 /* Login - Common */
 "login_nav_title" = "Login / Sign Up";
@@ -57,6 +68,8 @@
 "team_confirm_button" = "Confirm";
 "team_message_none_selected" = "No teams selected yet";
 "team_message_selected" = "Selected teams";
+"welcome_explore_button" = "Explore Now";
+"welcome_subtitle" = "Start recording your viewing experience, record your own match-watching situations~";
 "team_name_manutd" = "Manchester United";
 "team_name_liverpool" = "Liverpool";
 "team_name_chelsea" = "Chelsea";

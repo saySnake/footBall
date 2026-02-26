@@ -25,6 +25,17 @@
 /* Home */
 "home_title" = "首页";
 "welcome" = "欢迎";
+"home_view_matches" = "查看赛事";
+"tab_home" = "首页";
+"tab_discover" = "发现";
+"tab_location" = "位置";
+"tab_profile" = "我的";
+"home_all_teams" = "全部";
+"home_more" = "更多";
+"home_challenger" = "CHALLENGER";
+"home_match_time_pill" = "06:30";
+"team_name_burnley" = "伯恩利";
+"team_name_nforest" = "诺丁汉森林";
 
 /* Login - Common */
 "login_nav_title" = "登录注册";
@@ -57,6 +68,8 @@
 "team_confirm_button" = "确定";
 "team_message_none_selected" = "还没有选择任何球队";
 "team_message_selected" = "已经选定的球队";
+"welcome_explore_button" = "立即探索";
+"welcome_subtitle" = "开始记录你的观赛经历,记录自己观看比赛的情况吧~";
 "team_name_manutd" = "曼联";
 "team_name_liverpool" = "利物浦";
 "team_name_chelsea" = "切尔西";
