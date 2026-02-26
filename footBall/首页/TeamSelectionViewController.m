@@ -387,14 +387,14 @@
     [cancelBtn setTitle:NSLocalizedString(@"cancel", nil) forState:UIControlStateNormal];
     [cancelBtn setTitleColor:[UIColor darkGrayColor] forState:UIControlStateNormal];
     cancelBtn.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
-    cancelBtn.layer.cornerRadius = 22;
+    cancelBtn.layer.cornerRadius = 25;
     [cancelBtn addTarget:self action:@selector(hideBottomSheet) forControlEvents:UIControlEventTouchUpInside];
     
     UIButton *okBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     [okBtn setTitle:NSLocalizedString(@"confirm", nil) forState:UIControlStateNormal];
     [okBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     okBtn.backgroundColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
-    okBtn.layer.cornerRadius = 22;
+    okBtn.layer.cornerRadius = 25;
     [okBtn addTarget:self action:@selector(goToHome) forControlEvents:UIControlEventTouchUpInside];
     
     [self.view addSubview:overlay];
@@ -414,7 +414,7 @@
     
     [sheet mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.trailing.equalTo(overlay);
-        make.bottom.equalTo(overlay.mas_safeAreaLayoutGuideBottom);
+        make.bottom.mas_equalTo(overlay.mas_bottom);
         make.height.mas_equalTo(275);
     }];
     
@@ -426,12 +426,13 @@
     }];
     
     [label mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(handleView.mas_bottom).offset(12);
-        make.leading.trailing.equalTo(sheet).inset(24);
+        make.top.mas_equalTo(sheet.mas_top).offset(44);
+        make.leading.trailing.equalTo(sheet).inset(16);
+        make.height.mas_equalTo(28);
     }];
     
     [scroll mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(label.mas_bottom).offset(12);
+        make.top.equalTo(label.mas_bottom).offset(24);
         make.leading.trailing.equalTo(sheet);
         make.height.mas_equalTo(60);
     }];
@@ -442,18 +443,16 @@
     }];
     
     [cancelBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(scroll.mas_bottom).offset(12);
+        make.top.equalTo(scroll.mas_bottom).offset(33);
         make.leading.equalTo(sheet).offset(24);
-        make.height.mas_equalTo(44);
-        make.bottom.equalTo(sheet).offset(-24);
+        make.height.mas_equalTo(50);
         make.width.equalTo(sheet.mas_width).multipliedBy(0.4);
     }];
     
     [okBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(scroll.mas_bottom).offset(12);
+        make.top.equalTo(scroll.mas_bottom).offset(33);
         make.trailing.equalTo(sheet).offset(-24);
-        make.height.mas_equalTo(44);
-        make.bottom.equalTo(sheet).offset(-24);
+        make.height.mas_equalTo(50);
         make.width.equalTo(sheet.mas_width).multipliedBy(0.4);
     }];
 }
