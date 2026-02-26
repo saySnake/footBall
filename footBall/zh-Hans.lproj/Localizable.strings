@@ -26,6 +26,7 @@
 "home_title" = "首页";
 "welcome" = "欢迎";
 "home_view_matches" = "查看赛事";
+"more_matches_title" = "更多比赛";
 "tab_home" = "首页";
 "tab_discover" = "发现";
 "tab_location" = "位置";
@@ -79,6 +80,23 @@
 "team_name_brentford" = "布伦特福德";
 "team_name_wolves" = "狼队";
 "team_name_brighton" = "布莱顿";
+
+/* Discover */
+"discover_passport_title" = "我的足球护照";
+
+/* Add Consume */
+"add_consume_title" = "添加消费";
+"add_consume_upload_photo" = "上传照片（1张）";
+"add_consume_item" = "消费物品";
+"add_consume_item_placeholder" = "请输入消费物品";
+"add_consume_price" = "消费价格";
+"add_consume_price_placeholder" = "请输入价格";
+"add_consume_date" = "消费日期";
+"add_consume_time" = "时间";
+"add_consume_confirm" = "确认";
+
+/* More Matches */
+"more_pick_time_title" = "选择时间";
 
 /* Settings */
 "settings_title" = "设置";

@@ -4,6 +4,7 @@
 //
 
 #import "HomeViewController.h"
+#import "MoreMatchesViewController.h"
 #import "RefreshPagHeader.h"
 #import <Masonry/Masonry.h>
 
@@ -384,6 +385,11 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
     [self setupScrollContent];
 }
 
+- (void)onMoreTapped {
+    MoreMatchesViewController *vc = [[MoreMatchesViewController alloc] init];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
 - (void)setupHeader {
     _headerView = [[UIView alloc] init];
     _headerView.backgroundColor = kHeaderGreen;
@@ -475,6 +481,7 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
     [_moreBtn setTitle:NSLocalizedString(@"home_more", nil) forState:UIControlStateNormal];
     [_moreBtn setTitleColor:[UIColor darkGrayColor] forState:UIControlStateNormal];
     _moreBtn.titleLabel.font = [UIFont systemFontOfSize:14];
+    [_moreBtn addTarget:self action:@selector(onMoreTapped) forControlEvents:UIControlEventTouchUpInside];
     [_contentView addSubview:_titleLabel];
     [_contentView addSubview:_moreBtn];
 

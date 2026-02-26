@@ -26,6 +26,10 @@
 "home_title" = "Home";
 "welcome" = "Welcome";
 "home_view_matches" = "View Matches";
+"more_matches_title" = "More Matches";
+
+/* More Matches */
+"more_pick_time_title" = "Select Time";
 "tab_home" = "Home";
 "tab_discover" = "Discover";
 "tab_location" = "Location";
@@ -36,6 +40,20 @@
 "home_match_time_pill" = "06:30";
 "team_name_burnley" = "Burnley";
 "team_name_nforest" = "N Forest";
+
+/* Discover */
+"discover_passport_title" = "My Football Passport";
+
+/* Add Consume */
+"add_consume_title" = "Add Expense";
+"add_consume_upload_photo" = "Upload Photo (1)";
+"add_consume_item" = "Item";
+"add_consume_item_placeholder" = "Please enter item";
+"add_consume_price" = "Price";
+"add_consume_price_placeholder" = "Please enter price";
+"add_consume_date" = "Date";
+"add_consume_time" = "Time";
+"add_consume_confirm" = "Confirm";
 
 /* Login - Common */
 "login_nav_title" = "Login / Sign Up";

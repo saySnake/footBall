@@ -73,10 +73,27 @@ static const CGFloat kPillCircleSize = 44.f;
         UITabBarAppearance *appearance = [[UITabBarAppearance alloc] init];
         [appearance configureWithTransparentBackground];
         appearance.backgroundColor = [UIColor clearColor];
+
+        // 彻底隐藏系统标题文字
+        NSDictionary *hiddenTitleAttrs = @{ NSForegroundColorAttributeName : [UIColor clearColor] };
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = hiddenTitleAttrs;
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = hiddenTitleAttrs;
+        appearance.inlineLayoutAppearance.normal.titleTextAttributes = hiddenTitleAttrs;
+        appearance.inlineLayoutAppearance.selected.titleTextAttributes = hiddenTitleAttrs;
+        appearance.compactInlineLayoutAppearance.normal.titleTextAttributes = hiddenTitleAttrs;
+        appearance.compactInlineLayoutAppearance.selected.titleTextAttributes = hiddenTitleAttrs;
+
         tabBar.standardAppearance = appearance;
         if (@available(iOS 15.0, *)) {
             tabBar.scrollEdgeAppearance = appearance;
         }
+    }
+
+    // 再次确保每个 item 本身也不带标题
+    for (UITabBarItem *item in tabBar.items) {
+        item.title = nil;
+        item.imageInsets = UIEdgeInsetsMake(6, 0, -6, 0);
+        item.titlePositionAdjustment = UIOffsetMake(0, CGFLOAT_MAX); // 完全移出可视范围
     }
 }
 
@@ -117,22 +134,29 @@ static const CGFloat kPillCircleSize = 44.f;
 
     UITabBar *tabBar = self.tabBar;
     CGFloat barW = tabBar.bounds.size.width;
-    CGFloat pillWidth = 4 * kPillCircleSize + 3 * 16.f + 24.f; // 左右各 12 间距，圆之间 16
-    if (pillWidth > barW - 20) {
-        pillWidth = barW - 20;
+    NSInteger count = self.pillButtons.count;
+    if (count <= 0) return;
+
+    // 按设计图固定宽度排布：圆之间 16，左右各 12 留白
+    CGFloat spacing = 16.f;
+    CGFloat horizontalPadding = 12.f;
+    CGFloat pillWidth = count * kPillCircleSize + (count - 1) * spacing + horizontalPadding * 2.f;
+    if (pillWidth > barW - 40.f) {
+        pillWidth = barW - 40.f;
     }
     CGFloat pillX = (barW - pillWidth) / 2.f;
-    // 整体向上微调 5px
+    // 整体向上微调
     CGFloat pillY = tabBar.bounds.size.height - kPillHeight - 17.f;
     self.pillView.frame = CGRectMake(pillX, pillY, pillWidth, kPillHeight);
 
-    CGFloat startX = 12.f;
-    CGFloat centerY = kPillHeight / 2.f;
-    for (NSInteger i = 0; i < self.pillButtons.count; i++) {
+    // 在 pillView 内部均匀排布 4 个圆形按钮
+    CGFloat startX = horizontalPadding;
+    CGFloat centerYInPill = kPillHeight / 2.f;
+    for (NSInteger i = 0; i < count; i++) {
         UIButton *btn = self.pillButtons[i];
-        CGFloat cx = startX + kPillCircleSize / 2.f + i * (kPillCircleSize + 16.f);
+        CGFloat localX = startX + kPillCircleSize / 2.f + i * (kPillCircleSize + spacing);
         btn.bounds = CGRectMake(0, 0, kPillCircleSize, kPillCircleSize);
-        btn.center = CGPointMake(cx, centerY);
+        btn.center = CGPointMake(localX, centerYInPill);
     }
 }
 
