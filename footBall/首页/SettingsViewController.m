@@ -6,224 +6,241 @@
 //
 
 #import "SettingsViewController.h"
-#import "LanguageManager.h"
-#import "ThemeManager.h"
+#import "PNCommonAlertViewController.h"
+#import "AuthManager.h"
 #import <Masonry/Masonry.h>
 
-@interface SettingsViewController () <UITableViewDataSource, UITableViewDelegate>
-
-@property (nonatomic, strong) UITableView *tableView;
-@property (nonatomic, strong) NSArray<NSArray<NSString *> *> *dataSource;
-
+@interface SettingsViewController ()
+@property (nonatomic, strong) UILabel *navTitle;
+@property (nonatomic, strong) UIView *listCard;
+@property (nonatomic, strong) UISwitch *noticeSwitch;
+@property (nonatomic, strong) UILabel *versionValueLabel;
+@property (nonatomic, strong) UILabel *cacheValueLabel;
+@property (nonatomic, strong) UIButton *logoutBtn;
 @end
 
 @implementation SettingsViewController
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    
-    [self setupUI];
-    [self setupDataSource];
+    self.shouldShowNavigationBar = NO;
+    self.view.backgroundColor = [UIColor whiteColor];
 }
 
 - (void)setupUI {
-    [self setNavigationTitleKey:@"settings_title"];
-    
-    // 添加子视图（懒加载会自动初始化）
-    [self.view addSubview:self.tableView];
-    [self.tableView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.edges.equalTo(self.view);
+    // Nav
+    UIView *nav = [UIView new];
+    nav.backgroundColor = [UIColor whiteColor];
+    [self.view addSubview:nav];
+    [nav mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.leading.trailing.equalTo(self.view);
+        make.height.mas_equalTo(88);
     }];
-}
 
-#pragma mark - Lazy Loading
+    UIButton *back = [UIButton buttonWithType:UIButtonTypeSystem];
+    if (@available(iOS 13.0, *)) [back setImage:[UIImage systemImageNamed:@"arrow.left"] forState:UIControlStateNormal];
+    back.tintColor = [UIColor blackColor];
+    [back addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
+    [nav addSubview:back];
+    [back mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(nav).offset(12);
+        make.bottom.equalTo(nav).offset(-10);
+        make.size.mas_equalTo(CGSizeMake(36, 36));
+    }];
 
-- (UITableView *)tableView {
-    if (!_tableView) {
-        _tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleGrouped];
-        _tableView.dataSource = self;
-        _tableView.delegate = self;
-        _tableView.backgroundColor = [ThemeManager sharedManager].backgroundColor;
-    }
-    return _tableView;
-}
+    self.navTitle = [UILabel new];
+    self.navTitle.font = [UIFont boldSystemFontOfSize:17];
+    self.navTitle.textColor = [UIColor blackColor];
+    [nav addSubview:self.navTitle];
+    [self.navTitle mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(nav);
+        make.centerY.equalTo(back);
+    }];
 
-- (void)setupDataSource {
-    self.dataSource = @[
-        @[@"language_settings"],
-        @[@"theme_settings"],
-        @[@"about"]
-    ];
+    // List card
+    self.listCard = [UIView new];
+    self.listCard.backgroundColor = [UIColor whiteColor];
+    self.listCard.layer.cornerRadius = 12;
+    self.listCard.clipsToBounds = YES;
+    [self.view addSubview:self.listCard];
+    [self.listCard mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(nav.mas_bottom).offset(10);
+        make.leading.equalTo(self.view).offset(12);
+        make.trailing.equalTo(self.view).offset(-12);
+    }];
+
+    UIView *row1 = [self addRowToCard:self.listCard top:nil icon:@"bell" titleKey:@"settings_notice" showChevron:NO];
+    self.noticeSwitch = [UISwitch new];
+    self.noticeSwitch.onTintColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+    self.noticeSwitch.on = YES;
+    [row1 addSubview:self.noticeSwitch];
+    [self.noticeSwitch mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.equalTo(row1).offset(-16);
+        make.centerY.equalTo(row1);
+    }];
+
+    UIView *row2 = [self addRowToCard:self.listCard top:row1 icon:@"shield" titleKey:@"settings_privacy" showChevron:YES];
+    UIControl *privacyTap = (UIControl *)row2;
+    [privacyTap addTarget:self action:@selector(onPrivacy) forControlEvents:UIControlEventTouchUpInside];
+
+    UIControl *row3 = (UIControl *)[self addRowToCard:self.listCard top:row2 icon:@"checkmark.seal" titleKey:@"settings_test_version" showChevron:NO];
+    self.versionValueLabel = [UILabel new];
+    self.versionValueLabel.font = [UIFont systemFontOfSize:13];
+    self.versionValueLabel.textColor = [UIColor grayColor];
+    self.versionValueLabel.textAlignment = NSTextAlignmentRight;
+    [row3 addSubview:self.versionValueLabel];
+    [self.versionValueLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.equalTo(row3).offset(-16);
+        make.centerY.equalTo(row3);
+    }];
+
+    UIControl *row4 = (UIControl *)[self addRowToCard:self.listCard top:row3 icon:@"trash" titleKey:@"settings_clear_data" showChevron:NO];
+    [row4 addTarget:self action:@selector(onClearData) forControlEvents:UIControlEventTouchUpInside];
+    self.cacheValueLabel = [UILabel new];
+    self.cacheValueLabel.font = [UIFont systemFontOfSize:13];
+    self.cacheValueLabel.textColor = [UIColor grayColor];
+    self.cacheValueLabel.textAlignment = NSTextAlignmentRight;
+    [row4 addSubview:self.cacheValueLabel];
+    [self.cacheValueLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.equalTo(row4).offset(-16);
+        make.centerY.equalTo(row4);
+    }];
+
+    [self.listCard mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.bottom.equalTo(row4);
+    }];
+
+    // Logout button
+    self.logoutBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.logoutBtn.backgroundColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+    self.logoutBtn.layer.cornerRadius = 24;
+    self.logoutBtn.titleLabel.font = [UIFont boldSystemFontOfSize:16];
+    [self.logoutBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    [self.logoutBtn addTarget:self action:@selector(onLogout) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.logoutBtn];
+    [self.logoutBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.view).offset(24);
+        make.trailing.equalTo(self.view).offset(-24);
+        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-24);
+        make.height.mas_equalTo(48);
+    }];
 }
 
 - (void)updateLocalizedStrings {
     [super updateLocalizedStrings];
-    [self.tableView reloadData];
+    self.navTitle.text = NSLocalizedString(@"settings_title", nil);
+    [self.logoutBtn setTitle:NSLocalizedString(@"settings_logout", nil) forState:UIControlStateNormal];
+    self.versionValueLabel.text = NSLocalizedString(@"settings_test_version_value", nil);
+    self.cacheValueLabel.text = NSLocalizedString(@"settings_clear_data_value", nil);
 }
 
-- (void)updateTheme {
-    [super updateTheme];
-    self.tableView.backgroundColor = [ThemeManager sharedManager].backgroundColor;
-    [self.tableView reloadData];
-}
-
-#pragma mark - UITableViewDataSource
-
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return self.dataSource.count;
-}
-
-- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    return self.dataSource[section].count;
-}
-
-- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    static NSString *cellIdentifier = @"SettingsCell";
-    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellIdentifier];
-    if (!cell) {
-        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:cellIdentifier];
-    }
-    
-    NSString *key = self.dataSource[indexPath.section][indexPath.row];
-    cell.textLabel.text = [LanguageManager localizedStringForKey:key comment:nil];
-    cell.textLabel.textColor = [ThemeManager sharedManager].textColor;
-    cell.backgroundColor = [ThemeManager sharedManager].backgroundColor;
-    
-    // 显示当前设置
-    if ([key isEqualToString:@"language_settings"]) {
-        AppLanguage currentLanguage = [LanguageManager sharedManager].currentLanguage;
-        cell.detailTextLabel.text = [LanguageManager displayNameForLanguage:currentLanguage];
-    } else if ([key isEqualToString:@"theme_settings"]) {
-        AppTheme currentTheme = [ThemeManager sharedManager].currentTheme;
-        NSString *themeName = @"";
-        switch (currentTheme) {
-            case AppThemeLight:
-                themeName = L(@"theme_light");
-                break;
-            case AppThemeDark:
-                themeName = L(@"theme_dark");
-                break;
-            case AppThemeAuto:
-                themeName = L(@"theme_auto");
-                break;
-        }
-        cell.detailTextLabel.text = themeName;
-    }
-    
-    cell.detailTextLabel.textColor = [ThemeManager sharedManager].secondaryTextColor;
-    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-    
-    return cell;
-}
-
-#pragma mark - UITableViewDelegate
-
-- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-    [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    
-    NSString *key = self.dataSource[indexPath.section][indexPath.row];
-    
-    if ([key isEqualToString:@"language_settings"]) {
-        [self showLanguageSelector];
-    } else if ([key isEqualToString:@"theme_settings"]) {
-        [self showThemeSelector];
-    } else if ([key isEqualToString:@"about"]) {
-        [self showAbout];
-    }
-}
-
-- (void)showLanguageSelector {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:[LanguageManager localizedStringForKey:@"language_settings" comment:nil]
-                                                                   message:nil
-                                                            preferredStyle:UIAlertControllerStyleActionSheet];
-    
-    NSArray<NSNumber *> *languages = @[@(AppLanguageSystem), @(AppLanguageChinese), @(AppLanguageEnglish), @(AppLanguageTraditionalChinese)];
-    
-    for (NSNumber *langNum in languages) {
-        AppLanguage lang = [langNum integerValue];
-        NSString *title = [LanguageManager displayNameForLanguage:lang];
-        
-        // 标记当前选中的语言
-        if (lang == [LanguageManager sharedManager].currentLanguage) {
-            title = [NSString stringWithFormat:@"✓ %@", title];
-        }
-        
-        UIAlertAction *action = [UIAlertAction actionWithTitle:title
-                                                          style:UIAlertActionStyleDefault
-                                                        handler:^(UIAlertAction * _Nonnull action) {
-            // 设置语言
-            [[LanguageManager sharedManager] setLanguage:lang];
-            
-            // 刷新当前页面
-            [self.tableView reloadData];
-            
-            // 刷新导航栏标题
-            [self setNavigationTitleKey:@"settings_title"];
-            
-            // 提示用户可能需要重启应用（某些系统级文本）
-            NSLog(@"语言已切换为: %@", [LanguageManager displayNameForLanguage:lang]);
+- (UIControl *)addRowToCard:(UIView *)card top:(UIView * _Nullable)top icon:(NSString *)icon titleKey:(NSString *)titleKey showChevron:(BOOL)showChevron {
+    UIControl *row = [UIControl new];
+    row.backgroundColor = [UIColor whiteColor];
+    [card addSubview:row];
+    [row mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.trailing.equalTo(card);
+        make.height.mas_equalTo(52);
+        if (top) make.top.equalTo(top.mas_bottom);
+        else make.top.equalTo(card);
+    }];
+    if (top) {
+        UIView *line = [UIView new];
+        line.backgroundColor = [UIColor colorWithWhite:0.90 alpha:1.0];
+        [card addSubview:line];
+        [line mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.equalTo(row);
+            make.leading.equalTo(card).offset(16);
+            make.trailing.equalTo(card);
+            make.height.mas_equalTo(0.5);
         }];
-        
-        [alert addAction:action];
     }
-    
-    UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:[LanguageManager localizedStringForKey:@"cancel" comment:nil]
-                                                           style:UIAlertActionStyleCancel
-                                                         handler:nil];
-    [alert addAction:cancelAction];
-    
-    [self presentViewController:alert animated:YES completion:nil];
-}
 
-- (void)showThemeSelector {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:L(@"theme_settings")
-                                                                   message:nil
-                                                            preferredStyle:UIAlertControllerStyleActionSheet];
-    
-    NSArray<NSArray *> *themes = @[
-        @[L(@"theme_auto"), @(AppThemeAuto)],
-        @[L(@"theme_light"), @(AppThemeLight)],
-        @[L(@"theme_dark"), @(AppThemeDark)]
-    ];
-    
-    for (NSArray *theme in themes) {
-        NSString *title = theme[0];
-        AppTheme themeType = [theme[1] integerValue];
-        
-        // 标记当前选中的主题
-        if (themeType == [ThemeManager sharedManager].currentTheme) {
-            title = [NSString stringWithFormat:@"✓ %@", title];
+    UIImageView *ic = [UIImageView new];
+    if (@available(iOS 13.0, *)) {
+        ic.image = [UIImage systemImageNamed:icon];
+        ic.tintColor = [UIColor blackColor];
+    }
+    ic.contentMode = UIViewContentModeScaleAspectFit;
+    [row addSubview:ic];
+    [ic mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(row).offset(16);
+        make.centerY.equalTo(row);
+        make.size.mas_equalTo(CGSizeMake(18, 18));
+    }];
+
+    UILabel *lbl = [UILabel new];
+    lbl.font = [UIFont systemFontOfSize:15];
+    lbl.textColor = [UIColor blackColor];
+    lbl.text = NSLocalizedString(titleKey, nil);
+    [row addSubview:lbl];
+    [lbl mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(ic.mas_trailing).offset(10);
+        make.centerY.equalTo(row);
+    }];
+
+    if (showChevron) {
+        UIImageView *arr = [UIImageView new];
+        if (@available(iOS 13.0, *)) {
+            arr.image = [UIImage systemImageNamed:@"chevron.right"];
+            arr.tintColor = [UIColor colorWithWhite:0.65 alpha:1.0];
         }
-        
-        UIAlertAction *action = [UIAlertAction actionWithTitle:title
-                                                          style:UIAlertActionStyleDefault
-                                                        handler:^(UIAlertAction * _Nonnull action) {
-            [[ThemeManager sharedManager] setTheme:themeType];
-            [self.tableView reloadData];
+        [row addSubview:arr];
+        [arr mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.trailing.equalTo(row).offset(-16);
+            make.centerY.equalTo(row);
+            make.size.mas_equalTo(CGSizeMake(14, 14));
         }];
-        
-        [alert addAction:action];
     }
-    
-    UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:L(@"cancel")
-                                                           style:UIAlertActionStyleCancel
-                                                         handler:nil];
-    [alert addAction:cancelAction];
-    
+    return row;
+}
+
+- (void)onBack { [self.navigationController popViewControllerAnimated:YES]; }
+
+- (void)onPrivacy {
+    // 原型仅跳转入口，这里先做占位
+}
+
+- (void)onClearData {
+    // 原型仅展示入口，这里先做占位
+}
+
+- (void)onLogout {
+    PNCommonAlertViewController *alert = [PNCommonAlertViewController new];
+    alert.alertTitle = NSLocalizedString(@"settings_alert_title", nil);
+    alert.message = NSLocalizedString(@"settings_logout_confirm", nil);
+    alert.cancelTitle = NSLocalizedString(@"cancel", nil);
+    alert.confirmTitle = NSLocalizedString(@"confirm", nil);
+    __weak typeof(self) weakSelf = self;
+    alert.onConfirm = ^{
+        [weakSelf performLogoutAndGoLogin];
+    };
     [self presentViewController:alert animated:YES completion:nil];
 }
 
-- (void)showAbout {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:[LanguageManager localizedStringForKey:@"about" comment:nil]
-                                                                   message:@"FootBall Shell App\n\n支持多语言和换肤功能"
-                                                            preferredStyle:UIAlertControllerStyleAlert];
-    
-    UIAlertAction *okAction = [UIAlertAction actionWithTitle:[LanguageManager localizedStringForKey:@"ok" comment:nil]
-                                                        style:UIAlertActionStyleDefault
-                                                      handler:nil];
-    [alert addAction:okAction];
-    
-    [self presentViewController:alert animated:YES completion:nil];
+- (void)performLogoutAndGoLogin {
+    [[AuthManager sharedManager] clearToken];
+
+    UIWindow *window = self.view.window;
+    if (!window) {
+        for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+            if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+            UIWindowScene *ws = (UIWindowScene *)scene;
+            for (UIWindow *w in ws.windows) {
+                if (w.isKeyWindow) { window = w; break; }
+            }
+            if (window) break;
+        }
+    }
+    if (!window) return;
+
+    Class loginClass = NSClassFromString(@"LoginChoiceViewController");
+    UIViewController *loginVC = loginClass ? [loginClass new] : [UIViewController new];
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
+
+    [UIView transitionWithView:window duration:0.25 options:UIViewAnimationOptionTransitionCrossDissolve animations:^{
+        window.rootViewController = nav;
+    } completion:nil];
 }
 
 @end

@@ -219,6 +219,7 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
 
 @property (nonatomic, strong) UIScrollView *scrollView;
 @property (nonatomic, strong) UIView *contentView;
+@property (nonatomic, strong) UIView *bodyBgView;
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UIButton *moreBtn;
 @property (nonatomic, strong) UIView *twoCardsContainer;
@@ -238,6 +239,15 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
     [self filterData];
     [self setupUI];
     [self setupRefresh];
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    // 底部预留 tab bar 高度，避免内容滑到 tab bar 下方导致无法点击
+    CGFloat tabBarH = self.tabBarController.tabBar.bounds.size.height;
+    if (tabBarH > 0 && _scrollView.contentInset.bottom != tabBarH) {
+        _scrollView.contentInset = UIEdgeInsetsMake(0, 0, tabBarH, 0);
+    }
 }
 
 - (void)buildTeams {
@@ -464,11 +474,22 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
 }
 
 - (void)setupScrollContent {
+    // 白色内容区（顶部双圆弧，按原型“查看赛事/更多”所在区域）
+    self.bodyBgView = [[UIView alloc] init];
+    self.bodyBgView.backgroundColor = [UIColor whiteColor];
+    self.bodyBgView.layer.cornerRadius = 24;
+    self.bodyBgView.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+    if (@available(iOS 13.0, *)) {
+        self.bodyBgView.layer.cornerCurve = kCACornerCurveContinuous;
+    }
+    self.bodyBgView.clipsToBounds = YES;
+    [self.view addSubview:self.bodyBgView];
+
     _scrollView = [[UIScrollView alloc] init];
-    _scrollView.backgroundColor = [UIColor whiteColor];
+    _scrollView.backgroundColor = [UIColor clearColor];
     _scrollView.showsVerticalScrollIndicator = NO;
     if (@available(iOS 11.0, *)) _scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
-    [self.view addSubview:_scrollView];
+    [self.bodyBgView addSubview:_scrollView];
     _contentView = [[UIView alloc] init];
     _contentView.backgroundColor = [UIColor whiteColor];
     [_scrollView addSubview:_contentView];
@@ -500,9 +521,13 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
     [_tableView registerClass:[MatchCell class] forCellReuseIdentifier:@"MatchCell"];
     [_contentView addSubview:_tableView];
 
-    [_scrollView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_headerView.mas_bottom);
+    [self.bodyBgView mas_makeConstraints:^(MASConstraintMaker *make) {
+        // 轻微上移，让顶部圆弧露出绿底（与设计图一致）
+        make.top.equalTo(_headerView.mas_bottom).offset(-18);
         make.leading.trailing.bottom.equalTo(self.view);
+    }];
+    [_scrollView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.bodyBgView);
     }];
     [_contentView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(_scrollView);
@@ -562,7 +587,6 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
 
 - (void)buildTwoCards {
     for (UIView *v in _twoCardsContainer.subviews) [v removeFromSuperview];
-    CGFloat w = (UIScreen.mainScreen.bounds.size.width - 40 - 12) / 2.0;
     // 左卡：深青绿（与顶栏一致），已结束显示比分；右卡：更深绿，未开始无比分
     UIView *left = [self cardWithModel:_highlightFinished bg:kHeaderGreen textColor:[UIColor whiteColor] showScore:YES];
     UIView *right = [self cardWithModel:_highlightUpcoming bg:kCardDarkerGreen textColor:[UIColor whiteColor] showScore:NO];
@@ -570,7 +594,6 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
     [_twoCardsContainer addSubview:right];
     [left mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.top.bottom.equalTo(_twoCardsContainer);
-        make.width.mas_equalTo(w);
     }];
     [right mas_makeConstraints:^(MASConstraintMaker *make) {
         make.trailing.top.bottom.equalTo(_twoCardsContainer);
@@ -582,10 +605,22 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
 - (UIView *)cardWithModel:(MatchModel *)m bg:(UIColor *)bg textColor:(UIColor *)textColor showScore:(BOOL)showScore {
     UIView *card = [[UIView alloc] init];
     card.backgroundColor = bg;
-    card.layer.cornerRadius = 12;
+    // 原型：大圆角 + 连续曲线
+    card.layer.cornerRadius = 18;
+    if (@available(iOS 13.0, *)) {
+        card.layer.cornerCurve = kCACornerCurveContinuous;
+    }
     card.clipsToBounds = YES;
     UILabel *timeL = [[UILabel alloc] init];
-    timeL.text = @"Fri/11:00 pm";
+    // Fri/11:00 pm：优先从 dateDetail 里取星期缩写
+    NSString *weekday = @"";
+    if ([m.dateDetail containsString:@","]) {
+        weekday = [[m.dateDetail componentsSeparatedByString:@","] firstObject] ?: @"";
+    }
+    weekday = [weekday stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (weekday.length == 0) weekday = @"Fri";
+    NSString *t = m.time.length ? m.time : @"11:00 pm";
+    timeL.text = [NSString stringWithFormat:@"%@/%@", weekday, t];
     timeL.font = [UIFont boldSystemFontOfSize:13];
     timeL.textColor = textColor;
     UILabel *dateL = [[UILabel alloc] init];
@@ -621,12 +656,38 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
     [card addSubview:homeL];
     [card addSubview:awayIcon];
     [card addSubview:awayL];
-    [timeL mas_makeConstraints:^(MASConstraintMaker *make) { make.top.leading.equalTo(card).offset(12); }];
-    [dateL mas_makeConstraints:^(MASConstraintMaker *make) { make.top.equalTo(timeL.mas_bottom).offset(4); make.leading.equalTo(card).offset(12); }];
-    [homeIcon mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(card).offset(12); make.bottom.equalTo(card).offset(-24); make.width.height.mas_equalTo(22); }];
-    [homeL mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(homeIcon.mas_trailing).offset(6); make.centerY.equalTo(homeIcon); }];
-    [awayIcon mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(card).offset(12); make.bottom.equalTo(card).offset(-8); make.width.height.mas_equalTo(22); }];
-    [awayL mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(awayIcon.mas_trailing).offset(6); make.centerY.equalTo(awayIcon); }];
+    CGFloat pad = 16;
+    [timeL mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(card).offset(14);
+        make.leading.equalTo(card).offset(pad);
+    }];
+    [dateL mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(timeL.mas_bottom).offset(4);
+        make.leading.equalTo(card).offset(pad);
+    }];
+
+    // 底部两行球队：与原型一致的留白与行距
+    [awayIcon mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(card).offset(pad);
+        make.bottom.equalTo(card).offset(-16);
+        make.width.height.mas_equalTo(22);
+    }];
+    [awayL mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(awayIcon.mas_trailing).offset(8);
+        make.centerY.equalTo(awayIcon);
+        make.trailing.lessThanOrEqualTo(card).offset(-12);
+    }];
+
+    [homeIcon mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(card).offset(pad);
+        make.bottom.equalTo(awayIcon.mas_top).offset(-10);
+        make.width.height.mas_equalTo(22);
+    }];
+    [homeL mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(homeIcon.mas_trailing).offset(8);
+        make.centerY.equalTo(homeIcon);
+        make.trailing.lessThanOrEqualTo(card).offset(-12);
+    }];
     return card;
 }
 

@@ -293,7 +293,8 @@
         weakSelf.selectedDate = date;
         [weakSelf refreshDateTimeButtons];
     };
-    [self presentViewController:sheet animated:YES completion:nil];
+    // 取消底部阴影渐变动画，直接显示
+    [self presentViewController:sheet animated:NO completion:nil];
 }
 
 - (void)onPickTime {
@@ -306,7 +307,8 @@
         weakSelf.selectedDate = date;
         [weakSelf refreshDateTimeButtons];
     };
-    [self presentViewController:sheet animated:YES completion:nil];
+    // 取消底部阴影渐变动画，直接显示
+    [self presentViewController:sheet animated:NO completion:nil];
 }
 
 - (void)onConfirm {

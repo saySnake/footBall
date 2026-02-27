@@ -80,6 +80,12 @@
 "team_name_brentford" = "布倫特福德";
 "team_name_wolves" = "狼隊";
 "team_name_brighton" = "布萊頓";
+"team_name_astonvilla" = "阿士東維拉";
+"team_name_everton" = "愛華頓";
+"team_name_westham" = "韋斯咸";
+"team_name_fulham" = "富咸";
+"team_name_bournemouth" = "般尼茅夫";
+"team_name_sunderland" = "新特蘭";
 
 /* Discover */
 "discover_passport_title" = "我的足球護照";
@@ -98,8 +104,93 @@
 /* More Matches */
 "more_pick_time_title" = "選擇時間";
 
+/* Community */
+"community_title" = "社區";
+"community_tab_friends" = "好友";
+"community_tab_rank" = "排行榜";
+"community_add_friend" = "添加好友";
+"community_my_qrcode" = "我的二維碼";
+"community_section_friends" = "好友";
+"community_view_stamps" = "查看郵票";
+"community_view_data" = "查看數據";
+"community_id_format" = "ID:%@";
+"community_online_15m" = "上線15分鐘";
+"community_online_5m_ago" = "5分鐘前在線";
+"community_search_placeholder" = "輸入ID搜索好友";
+"community_search" = "搜索";
+"community_new_friends" = "新的好友";
+"community_new_friends_subtitle" = "添加新朋友";
+"community_scan_add_friend" = "掃碼添加好友";
+"community_scan_add_friend_subtitle" = "掃描二維碼名片";
+"community_search_result_format" = "搜索結果（%ld）";
+"community_recent_3days" = "三天內";
+"community_week_ago" = "一週前";
+"community_request_message" = "看你的護照很精彩，想添加您為好友";
+"community_request_accept" = "同意";
+"community_request_reject" = "拒絕";
+"community_request_expired" = "已過期";
+"community_request_added" = "已添加";
+"community_request_sent" = "已發送";
+"community_rank_week" = "週榜";
+"community_rank_month" = "月榜";
+"community_rank_season" = "賽季榜";
+"community_qrcode_hint" = "掃描二維碼添加好友";
+"community_qrcode_save" = "儲存圖片";
+"community_qrcode_save_success" = "已儲存至相簿";
+"community_qrcode_save_fail" = "儲存失敗";
+
+
+/* Profile */
+"profile_badge_verified" = "記者";
+"profile_id_format" = "ID : %@";
+"profile_personal_title" = "個人資料";
+"profile_upload_avatar" = "上傳頭像";
+"profile_nickname" = "暱稱";
+"profile_phone" = "手機號";
+"profile_birthdate" = "出生日期";
+"profile_date_format" = "yyyy年M月d日";
+"profile_gender" = "性別";
+"profile_gender_male" = "男";
+"profile_gender_female" = "女";
+"profile_first_match_year" = "第一次看球年份";
+"profile_identity" = "身份";
+"profile_save" = "保存";
+"profile_save_success" = "已保存";
+
+"profile_chip_ultras" = "ULTRAS球迷";
+"profile_chip_fan" = "球迷";
+"profile_chip_leader" = "領袖";
+"profile_chip_supporters" = "Supporters";
+"profile_chip_curve_stand" = "曲線看台球迷";
+"profile_chip_ball_boy" = "球童";
+"profile_chip_staff" = "場館保障";
+"profile_chip_media" = "媒體記者";
+"profile_chip_art" = "文藝化";
+"profile_chip_rescue" = "救援組";
+"profile_chip_athlete" = "運動員";
+"profile_stat_friends" = "好友";
+"profile_stat_follow" = "關注";
+"profile_stat_stamps" = "打卡球賽";
+"profile_section_teams" = "我關注的球隊";
+"profile_team_search_placeholder" = "請輸入球隊名稱";
+"profile_add_team_title" = "添加球隊";
+"profile_add_team" = "添加";
+"profile_my_teams" = "我關注的球隊";
+"profile_my_info" = "個人資料";
+"profile_my_stamps" = "我的郵票夾";
+"profile_id_verify" = "身份認證";
+
 /* Settings */
 "settings_title" = "設定";
+"settings_notice" = "消息提示";
+"settings_privacy" = "隱私協議";
+"settings_test_version" = "測試版本";
+"settings_test_version_value" = "測試版本1.1";
+"settings_clear_data" = "清除數據";
+"settings_clear_data_value" = "88 MB";
+"settings_logout" = "退出登錄";
+"settings_alert_title" = "提示";
+"settings_logout_confirm" = "確認退出登錄";
 "language_settings" = "語言設定";
 "theme_settings" = "主題設定";
 "about" = "關於";

@@ -11,7 +11,6 @@
 @interface PNPickerSheetViewController () <UIPickerViewDataSource, UIPickerViewDelegate>
 @property (nonatomic, strong) UIView *dimmingView;
 @property (nonatomic, strong) UIView *sheetView;
-@property (nonatomic, strong) UILabel *topTitleLabel;
 @property (nonatomic, strong) UIPickerView *pickerView;
 @property (nonatomic, strong) UIButton *cancelBtn;
 @property (nonatomic, strong) UIButton *okBtn;
@@ -58,24 +57,13 @@
         make.height.mas_equalTo(320);
     }];
 
-    UILabel *top = [[UILabel alloc] init];
-    top.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
-    top.textColor = [UIColor blackColor];
-    top.textAlignment = NSTextAlignmentCenter;
-    [sheet addSubview:top];
-    self.topTitleLabel = top;
-    [top mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(sheet).offset(14);
-        make.centerX.equalTo(sheet);
-    }];
-
     UIPickerView *picker = [[UIPickerView alloc] init];
     picker.dataSource = self;
     picker.delegate = self;
     [sheet addSubview:picker];
     self.pickerView = picker;
     [picker mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(top.mas_bottom).offset(8);
+        make.top.equalTo(sheet).offset(14);
         make.leading.trailing.equalTo(sheet);
         make.height.mas_equalTo(200);
     }];
@@ -114,13 +102,18 @@
 
     [self buildData];
     [self applyInitialSelection];
-    [self updateTopTitle];
 }
 
 - (void)buildData {
     NSMutableArray *years = [NSMutableArray array];
     NSInteger currentYear = [self.calendar component:NSCalendarUnitYear fromDate:[NSDate date]];
-    for (NSInteger y = currentYear - 1; y <= currentYear + 2; y++) [years addObject:@(y)];
+    NSInteger minY = self.minYear;
+    NSInteger maxY = self.maxYear;
+    if (minY > 0 && maxY >= minY) {
+        for (NSInteger y = minY; y <= maxY; y++) [years addObject:@(y)];
+    } else {
+        for (NSInteger y = currentYear - 1; y <= currentYear + 2; y++) [years addObject:@(y)];
+    }
     self.years = years;
 
     NSMutableArray *months = [NSMutableArray array];
@@ -157,9 +150,12 @@
         NSInteger monthIdx = [self.months indexOfObject:@(c.month)];
         [self rebuildDays];
         NSInteger dayIdx = [self.days indexOfObject:@(c.day)];
-        if (yearIdx != NSNotFound) [self.pickerView selectRow:yearIdx inComponent:0 animated:NO];
-        if (monthIdx != NSNotFound) [self.pickerView selectRow:monthIdx inComponent:1 animated:NO];
-        if (dayIdx != NSNotFound) [self.pickerView selectRow:dayIdx inComponent:2 animated:NO];
+        if (yearIdx == NSNotFound) yearIdx = 0;
+        if (monthIdx == NSNotFound) monthIdx = 0;
+        if (dayIdx == NSNotFound) dayIdx = 0;
+        [self.pickerView selectRow:yearIdx inComponent:0 animated:NO];
+        [self.pickerView selectRow:monthIdx inComponent:1 animated:NO];
+        [self.pickerView selectRow:dayIdx inComponent:2 animated:NO];
     } else {
         NSInteger hourIdx = [self.hours indexOfObject:@(c.hour)];
         NSInteger minuteIdx = [self.minutes indexOfObject:@(c.minute)];
@@ -214,7 +210,6 @@
         NSInteger min = [self.minutes[[pickerView selectedRowInComponent:1]] integerValue];
         [self setSelectedWithHour:h minute:min];
     }
-    [self updateTopTitle];
 }
 
 - (void)rebuildDaysForYear:(NSInteger)year month:(NSInteger)month {
@@ -255,23 +250,13 @@
     if (d) self.selectedDate = d;
 }
 
-- (void)updateTopTitle {
-    if (self.mode == PNPickerSheetModeDate) {
-        NSDateComponents *c = [self.calendar components:NSCalendarUnitYear|NSCalendarUnitMonth|NSCalendarUnitDay fromDate:self.selectedDate];
-        self.topTitleLabel.text = [NSString stringWithFormat:@"%ld月  %ld", (long)c.month, (long)c.day];
-    } else {
-        NSDateComponents *c = [self.calendar components:NSCalendarUnitHour|NSCalendarUnitMinute fromDate:self.selectedDate];
-        self.topTitleLabel.text = [NSString stringWithFormat:@"%02ld:%02ld", (long)c.hour, (long)c.minute];
-    }
-}
-
 - (void)onCancel {
-    [self dismissViewControllerAnimated:YES completion:nil];
+    [self dismissViewControllerAnimated:NO completion:nil];
 }
 
 - (void)onOk {
     if (self.onConfirm) self.onConfirm(self.selectedDate ?: [NSDate date]);
-    [self dismissViewControllerAnimated:YES completion:nil];
+    [self dismissViewControllerAnimated:NO completion:nil];
 }
 
 @end

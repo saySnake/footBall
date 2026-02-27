@@ -80,6 +80,12 @@
 "team_name_brentford" = "Brentford";
 "team_name_wolves" = "Wolves";
 "team_name_brighton" = "Brighton & Hove Albion";
+"team_name_astonvilla" = "Aston Villa";
+"team_name_everton" = "Everton";
+"team_name_westham" = "West Ham United";
+"team_name_fulham" = "Fulham";
+"team_name_bournemouth" = "Bournemouth";
+"team_name_sunderland" = "Sunderland";
 
 /* Discover */
 "discover_passport_title" = "My Football Passport";
@@ -98,8 +104,93 @@
 /* More Matches */
 "more_pick_time_title" = "Select Time";
 
+/* Community */
+"community_title" = "Community";
+"community_tab_friends" = "Friends";
+"community_tab_rank" = "Rankings";
+"community_add_friend" = "Add Friend";
+"community_my_qrcode" = "My QR Code";
+"community_section_friends" = "Friends";
+"community_view_stamps" = "View Stamps";
+"community_view_data" = "View Data";
+"community_id_format" = "ID:%@";
+"community_online_15m" = "Online 15 mins";
+"community_online_5m_ago" = "Online 5 mins ago";
+"community_search_placeholder" = "Search friend by ID";
+"community_search" = "Search";
+"community_new_friends" = "New Friends";
+"community_new_friends_subtitle" = "Add new friends";
+"community_scan_add_friend" = "Scan to Add Friend";
+"community_scan_add_friend_subtitle" = "Scan QR name card";
+"community_search_result_format" = "Results (%ld)";
+"community_recent_3days" = "Within 3 Days";
+"community_week_ago" = "A Week Ago";
+"community_request_message" = "Your passport looks great, I'd like to add you as a friend.";
+"community_request_accept" = "Accept";
+"community_request_reject" = "Reject";
+"community_request_expired" = "Expired";
+"community_request_added" = "Added";
+"community_request_sent" = "Sent";
+"community_rank_week" = "Weekly";
+"community_rank_month" = "Monthly";
+"community_rank_season" = "Season";
+"community_qrcode_hint" = "Scan QR Code to Add Friend";
+"community_qrcode_save" = "Save Image";
+"community_qrcode_save_success" = "Saved to Photos";
+"community_qrcode_save_fail" = "Save Failed";
+
+
+/* Profile */
+"profile_badge_verified" = "Journalist";
+"profile_id_format" = "ID : %@";
+"profile_personal_title" = "Personal Info";
+"profile_upload_avatar" = "Upload Avatar";
+"profile_nickname" = "Nickname";
+"profile_phone" = "Phone";
+"profile_birthdate" = "Birthday";
+"profile_date_format" = "MMM d, yyyy";
+"profile_gender" = "Gender";
+"profile_gender_male" = "Male";
+"profile_gender_female" = "Female";
+"profile_first_match_year" = "First Match Year";
+"profile_identity" = "Identity";
+"profile_save" = "Save";
+"profile_save_success" = "Saved";
+
+"profile_chip_ultras" = "ULTRAS";
+"profile_chip_fan" = "Fan";
+"profile_chip_leader" = "Leader";
+"profile_chip_supporters" = "Supporters";
+"profile_chip_curve_stand" = "Curve Stand Fan";
+"profile_chip_ball_boy" = "Ball Boy";
+"profile_chip_staff" = "Stadium Staff";
+"profile_chip_media" = "Media";
+"profile_chip_art" = "Arts";
+"profile_chip_rescue" = "Rescue Team";
+"profile_chip_athlete" = "Athlete";
+"profile_stat_friends" = "Friends";
+"profile_stat_follow" = "Following";
+"profile_stat_stamps" = "Match Stamps";
+"profile_section_teams" = "My Teams";
+"profile_team_search_placeholder" = "Enter team name";
+"profile_add_team_title" = "Add Team";
+"profile_add_team" = "Add";
+"profile_my_teams" = "My Teams";
+"profile_my_info" = "Personal Info";
+"profile_my_stamps" = "My Stamp Album";
+"profile_id_verify" = "Identity Verification";
+
 /* Settings */
 "settings_title" = "Settings";
+"settings_notice" = "Notifications";
+"settings_privacy" = "Privacy Policy";
+"settings_test_version" = "Test Version";
+"settings_test_version_value" = "Test 1.1";
+"settings_clear_data" = "Clear Data";
+"settings_clear_data_value" = "88 MB";
+"settings_logout" = "Log Out";
+"settings_alert_title" = "Tip";
+"settings_logout_confirm" = "Confirm log out";
 "language_settings" = "Language";
 "theme_settings" = "Theme";
 "about" = "About";

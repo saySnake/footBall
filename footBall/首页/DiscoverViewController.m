@@ -213,6 +213,15 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     [self switchToType:DiscoverMatchTypeFinished];
 }
 
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    // 底部预留 tab bar 高度，避免内容滑到 tab bar 下方导致无法点击
+    CGFloat tabBarH = self.tabBarController.tabBar.bounds.size.height;
+    if (tabBarH > 0 && _scrollView.contentInset.bottom != tabBarH) {
+        _scrollView.contentInset = UIEdgeInsetsMake(0, 0, tabBarH, 0);
+    }
+}
+
 - (void)buildHeader {
     _scrollView = [[UIScrollView alloc] init];
     _scrollView.showsVerticalScrollIndicator = NO;
@@ -738,27 +747,22 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     cell.awayLabel.text = m.awayName;
     cell.scoreLabel.text = m.scoreText;
     cell.dateLabel.text = m.dateText;
-    [cell.verifiedPill setTitle:m.verifiedText forState:UIControlStateNormal];
 
     if (m.type == DiscoverMatchTypeUpcoming) {
-        // 未来观赛：右侧为描边「认证球票」，中间时间更小
-        cell.verifiedPill.backgroundColor = [UIColor clearColor];
-        cell.verifiedPill.layer.borderWidth = 1;
-        cell.verifiedPill.layer.borderColor = kDiscoverGreen.CGColor;
-        [cell.verifiedPill setTitleColor:kDiscoverGreen forState:UIControlStateNormal];
-        if (@available(iOS 13.0, *)) {
-            UIImage *img = [UIImage systemImageNamed:@"ticket"];
-            [cell.verifiedPill setImage:img forState:UIControlStateNormal];
-            cell.verifiedPill.tintColor = kDiscoverGreen;
-        }
+        // 未来观赛：不显示输入信息、认证比赛按钮
+        cell.inputButton.hidden = YES;
+        cell.verifiedPill.hidden = YES;
         cell.scoreLabel.font = [UIFont boldSystemFontOfSize:14];
     } else {
-        // 已经观赛：右侧为绿色实心「已认证xx分钟」，中间比分更大
+        // 已经观赛：显示输入信息、认证比赛按钮
+        cell.inputButton.hidden = NO;
+        cell.verifiedPill.hidden = NO;
+        [cell.verifiedPill setTitle:@"认证比赛" forState:UIControlStateNormal];
         cell.verifiedPill.backgroundColor = kDiscoverPillGreen;
         cell.verifiedPill.layer.borderWidth = 0;
         [cell.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
         if (@available(iOS 13.0, *)) {
-            UIImage *img = [UIImage systemImageNamed:@"checkmark.circle"];
+            UIImage *img = [UIImage systemImageNamed:@"camera.fill"];
             [cell.verifiedPill setImage:img forState:UIControlStateNormal];
             cell.verifiedPill.tintColor = [UIColor whiteColor];
         }
