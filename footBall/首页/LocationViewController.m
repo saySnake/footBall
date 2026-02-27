@@ -597,11 +597,13 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
 - (void)onAddFriend {
     AddFriendViewController *vc = [[AddFriendViewController alloc] init];
+    vc.hidesBottomBarWhenPushed = YES;
     [self.navigationController pushViewController:vc animated:YES];
 }
 
 - (void)onQRCode {
     MyQRCodeViewController *vc = [[MyQRCodeViewController alloc] init];
+    vc.hidesBottomBarWhenPushed = YES;
     [self.navigationController pushViewController:vc animated:YES];
 }
 

@@ -86,6 +86,14 @@
     self.phoneTextField.keyboardType = UIKeyboardTypeNumberPad;
     self.phoneTextField.textAlignment = NSTextAlignmentLeft;
     self.phoneTextField.delegate = self;
+    self.phoneTextField.autocorrectionType = UITextAutocorrectionTypeNo;
+    self.phoneTextField.spellCheckingType = UITextSpellCheckingTypeNo;
+    if (@available(iOS 11.0, *)) {
+        self.phoneTextField.smartDashesType = UITextSmartDashesTypeNo;
+        self.phoneTextField.smartQuotesType = UITextSmartQuotesTypeNo;
+        self.phoneTextField.smartInsertDeleteType = UITextSmartInsertDeleteTypeNo;
+        self.phoneTextField.textContentType = UITextContentTypeTelephoneNumber;
+    }
     [self.phoneTextField addTarget:self action:@selector(textFieldDidChange:) forControlEvents:UIControlEventEditingChanged];
     
     self.getCodeButton = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -259,11 +267,36 @@
 }
 
 - (void)textFieldDidChange:(UITextField *)textField {
-    // 限制为 11 位手机号
-    if (textField.text.length > 11) {
-        textField.text = [textField.text substringToIndex:11];
-    }
+    // 只做轻量 UI 更新，长度限制放在 shouldChangeCharacters 中处理，避免输入过程中频繁改写 text 导致卡顿
     [self updateButtonState];
+}
+
+- (BOOL)textField:(UITextField *)textField shouldChangeCharactersInRange:(NSRange)range replacementString:(NSString *)string {
+    if (textField != self.phoneTextField) return YES;
+
+    // 仅允许数字（兼容粘贴/自动填充包含空格的情况）
+    NSString *current = textField.text ?: @"";
+    NSString *next = [current stringByReplacingCharactersInRange:range withString:(string ?: @"")];
+    NSCharacterSet *nonDigits = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
+    next = [[next componentsSeparatedByCharactersInSet:nonDigits] componentsJoinedByString:@""];
+
+    static NSInteger const kMaxLen = 11;
+    if (next.length > kMaxLen) {
+        next = [next substringToIndex:kMaxLen];
+        textField.text = next;
+        // 立即刷新按钮态
+        [self updateButtonState];
+        return NO;
+    }
+
+    // 即时刷新按钮态（避免等 editingChanged 才更新）
+    BOOL validPhone = (next.length == kMaxLen);
+    BOOL enabled = validPhone && self.agreeCheckButton.selected;
+    self.getCodeButton.enabled = enabled;
+    self.getCodeButton.alpha = enabled ? 1.0 : 0.5;
+
+    // 让系统继续处理输入（数字键盘下无复杂 IME）
+    return YES;
 }
 
 - (void)handleBack {
