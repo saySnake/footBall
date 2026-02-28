@@ -180,6 +180,37 @@
 "profile_my_stamps" = "我的郵票夾";
 "profile_id_verify" = "身份認證";
 
+/* Identity / Real-name / Professional Auth */
+"auth_identity_title" = "認證身份";
+"auth_pro_identity_title" = "身份職業認證";
+"auth_pro_identity_desc" = "適用於具有職業身份的用户。如:球員、媒體新聞、體育從業身份等...";
+"auth_status_uncertified" = "暫未認證身份";
+"auth_conditions_title" = "認證條件";
+"auth_professional_title" = "職業認證";
+"auth_professional_desc" = "認證可加速曝光度";
+"auth_realname_title" = "實名認證";
+"auth_realname_desc" = "實名認證可加速曝光度";
+"auth_start_cert" = "開始認證";
+"auth_realname_nav_title" = "實名認證";
+"auth_realname_hint" = "請完善一下證件信息";
+"auth_realname_subhint" = "已上傳信息將為您保存15天,您可以直接上傳證件";
+"auth_id_info_title" = "身份信息";
+"auth_id_front_label" = "上傳身份證正面照片";
+"auth_id_back_label" = "上傳身份證徽章面照片";
+"auth_submit_now" = "立即認證";
+"auth_realname_completed" = "已完成實名認證";
+"auth_id_front_display" = "正面圖片";
+"auth_id_back_display" = "徽章面照片";
+"auth_please_upload_both" = "請上傳身份證正面和背面照片";
+"auth_realname_success" = "實名認證提交成功";
+"auth_professional_nav_title" = "職業認證";
+"auth_professional_hint" = "請完善一下職業信息";
+"auth_professional_subhint" = "已上傳信息將為您保存15天，您可以直接上傳證件";
+"auth_work_cert_title" = "職業工作證";
+"auth_professional_completed" = "已完成職業認證";
+"auth_please_upload_work_cert" = "請至少上傳一張職業工作證";
+"auth_professional_success" = "職業認證提交成功";
+
 /* Settings */
 "settings_title" = "設定";
 "settings_notice" = "消息提示";

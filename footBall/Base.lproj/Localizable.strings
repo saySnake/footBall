@@ -180,6 +180,37 @@
 "profile_my_stamps" = "我的邮票夹";
 "profile_id_verify" = "身份认证";
 
+/* Identity / Real-name / Professional Auth */
+"auth_identity_title" = "认证身份";
+"auth_pro_identity_title" = "身份职业认证";
+"auth_pro_identity_desc" = "适用于具有职业身份的用户。如:球员、媒体新闻、体育从业身份等...";
+"auth_status_uncertified" = "暂未认证身份";
+"auth_conditions_title" = "认证条件";
+"auth_professional_title" = "职业认证";
+"auth_professional_desc" = "认证可加速曝光度";
+"auth_realname_title" = "实名认证";
+"auth_realname_desc" = "实名认证可加速曝光度";
+"auth_start_cert" = "开始认证";
+"auth_realname_nav_title" = "实名认证";
+"auth_realname_hint" = "请完善一下证件信息";
+"auth_realname_subhint" = "已上传信息将为您保存15天,您可以直接上传证件";
+"auth_id_info_title" = "身份信息";
+"auth_id_front_label" = "上传身份证正面照片";
+"auth_id_back_label" = "上传身份证徽章面照片";
+"auth_submit_now" = "立即认证";
+"auth_realname_completed" = "已完成实名认证";
+"auth_id_front_display" = "正面图片";
+"auth_id_back_display" = "徽章面照片";
+"auth_please_upload_both" = "请上传身份证正面和背面照片";
+"auth_realname_success" = "实名认证提交成功";
+"auth_professional_nav_title" = "职业认证";
+"auth_professional_hint" = "请完善一下职业信息";
+"auth_professional_subhint" = "已上传信息将为您保存15天，您可以直接上传证件";
+"auth_work_cert_title" = "职业工作证";
+"auth_professional_completed" = "已完成职业认证";
+"auth_please_upload_work_cert" = "请至少上传一张职业工作证";
+"auth_professional_success" = "职业认证提交成功";
+
 /* Settings */
 "settings_title" = "Settings";
 "settings_notice" = "Notifications";

@@ -180,6 +180,37 @@
 "profile_my_stamps" = "My Stamp Album";
 "profile_id_verify" = "Identity Verification";
 
+/* Identity / Real-name / Professional Auth */
+"auth_identity_title" = "Identity Authentication";
+"auth_pro_identity_title" = "Professional Identity Certification";
+"auth_pro_identity_desc" = "For users with professional identity. E.g.: players, media, sports professionals, etc.";
+"auth_status_uncertified" = "Not certified";
+"auth_conditions_title" = "Certification Conditions";
+"auth_professional_title" = "Professional Certification";
+"auth_professional_desc" = "Certification can increase exposure";
+"auth_realname_title" = "Real-name Certification";
+"auth_realname_desc" = "Real-name certification can increase exposure";
+"auth_start_cert" = "Start Certification";
+"auth_realname_nav_title" = "Real-name Verification";
+"auth_realname_hint" = "Please complete your document information";
+"auth_realname_subhint" = "Uploaded information will be saved for 15 days. You can upload documents directly.";
+"auth_id_info_title" = "Identity Information";
+"auth_id_front_label" = "Upload ID card front photo";
+"auth_id_back_label" = "Upload ID card back photo";
+"auth_submit_now" = "Verify Now";
+"auth_realname_completed" = "Real-name verification completed";
+"auth_id_front_display" = "Front image";
+"auth_id_back_display" = "Back image";
+"auth_please_upload_both" = "Please upload both front and back ID photos";
+"auth_realname_success" = "Real-name verification submitted";
+"auth_professional_nav_title" = "Professional Certification";
+"auth_professional_hint" = "Please complete your professional information";
+"auth_professional_subhint" = "Uploaded information will be saved for 15 days. You can upload certificates directly.";
+"auth_work_cert_title" = "Professional Work Certificate";
+"auth_professional_completed" = "Professional certification completed";
+"auth_please_upload_work_cert" = "Please upload at least one work certificate";
+"auth_professional_success" = "Professional certification submitted";
+
 /* Settings */
 "settings_title" = "Settings";
 "settings_notice" = "Notifications";
