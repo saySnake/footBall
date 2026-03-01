@@ -4,6 +4,8 @@
 //
 
 #import "IdentityAuthViewController.h"
+#import "RealNameAuthViewController.h"
+#import "ProfessionalAuthViewController.h"
 #import <Masonry/Masonry.h>
 
 // 设计图规范色
@@ -296,8 +298,15 @@
 }
 
 - (void)onCertTapped:(UIButton *)sender {
-    (void)sender;
-    // 可在此 push 实名认证 / 职业认证 子页
+    if (sender.tag == 0) {
+        ProfessionalAuthViewController *vc = [ProfessionalAuthViewController new];
+        vc.hidesBottomBarWhenPushed = YES;
+        [self.navigationController pushViewController:vc animated:YES];
+    } else if (sender.tag == 1) {
+        RealNameAuthViewController *vc = [RealNameAuthViewController new];
+        vc.hidesBottomBarWhenPushed = YES;
+        [self.navigationController pushViewController:vc animated:YES];
+    }
 }
 
 @end
