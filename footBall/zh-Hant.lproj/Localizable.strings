@@ -172,6 +172,7 @@
 "profile_stat_follow" = "關注";
 "profile_stat_stamps" = "打卡球賽";
 "profile_section_teams" = "我關注的球隊";
+"profile_team_empty_hint" = "點擊添加關注的球隊";
 "profile_team_search_placeholder" = "請輸入球隊名稱";
 "profile_add_team_title" = "添加球隊";
 "profile_add_team" = "添加";

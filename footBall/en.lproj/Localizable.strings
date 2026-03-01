@@ -172,6 +172,7 @@
 "profile_stat_follow" = "Following";
 "profile_stat_stamps" = "Match Stamps";
 "profile_section_teams" = "My Teams";
+"profile_team_empty_hint" = "Tap to add followed teams";
 "profile_team_search_placeholder" = "Enter team name";
 "profile_add_team_title" = "Add Team";
 "profile_add_team" = "Add";
