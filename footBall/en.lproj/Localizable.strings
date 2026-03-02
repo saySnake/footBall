@@ -103,6 +103,7 @@
 
 /* More Matches */
 "more_pick_time_title" = "Select Time";
+"consume_record_title" = "Consumption Record";
 
 /* Community */
 "community_title" = "Community";

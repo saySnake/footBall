@@ -6,6 +6,7 @@
 #import "DiscoverViewController.h"
 #import <Masonry/Masonry.h>
 #import "PNAddConsumeViewController.h"
+#import "ConsumptionRecordViewController.h"
 
 #define kDiscoverHeaderBg     [UIColor colorWithRed:0.05 green:0.16 blue:0.15 alpha:1.0]
 #define kDiscoverGreen        [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0]
@@ -323,6 +324,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     [_consumeBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     _consumeBtn.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
     if (@available(iOS 13.0, *)) { [_consumeBtn setImage:[UIImage systemImageNamed:@"doc.text"] forState:UIControlStateNormal]; _consumeBtn.tintColor = [UIColor whiteColor]; }
+    [_consumeBtn addTarget:self action:@selector(onConsumeRecordTapped) forControlEvents:UIControlEventTouchUpInside];
 
     _myPassportBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     _myPassportBtn.layer.cornerRadius = 12;
@@ -721,6 +723,12 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
     vc.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
     [self presentViewController:vc animated:YES completion:nil];
+}
+
+- (void)onConsumeRecordTapped {
+    ConsumptionRecordViewController *vc = [[ConsumptionRecordViewController alloc] init];
+    vc.hidesBottomBarWhenPushed = YES;
+    [self.navigationController pushViewController:vc animated:YES];
 }
 
 - (void)updateTableHeight {

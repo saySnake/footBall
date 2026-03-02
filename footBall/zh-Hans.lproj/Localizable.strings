@@ -103,6 +103,7 @@
 
 /* More Matches */
 "more_pick_time_title" = "选择时间";
+"consume_record_title" = "消费记录";
 
 /* Community */
 "community_title" = "社区";
