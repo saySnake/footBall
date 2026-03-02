@@ -71,6 +71,7 @@ static NSArray<NSString *> * _menuKeys(void) {
 @property (nonatomic, strong) UIScrollView *scrollView;
 @property (nonatomic, strong) UIView *contentWrap;
 @property (nonatomic, strong) UIView *headerView;
+@property (nonatomic, strong) UIButton *settingsBtn;
 @property (nonatomic, strong) UIImageView *avatarView;
 @property (nonatomic, strong) UILabel *vipLabel;
 @property (nonatomic, strong) UILabel *nameLabel;
@@ -102,6 +103,36 @@ static NSArray<NSString *> * _menuKeys(void) {
     [super viewDidLoad];
     self.shouldShowNavigationBar = NO;
     self.view.backgroundColor = kProfilePageBg;
+
+    // 设置按钮：在 super viewDidLoad（含 setupUI / QMUI 初始化）之后创建，确保在最顶层
+    self.settingsBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    [self.settingsBtn setTitle:@"⚙" forState:UIControlStateNormal];
+    self.settingsBtn.titleLabel.font = [UIFont systemFontOfSize:22];
+    if (@available(iOS 13.0, *)) {
+        UIImage *sfIcon = [UIImage systemImageNamed:@"gearshape"];
+        if (sfIcon) {
+            [self.settingsBtn setTitle:nil forState:UIControlStateNormal];
+            [self.settingsBtn setImage:[sfIcon imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+        }
+    }
+    self.settingsBtn.tintColor = [UIColor whiteColor];
+    [self.settingsBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    [self.settingsBtn addTarget:self action:@selector(openSettings) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.settingsBtn];
+    [self.view bringSubviewToFront:self.settingsBtn];
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    // 每次布局后保证按钮在最顶层且位置正确
+    [self.view bringSubviewToFront:self.settingsBtn];
+    CGFloat topInset = 0;
+    if (@available(iOS 11.0, *)) {
+        topInset = self.view.safeAreaInsets.top;
+    } else {
+        topInset = 20; // status bar height
+    }
+    self.settingsBtn.frame = CGRectMake(CGRectGetWidth(self.view.bounds) - 16 - 44, topInset + 8, 44, 44);
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -142,28 +173,6 @@ static NSArray<NSString *> * _menuKeys(void) {
         make.top.leading.trailing.equalTo(self.contentWrap);
         make.height.mas_equalTo(260);
     }];
-
-    // 设置按钮
-    UIButton *settingsBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    if (@available(iOS 13.0, *)) {
-        [settingsBtn setImage:[UIImage systemImageNamed:@"gearshape"] forState:UIControlStateNormal];
-    }
-    [settingsBtn setTintColor:[UIColor whiteColor]];
-    [settingsBtn addTarget:self action:@selector(openSettings) forControlEvents:UIControlEventTouchUpInside];
-    [self.headerView addSubview:settingsBtn];
-    if (@available(iOS 11.0, *)) {
-        [settingsBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.trailing.equalTo(self.headerView).offset(-16);
-            make.top.equalTo(self.view.mas_safeAreaLayoutGuide).offset(8);
-            make.size.mas_equalTo(CGSizeMake(36, 36));
-        }];
-    } else {
-        [settingsBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.trailing.equalTo(self.headerView).offset(-16);
-            make.top.equalTo(self.headerView).offset(28);
-            make.size.mas_equalTo(CGSizeMake(36, 36));
-        }];
-    }
 
     // 头像 + VIP
     UIView *avatarRing = [UIView new];

@@ -110,7 +110,8 @@
 @end
 
 @interface TeamCell : UICollectionViewCell
-@property (nonatomic, strong) UIView *circleBackgroundView;
+@property (nonatomic, strong) UIView *shadowContainerView;  // 仅负责阴影，圆角以产生圆形阴影
+@property (nonatomic, strong) UIView *circleBackgroundView; // 白底圆形容器，masksToBounds 裁剪为圆
 @property (nonatomic, strong) UIImageView *logoView;
 @property (nonatomic, strong) UILabel *nameLabel;
 @property (nonatomic, strong) UIImageView *checkmarkView;
@@ -123,12 +124,18 @@
     if (self) {
         self.contentView.backgroundColor = [UIColor clearColor];
         
+        // 外层：只负责圆形阴影，不裁剪子视图
+        _shadowContainerView = [[UIView alloc] init];
+        _shadowContainerView.backgroundColor = [UIColor clearColor];
+        _shadowContainerView.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.08].CGColor;
+        _shadowContainerView.layer.shadowOpacity = 1.0;
+        _shadowContainerView.layer.shadowRadius = 8;
+        _shadowContainerView.layer.shadowOffset = CGSizeMake(0, 4);
+        
+        // 内层：白底圆形容器，裁剪为圆（与设计图一致）
         _circleBackgroundView = [[UIView alloc] init];
         _circleBackgroundView.backgroundColor = [UIColor whiteColor];
-        _circleBackgroundView.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.08].CGColor;
-        _circleBackgroundView.layer.shadowOpacity = 1.0;
-        _circleBackgroundView.layer.shadowRadius = 8;
-        _circleBackgroundView.layer.shadowOffset = CGSizeMake(0, 4);
+        _circleBackgroundView.layer.masksToBounds = YES;
         
         _logoView = [[UIImageView alloc] init];
         _logoView.contentMode = UIViewContentModeScaleAspectFit;
@@ -141,15 +148,20 @@
         _checkmarkView.tintColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
         _checkmarkView.hidden = YES;
         
-        [self.contentView addSubview:_circleBackgroundView];
+        [self.contentView addSubview:_shadowContainerView];
+        [_shadowContainerView addSubview:_circleBackgroundView];
         [_circleBackgroundView addSubview:_logoView];
         [self.contentView addSubview:_nameLabel];
         [self.contentView addSubview:_checkmarkView];
         
-        [_circleBackgroundView mas_makeConstraints:^(MASConstraintMaker *make) {
+        [_shadowContainerView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(self.contentView);
             make.centerX.equalTo(self.contentView);
             make.width.height.mas_equalTo(72);
+        }];
+        
+        [_circleBackgroundView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.edges.equalTo(self.shadowContainerView);
         }];
         
         [_logoView mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -158,15 +170,15 @@
         }];
         
         [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(self.circleBackgroundView.mas_bottom).offset(8);
+            make.top.equalTo(self.shadowContainerView.mas_bottom).offset(8);
             make.leading.trailing.equalTo(self.contentView).inset(4);
             make.bottom.equalTo(self.contentView);
         }];
         
         // 对勾在圆形右上角，略微压住绿色描边
         [_checkmarkView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(self.circleBackgroundView).offset(-4);
-            make.trailing.equalTo(self.circleBackgroundView).offset(4);
+            make.top.equalTo(self.shadowContainerView).offset(-4);
+            make.trailing.equalTo(self.shadowContainerView).offset(4);
             make.width.height.mas_equalTo(20);
         }];
     }
@@ -175,12 +187,13 @@
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    CGFloat w = self.circleBackgroundView.bounds.size.width;
+    CGFloat w = self.shadowContainerView.bounds.size.width;
     if (!isfinite(w) || w <= 0) {
-        self.circleBackgroundView.layer.cornerRadius = 0;
-    } else {
-        self.circleBackgroundView.layer.cornerRadius = w / 2.0;
+        w = 72.0; // 与约束一致，保证首次展示即为圆
     }
+    CGFloat radius = w / 2.0;
+    self.shadowContainerView.layer.cornerRadius = radius; // 阴影形状为圆
+    self.circleBackgroundView.layer.cornerRadius = radius; // 白底裁剪为圆
 }
 
 @end
@@ -252,10 +265,10 @@
     self.searchBar.delegate = self;
     self.searchBar.searchBarStyle = UISearchBarStyleMinimal;
     self.searchBar.backgroundImage = [UIImage new];
-    // 设计图：搜索框为浅灰色圆角
+    // 设计图：搜索框为浅灰色圆角（与 MyTeams/AddTeams 搜索区 0.92 一致）
     if (@available(iOS 13.0, *)) {
         UITextField *textField = self.searchBar.searchTextField;
-        textField.backgroundColor = [UIColor colorWithWhite:0.90 alpha:1.0];
+        textField.backgroundColor = [UIColor colorWithWhite:0.92 alpha:1.0];
         textField.layer.cornerRadius = 20.0;
         textField.layer.masksToBounds = YES;
         textField.font = [UIFont systemFontOfSize:14];
@@ -343,11 +356,13 @@
     cell.logoView.image = [UIImage imageNamed:m.logoName];
     BOOL selected = [self.selectedTeams containsObject:m];
     cell.checkmarkView.hidden = !selected;
-    // 按设计图：选中 = 圆形加粗绿色描边；未选中 = 圆形细浅灰描边
+    // 按设计图：选中 = 圆形加粗绿色描边；未选中 = 圆形细浅灰描边（描边在圆形容器上）
     UIColor *greenColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
     UIColor *lightGrayColor = [UIColor colorWithWhite:0.85 alpha:1.0];
     cell.circleBackgroundView.layer.borderWidth = selected ? 3.0 : 1.0;
     cell.circleBackgroundView.layer.borderColor = selected ? greenColor.CGColor : lightGrayColor.CGColor;
+    [cell setNeedsLayout];
+    [cell layoutIfNeeded]; // 确保圆角已应用再显示
     return cell;
 }
 

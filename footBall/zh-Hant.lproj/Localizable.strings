@@ -221,6 +221,9 @@
 "settings_test_version_value" = "測試版本1.1";
 "settings_clear_data" = "清除數據";
 "settings_clear_data_value" = "88 MB";
+"settings_clear_data_confirm" = "確認清除所有緩存數據？";
+"settings_calculating" = "計算中...";
+"settings_clearing" = "清除中...";
 "settings_logout" = "退出登錄";
 "settings_alert_title" = "提示";
 "settings_logout_confirm" = "確認退出登錄";

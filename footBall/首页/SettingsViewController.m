@@ -8,6 +8,7 @@
 #import "SettingsViewController.h"
 #import "PNCommonAlertViewController.h"
 #import "AuthManager.h"
+#import "SDImageManager.h"
 #import <Masonry/Masonry.h>
 
 @interface SettingsViewController ()
@@ -131,7 +132,7 @@
     self.navTitle.text = NSLocalizedString(@"settings_title", nil);
     [self.logoutBtn setTitle:NSLocalizedString(@"settings_logout", nil) forState:UIControlStateNormal];
     self.versionValueLabel.text = NSLocalizedString(@"settings_test_version_value", nil);
-    self.cacheValueLabel.text = NSLocalizedString(@"settings_clear_data_value", nil);
+    [self refreshCacheSizeLabel];
 }
 
 - (UIControl *)addRowToCard:(UIView *)card top:(UIView * _Nullable)top icon:(NSString *)icon titleKey:(NSString *)titleKey showChevron:(BOOL)showChevron {
@@ -201,8 +202,120 @@
     // 原型仅跳转入口，这里先做占位
 }
 
+#pragma mark - Cache
+
+- (void)refreshCacheSizeLabel {
+    self.cacheValueLabel.text = NSLocalizedString(@"settings_calculating", @"计算中...");
+    __weak typeof(self) weakSelf = self;
+    [self calculateTotalCacheSizeWithCompletion:^(NSUInteger totalBytes) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            weakSelf.cacheValueLabel.text = [weakSelf formattedCacheSize:totalBytes];
+        });
+    }];
+}
+
+- (void)calculateTotalCacheSizeWithCompletion:(void(^)(NSUInteger totalBytes))completion {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        __block NSUInteger sdCacheSize = 0;
+        dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+        [[SDImageManager sharedManager] getCacheSizeWithCompletion:^(NSUInteger totalSize) {
+            sdCacheSize = totalSize;
+            dispatch_semaphore_signal(sema);
+        }];
+        dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC));
+
+        NSUInteger urlCacheSize = [[NSURLCache sharedURLCache] currentDiskUsage];
+
+        NSUInteger tmpSize = [self folderSizeAtPath:NSTemporaryDirectory()];
+
+        NSArray *cachePaths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
+        NSUInteger cachesDirSize = 0;
+        if (cachePaths.count > 0) {
+            cachesDirSize = [self folderSizeAtPath:cachePaths.firstObject];
+        }
+
+        // cachesDirSize 已包含 SDWebImage 磁盘缓存，避免重复计算
+        NSUInteger total = cachesDirSize + tmpSize;
+        if (completion) completion(total);
+    });
+}
+
+- (NSUInteger)folderSizeAtPath:(NSString *)path {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSUInteger size = 0;
+    NSDirectoryEnumerator *enumerator = [fm enumeratorAtPath:path];
+    for (NSString *fileName in enumerator) {
+        NSString *fullPath = [path stringByAppendingPathComponent:fileName];
+        NSDictionary *attrs = [fm attributesOfItemAtPath:fullPath error:nil];
+        if (attrs[NSFileSize]) {
+            size += [attrs[NSFileSize] unsignedIntegerValue];
+        }
+    }
+    return size;
+}
+
+- (NSString *)formattedCacheSize:(NSUInteger)bytes {
+    if (bytes >= 1024 * 1024 * 1024) {
+        return [NSString stringWithFormat:@"%.1f GB", bytes / (1024.0 * 1024.0 * 1024.0)];
+    } else if (bytes >= 1024 * 1024) {
+        return [NSString stringWithFormat:@"%.1f MB", bytes / (1024.0 * 1024.0)];
+    } else if (bytes >= 1024) {
+        return [NSString stringWithFormat:@"%.1f KB", bytes / 1024.0];
+    }
+    return @"0 KB";
+}
+
 - (void)onClearData {
-    // 原型仅展示入口，这里先做占位
+    PNCommonAlertViewController *alert = [PNCommonAlertViewController new];
+    alert.alertTitle = NSLocalizedString(@"settings_clear_data", nil);
+    alert.message = NSLocalizedString(@"settings_clear_data_confirm", @"确认清除所有缓存数据？");
+    alert.cancelTitle = NSLocalizedString(@"cancel", nil);
+    alert.confirmTitle = NSLocalizedString(@"confirm", nil);
+    __weak typeof(self) weakSelf = self;
+    alert.onConfirm = ^{
+        [weakSelf performClearData];
+    };
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)performClearData {
+    self.cacheValueLabel.text = NSLocalizedString(@"settings_clearing", @"清除中...");
+    __weak typeof(self) weakSelf = self;
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        // 1. SDWebImage 缓存
+        dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+        [[SDImageManager sharedManager] clearAllCacheWithCompletion:^{
+            dispatch_semaphore_signal(sema);
+        }];
+        dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC));
+
+        // 2. NSURLCache
+        [[NSURLCache sharedURLCache] removeAllCachedResponses];
+
+        // 3. tmp 目录
+        NSFileManager *fm = [NSFileManager defaultManager];
+        NSString *tmpDir = NSTemporaryDirectory();
+        NSArray *tmpFiles = [fm contentsOfDirectoryAtPath:tmpDir error:nil];
+        for (NSString *file in tmpFiles) {
+            [fm removeItemAtPath:[tmpDir stringByAppendingPathComponent:file] error:nil];
+        }
+
+        // 4. Caches 目录下非必要文件（保留 Snapshots 等系统目录）
+        NSArray *cachePaths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
+        if (cachePaths.count > 0) {
+            NSString *cachesDir = cachePaths.firstObject;
+            NSArray *cacheFiles = [fm contentsOfDirectoryAtPath:cachesDir error:nil];
+            NSSet *keepDirs = [NSSet setWithArray:@[@"Snapshots"]];
+            for (NSString *file in cacheFiles) {
+                if ([keepDirs containsObject:file]) continue;
+                [fm removeItemAtPath:[cachesDir stringByAppendingPathComponent:file] error:nil];
+            }
+        }
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [weakSelf refreshCacheSizeLabel];
+        });
+    });
 }
 
 - (void)onLogout {

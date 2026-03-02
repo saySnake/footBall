@@ -230,6 +230,9 @@
 "settings_test_version_value" = "测试版本1.1";
 "settings_clear_data" = "清除数据";
 "settings_clear_data_value" = "88 MB";
+"settings_clear_data_confirm" = "确认清除所有缓存数据？";
+"settings_calculating" = "计算中...";
+"settings_clearing" = "清除中...";
 "settings_logout" = "退出登录";
 "settings_alert_title" = "提示";
 "settings_logout_confirm" = "确认退出登录";

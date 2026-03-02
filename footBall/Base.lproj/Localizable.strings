@@ -221,6 +221,9 @@
 "settings_test_version_value" = "Test 1.1";
 "settings_clear_data" = "Clear Data";
 "settings_clear_data_value" = "88 MB";
+"settings_clear_data_confirm" = "Confirm clearing all cached data?";
+"settings_calculating" = "Calculating...";
+"settings_clearing" = "Clearing...";
 "settings_logout" = "Log Out";
 "settings_alert_title" = "Tip";
 "settings_logout_confirm" = "Confirm log out";
