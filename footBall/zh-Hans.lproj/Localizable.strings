@@ -146,6 +146,9 @@
 "profile_id_format" = "ID : %@";
 "profile_personal_title" = "个人资料";
 "profile_upload_avatar" = "上传头像";
+"profile_avatar_camera" = "拍照";
+"profile_avatar_album" = "从相册选择";
+"profile_avatar_unavailable" = "该功能不可用";
 "profile_nickname" = "昵称";
 "profile_phone" = "手机号";
 "profile_birthdate" = "出生日期";

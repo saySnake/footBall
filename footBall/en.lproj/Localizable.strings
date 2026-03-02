@@ -146,6 +146,9 @@
 "profile_id_format" = "ID : %@";
 "profile_personal_title" = "Personal Info";
 "profile_upload_avatar" = "Upload Avatar";
+"profile_avatar_camera" = "Take Photo";
+"profile_avatar_album" = "Choose from Album";
+"profile_avatar_unavailable" = "This feature is unavailable";
 "profile_nickname" = "Nickname";
 "profile_phone" = "Phone";
 "profile_birthdate" = "Birthday";

@@ -69,7 +69,7 @@
 }
 @end
 
-@interface PersonalInfoViewController () <UITextFieldDelegate>
+@interface PersonalInfoViewController () <UITextFieldDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate>
 @property (nonatomic, strong) UIView *navBar;
 @property (nonatomic, strong) UILabel *navTitle;
 @property (nonatomic, strong) UIScrollView *scrollView;
@@ -131,6 +131,8 @@
     // Fake data
     self.birthDate = [NSDate dateWithTimeIntervalSince1970: (NSTimeInterval) 628214400]; // 1990-12-03 (UTC-ish)
     self.firstMatchDate = self.birthDate;
+
+    [self loadLocalAvatar];
 }
 
 - (void)setupUI {
@@ -262,6 +264,10 @@
         make.center.equalTo(self.cameraBadge);
         make.size.mas_equalTo(CGSizeMake(12, 12));
     }];
+
+    UITapGestureRecognizer *avatarTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onAvatarTapped)];
+    self.avatarCard.userInteractionEnabled = YES;
+    [self.avatarCard addGestureRecognizer:avatarTap];
 
     // Tap to dismiss keyboard
     UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(endEditing)];
@@ -623,6 +629,80 @@
         weakSelf.firstYearValue.text = [weakSelf formatDate:date];
     };
     [self presentViewController:sheet animated:NO completion:nil];
+}
+
+#pragma mark - Avatar
+
+- (void)onAvatarTapped {
+    UIAlertController *sheet = [UIAlertController alertControllerWithTitle:nil message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+    __weak typeof(self) weakSelf = self;
+
+    [sheet addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"profile_avatar_camera", @"拍照") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        [weakSelf openImagePickerWithSource:UIImagePickerControllerSourceTypeCamera];
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"profile_avatar_album", @"从相册选择") style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        [weakSelf openImagePickerWithSource:UIImagePickerControllerSourceTypePhotoLibrary];
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"cancel", @"取消") style:UIAlertActionStyleCancel handler:nil]];
+
+    [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)openImagePickerWithSource:(UIImagePickerControllerSourceType)source {
+    if (![UIImagePickerController isSourceTypeAvailable:source]) {
+        [self showToast:NSLocalizedString(@"profile_avatar_unavailable", @"该功能不可用")];
+        return;
+    }
+    UIImagePickerController *picker = [[UIImagePickerController alloc] init];
+    picker.sourceType = source;
+    picker.allowsEditing = YES;
+    picker.delegate = self;
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary<UIImagePickerControllerInfoKey,id> *)info {
+    UIImage *image = info[UIImagePickerControllerEditedImage] ?: info[UIImagePickerControllerOriginalImage];
+    [picker dismissViewControllerAnimated:YES completion:nil];
+    if (!image) return;
+
+    self.avatarView.image = image;
+    [self saveAvatarToLocal:image];
+}
+
+- (void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
+    [picker dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (NSString *)avatarLocalPath {
+    NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    return [docs stringByAppendingPathComponent:@"user_avatar.jpg"];
+}
+
+- (void)saveAvatarToLocal:(UIImage *)image {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        CGFloat maxSide = 512;
+        UIImage *resized = image;
+        if (image.size.width > maxSide || image.size.height > maxSide) {
+            CGFloat scale = maxSide / MAX(image.size.width, image.size.height);
+            CGSize newSize = CGSizeMake(image.size.width * scale, image.size.height * scale);
+            UIGraphicsBeginImageContextWithOptions(newSize, NO, 1.0);
+            [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
+            resized = UIGraphicsGetImageFromCurrentImageContext();
+            UIGraphicsEndImageContext();
+        }
+        NSData *data = UIImageJPEGRepresentation(resized, 0.85);
+        [data writeToFile:[self avatarLocalPath] atomically:YES];
+    });
+}
+
+- (void)loadLocalAvatar {
+    NSString *path = [self avatarLocalPath];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        UIImage *saved = [UIImage imageWithContentsOfFile:path];
+        if (saved) {
+            self.avatarView.image = saved;
+        }
+    }
 }
 
 - (void)onBack { [self.navigationController popViewControllerAnimated:YES]; }
