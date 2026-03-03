@@ -6,6 +6,7 @@
 #import "DiscoverViewController.h"
 #import <Masonry/Masonry.h>
 #import "PNAddConsumeViewController.h"
+#import "PNMatchVerifyViewController.h"
 #import "ConsumptionRecordViewController.h"
 
 #define kDiscoverHeaderBg     [UIColor colorWithRed:0.05 green:0.16 blue:0.15 alpha:1.0]
@@ -775,6 +776,10 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
             cell.verifiedPill.tintColor = [UIColor whiteColor];
         }
         cell.scoreLabel.font = [UIFont boldSystemFontOfSize:16];
+
+        // 点击“认证比赛”进入认证弹层
+        [cell.verifiedPill removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+        [cell.verifiedPill addTarget:self action:@selector(onVerifyMatchButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
     }
 
     if (@available(iOS 13.0, *)) {
@@ -786,6 +791,18 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         cell.awayLogo.contentMode = UIViewContentModeCenter;
     }
     return cell;
+}
+
+- (void)onVerifyMatchButtonTapped:(UIButton *)sender {
+    CGPoint pointInTable = [sender convertPoint:CGPointZero toView:self.tableView];
+    NSIndexPath *indexPath = [self.tableView indexPathForRowAtPoint:pointInTable];
+    if (!indexPath) return;
+    DiscoverMatch *m = [self currentDataSource][indexPath.row];
+    if (m.type != DiscoverMatchTypeFinished) return;
+
+    PNMatchVerifyViewController *vc = [[PNMatchVerifyViewController alloc] init];
+    vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
+    [self presentViewController:vc animated:NO completion:nil];
 }
 
 @end

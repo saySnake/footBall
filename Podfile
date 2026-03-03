@@ -15,6 +15,7 @@ target 'footBall' do
   pod 'YYCategories'
   pod 'YYModel'
   pod 'IQKeyboardManager'
+  pod 'AMapLocation'
   pod 'DoraemonKit'
   pod 'libpag'
   pod 'SocketRocket'
