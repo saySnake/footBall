@@ -6,9 +6,10 @@
 #import "ConsumptionRecordViewController.h"
 #import "MoreDatePickerController.h"
 #import <Masonry/Masonry.h>
+#import "ColorManager.h"
 
 static UIColor *kConsumeGreen(void) {
-    return [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+    return [ColorManager sharedManager].primaryColor;
 }
 
 @interface ConsumeRecordItem : NSObject

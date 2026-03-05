@@ -7,10 +7,11 @@
 #import "AddTeamsViewController.h"
 #import "ProfileTeamsStore.h"
 #import <Masonry/Masonry.h>
+#import "ColorManager.h"
 
-#define kTeamsBg   [UIColor colorWithWhite:0.95 alpha:1.0]
+#define kTeamsBg   [ColorManager sharedManager].secondaryBackgroundColor
 #define kCardBg    [UIColor whiteColor]
-#define kGreen     [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0]
+#define kGreen     [ColorManager sharedManager].primaryColor
 
 @interface MyTeamCell : UICollectionViewCell
 @property (nonatomic, strong) UIView *circleBg;

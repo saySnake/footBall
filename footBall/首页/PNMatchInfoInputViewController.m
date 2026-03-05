@@ -7,9 +7,11 @@
 #import <Masonry/Masonry.h>
 #import <IQKeyboardManager/IQKeyboardManager.h>
 #import "PNPickerSheetViewController.h"
+#import "ColorManager.h"
 
 static UIColor *PNInputGreenColor(void) {
-    return [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+    // 统一使用 ColorManager 的主色，方便以后适配黑天/白天皮肤
+    return [ColorManager sharedManager].primaryColor;
 }
 
 @interface PNMatchInfoInputViewController () <UITextViewDelegate, UITextFieldDelegate>

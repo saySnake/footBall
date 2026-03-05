@@ -39,7 +39,7 @@
     [self.phoneLoginButton setTitle:NSLocalizedString(@"login_with_phone_button", nil) forState:UIControlStateNormal];
     self.phoneLoginButton.titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
     [self.phoneLoginButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    self.phoneLoginButton.backgroundColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0]; // 深绿色
+    self.phoneLoginButton.backgroundColor = [ColorManager sharedManager].primaryColor; // 深绿色（跟随主题）
     self.phoneLoginButton.layer.cornerRadius = 26;
     self.phoneLoginButton.layer.masksToBounds = YES;
     [self.phoneLoginButton addTarget:self action:@selector(phoneLoginTapped) forControlEvents:UIControlEventTouchUpInside];

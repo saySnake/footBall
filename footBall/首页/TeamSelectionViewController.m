@@ -69,7 +69,7 @@
     UIButton *exploreBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     [exploreBtn setTitle:NSLocalizedString(@"welcome_explore_button", nil) forState:UIControlStateNormal];
     [exploreBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    exploreBtn.backgroundColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+    exploreBtn.backgroundColor = [ColorManager sharedManager].primaryColor;
     exploreBtn.layer.cornerRadius = 26;
     exploreBtn.translatesAutoresizingMaskIntoConstraints = NO;
     [exploreBtn addTarget:self action:@selector(exploreTapped) forControlEvents:UIControlEventTouchUpInside];
@@ -145,7 +145,7 @@
         _nameLabel.textAlignment = NSTextAlignmentCenter;
         
         _checkmarkView = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"checkmark.circle.fill"]];
-        _checkmarkView.tintColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+        _checkmarkView.tintColor = [ColorManager sharedManager].primaryColor;
         _checkmarkView.hidden = YES;
         
         [self.contentView addSubview:_shadowContainerView];
@@ -300,7 +300,7 @@
     self.confirmButton = [UIButton buttonWithType:UIButtonTypeSystem];
     [self.confirmButton setTitle:NSLocalizedString(@"team_confirm_button", nil) forState:UIControlStateNormal];
     [self.confirmButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    self.confirmButton.backgroundColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+    self.confirmButton.backgroundColor = [ColorManager sharedManager].primaryColor;
     self.confirmButton.layer.cornerRadius = 22;
     [self.confirmButton addTarget:self action:@selector(confirmTapped) forControlEvents:UIControlEventTouchUpInside];
     
@@ -357,7 +357,7 @@
     BOOL selected = [self.selectedTeams containsObject:m];
     cell.checkmarkView.hidden = !selected;
     // 按设计图：选中 = 圆形加粗绿色描边；未选中 = 圆形细浅灰描边（描边在圆形容器上）
-    UIColor *greenColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+    UIColor *greenColor = [ColorManager sharedManager].primaryColor;
     UIColor *lightGrayColor = [UIColor colorWithWhite:0.85 alpha:1.0];
     cell.circleBackgroundView.layer.borderWidth = selected ? 3.0 : 1.0;
     cell.circleBackgroundView.layer.borderColor = selected ? greenColor.CGColor : lightGrayColor.CGColor;
@@ -501,7 +501,7 @@
     UIButton *okBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     [okBtn setTitle:NSLocalizedString(@"confirm", nil) forState:UIControlStateNormal];
     [okBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    okBtn.backgroundColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+    okBtn.backgroundColor = [ColorManager sharedManager].primaryColor;
     okBtn.layer.cornerRadius = 25;
     [okBtn addTarget:self action:@selector(onConfirmSheetOkTapped) forControlEvents:UIControlEventTouchUpInside];
     
@@ -604,7 +604,7 @@
     UIButton *okBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     [okBtn setTitle:NSLocalizedString(@"confirm", nil) forState:UIControlStateNormal];
     [okBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    okBtn.backgroundColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+    okBtn.backgroundColor = [ColorManager sharedManager].primaryColor;
     okBtn.layer.cornerRadius = 22;
     [okBtn addTarget:self action:@selector(hideBottomSheet) forControlEvents:UIControlEventTouchUpInside];
     

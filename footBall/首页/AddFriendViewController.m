@@ -6,10 +6,11 @@
 #import "AddFriendViewController.h"
 #import "NewFriendRequestsViewController.h"
 #import <Masonry/Masonry.h>
+#import "ColorManager.h"
 
-#define kAddFriendGreen [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0]
-#define kAddFriendHeaderBg [UIColor colorWithRed:0.02 green:0.14 blue:0.15 alpha:1.0]
-#define kAddFriendPageBg [UIColor colorWithWhite:0.94 alpha:1.0]
+#define kAddFriendGreen    [ColorManager sharedManager].primaryColor
+#define kAddFriendHeaderBg [ColorManager sharedManager].primaryDarkColor
+#define kAddFriendPageBg   [ColorManager sharedManager].secondaryBackgroundColor
 static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_search_friend_ids";
 

@@ -5,9 +5,11 @@
 
 #import "PNMatchDetailViewController.h"
 #import <Masonry/Masonry.h>
+#import "ColorManager.h"
 
 static UIColor *PNMatchGreenColor(void) {
-    return [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+    // 统一使用 ColorManager 主色
+    return [ColorManager sharedManager].primaryColor;
 }
 
 @interface PNMatchDetailViewController ()

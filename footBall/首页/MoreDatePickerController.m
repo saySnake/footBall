@@ -234,9 +234,9 @@
         label.textColor = [UIColor blackColor];
     }
 
-    BOOL selected = [self isSameDay:cellDate other:self.selectedDate];
-    if (selected) {
-        cell.contentView.backgroundColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+        BOOL selected = [self isSameDay:cellDate other:self.selectedDate];
+        if (selected) {
+            cell.contentView.backgroundColor = [ColorManager sharedManager].primaryColor;
         cell.contentView.layer.cornerRadius = MIN(cell.bounds.size.width, cell.bounds.size.height) / 2.0;
         cell.contentView.layer.masksToBounds = YES;
         label.textColor = [UIColor whiteColor];

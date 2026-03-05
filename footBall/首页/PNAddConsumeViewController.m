@@ -6,8 +6,10 @@
 #import "PNAddConsumeViewController.h"
 #import "PNPickerSheetViewController.h"
 #import <Masonry/Masonry.h>
+#import "ColorManager.h"
 
-#define kPNGreen [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0]
+// 统一使用 ColorManager 的主色，方便主题切换
+#define kPNGreen [ColorManager sharedManager].primaryColor
 
 @interface PNAddConsumeViewController () <UIImagePickerControllerDelegate, UINavigationControllerDelegate, UITextFieldDelegate>
 @property (nonatomic, strong) UIView *dimmingView;

@@ -384,7 +384,7 @@
         // 高亮当前选中的那一天
         BOOL isSameDay = [self isSameDay:date other:self.selectedDate];
         if (isSameDay) {
-            dayView.backgroundColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+            dayView.backgroundColor = [ColorManager sharedManager].primaryColor;
             dayView.layer.cornerRadius = 8;
             dayView.layer.masksToBounds = YES;
             for (UIView *sub in dayView.subviews) {

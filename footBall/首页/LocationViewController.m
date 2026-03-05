@@ -7,10 +7,11 @@
 #import "AddFriendViewController.h"
 #import "MyQRCodeViewController.h"
 #import <Masonry/Masonry.h>
+#import "ColorManager.h"
 
-#define kCommunityGreen [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0]
-#define kCommunityHeaderBg [UIColor colorWithRed:0.02 green:0.14 blue:0.15 alpha:1.0]
-#define kCommunityPageBg [UIColor colorWithWhite:0.94 alpha:1.0]
+#define kCommunityGreen    [ColorManager sharedManager].primaryColor
+#define kCommunityHeaderBg [ColorManager sharedManager].primaryDarkColor
+#define kCommunityPageBg   [ColorManager sharedManager].secondaryBackgroundColor
 static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 static NSString * const kCommunityPendingCountDidChangeNotification = @"community_pending_count_did_change";
 static NSString * const kCommunityAddedFriendsKey = @"community_added_friends";

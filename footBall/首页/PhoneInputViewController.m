@@ -5,6 +5,7 @@
 
 #import "PhoneInputViewController.h"
 #import <Masonry/Masonry.h>
+#import "ColorManager.h"
 
 @interface PhoneInputViewController () <UITextFieldDelegate>
 
@@ -99,7 +100,7 @@
     self.getCodeButton = [UIButton buttonWithType:UIButtonTypeSystem];
     [self.getCodeButton setTitle:NSLocalizedString(@"phone_get_code_button", nil) forState:UIControlStateNormal];
     [self.getCodeButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    self.getCodeButton.backgroundColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+    self.getCodeButton.backgroundColor = [ColorManager sharedManager].primaryColor;
     self.getCodeButton.titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
     self.getCodeButton.layer.cornerRadius = 28;
     self.getCodeButton.layer.masksToBounds = YES;
@@ -108,7 +109,7 @@
     self.agreeCheckButton = [UIButton buttonWithType:UIButtonTypeCustom];
     [self.agreeCheckButton setImage:[UIImage systemImageNamed:@"checkmark.circle.fill"] forState:UIControlStateSelected];
     [self.agreeCheckButton setImage:[UIImage systemImageNamed:@"circle"] forState:UIControlStateNormal];
-    self.agreeCheckButton.tintColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+    self.agreeCheckButton.tintColor = [ColorManager sharedManager].primaryColor;
     self.agreeCheckButton.selected = YES;
     [self.agreeCheckButton addTarget:self action:@selector(toggleAgree) forControlEvents:UIControlEventTouchUpInside];
     

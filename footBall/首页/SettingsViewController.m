@@ -10,6 +10,7 @@
 #import "AuthManager.h"
 #import "SDImageManager.h"
 #import <Masonry/Masonry.h>
+#import "ColorManager.h"
 
 @interface SettingsViewController ()
 @property (nonatomic, strong) UILabel *navTitle;
@@ -72,7 +73,7 @@
 
     UIView *row1 = [self addRowToCard:self.listCard top:nil icon:@"bell" titleKey:@"settings_notice" showChevron:NO];
     self.noticeSwitch = [UISwitch new];
-    self.noticeSwitch.onTintColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+    self.noticeSwitch.onTintColor = [ColorManager sharedManager].primaryLightColor;
     self.noticeSwitch.on = YES;
     [row1 addSubview:self.noticeSwitch];
     [self.noticeSwitch mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -113,7 +114,7 @@
 
     // Logout button
     self.logoutBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.logoutBtn.backgroundColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+    self.logoutBtn.backgroundColor = [ColorManager sharedManager].primaryColor;
     self.logoutBtn.layer.cornerRadius = 24;
     self.logoutBtn.titleLabel.font = [UIFont boldSystemFontOfSize:16];
     [self.logoutBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];

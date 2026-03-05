@@ -7,8 +7,9 @@
 #import "MoreMatchesViewController.h"
 #import "RefreshPagHeader.h"
 #import <Masonry/Masonry.h>
+#import "ColorManager.h"
 
-#define kHeaderGreen [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0]
+#define kHeaderGreen [ColorManager sharedManager].primaryDarkColor
 #define kCardDarkerGreen [UIColor colorWithRed:0.06 green:0.28 blue:0.22 alpha:1.0]
 #define kCardLightGray [UIColor colorWithRed:0.96 green:0.96 blue:0.96 alpha:1.0]
 #define kScoreOvalBg [UIColor colorWithRed:0.28 green:0.28 blue:0.30 alpha:1.0]

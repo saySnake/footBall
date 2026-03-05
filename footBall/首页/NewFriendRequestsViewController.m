@@ -5,11 +5,12 @@
 
 #import "NewFriendRequestsViewController.h"
 #import <Masonry/Masonry.h>
+#import "ColorManager.h"
 
-#define kRequestGreen [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0]
-#define kRequestHeaderBg [UIColor colorWithRed:0.02 green:0.14 blue:0.15 alpha:1.0]
-#define kRequestRed [UIColor colorWithRed:0.95 green:0.20 blue:0.20 alpha:1.0]
-#define kRequestPageBg [UIColor colorWithWhite:0.94 alpha:1.0]
+#define kRequestGreen    [ColorManager sharedManager].primaryColor
+#define kRequestHeaderBg [ColorManager sharedManager].primaryDarkColor
+#define kRequestRed      [ColorManager sharedManager].errorColor
+#define kRequestPageBg   [ColorManager sharedManager].secondaryBackgroundColor
 static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 static NSString * const kCommunityPendingCountDidChangeNotification = @"community_pending_count_did_change";
 static NSString * const kCommunityAddedFriendsKey = @"community_added_friends";

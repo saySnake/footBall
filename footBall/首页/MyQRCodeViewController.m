@@ -6,9 +6,10 @@
 #import "MyQRCodeViewController.h"
 #import <Masonry/Masonry.h>
 #import <CoreImage/CoreImage.h>
+#import "ColorManager.h"
 
-#define kQRGreen   [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0]
-#define kQRBgColor [UIColor colorWithRed:0.04 green:0.14 blue:0.12 alpha:1.0]
+#define kQRGreen   [ColorManager sharedManager].primaryColor
+#define kQRBgColor [ColorManager sharedManager].primaryDarkColor
 
 @interface MyQRCodeViewController ()
 @property (nonatomic, strong) UILabel *navTitleLabel;

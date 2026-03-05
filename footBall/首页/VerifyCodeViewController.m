@@ -126,7 +126,7 @@
     self.loginButton = [UIButton buttonWithType:UIButtonTypeSystem];
     [self.loginButton setTitle:NSLocalizedString(@"verify_login_button", nil) forState:UIControlStateNormal];
     [self.loginButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    self.loginButton.backgroundColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+    self.loginButton.backgroundColor = [ColorManager sharedManager].primaryColor;
     self.loginButton.titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
     self.loginButton.layer.cornerRadius = 27;
     self.loginButton.layer.masksToBounds = YES;

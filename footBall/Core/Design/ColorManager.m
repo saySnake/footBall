@@ -48,10 +48,17 @@
 }
 
 - (void)setupColorConfiguration {
-    // 可以在这里设置默认的自定义颜色
-    // 例如：
-    // [self setPrimaryColorLight:[UIColor colorWithHexString:@"#007AFF"] 
-    //                       dark:[UIColor colorWithHexString:@"#0A84FF"]];
+    // 统一配置主色：暂时白天/夜间使用同一套绿色系，便于后续适配主题时集中修改
+    UIColor *brandGreen = [ColorManager colorWithHexString:@"#1A5B47"];      // 主绿
+    UIColor *brandGreenLight = [ColorManager colorWithHexString:@"#1E6C54"]; // 浅一点
+    UIColor *brandGreenDark = [ColorManager colorWithHexString:@"#144033"];  // 深一点
+    
+    self.customPrimaryColorLight      = brandGreen;
+    self.customPrimaryColorDark       = brandGreen;
+    self.customPrimaryLightColorLight = brandGreenLight;
+    self.customPrimaryLightColorDark  = brandGreenLight;
+    self.customPrimaryDarkColorLight  = brandGreenDark;
+    self.customPrimaryDarkColorDark   = brandGreenDark;
 }
 
 - (void)handleThemeChange:(NSNotification *)notification {

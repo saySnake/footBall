@@ -215,7 +215,8 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
 
     UIButton *confirm = [UIButton buttonWithType:UIButtonTypeSystem];
     [confirm setTitle:@"确认" forState:UIControlStateNormal];
-    confirm.backgroundColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
+    // 使用 ColorManager 主色
+    confirm.backgroundColor = [ColorManager sharedManager].primaryColor;
     [confirm setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     confirm.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
     confirm.layer.cornerRadius = 26;

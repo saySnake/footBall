@@ -5,8 +5,9 @@
 
 #import "PNCommonAlertViewController.h"
 #import <Masonry/Masonry.h>
+#import "ColorManager.h"
 
-#define kAlertGreen [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0]
+#define kAlertGreen [ColorManager sharedManager].primaryColor
 
 @interface PNCommonAlertViewController ()
 @property (nonatomic, strong) UIView *dimmingView;
