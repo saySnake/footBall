@@ -8,6 +8,8 @@
 #import "PNAddConsumeViewController.h"
 #import "PNMatchVerifyViewController.h"
 #import "ConsumptionRecordViewController.h"
+#import "PNMatchDetailViewController.h"
+#import "PNMatchInfoInputViewController.h"
 
 #define kDiscoverHeaderBg     [UIColor colorWithRed:0.05 green:0.16 blue:0.15 alpha:1.0]
 #define kDiscoverGreen        [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0]
@@ -25,6 +27,10 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 @property (nonatomic, copy) NSString *dateText;
 @property (nonatomic, copy) NSString *scoreText;
 @property (nonatomic, copy) NSString *verifiedText;
+/// 是否已经完成“输入信息”
+@property (nonatomic, assign) BOOL hasInputInfo;
+/// 是否已经完成“认证比赛”
+@property (nonatomic, assign) BOOL hasVerified;
 @property (nonatomic, assign) DiscoverMatchType type;
 @end
 
@@ -669,7 +675,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         @[ @"诺丁汉森林队", @"利物浦", @"0 : 2", @"05 Dec, 2025", @"已认证110分钟" ],
         @[ @"伯恩利", @"布伦特福德", @"2 : 1", @"02 Dec, 2025", @"已认证96分钟" ]
     ];
-    for (NSArray *info in finishedRaw) {
+    [finishedRaw enumerateObjectsUsingBlock:^(NSArray *info, NSUInteger idx, BOOL *stop) {
         DiscoverMatch *m = [DiscoverMatch new];
         m.homeName = info[0];
         m.awayName = info[1];
@@ -677,8 +683,11 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         m.dateText = info[3];
         m.verifiedText = info[4];
         m.type = DiscoverMatchTypeFinished;
+        // 仅为假数据：第 5 条（索引 4）视为“已经输入信息 + 已经认证比赛”，其它都未完成
+        m.hasInputInfo = (idx == 4);
+        m.hasVerified = (idx == 4);
         [finished addObject:m];
-    }
+    }];
 
     self.upcomingMatches = upcoming;
     self.finishedMatches = finished;
@@ -763,23 +772,50 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         cell.verifiedPill.hidden = YES;
         cell.scoreLabel.font = [UIFont boldSystemFontOfSize:14];
     } else {
-        // 已经观赛：显示输入信息、认证比赛按钮
-        cell.inputButton.hidden = NO;
+        // 已经观赛：底部仍然是左侧“输入信息”、右侧 pill，
+        // 但当 hasInputInfo=YES 时，隐藏“输入信息”，并将中间时间挪到左侧展示
         cell.verifiedPill.hidden = NO;
-        [cell.verifiedPill setTitle:@"认证比赛" forState:UIControlStateNormal];
+        // 右侧始终文案为“认证比赛”，只有在输入信息+认证都完成后，才显示“已认证xx分钟”
+        NSString *pillTitle = (m.hasInputInfo && m.hasVerified) ? m.verifiedText : @"认证比赛";
+        [cell.verifiedPill setTitle:pillTitle forState:UIControlStateNormal];
         cell.verifiedPill.backgroundColor = kDiscoverPillGreen;
         cell.verifiedPill.layer.borderWidth = 0;
         [cell.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
         if (@available(iOS 13.0, *)) {
-            UIImage *img = [UIImage systemImageNamed:@"camera.fill"];
+            // 未完成时统一使用“认证”图标，完成后使用已认证图标
+            NSString *iconName = (m.hasInputInfo && m.hasVerified) ? @"checkmark.circle" : @"checkmark.seal";
+            UIImage *img = [UIImage systemImageNamed:iconName];
             [cell.verifiedPill setImage:img forState:UIControlStateNormal];
             cell.verifiedPill.tintColor = [UIColor whiteColor];
         }
         cell.scoreLabel.font = [UIFont boldSystemFontOfSize:16];
 
-        // 点击“认证比赛”进入认证弹层
+        if (m.hasInputInfo) {
+            // 已完成：隐藏“输入信息”按钮
+            cell.inputButton.hidden = YES;
+            // 时间标签从居中改为靠左，贴合“时间向左移动”的设计
+            cell.dateLabel.textAlignment = NSTextAlignmentLeft;
+            [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
+                make.leading.equalTo(cell.homeLogo);                   // 与左侧球队图标对齐
+                make.top.equalTo(cell.scoreLabel.mas_bottom).offset(10);
+            }];
+        } else {
+            // 未完成：保留原始布局（中间时间 + 左侧输入信息按钮）
+            cell.inputButton.hidden = NO;
+            cell.dateLabel.textAlignment = NSTextAlignmentCenter;
+            [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
+                make.centerX.equalTo(cell.contentView);
+                make.top.equalTo(cell.scoreLabel.mas_bottom).offset(10);
+            }];
+        }
+
+        // 点击右侧操作 pill：根据当前状态在“输入信息 / 认证比赛 / 比赛详情”之间切换
         [cell.verifiedPill removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
         [cell.verifiedPill addTarget:self action:@selector(onVerifyMatchButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
+
+        // “输入信息”按钮：仅在未完成时可见，进入输入信息弹层
+        [cell.inputButton removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+        [cell.inputButton addTarget:self action:@selector(onInputInfoButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
     }
 
     if (@available(iOS 13.0, *)) {
@@ -793,16 +829,80 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     return cell;
 }
 
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    DiscoverMatch *m = [self currentDataSource][indexPath.row];
+    if (m.type != DiscoverMatchTypeFinished) return;
+    
+    // 只有在“已输入信息 + 已认证比赛”完成后，才允许进入比赛详情
+    if (m.hasInputInfo && m.hasVerified) {
+        [self showMatchDetailForMatch:m];
+    } else {
+        // 仍有步骤未完成时，不允许直接进详情，这里优先引导到“输入信息”
+        if (!m.hasInputInfo) {
+            [self presentMatchInfoForMatch:m];
+        } else {
+            [self presentMatchVerifyForMatch:m];
+        }
+    }
+}
+
 - (void)onVerifyMatchButtonTapped:(UIButton *)sender {
     CGPoint pointInTable = [sender convertPoint:CGPointZero toView:self.tableView];
     NSIndexPath *indexPath = [self.tableView indexPathForRowAtPoint:pointInTable];
     if (!indexPath) return;
     DiscoverMatch *m = [self currentDataSource][indexPath.row];
     if (m.type != DiscoverMatchTypeFinished) return;
+    
+    // 右侧 pill：始终表示“认证比赛”
+    // 未认证时 -> 进入认证弹窗；已认证并且输入信息完成 -> 进入比赛详情
+    if (!m.hasVerified) {
+        [self presentMatchVerifyForMatch:m];
+    } else if (m.hasInputInfo) {
+        [self showMatchDetailForMatch:m];
+    }
+}
 
-    PNMatchVerifyViewController *vc = [[PNMatchVerifyViewController alloc] init];
+- (void)onInputInfoButtonTapped:(UIButton *)sender {
+    CGPoint pointInTable = [sender convertPoint:CGPointZero toView:self.tableView];
+    NSIndexPath *indexPath = [self.tableView indexPathForRowAtPoint:pointInTable];
+    if (!indexPath) return;
+    DiscoverMatch *m = [self currentDataSource][indexPath.row];
+    if (m.type != DiscoverMatchTypeFinished) return;
+    [self presentMatchInfoForMatch:m];
+}
+
+- (void)presentMatchInfoForMatch:(DiscoverMatch *)match {
+    PNMatchInfoInputViewController *vc = [[PNMatchInfoInputViewController alloc] init];
+    vc.homeName = match.homeName;
+    vc.awayName = match.awayName;
+    __weak typeof(self) weakSelf = self;
+    vc.completion = ^{
+        // 仅完成“输入信息”，暂不允许看详情，还需“认证比赛”
+        match.hasInputInfo = YES;
+        [weakSelf.tableView reloadData];
+    };
     vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
     [self presentViewController:vc animated:NO completion:nil];
+}
+
+- (void)presentMatchVerifyForMatch:(DiscoverMatch *)match {
+    PNMatchVerifyViewController *vc = [[PNMatchVerifyViewController alloc] init];
+    vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
+    __weak typeof(self) weakSelf = self;
+    vc.completion = ^{
+        // 完成“认证比赛”流程
+        match.hasVerified = YES;
+        [weakSelf.tableView reloadData];
+    };
+    [self presentViewController:vc animated:NO completion:nil];
+}
+
+- (void)showMatchDetailForMatch:(DiscoverMatch *)match {
+    PNMatchDetailViewController *vc = [[PNMatchDetailViewController alloc] init];
+    vc.homeName = match.homeName;
+    vc.awayName = match.awayName;
+    vc.hidesBottomBarWhenPushed = YES;
+    [self.navigationController pushViewController:vc animated:YES];
 }
 
 @end

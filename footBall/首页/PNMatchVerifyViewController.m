@@ -7,13 +7,6 @@
 #import <Masonry/Masonry.h>
 #import <CoreLocation/CoreLocation.h>
 
-#if __has_include(<AMapLocationKit/AMapLocationKit.h>)
-#import <AMapLocationKit/AMapLocationKit.h>
-#define PN_HAS_AMAP_LOCATION 1
-#else
-#define PN_HAS_AMAP_LOCATION 0
-#endif
-
 static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
 
 @interface PNMatchVerifyPhotoCell : UICollectionViewCell
@@ -57,7 +50,7 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
 
 @end
 
-@interface PNMatchVerifyViewController () <UICollectionViewDataSource, UICollectionViewDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate>
+@interface PNMatchVerifyViewController () <UICollectionViewDataSource, UICollectionViewDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate, CLLocationManagerDelegate>
 
 @property (nonatomic, strong) UIView *dimmingView;
 @property (nonatomic, strong) UIView *cardView;
@@ -67,9 +60,7 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
 @property (nonatomic, strong) NSMutableArray<UIImage *> *photos;
 
 @property (nonatomic, strong) UILabel *locationLabel;
-#if PN_HAS_AMAP_LOCATION
-@property (nonatomic, strong) AMapLocationManager *locationManager;
-#endif
+@property (nonatomic, strong) CLLocationManager *locationManager;
 @property (nonatomic, copy) NSString *currentAddress;
 
 @property (nonatomic, strong) UIButton *confirmButton;
@@ -333,62 +324,85 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
         return;
     }
 
-#if PN_HAS_AMAP_LOCATION
     if (!self.locationManager) {
-        self.locationManager = [[AMapLocationManager alloc] init];
-        [self.locationManager setDesiredAccuracy:kCLLocationAccuracyHundredMeters];
-        self.locationManager.locationTimeout = 6;
-        self.locationManager.reGeocodeTimeout = 6;
+        self.locationManager = [[CLLocationManager alloc] init];
+        self.locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters;
+        self.locationManager.delegate = self;
+    }
+    
+    // iOS 8+ 需要显式请求授权
+    CLAuthorizationStatus status;
+    if (@available(iOS 14.0, *)) {
+        status = self.locationManager.authorizationStatus;
+    } else {
+        status = [CLLocationManager authorizationStatus];
+    }
+    if (status == kCLAuthorizationStatusNotDetermined) {
+        [self.locationManager requestWhenInUseAuthorization];
     }
 
+    self.locationLabel.text = @"定位中...";
+    self.currentAddress = @"";
+    [self updateConfirmButtonState];
+
+    // 请求一次当前定位，结果在代理回调中处理
+    [self.locationManager requestLocation];
+}
+
+- (void)locationManager:(CLLocationManager *)manager didFailWithError:(NSError *)error {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self.locationLabel.text = @"定位失败";
+        self.currentAddress = @"";
+        [self updateConfirmButtonState];
+    });
+}
+
+- (void)locationManager:(CLLocationManager *)manager didUpdateLocations:(NSArray<CLLocation *> *)locations {
+    CLLocation *location = [locations lastObject];
+    if (!location) {
+        [self locationManager:manager didFailWithError:[NSError errorWithDomain:kCLErrorDomain code:kCLErrorLocationUnknown userInfo:nil]];
+        return;
+    }
+    
+    CLGeocoder *geocoder = [[CLGeocoder alloc] init];
     __weak typeof(self) weakSelf = self;
-    [self.locationManager requestLocationWithReGeocode:YES completionBlock:^(CLLocation *location, AMapLocationReGeocode *regeocode, NSError *error) {
-        if (error || !location) {
-            dispatch_async(dispatch_get_main_queue(), ^{
+    [geocoder reverseGeocodeLocation:location completionHandler:^(NSArray<CLPlacemark *> * _Nullable placemarks, NSError * _Nullable error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (error || placemarks.count == 0) {
                 weakSelf.locationLabel.text = @"定位失败";
+                weakSelf.currentAddress = @"";
                 [weakSelf updateConfirmButtonState];
-            });
-            return;
-        }
-
-        NSString *display = nil;
-        if (regeocode) {
-            // 直辖市等 city 为空时用 province 兜底
-            NSString *city = (regeocode.city.length > 0) ? regeocode.city : regeocode.province;
-            NSString *district = regeocode.district ?: @"";
-            NSString *poi = regeocode.POIName ?: @"";
-
-            // 优先 “城市·POI”，否则城市+区县，再退回详细地址
-            if (city.length > 0 && poi.length > 0) {
-                display = [NSString stringWithFormat:@"%@·%@", city, poi];
-            } else if (city.length > 0 && district.length > 0) {
-                display = [NSString stringWithFormat:@"%@%@", city, district];
-            } else if (regeocode.formattedAddress.length > 0) {
-                display = regeocode.formattedAddress;
+                return;
+            }
+            
+            CLPlacemark *placemark = [placemarks firstObject];
+            NSString *city = placemark.locality ?: placemark.administrativeArea;
+            NSString *subLocality = placemark.subLocality ?: @"";
+            NSString *name = placemark.name ?: @"";
+            
+            NSString *display = nil;
+            if (city.length > 0 && name.length > 0) {
+                display = [NSString stringWithFormat:@"%@·%@", city, name];
+            } else if (city.length > 0 && subLocality.length > 0) {
+                display = [NSString stringWithFormat:@"%@%@", city, subLocality];
+            } else if (placemark.postalAddress) {
+                // 使用 CNPostalAddressFormatter 生成更详细地址（需要 Contacts.framework）
+                display = name.length > 0 ? name : city;
+            } else if (name.length > 0) {
+                display = name;
             } else if (city.length > 0) {
                 display = city;
-            } else if (district.length > 0) {
-                display = district;
+            } else {
+                display = [NSString stringWithFormat:@"%.6f,%.6f",
+                           location.coordinate.longitude,
+                           location.coordinate.latitude];
             }
-        }
-        if (display.length == 0) {
-            display = [NSString stringWithFormat:@"%.6f,%.6f",
-                       location.coordinate.longitude,
-                       location.coordinate.latitude];
-        }
-
-        dispatch_async(dispatch_get_main_queue(), ^{
+            
             weakSelf.currentAddress = display;
             weakSelf.locationLabel.text = display;
             [weakSelf updateConfirmButtonState];
         });
     }];
-#else
-    // 未集成高德 SDK 时的兜底提示（避免编译错误）
-    self.locationLabel.text = @"请集成 AMapLocationKit 以使用定位";
-    self.currentAddress = @"";
-    [self updateConfirmButtonState];
-#endif
 }
 
 #pragma mark - Confirm
@@ -400,7 +414,10 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
 }
 
 - (void)onConfirm {
-    // 提交逻辑留给后端集成，这里先关闭弹层
+    // 提交逻辑留给后端集成，这里先回调上层并关闭弹层
+    if (self.completion) {
+        self.completion();
+    }
     [self dismissViewControllerAnimated:NO completion:nil];
 }
 

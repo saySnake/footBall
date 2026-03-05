@@ -16,7 +16,8 @@ static const CGFloat kPillCircleSize = 44.f;
 #define kPillCircleDark  [UIColor colorWithRed:0.16 green:0.18 blue:0.19 alpha:1.0]   // 未选中圆底
 #define kPillIconGreen   [UIColor colorWithRed:0.41 green:0.83 blue:0.43 alpha:1.0]   // 绿色图标
 
-@interface MainTabBarController ()
+@interface MainTabBarController () <UITabBarControllerDelegate, UINavigationControllerDelegate>
+@property (nonatomic, strong) UIView *bottomBar;
 @property (nonatomic, strong) UIView *pillView;
 @property (nonatomic, strong) NSArray<UIButton *> *pillButtons;
 @end
@@ -53,6 +54,16 @@ static const CGFloat kPillCircleSize = 44.f;
     self.viewControllers = @[ navHome, navDiscover, navLocation, navProfile ];
     self.delegate = self;
 
+    // 监听子导航控制器的页面切换，用于控制底部自定义 TabBar 的显示/隐藏
+    navHome.delegate = self;
+    navDiscover.delegate = self;
+    navLocation.delegate = self;
+    navProfile.delegate = self;
+
+    // 方案 B：隐藏系统 TabBar，自定义底部导航条
+    self.tabBar.hidden = YES;
+    self.tabBar.userInteractionEnabled = NO;
+
     [self setupTabBarAppearance];
     [self buildPillTabBar];
     [self updatePillSelection];
@@ -60,10 +71,20 @@ static const CGFloat kPillCircleSize = 44.f;
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
+    // 彻底把系统 TabBar 移出可视区域，避免在部分 iOS 版本上出现第二层 TabBar
+    UITabBar *tabBar = self.tabBar;
+    tabBar.hidden = YES;
+    tabBar.alpha = 0.0;
+    CGRect frame = tabBar.frame;
+    frame.origin.y = CGRectGetMaxY(self.view.bounds);
+    frame.size.height = 0;
+    tabBar.frame = frame;
+
     [self layoutPillTabBar];
 }
 
 - (void)setupTabBarAppearance {
+    // 虽然隐藏了系统 TabBar，但仍统一清空其背景，避免系统层视觉干扰
     UITabBar *tabBar = self.tabBar;
     tabBar.backgroundImage = [UIImage new];
     tabBar.shadowImage = [UIImage new];
@@ -100,12 +121,28 @@ static const CGFloat kPillCircleSize = 44.f;
 - (void)buildPillTabBar {
     if (self.pillView) return;
 
-    UITabBar *tabBar = self.tabBar;
+    // 自定义底部容器，固定在安全区域上方
+    if (!self.bottomBar) {
+        UIView *bar = [[UIView alloc] initWithFrame:CGRectZero];
+        bar.backgroundColor = [UIColor clearColor];
+        [self.view addSubview:bar];
+        self.bottomBar = bar;
+
+        // 使用 Auto Layout 约束到底部安全区域
+        bar.translatesAutoresizingMaskIntoConstraints = NO;
+        [NSLayoutConstraint activateConstraints:@[
+            [bar.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+            [bar.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+            [bar.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor],
+            [bar.heightAnchor constraintEqualToConstant:kPillHeight + 16.f] // 上下各 8 间距
+        ]];
+    }
+
     UIView *pill = [[UIView alloc] initWithFrame:CGRectZero];
     pill.backgroundColor = kPillBgColor;
     pill.layer.cornerRadius = kPillHeight / 2.f;
     pill.layer.masksToBounds = YES;
-    [tabBar addSubview:pill];
+    [self.bottomBar addSubview:pill];
     self.pillView = pill;
 
     NSMutableArray<UIButton *> *buttons = [NSMutableArray array];
@@ -132,8 +169,10 @@ static const CGFloat kPillCircleSize = 44.f;
 - (void)layoutPillTabBar {
     if (!self.pillView || self.pillButtons.count == 0) return;
 
-    UITabBar *tabBar = self.tabBar;
-    CGFloat barW = tabBar.bounds.size.width;
+    UIView *bar = self.bottomBar;
+    if (!bar) return;
+
+    CGFloat barW = bar.bounds.size.width;
     NSInteger count = self.pillButtons.count;
     if (count <= 0) return;
 
@@ -145,8 +184,8 @@ static const CGFloat kPillCircleSize = 44.f;
         pillWidth = barW - 40.f;
     }
     CGFloat pillX = (barW - pillWidth) / 2.f;
-    // 整体向上微调
-    CGFloat pillY = tabBar.bounds.size.height - kPillHeight - 17.f;
+    // 在自定义底部容器内垂直居中 pill
+    CGFloat pillY = (bar.bounds.size.height - kPillHeight) / 2.f;
     self.pillView.frame = CGRectMake(pillX, pillY, pillWidth, kPillHeight);
 
     // 在 pillView 内部均匀排布 4 个圆形按钮
@@ -186,6 +225,29 @@ static const CGFloat kPillCircleSize = 44.f;
 
 - (void)tabBarController:(UITabBarController *)tabBarController didSelectViewController:(UIViewController *)viewController {
     [self updatePillSelection];
+    [self updateBottomBarHiddenForController:viewController];
+}
+
+#pragma mark - UINavigationControllerDelegate
+
+- (void)navigationController:(UINavigationController *)navigationController
+       willShowViewController:(UIViewController *)viewController
+                     animated:(BOOL)animated {
+    // 根据即将显示的 VC 决定是否隐藏底部栏（传 viewController 而不是 nav，否则拿到的是旧 topVC）
+    [self updateBottomBarHiddenForController:viewController];
+}
+
+#pragma mark - BottomBar Visibility
+
+- (void)updateBottomBarHiddenForController:(UIViewController *)vc {
+    // 规则：当当前可见控制器（或其顶层）设置了 hidesBottomBarWhenPushed=YES 时，隐藏自定义底部导航条
+    UIViewController *target = vc;
+    if ([vc isKindOfClass:[UINavigationController class]]) {
+        target = ((UINavigationController *)vc).topViewController ?: vc;
+    }
+    BOOL shouldHide = target.hidesBottomBarWhenPushed;
+    self.bottomBar.hidden = shouldHide;
+    self.bottomBar.userInteractionEnabled = !shouldHide;
 }
 
 - (UIImage *)imageWithSystemName:(NSString *)name {

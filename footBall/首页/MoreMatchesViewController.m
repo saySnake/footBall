@@ -126,6 +126,7 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+    self.hidesBottomBarWhenPushed = YES;
     self.view.backgroundColor = [UIColor whiteColor];
     // 使用自定义顶部栏，而不是系统导航栏
     self.shouldShowNavigationBar = NO;

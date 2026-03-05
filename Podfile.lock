@@ -14,9 +14,6 @@ PODS:
   - AFNetworking/Serialization (4.0.1)
   - AFNetworking/UIKit (4.0.1):
     - AFNetworking/NSURLSession
-  - AMapFoundation (1.8.2)
-  - AMapLocation (2.11.0):
-    - AMapFoundation (>= 1.8.0)
   - DoraemonKit (3.1.7):
     - DoraemonKit/Core (= 3.1.7)
   - DoraemonKit/Core (3.1.7):
@@ -369,7 +366,6 @@ PODS:
 
 DEPENDENCIES:
   - AFNetworking
-  - AMapLocation
   - DoraemonKit
   - IQKeyboardManager
   - libpag
@@ -386,8 +382,6 @@ DEPENDENCIES:
 SPEC REPOS:
   trunk:
     - AFNetworking
-    - AMapFoundation
-    - AMapLocation
     - DoraemonKit
     - FMDB
     - GCDWebServer
@@ -405,8 +399,6 @@ SPEC REPOS:
 
 SPEC CHECKSUMS:
   AFNetworking: 3bd23d814e976cd148d7d44c3ab78017b744cd58
-  AMapFoundation: 9885c48fc3a78fdfb84a0299a2293e56ea3c9fec
-  AMapLocation: 8c46dbe995333ad6cae147d54a7307a577020be0
   DoraemonKit: 0b45c9dc6ab34bd426a2782ee1bf7ab13492a60b
   FMDB: 728731dd336af3936ce00f91d9d8495f5718a0e6
   GCDWebServer: 2c156a56c8226e2d5c0c3f208a3621ccffbe3ce4
@@ -422,6 +414,6 @@ SPEC CHECKSUMS:
   YYCategories: 6bcd4314c6661a561410dce4a793379ebd306abd
   YYModel: 2a7fdd96aaa4b86a824e26d0c517de8928c04b30
 
-PODFILE CHECKSUM: 2e70e338da88f46d907f63522a69c8574f2ac6c6
+PODFILE CHECKSUM: 76a09d592b393eb1a6385b2670c8723d4fc32509
 
 COCOAPODS: 1.16.2

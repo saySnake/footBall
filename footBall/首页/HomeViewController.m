@@ -397,6 +397,7 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
 
 - (void)onMoreTapped {
     MoreMatchesViewController *vc = [[MoreMatchesViewController alloc] init];
+    vc.hidesBottomBarWhenPushed = YES;
     [self.navigationController pushViewController:vc animated:YES];
 }
 

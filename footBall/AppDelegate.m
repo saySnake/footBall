@@ -15,7 +15,6 @@
 #import "AuthManager.h"
 #import "PagFilePreloader.h"
 #import <DoraemonKit/DoraemonManager.h>
-#import <AMapFoundationKit/AMapFoundationKit.h>
 
 #ifdef DEBUG
 #import "EasyDebugPositionConfig.h"
@@ -114,7 +113,7 @@
         NSLog(@"✅ EasyDebug 已初始化");
     #endif
     
-    [AMapServices sharedServices].apiKey = @"3002c4c826fa195d3e1878a6402172fd";
+    
     return YES;
 }
 
