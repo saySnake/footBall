@@ -89,6 +89,28 @@
 
 /* Discover */
 "discover_passport_title" = "我的足球護照";
+"discover_passport_subtitle" = "護照·通行證";
+"discover_input_info" = "輸入資訊";
+"discover_stat_matches" = "總場次";
+"discover_stat_duration" = "總觀看時長";
+"discover_stat_venues" = "總球場數";
+"discover_stat_league" = "聯賽";
+"discover_stat_country" = "國家";
+"discover_consume_record" = "  消費記錄  ";
+"discover_my_passport_btn" = "  我的足球護照  ";
+"discover_league_info" = "聯賽資訊";
+"discover_win" = "勝利";
+"discover_draw" = "和局";
+"discover_loss" = "失敗";
+"discover_eliminated" = "淘汰";
+"discover_qualified" = "出線";
+"discover_add_consume" = "添加消費";
+"discover_stamp_album" = "郵票夾";
+"discover_tab_upcoming_format" = "未來觀賽(%ld)";
+"discover_tab_finished_format" = "已經觀賽(%ld)";
+"discover_verified_ticket" = "認證球票";
+"discover_verified_minutes_format" = "已認證%ld分鐘";
+"discover_verify_match" = "認證比賽";
 
 /* Add Consume */
 "add_consume_title" = "添加消費";

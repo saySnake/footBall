@@ -44,6 +44,28 @@
 
 /* Discover */
 "discover_passport_title" = "My Football Passport";
+"discover_passport_subtitle" = "Passport · Pass";
+"discover_input_info" = "Input Info";
+"discover_stat_matches" = "Matches";
+"discover_stat_duration" = "Watch Time";
+"discover_stat_venues" = "Venues";
+"discover_stat_league" = "Leagues";
+"discover_stat_country" = "Countries";
+"discover_consume_record" = "  Consumption  ";
+"discover_my_passport_btn" = "  My Passport  ";
+"discover_league_info" = "League Info";
+"discover_win" = "Win";
+"discover_draw" = "Draw";
+"discover_loss" = "Loss";
+"discover_eliminated" = "Eliminated";
+"discover_qualified" = "Qualified";
+"discover_add_consume" = "Add Expense";
+"discover_stamp_album" = "Stamp Album";
+"discover_tab_upcoming_format" = "Upcoming (%ld)";
+"discover_tab_finished_format" = "Attended (%ld)";
+"discover_verified_ticket" = "Verified Ticket";
+"discover_verified_minutes_format" = "Verified %ld min";
+"discover_verify_match" = "Verify Match";
 
 /* Add Consume */
 "add_consume_title" = "Add Expense";

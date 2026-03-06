@@ -94,7 +94,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 
         _inputButton = [UIButton buttonWithType:UIButtonTypeSystem];
         _inputButton.titleLabel.font = [UIFont systemFontOfSize:12];
-        [_inputButton setTitle:@"输入信息" forState:UIControlStateNormal];
+        [_inputButton setTitle:(NSLocalizedString(@"discover_input_info", nil) ?: @"输入信息") forState:UIControlStateNormal];
         [_inputButton setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
         _inputButton.layer.cornerRadius = 14;
         _inputButton.layer.borderWidth = 1;
@@ -278,7 +278,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     _passportTitleLabel.textColor = [UIColor whiteColor];
 
     _passportSubLabel = [[UILabel alloc] init];
-    _passportSubLabel.text = @"护照·通行证";
+    _passportSubLabel.text = (NSLocalizedString(@"discover_passport_subtitle", nil) ?: @"护照·通行证");
     _passportSubLabel.font = [UIFont systemFontOfSize:11];
     _passportSubLabel.textColor = [UIColor colorWithWhite:0.75 alpha:1.0];
 
@@ -302,11 +302,11 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         return l;
     };
 
-    _statAValue = makeValue(); UILabel *statADesc = makeDesc(@"总场次");
-    _statBValue = makeValue(); UILabel *statBDesc = makeDesc(@"总观看时长");
-    _statCValue = makeValue(); UILabel *statCDesc = makeDesc(@"总球场数");
-    _statDValue = makeValue(); UILabel *statDDesc = makeDesc(@"联赛");
-    _statEValue = makeValue(); UILabel *statEDesc = makeDesc(@"国家");
+    _statAValue = makeValue(); UILabel *statADesc = makeDesc(NSLocalizedString(@"discover_stat_matches", nil) ?: @"总场次");
+    _statBValue = makeValue(); UILabel *statBDesc = makeDesc(NSLocalizedString(@"discover_stat_duration", nil) ?: @"总观看时长");
+    _statCValue = makeValue(); UILabel *statCDesc = makeDesc(NSLocalizedString(@"discover_stat_venues", nil) ?: @"总球场数");
+    _statDValue = makeValue(); UILabel *statDDesc = makeDesc(NSLocalizedString(@"discover_stat_league", nil) ?: @"联赛");
+    _statEValue = makeValue(); UILabel *statEDesc = makeDesc(NSLocalizedString(@"discover_stat_country", nil) ?: @"国家");
 
     [header addSubview:_statAValue];
     [header addSubview:statADesc];
@@ -327,7 +327,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     _consumeBtn.layer.borderWidth = 1;
     _consumeBtn.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.18].CGColor;
     _consumeBtn.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.08];
-    [_consumeBtn setTitle:@"  消费记录  " forState:UIControlStateNormal];
+    [_consumeBtn setTitle:(NSLocalizedString(@"discover_consume_record", nil) ?: @"  消费记录  ") forState:UIControlStateNormal];
     [_consumeBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     _consumeBtn.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
     if (@available(iOS 13.0, *)) { [_consumeBtn setImage:[UIImage systemImageNamed:@"doc.text"] forState:UIControlStateNormal]; _consumeBtn.tintColor = [UIColor whiteColor]; }
@@ -338,7 +338,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     _myPassportBtn.layer.borderWidth = 1;
     _myPassportBtn.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.18].CGColor;
     _myPassportBtn.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.08];
-    [_myPassportBtn setTitle:@"  我的足球护照  " forState:UIControlStateNormal];
+    [_myPassportBtn setTitle:(NSLocalizedString(@"discover_my_passport_btn", nil) ?: @"  我的足球护照  ") forState:UIControlStateNormal];
     [_myPassportBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     _myPassportBtn.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
     if (@available(iOS 13.0, *)) { [_myPassportBtn setImage:[UIImage systemImageNamed:@"soccerball"] forState:UIControlStateNormal]; _myPassportBtn.tintColor = [UIColor whiteColor]; }
@@ -461,7 +461,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     [white addSubview:topLine];
 
     UILabel *leagueTitle = [[UILabel alloc] init];
-    leagueTitle.text = @"联赛信息";
+    leagueTitle.text = (NSLocalizedString(@"discover_league_info", nil) ?: @"联赛信息");
     leagueTitle.font = [UIFont boldSystemFontOfSize:16];
     leagueTitle.textColor = [UIColor blackColor];
     [white addSubview:leagueTitle];
@@ -489,15 +489,15 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     };
 
     UILabel *w40 = bigNum(); w40.text = @"40";
-    UILabel *w40d = smallLab(@"胜利");
+    UILabel *w40d = smallLab(NSLocalizedString(@"discover_win", nil) ?: @"胜利");
     UILabel *d20 = bigNum(); d20.text = @"20";
-    UILabel *d20d = smallLab(@"平局");
+    UILabel *d20d = smallLab(NSLocalizedString(@"discover_draw", nil) ?: @"平局");
     UILabel *l30 = bigNum(); l30.text = @"30";
-    UILabel *l30d = smallLab(@"失败");
+    UILabel *l30d = smallLab(NSLocalizedString(@"discover_loss", nil) ?: @"失败");
     UILabel *k2 = bigNum(); k2.text = @"2";
-    UILabel *k2d = smallLab(@"淘汰");
+    UILabel *k2d = smallLab(NSLocalizedString(@"discover_eliminated", nil) ?: @"淘汰");
     UILabel *q2 = bigNum(); q2.text = @"2";
-    UILabel *q2d = smallLab(@"出线");
+    UILabel *q2d = smallLab(NSLocalizedString(@"discover_qualified", nil) ?: @"出线");
 
     NSArray *topNums = @[ w40, d20, l30 ];
     NSArray *topDescs = @[ w40d, d20d, l30d ];
@@ -560,8 +560,8 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         if (@available(iOS 13.0, *)) { [b setImage:[UIImage systemImageNamed:sys] forState:UIControlStateNormal]; b.tintColor = [UIColor blackColor]; }
         return b;
     };
-    _addConsumeBtn = outlineBtn(@"添加消费", @"plus.circle");
-    _stampBtn = outlineBtn(@"邮票夹", @"qrcode.viewfinder");
+    _addConsumeBtn = outlineBtn((NSLocalizedString(@"discover_add_consume", nil) ?: @"添加消费"), @"plus.circle");
+    _stampBtn = outlineBtn((NSLocalizedString(@"discover_stamp_album", nil) ?: @"邮票夹"), @"qrcode.viewfinder");
     [white addSubview:_addConsumeBtn];
     [white addSubview:_stampBtn];
     [_addConsumeBtn addTarget:self action:@selector(onAddConsumeTapped) forControlEvents:UIControlEventTouchUpInside];
@@ -569,7 +569,9 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     _upcomingPill = [UIButton buttonWithType:UIButtonTypeSystem];
     _finishedPill = [UIButton buttonWithType:UIButtonTypeSystem];
     NSArray *tabs = @[ _upcomingPill, _finishedPill ];
-    NSArray *tabTitles = @[ @"未来观赛(2)", @"已经观赛(2)" ];
+    NSString *tabUpcoming = [NSString stringWithFormat:(NSLocalizedString(@"discover_tab_upcoming_format", nil) ?: @"未来观赛(%ld)"), (long)2];
+    NSString *tabFinished = [NSString stringWithFormat:(NSLocalizedString(@"discover_tab_finished_format", nil) ?: @"已经观赛(%ld)"), (long)2];
+    NSArray *tabTitles = @[ tabUpcoming, tabFinished ];
     for (NSInteger i = 0; i < tabs.count; i++) {
         UIButton *b = tabs[i];
         [b setTitle:tabTitles[i] forState:UIControlStateNormal];
@@ -644,16 +646,17 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     NSMutableArray *upcoming = [NSMutableArray array];
     NSMutableArray *finished = [NSMutableArray array];
 
+    NSString *verifiedTicket = (NSLocalizedString(@"discover_verified_ticket", nil) ?: @"认证球票");
     // 未来观赛：中间展示时间，右侧为「认证球票」（假数据多一些）
     NSArray *upcomingRaw = @[
-        @[ @"诺丁汉森林队", @"利物浦", @"06:30", @"15 Dec, 2025", @"认证球票" ],
-        @[ @"曼城", @"布莱顿", @"07:30", @"16 Dec, 2025", @"认证球票" ],
-        @[ @"狼队", @"阿森纳", @"08:30", @"16 Dec, 2025", @"认证球票" ],
-        @[ @"伯恩利", @"布伦特福德", @"09:00", @"17 Dec, 2025", @"认证球票" ],
-        @[ @"阿森纳", @"布莱顿", @"11:00", @"18 Dec, 2025", @"认证球票" ],
-        @[ @"曼联", @"切尔西", @"19:30", @"18 Dec, 2025", @"认证球票" ],
-        @[ @"热刺", @"曼城", @"20:00", @"19 Dec, 2025", @"认证球票" ],
-        @[ @"利物浦", @"狼队", @"21:15", @"19 Dec, 2025", @"认证球票" ]
+        @[ @"诺丁汉森林队", @"利物浦", @"06:30", @"15 Dec, 2025", verifiedTicket ],
+        @[ @"曼城", @"布莱顿", @"07:30", @"16 Dec, 2025", verifiedTicket ],
+        @[ @"狼队", @"阿森纳", @"08:30", @"16 Dec, 2025", verifiedTicket ],
+        @[ @"伯恩利", @"布伦特福德", @"09:00", @"17 Dec, 2025", verifiedTicket ],
+        @[ @"阿森纳", @"布莱顿", @"11:00", @"18 Dec, 2025", verifiedTicket ],
+        @[ @"曼联", @"切尔西", @"19:30", @"18 Dec, 2025", verifiedTicket ],
+        @[ @"热刺", @"曼城", @"20:00", @"19 Dec, 2025", verifiedTicket ],
+        @[ @"利物浦", @"狼队", @"21:15", @"19 Dec, 2025", verifiedTicket ]
     ];
     for (NSArray *info in upcomingRaw) {
         DiscoverMatch *m = [DiscoverMatch new];
@@ -666,14 +669,15 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         [upcoming addObject:m];
     }
 
+    NSString *verifiedMinutesFormat = (NSLocalizedString(@"discover_verified_minutes_format", nil) ?: @"已认证%ld分钟");
     // 已经观赛：中间展示比分，右侧为「已认证xx分钟」
     NSArray *finishedRaw = @[
-        @[ @"阿森纳", @"布莱顿", @"2 : 0", @"15 Dec, 2025", @"已认证98分钟" ],
-        @[ @"阿森纳", @"布莱顿", @"3 : 1", @"12 Dec, 2025", @"已认证123分钟" ],
-        @[ @"曼城", @"利物浦", @"1 : 1", @"10 Dec, 2025", @"已认证104分钟" ],
-        @[ @"狼队", @"阿森纳", @"0 : 2", @"08 Dec, 2025", @"已认证91分钟" ],
-        @[ @"诺丁汉森林队", @"利物浦", @"0 : 2", @"05 Dec, 2025", @"已认证110分钟" ],
-        @[ @"伯恩利", @"布伦特福德", @"2 : 1", @"02 Dec, 2025", @"已认证96分钟" ]
+        @[ @"阿森纳", @"布莱顿", @"2 : 0", @"15 Dec, 2025", [NSString stringWithFormat:verifiedMinutesFormat, (long)98] ],
+        @[ @"阿森纳", @"布莱顿", @"3 : 1", @"12 Dec, 2025", [NSString stringWithFormat:verifiedMinutesFormat, (long)123] ],
+        @[ @"曼城", @"利物浦", @"1 : 1", @"10 Dec, 2025", [NSString stringWithFormat:verifiedMinutesFormat, (long)104] ],
+        @[ @"狼队", @"阿森纳", @"0 : 2", @"08 Dec, 2025", [NSString stringWithFormat:verifiedMinutesFormat, (long)91] ],
+        @[ @"诺丁汉森林队", @"利物浦", @"0 : 2", @"05 Dec, 2025", [NSString stringWithFormat:verifiedMinutesFormat, (long)110] ],
+        @[ @"伯恩利", @"布伦特福德", @"2 : 1", @"02 Dec, 2025", [NSString stringWithFormat:verifiedMinutesFormat, (long)96] ]
     ];
     [finishedRaw enumerateObjectsUsingBlock:^(NSArray *info, NSUInteger idx, BOOL *stop) {
         DiscoverMatch *m = [DiscoverMatch new];
@@ -692,8 +696,10 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     self.upcomingMatches = upcoming;
     self.finishedMatches = finished;
 
-    [self.upcomingPill setTitle:[NSString stringWithFormat:@"未来观赛(%ld)", (long)upcoming.count] forState:UIControlStateNormal];
-    [self.finishedPill setTitle:[NSString stringWithFormat:@"已经观赛(%ld)", (long)finished.count] forState:UIControlStateNormal];
+    NSString *fmtUpcoming = (NSLocalizedString(@"discover_tab_upcoming_format", nil) ?: @"未来观赛(%ld)");
+    NSString *fmtFinished = (NSLocalizedString(@"discover_tab_finished_format", nil) ?: @"已经观赛(%ld)");
+    [self.upcomingPill setTitle:[NSString stringWithFormat:fmtUpcoming, (long)upcoming.count] forState:UIControlStateNormal];
+    [self.finishedPill setTitle:[NSString stringWithFormat:fmtFinished, (long)finished.count] forState:UIControlStateNormal];
 
     self.statAValue.text = @"29";
     self.statBValue.text = @"3455";
@@ -776,7 +782,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         // 但当 hasInputInfo=YES 时，隐藏“输入信息”，并将中间时间挪到左侧展示
         cell.verifiedPill.hidden = NO;
         // 右侧始终文案为“认证比赛”，只有在输入信息+认证都完成后，才显示“已认证xx分钟”
-        NSString *pillTitle = (m.hasInputInfo && m.hasVerified) ? m.verifiedText : @"认证比赛";
+        NSString *pillTitle = (m.hasInputInfo && m.hasVerified) ? m.verifiedText : (NSLocalizedString(@"discover_verify_match", nil) ?: @"认证比赛");
         [cell.verifiedPill setTitle:pillTitle forState:UIControlStateNormal];
         cell.verifiedPill.backgroundColor = kDiscoverPillGreen;
         cell.verifiedPill.layer.borderWidth = 0;
