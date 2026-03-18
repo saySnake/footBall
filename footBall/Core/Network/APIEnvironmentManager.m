@@ -7,7 +7,6 @@
 
 #import "APIEnvironmentManager.h"
 #import "APIServerConfig.h"
-#import "APIPathConfig.h"
 
 @interface APIEnvironmentManager ()
 
@@ -59,12 +58,11 @@
     return [[APIServerConfigManager sharedManager] serverURLForEnvironment:environment];
 }
 
-- (NSString *)fullURLForPathName:(NSString *)pathName {
+- (NSString *)fullURLForPath:(NSString *)path {
     NSString *baseURL = self.currentBaseURL;
-    NSString *path = [self pathForPathName:pathName];
     
     if (!path) {
-        NSLog(@"⚠️ 未找到路径名称: %@", pathName);
+        NSLog(@"⚠️ 未找到路径名称: %@", path);
         return baseURL;
     }
     
@@ -79,10 +77,7 @@
     return [NSString stringWithFormat:@"%@%@", baseURL, path];
 }
 
-- (NSString *)pathForPathName:(NSString *)pathName {
-    // 从 APIPathConfigManager 获取路径（支持智能解析）
-    return [[APIPathConfigManager sharedManager] pathForPathName:pathName];
-}
+
 
 - (void)switchToEnvironment:(APIEnvironment)environment {
     if (environment < APIEnvironmentTest || environment > APIEnvironmentAppStore) {

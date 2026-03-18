@@ -9,7 +9,7 @@
 #import <AFNetworking/AFNetworking.h>
 #import "APIRequestInterceptor.h"
 #import "APIError.h"
-
+#import "HTTPResponse.h"
 NS_ASSUME_NONNULL_BEGIN
 
 /// 网络请求方法类型
@@ -22,7 +22,7 @@ typedef NS_ENUM(NSInteger, HTTPMethod) {
 };
 
 /// 网络请求成功回调
-typedef void(^APISuccessBlock)(id _Nullable responseObject);
+typedef void(^APISuccessBlock)(HTTPResponse * _Nullable responseObject);
 /// 网络请求失败回调
 typedef void(^APIFailureBlock)(NSError *error);
 /// 网络请求进度回调
@@ -80,8 +80,8 @@ typedef void(^APIProgressBlock)(NSProgress *progress);
                                    URLString:(NSString *)URLString
                                   parameters:(nullable id)parameters
                                      headers:(nullable NSDictionary<NSString *, NSString *> *)headers
-                                     success:(nullable APISuccessBlock)success
-                                     failure:(nullable APIFailureBlock)failure;
+                                     success:(nullable void (^)(NSURLSessionDataTask * _Nonnull, id _Nullable))success
+                                     failure:(nullable void (^)(NSURLSessionDataTask * _Nullable, NSError * _Nonnull))failure;
 
 /// GET请求
 - (NSURLSessionDataTask *)GET:(NSString *)URLString
@@ -111,45 +111,6 @@ typedef void(^APIProgressBlock)(NSProgress *progress);
                           success:(nullable APISuccessBlock)success
                           failure:(nullable APIFailureBlock)failure;
 
-/// 使用路径名称发起GET请求（推荐使用）
-/// 
-/// 使用方式：
-/// 1. 直接使用路径字符串：@"/api/v1/user/profile"
-/// 2. 使用约定路径：@"user" 会自动转换为 @"/api/v1/user"
-/// 3. 使用已注册的路径名称：APIPathNameUser（如果已注册）
-/// 
-/// @param pathName 路径名称或路径字符串（如：@"user" 或 @"/api/v1/user"）
-/// @param subPath 子路径（可选，如：@"/profile"）
-/// @param parameters 请求参数
-/// @param headers 请求头
-/// @param success 成功回调
-/// @param failure 失败回调
-- (NSURLSessionDataTask *)GETWithPathName:(NSString *)pathName
-                                   subPath:(nullable NSString *)subPath
-                                parameters:(nullable id)parameters
-                                   headers:(nullable NSDictionary<NSString *, NSString *> *)headers
-                                   success:(nullable APISuccessBlock)success
-                                   failure:(nullable APIFailureBlock)failure;
-
-/// 使用路径名称发起POST请求（推荐使用）
-/// 
-/// 使用方式：
-/// 1. 直接使用路径字符串：@"/api/v1/auth/login"
-/// 2. 使用约定路径：@"auth" 会自动转换为 @"/api/v1/auth"
-/// 3. 使用已注册的路径名称：APIPathNameAuthLogin（如果已注册）
-/// 
-/// @param pathName 路径名称或路径字符串（如：@"auth" 或 @"/api/v1/auth"）
-/// @param subPath 子路径（可选，如：@"/login"）
-/// @param parameters 请求参数
-/// @param headers 请求头
-/// @param success 成功回调
-/// @param failure 失败回调
-- (NSURLSessionDataTask *)POSTWithPathName:(NSString *)pathName
-                                    subPath:(nullable NSString *)subPath
-                                 parameters:(nullable id)parameters
-                                    headers:(nullable NSDictionary<NSString *, NSString *> *)headers
-                                    success:(nullable APISuccessBlock)success
-                                    failure:(nullable APIFailureBlock)failure;
 
 /// 上传文件
 /// @param URLString 请求路径

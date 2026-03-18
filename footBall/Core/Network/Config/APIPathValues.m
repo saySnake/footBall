@@ -13,6 +13,8 @@ NSString * const APIPathValueUserProfile = @"/api/v1/user/profile";
 NSString * const APIPathValueUserList = @"/api/v1/user/list";
 
 #pragma mark - 认证模块
+NSString * const APIPathValueSendCode = @"/api/v1/auth/send-code";
+NSString * const APIPathValueAuthLoginPhone = @"/api/v1/auth/login/phone";
 NSString * const APIPathValueAuth = @"/api/v1/auth";
 NSString * const APIPathValueAuthLogin = @"/api/v1/auth/login";
 NSString * const APIPathValueAuthLogout = @"/api/v1/auth/logout";

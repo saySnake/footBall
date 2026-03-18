@@ -34,7 +34,7 @@ typedef NS_ENUM(NSInteger, APIErrorHandlingStrategy) {
 @interface APIError : NSError
 
 /// 业务错误码（服务器返回的错误码）
-@property (nonatomic, assign) NSInteger businessCode;
+@property (nonatomic, strong) NSString *businessCode;
 
 /// 业务错误消息（服务器返回的错误消息）
 @property (nonatomic, strong, nullable) NSString *businessMessage;
@@ -75,9 +75,11 @@ typedef NS_ENUM(NSInteger, APIErrorHandlingStrategy) {
 /// @param businessCode 业务错误码
 /// @param businessMessage 业务错误消息
 /// @param underlyingError 底层错误
-+ (instancetype)errorWithBusinessCode:(NSInteger)businessCode
++ (instancetype)errorWithBusinessCode:(NSString *)businessCode
                       businessMessage:(nullable NSString *)businessMessage
                        underlyingError:(nullable NSError *)underlyingError;
+
++ (instancetype)errorWithResponse:(HTTPResponse *)response;
 
 /// 从NSError创建APIError
 /// @param error 原始错误

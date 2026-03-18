@@ -10,7 +10,6 @@
 NS_ASSUME_NONNULL_BEGIN
 
 /// API路径值常量类 - 统一管理所有API路径值
-@interface APIPathValues : NSObject
 
 #pragma mark - 用户模块
 /// 用户相关接口路径
@@ -21,6 +20,10 @@ FOUNDATION_EXPORT NSString * const APIPathValueUserProfile;
 FOUNDATION_EXPORT NSString * const APIPathValueUserList;
 
 #pragma mark - 认证模块
+/// 发送验证码
+FOUNDATION_EXPORT NSString * const APIPathValueSendCode;
+/// 手机登录
+FOUNDATION_EXPORT NSString * const APIPathValueAuthLoginPhone;
 /// 认证相关接口路径
 FOUNDATION_EXPORT NSString * const APIPathValueAuth;
 /// 登录路径
@@ -36,6 +39,5 @@ FOUNDATION_EXPORT NSString * const APIPathValueUpload;
 /// 文件下载路径
 FOUNDATION_EXPORT NSString * const APIPathValueDownload;
 
-@end
 
 NS_ASSUME_NONNULL_END

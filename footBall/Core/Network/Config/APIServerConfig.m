@@ -77,9 +77,9 @@
 - (void)loadDefaultServerConfigs {
     // 默认HTTP服务器地址配置
     // 注意：这些是示例地址，需要根据实际项目修改
-    _serverURLs[@(APIEnvironmentTest)] = @"https://test-api.example.com";
-    _serverURLs[@(APIEnvironmentUAT)] = @"https://uat-api.example.com";
-    _serverURLs[@(APIEnvironmentAppStore)] = @"https://api.example.com";
+    _serverURLs[@(APIEnvironmentTest)] = @"https://112.126.56.42";
+    _serverURLs[@(APIEnvironmentUAT)] = @"https://112.126.56.42";
+    _serverURLs[@(APIEnvironmentAppStore)] = @"https://112.126.56.42";
     
     // WebSocket地址默认从HTTP地址自动转换，也可以单独配置
     // 如果需要独立的WebSocket地址，可以在这里设置：

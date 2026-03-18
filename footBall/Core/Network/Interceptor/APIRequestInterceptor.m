@@ -22,7 +22,7 @@
     return self;
 }
 
-- (nullable NSURLRequest *)interceptRequest:(NSURLRequest *)request {
+- (nullable NSURLRequest *)interceptRequest:(NSURLRequest *)request task:(NSURLSessionDataTask *)task{
     if (!self.tokenProvider) {
         return request;
     }
@@ -44,7 +44,7 @@
 @implementation APILoggingInterceptor
 
 - (instancetype)init {
-    return [self initWithLogLevel:1];
+    return [self initWithLogLevel:2];
 }
 
 - (instancetype)initWithLogLevel:(NSInteger)logLevel {
@@ -56,7 +56,7 @@
     return self;
 }
 
-- (nullable NSURLRequest *)interceptRequest:(NSURLRequest *)request {
+- (nullable NSURLRequest *)interceptRequest:(NSURLRequest *)request{
     if (!self.enabled || self.logLevel < 1) {
         return request;
     }
@@ -75,27 +75,26 @@
     return request;
 }
 
-- (BOOL)interceptResponse:(NSURLResponse *)response
-                     data:(nullable NSData *)data
-                    error:(nullable NSError *)error {
+- (BOOL)interceptResponse:(id)response task:(NSURLSessionDataTask *)task{
     if (!self.enabled || self.logLevel < 1) {
         return YES;
     }
-    
-    if (error) {
-        NSLog(@"❌ [API Error] %@", error.localizedDescription);
-    } else {
-        NSLog(@"✅ [API Response] %@", ((NSHTTPURLResponse *)response).statusCode);
-        
-        if (self.logLevel >= 2 && data) {
-            NSString *responseString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-            NSLog(@"📥 [Response Body] %@", responseString);
-        }
+    NSHTTPURLResponse *httpResp = (NSHTTPURLResponse *)task.response;
+    NSLog(@"✅ [API Response] %@", httpResp.URL);
+    NSLog(@"✅ [API StatusCode] %ld", httpResp.statusCode);
+    if (self.logLevel >= 2 && response) {
+        NSLog(@"✅ [API Body]***************** \n%@\n✅ [API Body]***************** ",response);
     }
     
     return YES;
 }
-
+- (NSError *)interceptError:(NSError *)error task:(NSURLSessionDataTask *)task{
+    NSHTTPURLResponse *httpResp = (NSHTTPURLResponse *)task.response;
+    NSLog(@"❌ [API Response] %@", httpResp.URL);
+    NSLog(@"❌ [API StatusCode] %ld", httpResp.statusCode);
+    NSLog(@"❌ [API ERROR]***************** \n%@\n❌ [API ERROR]*****************",error);
+    return error;
+}
 @end
 
 @implementation APIErrorHandlingInterceptor
@@ -112,7 +111,7 @@
     return self;
 }
 
-- (nullable NSError *)interceptError:(NSError *)error {
+- (nullable NSError *)interceptError:(NSError *)error task:(NSURLSessionDataTask *)task{
     // 转换为APIError
     APIError *apiError = [APIError errorFromNSError:error];
     

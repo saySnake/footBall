@@ -10,7 +10,7 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @class NSURLRequest;
-@class NSURLResponse;
+@class HTTPResponse;
 
 /// 请求拦截器协议 - 用于统一处理请求和响应
 @protocol APIRequestInterceptor <NSObject>
@@ -24,17 +24,12 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 拦截响应（在收到响应后调用）
 /// @param response 响应对象
-/// @param data 响应数据
-/// @param error 错误信息（如果有）
 /// @return 是否继续处理响应，返回NO表示拦截器已处理完成
-- (BOOL)interceptResponse:(NSURLResponse *)response
-                     data:(nullable NSData *)data
-                    error:(nullable NSError *)error;
-
+- (BOOL)interceptResponse:(id)response task:(NSURLSessionDataTask *)task;
 /// 拦截错误（在请求失败时调用）
 /// @param error 错误信息
 /// @return 处理后的错误，返回nil表示错误已处理
-- (nullable NSError *)interceptError:(NSError *)error;
+- (nullable NSError *)interceptError:(NSError *)error task:(NSURLSessionDataTask *)task;
 
 @end
 

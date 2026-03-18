@@ -83,7 +83,7 @@
     APIAuthenticationInterceptor *authInterceptor = 
         [[APIAuthenticationInterceptor alloc] initWithTokenProvider:^NSString *{
             // 从AuthManager获取token
-            return [[AuthManager sharedManager] getToken];
+            return [[AuthManager sharedManager] user].accessToken;
         }];
     [apiManager addInterceptor:authInterceptor];
     NSLog(@"✅ 认证拦截器已配置，将自动添加Authorization请求头");

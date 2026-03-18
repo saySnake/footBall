@@ -6,7 +6,7 @@
 #import "PhoneInputViewController.h"
 #import <Masonry/Masonry.h>
 #import "ColorManager.h"
-
+#import "VerifyCodeViewController.h"
 @interface PhoneInputViewController () <UITextFieldDelegate>
 
 @property (nonatomic, strong) UIImageView *logoImageView;
@@ -52,6 +52,10 @@
     
     [self setupUI];
     [self updateButtonState];
+}
+-(void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    self.phoneTextField.text=@"18101334471";
 }
 
 - (void)setupUI {
@@ -320,13 +324,16 @@
     if (!self.getCodeButton.enabled) {
         return;
     }
-    Class verifyClass = NSClassFromString(@"VerifyCodeViewController");
-    if (!verifyClass) {
-        return;
-    }
-    UIViewController *vc = [verifyClass new];
-    [vc setValue:self.phoneTextField.text forKey:@"phoneNumber"];
-    [self.navigationController pushViewController:vc animated:YES];
+    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+    [AuthManager.sharedManager sendVerifyCode:self.phoneTextField.text success:^(HTTPResponse *response) {
+        [MBProgressHUD hideHUDForView:self.view animated:YES];
+        VerifyCodeViewController *vc = VerifyCodeViewController.alloc.init;
+        vc.phoneNumber = self.phoneTextField.text;
+        [self.navigationController pushViewController:vc animated:YES];
+    } failure:^(NSError * _Nonnull error) {
+        [MBProgressHUD hideHUDForView:self.view animated:YES];
+        [QMUITips showError:error.localizedDescription];
+    }];
 }
 
 @end

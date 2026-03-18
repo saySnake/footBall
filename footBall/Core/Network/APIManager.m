@@ -9,7 +9,7 @@
 #import "APIEnvironmentManager.h"
 #import "APIRequestInterceptor.h"
 #import "APIError.h"
-
+#import <YYModel/YYModel.h>
 @interface APIManager ()
 
 @property (nonatomic, strong) AFHTTPSessionManager *sessionManager;
@@ -45,8 +45,12 @@
         
         // 初始化AFHTTPSessionManager
         _sessionManager = [[AFHTTPSessionManager alloc] init];
+        _sessionManager.securityPolicy.allowInvalidCertificates = YES;
+        _sessionManager.securityPolicy.validatesDomainName = NO;
         _sessionManager.requestSerializer = [AFJSONRequestSerializer serializer];
-        _sessionManager.responseSerializer = [AFJSONResponseSerializer serializer];
+        AFJSONResponseSerializer *responseSerializer = [AFJSONResponseSerializer serializer];
+        responseSerializer.removesKeysWithNullValues = YES;
+        _sessionManager.responseSerializer = responseSerializer;
         _sessionManager.requestSerializer.timeoutInterval = _timeoutInterval;
         
         // 设置可接受的响应类型
@@ -87,8 +91,8 @@
                                    URLString:(NSString *)URLString
                                   parameters:(nullable id)parameters
                                      headers:(nullable NSDictionary<NSString *, NSString *> *)headers
-                                     success:(nullable APISuccessBlock)success
-                                     failure:(nullable APIFailureBlock)failure {
+                                     success:(nullable void (^)(NSURLSessionDataTask * _Nonnull, id _Nullable))success
+                                    failure:(nullable void (^)(NSURLSessionDataTask * _Nullable, NSError * _Nonnull))failure {
     
     // 构建完整URL
     NSString *fullURL = URLString;
@@ -136,7 +140,7 @@
                     APIError *error = [APIError errorWithCode:APIErrorCodeCancelled
                                                        message:@"请求被拦截器取消"
                                                underlyingError:nil];
-                    failure(error);
+                    failure(nil,error);
                 }
                 return nil;
             }
@@ -151,27 +155,26 @@
     
     // 包装成功和失败回调，执行响应拦截器
     __weak typeof(self) weakSelf = self;
-    APISuccessBlock wrappedSuccess = ^(id responseObject) {
+     void (^wrappedSuccess)(id,id) = ^(NSURLSessionDataTask * task,id responseObject) {
         // 执行响应拦截器
         BOOL shouldContinue = YES;
         for (id<APIRequestInterceptor> interceptor in weakSelf.interceptors) {
-            if ([interceptor respondsToSelector:@selector(interceptResponse:data:error:)]) {
-                shouldContinue = [interceptor interceptResponse:nil data:nil error:nil];
+            if ([interceptor respondsToSelector:@selector(interceptResponse:task:)]) {
+                shouldContinue = [interceptor interceptResponse:responseObject task:task];
                 if (!shouldContinue) {
                     break;
                 }
             }
         }
-        
         if (shouldContinue && success) {
-            success(responseObject);
+            success(task,responseObject);
         }
     };
     
     // 生成请求唯一标识（用于跟踪重试次数）
     NSString *requestKey = [NSString stringWithFormat:@"%@_%ld_%p", fullURL, (long)method, parameters];
-    
-    APIFailureBlock wrappedFailure = ^(NSError *error) {
+    void (^wrappedFailure)(id,id) = ^(NSURLSessionDataTask * task,NSError *error) {
+
         // 转换为APIError
         APIError *apiError = [APIError errorFromNSError:error];
         apiError.requestPath = fullURL;
@@ -185,8 +188,8 @@
         // 执行错误拦截器
         NSError *finalError = apiError;
         for (id<APIRequestInterceptor> interceptor in weakSelf.interceptors) {
-            if ([interceptor respondsToSelector:@selector(interceptError:)]) {
-                NSError *interceptedError = [interceptor interceptError:finalError];
+            if ([interceptor respondsToSelector:@selector(interceptError:task:)]) {
+                NSError *interceptedError = [interceptor interceptError:finalError task:task];
                 if (!interceptedError) {
                     // 错误已被处理，不继续传播
                     [weakSelf.retryCountMap removeObjectForKey:requestKey]; // 清理重试计数
@@ -217,11 +220,11 @@
                                   URLString:URLString
                                  parameters:parameters
                                     headers:headers
-                                    success:^(id responseObject) {
+                                    success:^(NSURLSessionDataTask * task,id responseObject) {
                     // 重试成功，清理重试计数
                     [weakSelf.retryCountMap removeObjectForKey:requestKey];
                     if (success) {
-                        success(responseObject);
+                        success(task,responseObject);
                     }
                 } failure:wrappedFailure]; // 使用相同的wrappedFailure，继续重试逻辑
             });
@@ -237,7 +240,7 @@
         }
         
         if (failure) {
-            failure(finalError);
+            failure(task,finalError);
         }
     };
     
@@ -252,10 +255,10 @@
                                     progress:nil
                                      success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
                 [weakSelf.tasks removeObject:task];
-                wrappedSuccess(responseObject);
+                wrappedSuccess(task,responseObject);
             } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
                 [weakSelf.tasks removeObject:task];
-                wrappedFailure(error);
+                wrappedFailure(task,error);
             }];
             break;
         }
@@ -267,10 +270,10 @@
                                      progress:nil
                                       success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
                 [weakSelf.tasks removeObject:task];
-                wrappedSuccess(responseObject);
+                wrappedSuccess(task,responseObject);
             } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
                 [weakSelf.tasks removeObject:task];
-                wrappedFailure(error);
+                wrappedFailure(task,error);
             }];
             break;
         }
@@ -281,10 +284,10 @@
                                     headers:nil
                                     success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
                 [weakSelf.tasks removeObject:task];
-                wrappedSuccess(responseObject);
+                wrappedSuccess(task,responseObject);
             } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
                 [weakSelf.tasks removeObject:task];
-                wrappedFailure(error);
+                wrappedFailure(task,error);
             }];
             break;
         }
@@ -295,10 +298,10 @@
                                        headers:nil
                                        success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
                 [weakSelf.tasks removeObject:task];
-                wrappedSuccess(responseObject);
+                wrappedSuccess(task,responseObject);
             } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
                 [weakSelf.tasks removeObject:task];
-                wrappedFailure(error);
+                wrappedFailure(task,error);
             }];
             break;
         }
@@ -309,10 +312,10 @@
                                       headers:nil
                                       success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
                 [weakSelf.tasks removeObject:task];
-                wrappedSuccess(responseObject);
+                wrappedSuccess(task,responseObject);
             } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
                 [weakSelf.tasks removeObject:task];
-                wrappedFailure(error);
+                wrappedFailure(task,error);
             }];
             break;
         }
@@ -324,6 +327,23 @@
     
     return task;
 }
+- (nullable void (^)(NSURLSessionDataTask * _Nonnull, id _Nullable))successBlock:(APISuccessBlock)block {
+    void (^taskBlock)(NSURLSessionDataTask *,id) = ^(NSURLSessionDataTask * task,id response) {
+        if (block) {
+            HTTPResponse *resp = [HTTPResponse yy_modelWithJSON:response];
+            block(resp);
+        }
+    };
+    return taskBlock;
+}
+- (nullable void (^)(NSURLSessionDataTask * _Nonnull, NSError * _Nullable))errorBlock:(APIFailureBlock)block {
+    void (^taskBlock)(NSURLSessionDataTask *,NSError *) = ^(NSURLSessionDataTask * task,NSError *error) {
+        if (block) {
+            block(error);
+        }
+    };
+    return taskBlock;
+}
 
 - (NSURLSessionDataTask *)GET:(NSString *)URLString
                     parameters:(nullable id)parameters
@@ -334,8 +354,8 @@
                           URLString:URLString
                          parameters:parameters
                             headers:headers
-                            success:success
-                            failure:failure];
+                           success:[self successBlock:success]
+                            failure:[self errorBlock:failure]];
 }
 
 - (NSURLSessionDataTask *)POST:(NSString *)URLString
@@ -347,8 +367,8 @@
                           URLString:URLString
                          parameters:parameters
                             headers:headers
-                            success:success
-                            failure:failure];
+                            success:[self successBlock:success]
+                            failure:[self errorBlock:failure]];
 }
 
 - (NSURLSessionDataTask *)PUT:(NSString *)URLString
@@ -360,8 +380,8 @@
                           URLString:URLString
                          parameters:parameters
                             headers:headers
-                            success:success
-                            failure:failure];
+                            success:[self successBlock:success]
+                            failure:[self errorBlock:failure]];
 }
 
 - (NSURLSessionDataTask *)DELETE:(NSString *)URLString
@@ -373,8 +393,8 @@
                           URLString:URLString
                          parameters:parameters
                             headers:headers
-                            success:success
-                            failure:failure];
+                            success:[self successBlock:success]
+                            failure:[self errorBlock:failure]];
 }
 
 - (NSURLSessionDataTask *)uploadFile:(NSString *)URLString
@@ -522,96 +542,6 @@
         case HTTPMethodPATCH:
             return @"PATCH";
     }
-}
-
-#pragma mark - Path Name Methods
-
-- (NSURLSessionDataTask *)GETWithPathName:(NSString *)pathName
-                                   subPath:(nullable NSString *)subPath
-                                parameters:(nullable id)parameters
-                                   headers:(nullable NSDictionary<NSString *, NSString *> *)headers
-                                   success:(nullable APISuccessBlock)success
-                                   failure:(nullable APIFailureBlock)failure {
-    APIEnvironmentManager *envManager = [APIEnvironmentManager sharedManager];
-    NSString *basePath = [envManager pathForPathName:pathName];
-    
-    // 移除强制检查，允许直接使用路径字符串
-    if (!basePath || basePath.length == 0) {
-        // 如果路径为空，使用 pathName 作为路径（向后兼容）
-        basePath = pathName;
-    }
-    
-    // 拼接完整路径
-    NSString *fullPath = basePath;
-    if (subPath && subPath.length > 0) {
-        // 确保 subPath 以 / 开头
-        if (![subPath hasPrefix:@"/"]) {
-            subPath = [NSString stringWithFormat:@"/%@", subPath];
-        }
-        fullPath = [basePath stringByAppendingString:subPath];
-    }
-    
-    // 构建完整URL：Base URL + Path
-    NSString *baseURL = envManager.currentBaseURL;
-    // 确保 baseURL 不以 / 结尾
-    if ([baseURL hasSuffix:@"/"]) {
-        baseURL = [baseURL substringToIndex:baseURL.length - 1];
-    }
-    // 确保 fullPath 以 / 开头
-    if (![fullPath hasPrefix:@"/"]) {
-        fullPath = [NSString stringWithFormat:@"/%@", fullPath];
-    }
-    NSString *fullURL = [NSString stringWithFormat:@"%@%@", baseURL, fullPath];
-    
-    return [self GET:fullURL
-          parameters:parameters
-             headers:headers
-             success:success
-             failure:failure];
-}
-
-- (NSURLSessionDataTask *)POSTWithPathName:(NSString *)pathName
-                                    subPath:(nullable NSString *)subPath
-                                 parameters:(nullable id)parameters
-                                    headers:(nullable NSDictionary<NSString *, NSString *> *)headers
-                                    success:(nullable APISuccessBlock)success
-                                    failure:(nullable APIFailureBlock)failure {
-    APIEnvironmentManager *envManager = [APIEnvironmentManager sharedManager];
-    NSString *basePath = [envManager pathForPathName:pathName];
-    
-    // 移除强制检查，允许直接使用路径字符串
-    if (!basePath || basePath.length == 0) {
-        // 如果路径为空，使用 pathName 作为路径（向后兼容）
-        basePath = pathName;
-    }
-    
-    // 拼接完整路径
-    NSString *fullPath = basePath;
-    if (subPath && subPath.length > 0) {
-        // 确保 subPath 以 / 开头
-        if (![subPath hasPrefix:@"/"]) {
-            subPath = [NSString stringWithFormat:@"/%@", subPath];
-        }
-        fullPath = [basePath stringByAppendingString:subPath];
-    }
-    
-    // 构建完整URL：Base URL + Path
-    NSString *baseURL = envManager.currentBaseURL;
-    // 确保 baseURL 不以 / 结尾
-    if ([baseURL hasSuffix:@"/"]) {
-        baseURL = [baseURL substringToIndex:baseURL.length - 1];
-    }
-    // 确保 fullPath 以 / 开头
-    if (![fullPath hasPrefix:@"/"]) {
-        fullPath = [NSString stringWithFormat:@"/%@", fullPath];
-    }
-    NSString *fullURL = [NSString stringWithFormat:@"%@%@", baseURL, fullPath];
-    
-    return [self POST:fullURL
-           parameters:parameters
-              headers:headers
-              success:success
-              failure:failure];
 }
 
 @end

@@ -48,10 +48,10 @@ static char kRetryCountKey;
     return error;
 }
 
-+ (instancetype)errorWithBusinessCode:(NSInteger)businessCode
++ (instancetype)errorWithBusinessCode:(NSString *)businessCode
                       businessMessage:(nullable NSString *)businessMessage
                        underlyingError:(nullable NSError *)underlyingError {
-    APIErrorCode code = [APIError mapBusinessCodeToErrorCode:businessCode];
+    APIErrorCode code = [APIError mapBusinessCodeToErrorCode:businessCode.integerValue];
     APIError *error = [self errorWithCode:code
                                    message:businessMessage
                            underlyingError:underlyingError];
@@ -60,7 +60,10 @@ static char kRetryCountKey;
     
     return error;
 }
-
++ (instancetype)errorWithResponse:(HTTPResponse *)response {
+    APIError *error = [self errorWithBusinessCode:response.errorCode businessMessage:response.errorMessage underlyingError:nil];
+    return error;
+}
 + (instancetype)errorFromNSError:(NSError *)error {
     if ([error isKindOfClass:[APIError class]]) {
         return (APIError *)error;

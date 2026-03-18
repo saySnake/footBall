@@ -39,6 +39,7 @@
 
 // 工具类
 #import <YYCategories/YYCategories.h>
+#import <YYModel/YYModel.h>
 
 // 调试工具（仅在Debug模式下）
 #ifdef DEBUG
@@ -67,8 +68,6 @@
 
 #pragma mark - 项目核心类 - Network Config
 #import "APIServerConfig.h"
-#import "APIPathConfig.h"
-#import "APIPathNames.h"
 #import "APIPathValues.h"
 #import "WebSocketPathConfig.h"
 #import "WebSocketPathNames.h"

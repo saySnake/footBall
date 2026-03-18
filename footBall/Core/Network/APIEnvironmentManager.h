@@ -7,7 +7,6 @@
 
 #import <Foundation/Foundation.h>
 #import "APIServerConfig.h"
-#import "APIPathConfig.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -33,12 +32,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSString *)baseURLForEnvironment:(APIEnvironment)environment;
 
 /// 获取指定路径名称的完整URL（服务器地址 + 路径）
-/// @param pathName 路径名称（如：@"user"）
-- (NSString *)fullURLForPathName:(NSString *)pathName;
-
-/// 获取指定路径名称的路径值（从 APIPathConfigManager 获取）
-/// @param pathName 路径名称
-- (NSString *)pathForPathName:(NSString *)pathName;
+- (NSString *)fullURLForPath:(NSString *)path;
 
 /// 切换环境
 /// @param environment 目标环境

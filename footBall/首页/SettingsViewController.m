@@ -333,7 +333,7 @@
 }
 
 - (void)performLogoutAndGoLogin {
-    [[AuthManager sharedManager] clearToken];
+    [[AuthManager sharedManager] removeUser];
 
     UIWindow *window = self.view.window;
     if (!window) {
