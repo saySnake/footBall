@@ -28,56 +28,156 @@
 
 #pragma mark - 字体属性（按大小命名）
 
-- (UIFont *)font34Bold {
-    return [UIFont systemFontOfSize:34 weight:UIFontWeightBold];
+- (UIFont *)font14Bold {
+    return [UIFont fontWithName:@"aliBody" size:14.0f];
+}
+
+- (UIFont *)font16Bold {
+    return [UIFont fontWithName:@"aliBody" size:16.0f];
+}
+
+- (UIFont *)font18Bold {
+    return [UIFont fontWithName:@"aliBody" size:18.0f];
+}
+
+- (UIFont *)font20Bold {
+    return [UIFont fontWithName:@"aliBody" size:20.0f];
+}
+
+- (UIFont *)font22Bold {
+    return [UIFont fontWithName:@"aliBody" size:22.0f];
+}
+
+- (UIFont *)font24Bold {
+    return [UIFont fontWithName:@"aliBody" size:24.0f];
+}
+
+- (UIFont *)font26Bold {
+    return [UIFont fontWithName:@"aliBody" size:26.0f];
 }
 
 - (UIFont *)font28Bold {
-    return [UIFont systemFontOfSize:28 weight:UIFontWeightBold];
+    return [UIFont fontWithName:@"aliBody" size:28.0f];
 }
 
-- (UIFont *)font22Semibold {
-    return [UIFont systemFontOfSize:22 weight:UIFontWeightSemibold];
+- (UIFont *)font30Bold {
+    return [UIFont fontWithName:@"aliBody" size:30.0f];
 }
 
-- (UIFont *)font18Semibold {
-    return [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
+- (UIFont *)font32Bold {
+    return [UIFont fontWithName:@"aliBody" size:32.0f];
 }
 
-- (UIFont *)font17Regular {
-    return [UIFont systemFontOfSize:17 weight:UIFontWeightRegular];
+- (UIFont *)font34Bold {
+    return [UIFont fontWithName:@"aliBody" size:34.0f];
 }
 
-- (UIFont *)font17Medium {
-    return [UIFont systemFontOfSize:17 weight:UIFontWeightMedium];
+- (UIFont *)font36Bold {
+    return [UIFont fontWithName:@"aliBody" size:36.0f];
 }
 
-- (UIFont *)font17Semibold {
-    return [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+- (UIFont *)font38Bold {
+    return [UIFont fontWithName:@"aliBody" size:38.0f];
 }
 
-- (UIFont *)font17Bold {
-    return [UIFont systemFontOfSize:17 weight:UIFontWeightBold];
+- (UIFont *)font36Regular {
+    return [UIFont fontWithName:@"NeueRegular" size:36.0f];
 }
 
-- (UIFont *)font16Medium {
-    return [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
+- (UIFont *)font34Regular {
+    return [UIFont fontWithName:@"NeueRegular" size:34.0f];
 }
 
-- (UIFont *)font15Regular {
-    return [UIFont systemFontOfSize:15 weight:UIFontWeightRegular];
+- (UIFont *)font32Regular {
+    return [UIFont fontWithName:@"NeueRegular" size:32.0f];
 }
 
-- (UIFont *)font14Medium {
-    return [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+- (UIFont *)font30Regular {
+    return [UIFont fontWithName:@"NeueRegular" size:30.0f];
 }
 
-- (UIFont *)font13Regular {
-    return [UIFont systemFontOfSize:13 weight:UIFontWeightRegular];
+- (UIFont *)font28Regular {
+    return [UIFont fontWithName:@"NeueRegular" size:28.0f];
+}
+
+- (UIFont *)font26Regular {
+    return [UIFont fontWithName:@"NeueRegular" size:26.0f];
+}
+
+- (UIFont *)font24Regular {
+    return [UIFont fontWithName:@"NeueRegular" size:24.0f];
+}
+
+- (UIFont *)font22Regular {
+    return [UIFont fontWithName:@"NeueRegular" size:22.0f];
+}
+
+- (UIFont *)font20Regular {
+    return [UIFont fontWithName:@"NeueRegular" size:20.0f];
+}
+
+- (UIFont *)font18Regular {
+    return [UIFont fontWithName:@"NeueRegular" size:18.0f];
+}
+
+- (UIFont *)font16Regular {
+    return [UIFont fontWithName:@"NeueRegular" size:16.0f];
+}
+
+- (UIFont *)font14Regular {
+    return [UIFont fontWithName:@"NeueRegular" size:14.0f];
 }
 
 - (UIFont *)font12Regular {
-    return [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
+    return [UIFont fontWithName:@"NeueRegular" size:12.0f];
+}
+
+- (UIFont *)font10Regular {
+    return [UIFont fontWithName:@"NeueRegular" size:10.0f];
+}
+
+- (UIFont *)font30 {
+    return [UIFont systemFontOfSize:30];
+}
+
+- (UIFont *)font28 {
+    return [UIFont systemFontOfSize:28];
+}
+
+- (UIFont *)font26 {
+    return [UIFont systemFontOfSize:26];
+}
+
+- (UIFont *)font24 {
+    return [UIFont systemFontOfSize:24];
+}
+
+- (UIFont *)font22 {
+    return [UIFont systemFontOfSize:22];
+}
+
+- (UIFont *)font20 {
+    return [UIFont systemFontOfSize:20];
+}
+
+- (UIFont *)font18 {
+    return [UIFont systemFontOfSize:18];
+}
+
+- (UIFont *)font16 {
+    return [UIFont systemFontOfSize:16];
+}
+
+- (UIFont *)font14 {
+    return [UIFont systemFontOfSize:14];
+}
+
+- (UIFont *)font12 {
+    return [UIFont systemFontOfSize:12];
+}
+
+- (UIFont *)font10 {
+    return [UIFont systemFontOfSize:10];
 }
 
 #pragma mark - 便捷方法

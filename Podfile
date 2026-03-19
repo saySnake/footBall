@@ -30,4 +30,15 @@ post_install do |installer|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
     end
   end
+
+  afn_dir = File.join(installer.sandbox.root.to_s, 'AFNetworking', 'AFNetworking')
+  if Dir.exist?(afn_dir)
+    Dir.glob(File.join(afn_dir, '*.{h,m}')).each do |path|
+      next unless File.file?(path)
+      system('chmod', 'u+w', path)
+      contents = File.read(path)
+      patched = contents.gsub(/^#import <netinet6\/in6\.h>\s*\n/, '')
+      File.write(path, patched) if patched != contents
+    end
+  end
 end

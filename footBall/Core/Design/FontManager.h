@@ -18,44 +18,153 @@ NS_ASSUME_NONNULL_BEGIN
 
 #pragma mark - 字体属性（按大小命名）
 
-/// 34pt 粗体（超大标题）
-@property (nonatomic, strong, readonly) UIFont *font34Bold;
+/// 14pt 粗体（标题）
+@property (nonatomic, strong, readonly) UIFont *font14Bold;
 
-/// 28pt 粗体（大标题）
+/// 16pt 粗体（标题）
+@property (nonatomic, strong, readonly) UIFont *font16Bold;
+
+/// 18pt 粗体（标题）
+@property (nonatomic, strong, readonly) UIFont *font18Bold;
+
+/// 20pt 粗体（标题）
+@property (nonatomic, strong, readonly) UIFont *font20Bold;
+
+/// 22pt 粗体（标题）
+@property (nonatomic, strong, readonly) UIFont *font22Bold;
+
+/// 24pt 粗体（标题）
+@property (nonatomic, strong, readonly) UIFont *font24Bold;
+
+/// 26pt 粗体（标题）
+@property (nonatomic, strong, readonly) UIFont *font26Bold;
+
+/// 28pt 粗体（标题）
 @property (nonatomic, strong, readonly) UIFont *font28Bold;
 
-/// 22pt 半粗体（中标题）
-@property (nonatomic, strong, readonly) UIFont *font22Semibold;
+/// 30pt 粗体（标题）
+@property (nonatomic, strong, readonly) UIFont *font30Bold;
 
-/// 18pt 半粗体（大按钮）
-@property (nonatomic, strong, readonly) UIFont *font18Semibold;
+/// 32pt 粗体（标题）
+@property (nonatomic, strong, readonly) UIFont *font32Bold;
 
-/// 17pt 常规（正文）
-@property (nonatomic, strong, readonly) UIFont *font17Regular;
+/// 34pt 粗体（标题）
+@property (nonatomic, strong, readonly) UIFont *font34Bold;
 
-/// 17pt 中等（正文中等）
-@property (nonatomic, strong, readonly) UIFont *font17Medium;
+/// 36pt 粗体（标题）
+@property (nonatomic, strong, readonly) UIFont *font36Bold;
 
-/// 17pt 半粗体（小标题）
-@property (nonatomic, strong, readonly) UIFont *font17Semibold;
+/// 38pt 粗体（标题）
+@property (nonatomic, strong, readonly) UIFont *font38Bold;
 
-/// 17pt 粗体（正文加粗）
-@property (nonatomic, strong, readonly) UIFont *font17Bold;
+/// 36pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font36Regular;
 
-/// 16pt 中等（常规按钮）
-@property (nonatomic, strong, readonly) UIFont *font16Medium;
+/// 34pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font34Regular;
 
-/// 15pt 常规（说明文字）
-@property (nonatomic, strong, readonly) UIFont *font15Regular;
+/// 32pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font32Regular;
 
-/// 14pt 中等（小按钮）
-@property (nonatomic, strong, readonly) UIFont *font14Medium;
+/// 30pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font30Regular;
 
-/// 13pt 常规（小号说明文字）
-@property (nonatomic, strong, readonly) UIFont *font13Regular;
+/// 28pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font28Regular;
 
-/// 12pt 常规（脚注）
+/// 26pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font26Regular;
+
+/// 24pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font24Regular;
+
+/// 22pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font22Regular;
+
+/// 20pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font20Regular;
+
+/// 18pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font18Regular;
+
+/// 16pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font16Regular;
+
+/// 14pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font14Regular;
+
+/// 12pt （数字）
 @property (nonatomic, strong, readonly) UIFont *font12Regular;
+
+/// 10pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font10Regular;
+
+/// 30pt （汉字）
+@property (nonatomic, strong, readonly) UIFont *font30;
+
+/// 28pt （汉字）
+@property (nonatomic, strong, readonly) UIFont *font28;
+
+/// 26pt （汉字）
+@property (nonatomic, strong, readonly) UIFont *font26;
+
+/// 24pt （汉字）
+@property (nonatomic, strong, readonly) UIFont *font24;
+
+/// 22pt （汉字）
+@property (nonatomic, strong, readonly) UIFont *font22;
+
+/// 20pt （汉字）
+@property (nonatomic, strong, readonly) UIFont *font20;
+
+/// 18pt （汉字）
+@property (nonatomic, strong, readonly) UIFont *font18;
+
+/// 16pt （汉字）
+@property (nonatomic, strong, readonly) UIFont *font16;
+
+/// 14pt （汉字）
+@property (nonatomic, strong, readonly) UIFont *font14;
+
+/// 12pt （汉字）
+@property (nonatomic, strong, readonly) UIFont *font12;
+
+/// 10pt （汉字）
+@property (nonatomic, strong, readonly) UIFont *font10;
+
+//
+///// 22pt 半粗体（中标题）
+//@property (nonatomic, strong, readonly) UIFont *font22Semibold;
+//
+///// 18pt 半粗体（大按钮）
+//@property (nonatomic, strong, readonly) UIFont *font18Semibold;
+//
+///// 17pt 常规（正文）
+//@property (nonatomic, strong, readonly) UIFont *font17Regular;
+//
+///// 17pt 中等（正文中等）
+//@property (nonatomic, strong, readonly) UIFont *font17Medium;
+//
+///// 17pt 半粗体（小标题）
+//@property (nonatomic, strong, readonly) UIFont *font17Semibold;
+//
+///// 17pt 粗体（正文加粗）
+//@property (nonatomic, strong, readonly) UIFont *font17Bold;
+//
+///// 16pt 中等（常规按钮）
+//@property (nonatomic, strong, readonly) UIFont *font16Medium;
+//
+///// 15pt 常规（说明文字）
+//@property (nonatomic, strong, readonly) UIFont *font15Regular;
+//
+///// 14pt 中等（小按钮）
+//@property (nonatomic, strong, readonly) UIFont *font14Medium;
+//
+///// 13pt 常规（小号说明文字）
+//@property (nonatomic, strong, readonly) UIFont *font13Regular;
+//
+///// 12pt 常规（脚注）
+//@property (nonatomic, strong, readonly) UIFont *font12Regular;
 
 #pragma mark - 便捷方法
 
