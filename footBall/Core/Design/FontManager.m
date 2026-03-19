@@ -197,5 +197,4 @@
 + (UIFont *)mediumFontOfSize:(CGFloat)size {
     return [UIFont systemFontOfSize:size weight:UIFontWeightMedium];
 }
-
 @end
