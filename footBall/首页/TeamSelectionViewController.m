@@ -250,6 +250,19 @@
     self.allTeams = arr;
     self.filteredTeams = arr;
     self.selectedTeams = [NSMutableArray array];
+    
+//    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+//    [AuthManager.sharedManager loginPhone:self.phoneNumber verify:self.codeTextField.text success:^(HTTPResponse * _Nonnull response) {
+//        [MBProgressHUD hideHUDForView:self.view animated:YES];
+//        // 登录成功后进入选择球队界面
+//        TeamSelectionViewController *teamVC = [[TeamSelectionViewController alloc] init];
+//        [self.navigationController pushViewController:teamVC animated:YES];
+//
+//    } failure:^(NSError * _Nonnull error) {
+//        [MBProgressHUD hideHUDForView:self.view animated:YES];
+//        [QMUITips showError:error.localizedDescription];
+//    }];
+
 }
 
 - (void)setupUI {

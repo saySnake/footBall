@@ -64,6 +64,7 @@
         NSLog(@"✅ 找到 keyWindow，开始安装 DoKit");
         
         // 安装 DoKit
+        DoraemonStatisticsUtil.shareInstance.noUpLoad = YES;
         [[DoraemonManager shareInstance] install];
         NSLog(@"✅ DoKit 已安装");
         

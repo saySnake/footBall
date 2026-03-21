@@ -29,7 +29,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// 拦截错误（在请求失败时调用）
 /// @param error 错误信息
 /// @return 处理后的错误，返回nil表示错误已处理
-- (nullable NSError *)interceptError:(NSError *)error task:(NSURLSessionDataTask *)task;
+- (nullable NSError *)interceptError:(NSError *)error task:(NSURLSessionDataTask *)task tokenRefreshed:(void (^)(void))tokenRefreshed;
 
 @end
 
@@ -38,9 +38,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// Token获取回调
 @property (nonatomic, copy, nullable) NSString *(^tokenProvider)(void);
-
-/// Token刷新回调
-@property (nonatomic, copy, nullable) void(^tokenRefreshHandler)(void(^completion)(BOOL success));
 
 /// 初始化方法
 /// @param tokenProvider Token提供者

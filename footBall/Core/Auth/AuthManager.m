@@ -40,7 +40,7 @@ static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
 
 #pragma mark - Public Methods
 
-- (void)sendVerifyCode:(NSString *)phone success:(AuthLoginSuccessBlock)success failure:(AuthLoginFailureBlock)failure {
+- (void)sendVerifyCode:(NSString *)phone success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     if (!phone || phone.length == 0) {
         if (failure) {
             NSError *error = [NSError errorWithDomain:@"AuthManagerErrorDomain"
@@ -61,7 +61,7 @@ static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
     }];
     
 }
-- (void)loginPhone:(NSString *)phone verify:(NSString *)verify success:(AuthLoginSuccessBlock)success failure:(AuthLoginFailureBlock)failure {
+- (void)loginPhone:(NSString *)phone verify:(NSString *)verify success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     if (!phone || phone.length == 0) {
         if (failure) {
             NSError *error = [NSError errorWithDomain:@"AuthManagerErrorDomain"
@@ -86,6 +86,7 @@ static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
             NSDictionary *data = responseObject.data;
             User *user = [User yy_modelWithJSON:data];
             self.user = user;
+            [self saveUser];
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);
@@ -95,7 +96,49 @@ static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
     }];
 
 }
+- (void)refreshTokenSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    NSString *refreshToken = self.user.refreshToken;
+    if (!refreshToken || refreshToken.length == 0) {
+        if (failure) {
+            NSError *error = [NSError errorWithDomain:@"AuthManagerErrorDomain"
+                                                  code:-1
+                                              userInfo:@{NSLocalizedDescriptionKey: @"Token不能为空"}];
+            failure(error);
+        }
+        return;
+    }
+    [[APIManager sharedManager] POST:APIPathValueAuthRefresh parameters:@{@"refreshToken":refreshToken} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            NSDictionary *data = responseObject.data;
+            NSString *accessToken = data[@"accessToken"];
+            NSString *refreshToken = data[@"refreshToken"];
+            NSInteger expiresIn = [data[@"expiresIn"] integerValue];
+            self.user.accessToken = accessToken;
+            self.user.refreshToken = refreshToken;
+            self.user.expiresIn = expiresIn;
+            [self saveUser];
+            success(responseObject);
+        } else {
+            failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        failure(error);
+    }];
+}
+- (void)logoutSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    [[APIManager sharedManager] POST:APIPathValueAuthLogout parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            self.user = nil;
+            [self removeUser];
+            success(responseObject);
+        } else {
+            failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        failure(error);
+    }];
 
+}
 - (BOOL)isLoggedIn {
     return self.user && self.user.userId.length>0 && self.user.accessToken.length>0;
 }

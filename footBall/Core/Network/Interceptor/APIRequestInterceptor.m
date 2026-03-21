@@ -111,21 +111,35 @@
     return self;
 }
 
-- (nullable NSError *)interceptError:(NSError *)error task:(NSURLSessionDataTask *)task{
-    // 转换为APIError
-    APIError *apiError = [APIError errorFromNSError:error];
-    
-    // 调用错误处理回调
-    if (self.errorHandler) {
-        self.errorHandler(apiError);
+- (nullable NSError *)interceptError:(NSError *)error task:(NSURLSessionDataTask *)task tokenRefreshed:(nonnull void (^)(void))tokenRefreshed{
+    NSHTTPURLResponse *httpResp = (NSHTTPURLResponse *)task.response;
+    if (httpResp.statusCode == 401) {
+        [AuthManager.sharedManager refreshTokenSuccess:^(HTTPResponse * _Nonnull response) {
+            if (response.success) {
+                tokenRefreshed();
+            } else {
+                [NSNotificationCenter.defaultCenter postNotificationName:TokenExpiredNotification object:nil];
+            }
+        } failure:^(NSError * _Nonnull error) {
+            [NSNotificationCenter.defaultCenter postNotificationName:TokenExpiredNotification object:nil];
+        }];
+        return nil;
+    } else {
+        // 转换为APIError
+        APIError *apiError = [APIError errorFromNSError:error];
+        
+        // 调用错误处理回调
+        if (self.errorHandler) {
+            self.errorHandler(apiError);
+        }
+        
+        // 根据错误处理策略决定是否继续传播错误
+        if (apiError.handlingStrategy == APIErrorHandlingStrategySilent) {
+            return nil; // 静默处理，不传播错误
+        }
+        
+        return apiError;
     }
-    
-    // 根据错误处理策略决定是否继续传播错误
-    if (apiError.handlingStrategy == APIErrorHandlingStrategySilent) {
-        return nil; // 静默处理，不传播错误
-    }
-    
-    return apiError;
 }
 
 @end

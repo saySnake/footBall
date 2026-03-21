@@ -9,10 +9,10 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface HTTPResponse : NSObject
+@interface HTTPResponse <ObjectType> : NSObject
 @property (nonatomic, assign) BOOL success;
 @property (nonatomic, strong) NSString *errorCode;
-@property (nonatomic, strong) id data;
+@property (nonatomic, strong) ObjectType data;
 @property (nonatomic, strong) NSString *errorMessage;
 @end
 

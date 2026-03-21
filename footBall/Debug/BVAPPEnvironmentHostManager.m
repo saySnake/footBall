@@ -97,48 +97,22 @@
 //https://static.bvox.io/config/db_test2.json 不读取配置文件，直接写死
 - (NSArray<BVAPPEnvironmentHostItemModel *> *)datasource {
     return @[
-        // UAT 环境
-        [[BVAPPEnvironmentHostItemModel alloc] initWithProduct:2 
-                                                        domain:@"bitvenus.live" 
-                                                     domainUrl:@"https://static.bvox.io/config/db_uat.json" 
-                                                     apiPrefix:@"" 
-                                                   displayName:@"UAT0"
-                                                      wsDomain:@"ws-bitvenus.live"
-                                                         wsUrl:@"wss://ws-bitvenus.live"],
 
         // 测试环境 1
-        [[BVAPPEnvironmentHostItemModel alloc] initWithProduct:3 
-                                                        domain:@"bxingupdate.com" 
-                                                     domainUrl:@"" 
-                                                     apiPrefix:@"-t1" 
+        [[BVAPPEnvironmentHostItemModel alloc] initWithProduct:2
+                                                        domain:@"112.126.56.42"
+                                                     domainUrl:@""
+                                                     apiPrefix:@""
                                                    displayName:@"test1"
                                                       wsDomain:@"ws-test1.bxingupdate.com"
                                                          wsUrl:@"wss://ws-test1.bxingupdate.com"],
-        
-        // 测试环境 2
-        [[BVAPPEnvironmentHostItemModel alloc] initWithProduct:3 
-                                                        domain:@"bxingupdate.com" 
-                                                     domainUrl:@"" 
-                                                     apiPrefix:@"-t2" 
-                                                   displayName:@"test2"
-                                                      wsDomain:@"ws-test2.bxingupdate.com"
-                                                         wsUrl:@"wss://ws-test2.bxingupdate.com"],
-        
-        // 生产环境 - 企业签用户
-        [[BVAPPEnvironmentHostItemModel alloc] initWithProduct:1 
-                                                        domain:@"bitvenus.com" 
-                                                     domainUrl:@"https://static.bvox.io/config/db_prod.json" 
-                                                     apiPrefix:@"" 
-                                                   displayName:@"企业签用户"
-                                                      wsDomain:@"ws.bitvenus.com"
-                                                         wsUrl:@"wss://ws.bitvenus.com"],
-        
+                        
         // 生产环境 - TF签和appstore
         [[BVAPPEnvironmentHostItemModel alloc] initWithProduct:1 
-                                                        domain:@"bitvenus.com" 
-                                                     domainUrl:@"https://static.bvox.io/config/db_prod.json" 
+                                                        domain:@"112.126.56.42"
+                                                     domainUrl:@""
                                                      apiPrefix:@"" 
-                                                   displayName:@"TF签和appstore"
+                                                   displayName:@"appstore"
                                                       wsDomain:@"ws.bitvenus.com"
                                                          wsUrl:@"wss://ws.bitvenus.com"]
     ];

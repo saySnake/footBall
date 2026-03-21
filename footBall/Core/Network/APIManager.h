@@ -11,7 +11,8 @@
 #import "APIError.h"
 #import "HTTPResponse.h"
 NS_ASSUME_NONNULL_BEGIN
-
+/// toke过期，刷新token报错，退出登录
+FOUNDATION_EXPORT NSString * const TokenExpiredNotification;
 /// 网络请求方法类型
 typedef NS_ENUM(NSInteger, HTTPMethod) {
     HTTPMethodGET = 0,

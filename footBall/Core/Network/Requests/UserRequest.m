@@ -1,0 +1,172 @@
+//
+//  UserRequest.m
+//  footBall
+//
+//  Created by LWJ on 2026/3/22.
+//
+
+#import "UserRequest.h"
+
+@implementation UserRequest
++(instancetype)shared {
+    static UserRequest *instance = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        instance = UserRequest.alloc.init;
+    });
+    return instance;
+}
+
+- (void)completeNewUserOnboardingSuccess:(nullable APISuccessBlock)success failure:(nullable APIFailureBlock)failure {
+    [[APIManager sharedManager] POST:APIPathValueOnboardingComplete parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            AuthManager.sharedManager.user.onboardingCompleted = YES;
+            AuthManager.sharedManager.user.profile.onboardingCompleted = YES;
+            [AuthManager.sharedManager saveUser];
+            success(responseObject);
+        } else {
+            failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        failure(error);
+    }];
+}
+
+- (void)getLoginUserInfoSuccess:(nullable APISuccessBlock)success failure:(nullable APIFailureBlock)failure {
+    if (!AuthManager.sharedManager.isLoggedIn) {
+        if (failure) {
+            NSError *error = [NSError errorWithDomain:@"AuthManagerErrorDomain"
+                                                  code:-1
+                                              userInfo:@{NSLocalizedDescriptionKey: @"用户未登录"}];
+            failure(error);
+        }
+        return;
+    }
+
+    [[APIManager sharedManager] GET:APIPathValueUser parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            UserProfile *user = [UserProfile yy_modelWithJSON:responseObject.data];
+            AuthManager.sharedManager.user.profile = user;
+            [AuthManager.sharedManager saveUser];
+            success(responseObject);
+        } else {
+            failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        failure(error);
+    }];
+
+}
+- (void)updateUserInfo:(nonnull UserProfile *)user success:(nullable APISuccessBlock)success failure:(nullable APIFailureBlock)failure {
+    if (!AuthManager.sharedManager.isLoggedIn) {
+        if (failure) {
+            NSError *error = [NSError errorWithDomain:@"AuthManagerErrorDomain"
+                                                  code:-1
+                                              userInfo:@{NSLocalizedDescriptionKey: @"用户未登录"}];
+            failure(error);
+        }
+        return;
+    }
+    if (!user) {
+        if (failure) {
+            NSError *error = [NSError errorWithDomain:@"AuthManagerErrorDomain"
+                                                  code:-1
+                                              userInfo:@{NSLocalizedDescriptionKey: @"用户为空"}];
+            failure(error);
+        }
+        return;
+    }
+    NSMutableDictionary *dict = NSMutableDictionary.dictionary;
+    dict[@"nickname"] = user.nickname;
+    dict[@"avatar"] = user.avatar;
+    dict[@"gender"] = @(user.gender);
+    dict[@"birthDate"] = user.birthDate;
+    dict[@"bio"] = user.bio;
+    dict[@"city"] = user.city;
+    dict[@"passportCode"] = user.passportCode;
+    dict[@"preferenceTags"] = user.preferenceTags;
+    dict[@"firstWatchYear"] = user.firstWatchYear;
+    dict[@"primaryTeamId"] = user.primaryTeamId;
+    dict[@"nationalTeamId"] = user.nationalTeamId;
+    [[APIManager sharedManager] PUT:APIPathValueUser parameters:dict headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            success(responseObject);
+        } else {
+            failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        failure(error);
+    }];
+}
+- (void)getUserQRCodeSuccess:(nullable APISuccessBlock)success failure:(nullable APIFailureBlock)failure {
+    if (!AuthManager.sharedManager.isLoggedIn) {
+        if (failure) {
+            NSError *error = [NSError errorWithDomain:@"AuthManagerErrorDomain"
+                                                  code:-1
+                                              userInfo:@{NSLocalizedDescriptionKey: @"用户未登录"}];
+            failure(error);
+        }
+        return;
+    }
+
+    [[APIManager sharedManager] GET:APIPathValueUserQRCode parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            AuthManager.sharedManager.user.profile.qrCode = responseObject.data;
+            [AuthManager.sharedManager saveUser];
+            success(responseObject);
+        } else {
+            failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        failure(error);
+    }];
+
+}
+
+- (void)getUserInfo:(nonnull NSString *)userId success:(nullable APISuccessBlock)success failure:(nullable APIFailureBlock)failure {
+    if (!userId || userId.length == 0) {
+        if (failure) {
+            NSError *error = [NSError errorWithDomain:@"AuthManagerErrorDomain"
+                                                  code:-1
+                                              userInfo:@{NSLocalizedDescriptionKey: @"用户ID为空"}];
+            failure(error);
+        }
+        return;
+    }
+
+    [[APIManager sharedManager] GET:APIPathValueGetUser(userId) parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            success(responseObject);
+        } else {
+            failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        failure(error);
+    }];
+
+}
+
+- (void)searchUser:(nonnull NSString *)userId success:(nullable APISuccessBlock)success failure:(nullable APIFailureBlock)failure {
+    if (!userId || userId.length == 0) {
+        if (failure) {
+            NSError *error = [NSError errorWithDomain:@"AuthManagerErrorDomain"
+                                                  code:-1
+                                              userInfo:@{NSLocalizedDescriptionKey: @"用户ID为空"}];
+            failure(error);
+        }
+        return;
+    }
+
+    [[APIManager sharedManager] GET:APIPathValueSearchUser parameters:@{@"userId":userId} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            success(responseObject);
+        } else {
+            failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        failure(error);
+    }];
+
+}
+
+@end

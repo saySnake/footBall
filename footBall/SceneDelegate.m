@@ -32,7 +32,7 @@
         UIViewController *rootVC = nil;
         if ([AuthManager sharedManager].isLoggedIn) {
             // 已登录，进入底部 4 个 Tab 的主界面
-            self.window.rootViewController = [[MainTabBarController alloc] init];
+            self.window.rootViewController = [NSClassFromString(@"TeamSelectionViewController") new];//[[MainTabBarController alloc] init];
         } else {
             // 未登录，进入登录流程的第一个页面（需要 Nav 以便 push）
             Class loginClass = NSClassFromString(@"LoginChoiceViewController");
