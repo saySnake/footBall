@@ -97,7 +97,7 @@
             break;
     }
 }
-- (void)uploadFile:(NSData *)data type:(ImageObjectType)type success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+- (void)uploadImage:(NSData *)data type:(ImageObjectType)type success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     if (!data) {
         NSError *error = [NSError errorWithDomain:NSInvalidArgumentException code:0 userInfo:@{NSLocalizedDescriptionKey: @"头像不能为空"}];
         failure(error);
