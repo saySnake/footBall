@@ -251,17 +251,6 @@
         [MBProgressHUD hideHUDForView:self.view animated:YES];
         [QMUITips showError:error.localizedDescription];
     }];
-//    [AuthManager.sharedManager loginPhone:self.phoneNumber verify:self.codeTextField.text success:^(HTTPResponse * _Nonnull response) {
-//        [MBProgressHUD hideHUDForView:self.view animated:YES];
-//        // 登录成功后进入选择球队界面
-//        TeamSelectionViewController *teamVC = [[TeamSelectionViewController alloc] init];
-//        [self.navigationController pushViewController:teamVC animated:YES];
-//
-//    } failure:^(NSError * _Nonnull error) {
-//        [MBProgressHUD hideHUDForView:self.view animated:YES];
-//        [QMUITips showError:error.localizedDescription];
-//    }];
-
 }
 
 - (void)setupUI {
@@ -365,7 +354,7 @@
     TeamCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"TeamCell" forIndexPath:indexPath];
     Team *m = self.filteredTeams[indexPath.item];
     cell.nameLabel.text = m.name;
-    cell.logoView.image = [UIImage imageNamed:m.logo];
+    [cell.logoView sd_setImageWithURL:[NSURL URLWithString:m.logo]];
     BOOL selected = [self.selectedTeams containsObject:m];
     cell.checkmarkView.hidden = !selected;
     // 按设计图：选中 = 圆形加粗绿色描边；未选中 = 圆形细浅灰描边（描边在圆形容器上）
@@ -662,12 +651,21 @@
 /// 底部弹层「确认」：先关闭弹层，再弹出「欢迎来到 Pass Nomad」页，点击「立即探索」后再进入首页
 - (void)onConfirmSheetOkTapped {
     [self hideBottomSheet];
-    __weak typeof(self) wself = self;
-    PassNomadWelcomeViewController *welcomeVC = [[PassNomadWelcomeViewController alloc] init];
-    welcomeVC.onExploreBlock = ^{
-        [wself goToHome];
-    };
-    [self presentViewController:welcomeVC animated:YES completion:nil];
+    NSArray *teamIds = [self.selectedTeams qmui_mapWithBlock:^id _Nonnull(Team * _Nonnull item, NSInteger index) {
+        return item.teamId;
+    }];
+    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+    [TeamsRequest.shared followTeams:teamIds success:^(HTTPResponse * _Nullable responseObject) {
+        [MBProgressHUD hideHUDForView:self.view animated:YES];
+        PassNomadWelcomeViewController *welcomeVC = [[PassNomadWelcomeViewController alloc] init];
+        __weak typeof(self) wself = self;
+        welcomeVC.onExploreBlock = ^{
+            [wself goToHome];
+        };
+        [self presentViewController:welcomeVC animated:YES completion:nil];
+    } failure:^(NSError * _Nonnull error) {
+        [MBProgressHUD hideHUDForView:self.view animated:YES];
+    }];
 }
 
 - (void)goToHome {

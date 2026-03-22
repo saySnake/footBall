@@ -66,6 +66,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// 错误处理回调
 @property (nonatomic, copy, nullable) void(^errorHandler)(NSError *error);
 
+@property (nonatomic, assign) BOOL refreshingToken;
+@property (nonatomic, copy) NSMutableArray *callbacks;
+
+
 /// 初始化方法
 /// @param errorHandler 错误处理回调
 - (instancetype)initWithErrorHandler:(nullable void(^)(NSError *error))errorHandler;

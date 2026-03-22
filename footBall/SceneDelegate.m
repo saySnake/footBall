@@ -14,7 +14,8 @@
 #import "BVAPPDebugTool.h"
 #import "BVAPPEnvironmentHostManager.h"
 #endif
-
+#import "LoginChoiceViewController.h"
+#import "TeamSelectionViewController.h"
 @interface SceneDelegate ()
 
 @property (nonatomic, strong) ThemeObserverView *themeObserverView; // 用于监听主题变化的透明视图
@@ -32,24 +33,19 @@
         UIViewController *rootVC = nil;
         if ([AuthManager sharedManager].isLoggedIn) {
             // 已登录，进入底部 4 个 Tab 的主界面
-            self.window.rootViewController = [NSClassFromString(@"TeamSelectionViewController") new];//[[MainTabBarController alloc] init];
+            self.window.rootViewController = [TeamSelectionViewController new];//[[MainTabBarController alloc] init];
         } else {
             // 未登录，进入登录流程的第一个页面（需要 Nav 以便 push）
-            Class loginClass = NSClassFromString(@"LoginChoiceViewController");
-            if (loginClass) {
-                rootVC = [loginClass new];
-                UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:rootVC];
-                self.window.rootViewController = nav;
-            } else {
-                self.window.rootViewController = [[MainTabBarController alloc] init];
-            }
+            LoginChoiceViewController *rootVC = [LoginChoiceViewController new];
+            UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:rootVC];
+            self.window.rootViewController = nav;
         }
         
         [self.window makeKeyAndVisible];
         
         // 添加主题监听视图（透明，仅用于监听主题变化）
         [self setupThemeObserver];
-        
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(tokenExpiredNotification) name:TokenExpiredNotification object:nil];
         // 初始化 DoKit（仅在Debug模式下，且非生产环境）
         // 注意：必须在 window makeKeyAndVisible 之后初始化
         #ifdef DEBUG
@@ -72,7 +68,11 @@
     }
 }
 
-
+- (void)tokenExpiredNotification {
+    LoginChoiceViewController *rootVC = [LoginChoiceViewController new];
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:rootVC];
+    self.window.rootViewController = nav;
+}
 - (void)sceneDidDisconnect:(UIScene *)scene {
     // Called as the scene is being released by the system.
     // This occurs shortly after the scene enters the background, or when its session is discarded.

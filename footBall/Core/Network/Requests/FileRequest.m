@@ -14,8 +14,13 @@
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         instance = FileRequest.alloc.init;
+        [[NSNotificationCenter defaultCenter] addObserver:instance selector:@selector(tokenExpiredNotification) name:TokenExpiredNotification object:nil];
     });
     return instance;
+}
+- (void)tokenExpiredNotification {
+    self.stsToken = nil;
+    self.defaultClient = nil;
 }
 - (void)setupSTSToken {
     // 针对只有一个region下bucket的数据上传下载操作时,可以将client实例给App单例持有。

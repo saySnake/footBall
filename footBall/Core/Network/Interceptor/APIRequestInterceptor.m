@@ -113,16 +113,24 @@
 
 - (nullable NSError *)interceptError:(NSError *)error task:(NSURLSessionDataTask *)task tokenRefreshed:(nonnull void (^)(void))tokenRefreshed{
     NSHTTPURLResponse *httpResp = (NSHTTPURLResponse *)task.response;
-    if (httpResp.statusCode == 401) {
-        [AuthManager.sharedManager refreshTokenSuccess:^(HTTPResponse * _Nonnull response) {
-            if (response.success) {
-                tokenRefreshed();
-            } else {
+    if (httpResp.statusCode == 401 && AuthManager.sharedManager.isLoggedIn) {
+        [self.callbacks addObject:tokenRefreshed];
+        if (!self.refreshingToken) {
+            [AuthManager.sharedManager refreshTokenSuccess:^(HTTPResponse * _Nonnull response) {
+                if (response.success) {
+                    [self.callbacks enumerateObjectsUsingBlock:^(void(^callback)(void), NSUInteger idx, BOOL * _Nonnull stop) {
+                        callback();
+                    }];
+                    [self.callbacks removeAllObjects];
+                } else {
+                    [NSNotificationCenter.defaultCenter postNotificationName:TokenExpiredNotification object:nil];
+                }
+                self.refreshingToken = NO;
+            } failure:^(NSError * _Nonnull error) {
                 [NSNotificationCenter.defaultCenter postNotificationName:TokenExpiredNotification object:nil];
-            }
-        } failure:^(NSError * _Nonnull error) {
-            [NSNotificationCenter.defaultCenter postNotificationName:TokenExpiredNotification object:nil];
-        }];
+                self.refreshingToken = NO;
+            }];
+        }
         return nil;
     } else {
         // 转换为APIError

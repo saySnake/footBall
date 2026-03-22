@@ -34,10 +34,14 @@ static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
     if (self) {
         // 从本地加载保存的Token
         [self loadTokenFromStorage];
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(tokenExpiredNotification) name:TokenExpiredNotification object:nil];
     }
     return self;
 }
-
+- (void)tokenExpiredNotification {
+    self.user = nil;
+    [self removeUser];
+}
 #pragma mark - Public Methods
 
 - (void)sendVerifyCode:(NSString *)phone success:(APISuccessBlock)success failure:(APIFailureBlock)failure {

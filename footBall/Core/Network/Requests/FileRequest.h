@@ -19,8 +19,8 @@ typedef NS_ENUM(NSUInteger, ImageObjectType) {
 NS_ASSUME_NONNULL_BEGIN
 @class STSToken;
 @interface FileRequest : NSObject
-@property (nonatomic, strong) OSSClient *defaultClient;
-@property (nonatomic, strong) STSToken *stsToken;
+@property (nonatomic, strong, nullable) OSSClient *defaultClient;
+@property (nonatomic, strong, nullable) STSToken *stsToken;
 +(instancetype)shared;
 - (void)setupSTSToken;
 /// 获取OSS临时上传凭证(STS Token)
