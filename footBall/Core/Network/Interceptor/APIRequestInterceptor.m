@@ -107,29 +107,41 @@
     self = [super init];
     if (self) {
         _errorHandler = errorHandler;
+        _callbacks = [NSMutableArray array];
     }
     return self;
 }
 
-- (nullable NSError *)interceptError:(NSError *)error task:(NSURLSessionDataTask *)task tokenRefreshed:(nonnull void (^)(void))tokenRefreshed{
+- (nullable NSError *)interceptError:(NSError *)error task:(NSURLSessionDataTask *)task tokenRefreshed:(nonnull void (^)(BOOL))tokenRefreshed{
     NSHTTPURLResponse *httpResp = (NSHTTPURLResponse *)task.response;
-    if (httpResp.statusCode == 401 && AuthManager.sharedManager.isLoggedIn) {
+    if (httpResp.statusCode == 401 && AuthManager.sharedManager.isLoggedIn && ![task.currentRequest.URL.path containsString:APIPathValueRefreshToken]) {
         [self.callbacks addObject:tokenRefreshed];
         if (!self.refreshingToken) {
+            NSLog(@"✅ [API Request] token过期，开始刷新token");
             [AuthManager.sharedManager refreshTokenSuccess:^(HTTPResponse * _Nonnull response) {
                 if (response.success) {
-                    [self.callbacks enumerateObjectsUsingBlock:^(void(^callback)(void), NSUInteger idx, BOOL * _Nonnull stop) {
-                        callback();
-                    }];
-                    [self.callbacks removeAllObjects];
+                    NSLog(@"✅ [API Request] token刷新成功，开始重启%ld个请求",self.callbacks.count);
+                    [self _callback:YES];
                 } else {
+                    NSLog(@"✅ [API Request] token刷新失败，退出重新登录");
+                    [self _callback:NO];
+                    [APIManager.sharedManager clearAuthorizationHeader];
                     [NSNotificationCenter.defaultCenter postNotificationName:TokenExpiredNotification object:nil];
                 }
                 self.refreshingToken = NO;
             } failure:^(NSError * _Nonnull error) {
+                [APIManager.sharedManager clearAuthorizationHeader];
+                NSLog(@"✅ [API Request] token刷新失败，退出重新登录");
+                [self _callback:NO];
                 [NSNotificationCenter.defaultCenter postNotificationName:TokenExpiredNotification object:nil];
-                self.refreshingToken = NO;
+                self.refreshingToken = NO;                
+                // 调用错误处理回调
+                if (self.errorHandler) {
+                    self.errorHandler(error);
+                }
             }];
+        } else {
+            NSLog(@"✅ [API Request] token重复刷新，等待刷新完成");
         }
         return nil;
     } else {
@@ -149,5 +161,10 @@
         return apiError;
     }
 }
-
+- (void)_callback:(BOOL)success {
+    [self.callbacks enumerateObjectsUsingBlock:^(void(^callback)(BOOL), NSUInteger idx, BOOL * _Nonnull stop) {
+        callback(success);
+    }];
+    [self.callbacks removeAllObjects];
+}
 @end

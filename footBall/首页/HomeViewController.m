@@ -210,7 +210,7 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
 @property (nonatomic, strong) UILabel *dateLabel;
 @property (nonatomic, strong) UIButton *heartBtn;
 @property (nonatomic, strong) UICollectionView *teamCollectionView;
-@property (nonatomic, strong) NSArray<HomeTeamItem *> *teamItems;
+@property (nonatomic, strong) NSArray<TeamIcon *> *teamItems;
 @property (nonatomic, copy, nullable) NSString *selectedTeamId; // nil = 全部
 
 @property (nonatomic, strong) NSMutableArray<MatchModel *> *dataSource;
@@ -241,7 +241,11 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
     [self setupUI];
     [self setupRefresh];
 }
-
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self fetchUserProfile];
+    [self fetchFollowTeams];
+}
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
     // 底部预留 tab bar 高度，避免内容滑到 tab bar 下方导致无法点击
@@ -252,26 +256,26 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
 }
 
 - (void)buildTeams {
-    HomeTeamItem *all = [HomeTeamItem new];
-    all.teamId = nil;
-    all.name = NSLocalizedString(@"home_all_teams", nil);
-    NSArray *ids = @[ @"burnley", @"wolves", @"liverpool", @"brentford", @"brighton", @"arsenal" ];
-    NSArray *names = @[
-        NSLocalizedString(@"team_name_burnley", nil),
-        NSLocalizedString(@"team_name_wolves", nil),
-        NSLocalizedString(@"team_name_liverpool", nil),
-        NSLocalizedString(@"team_name_brentford", nil),
-        NSLocalizedString(@"team_name_brighton", nil),
-        NSLocalizedString(@"team_name_arsenal", nil),
-    ];
-    NSMutableArray *arr = [NSMutableArray arrayWithObject:all];
-    for (NSInteger i = 0; i < ids.count; i++) {
-        HomeTeamItem *item = [HomeTeamItem new];
-        item.teamId = ids[i];
-        item.name = names[i];
-        [arr addObject:item];
-    }
-    self.teamItems = [arr copy];
+//    HomeTeamItem *all = [HomeTeamItem new];
+//    all.teamId = nil;
+//    all.name = NSLocalizedString(@"home_all_teams", nil);
+//    NSArray *ids = @[ @"burnley", @"wolves", @"liverpool", @"brentford", @"brighton", @"arsenal" ];
+//    NSArray *names = @[
+//        NSLocalizedString(@"team_name_burnley", nil),
+//        NSLocalizedString(@"team_name_wolves", nil),
+//        NSLocalizedString(@"team_name_liverpool", nil),
+//        NSLocalizedString(@"team_name_brentford", nil),
+//        NSLocalizedString(@"team_name_brighton", nil),
+//        NSLocalizedString(@"team_name_arsenal", nil),
+//    ];
+//    NSMutableArray *arr = [NSMutableArray arrayWithObject:all];
+//    for (NSInteger i = 0; i < ids.count; i++) {
+//        HomeTeamItem *item = [HomeTeamItem new];
+//        item.teamId = ids[i];
+//        item.name = names[i];
+//        [arr addObject:item];
+//    }
+//    self.teamItems = [arr copy];
 }
 
 - (void)loadFakeData {
@@ -704,7 +708,25 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
         [self.scrollView.mj_header endRefreshing];
     });
 }
-
+- (void)fetchUserProfile {
+    [UserRequest.shared getLoginUserInfoSuccess:^(HTTPResponse <User *>* _Nullable responseObject) {
+        [self refreshUserProfile];
+    } failure:^(NSError * _Nonnull error) {
+    }];
+}
+- (void)fetchFollowTeams {
+    [TeamsRequest.shared getFollowTeamIconsSuccess:^(HTTPResponse <NSArray <TeamIcon *> *>* _Nullable responseObject) {
+        self.teamItems = responseObject.dataObject;
+        [self.teamCollectionView reloadData];
+    } failure:^(NSError * _Nonnull error) {
+        
+    }];
+}
+- (void)refreshUserProfile {
+    [_avatarView sd_setImageWithURL:[NSURL URLWithString:AuthManager.sharedManager.user.profile.avatar]];
+    _challengerLabel.text = AuthManager.sharedManager.user.profile.nickname;
+    _dateLabel.text = AuthManager.sharedManager.user.profile.birthDate;
+}
 #pragma mark - UICollectionView
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
     return _teamItems.count;

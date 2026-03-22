@@ -70,6 +70,8 @@ typedef void(^APIProgressBlock)(NSProgress *progress);
 /// 设置响应序列化器
 - (void)setResponseSerializer:(AFJSONResponseSerializer *)serializer;
 
+/// 清空token
+- (void)clearAuthorizationHeader;
 /// 通用请求方法
 /// @param method 请求方法
 /// @param URLString 请求路径（相对或绝对）

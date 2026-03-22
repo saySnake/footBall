@@ -7,7 +7,7 @@
 #import "AuthManager.h"
 #import "TeamSelectionViewController.h"
 #import <Masonry/Masonry.h>
-
+#import "MainTabBarController.h"
 @interface VerifyCodeViewController () <UITextFieldDelegate>
 
 @property (nonatomic, strong) UILabel *titleLabel;
@@ -222,13 +222,26 @@
     [AuthManager.sharedManager loginPhone:self.phoneNumber verify:self.codeTextField.text success:^(HTTPResponse * _Nonnull response) {
         [MBProgressHUD hideHUDForView:self.view animated:YES];
         // 登录成功后进入选择球队界面
-        TeamSelectionViewController *teamVC = [[TeamSelectionViewController alloc] init];
-        [self.navigationController pushViewController:teamVC animated:YES];
+        if (AuthManager.sharedManager.user.onboardingCompleted) {
+            [self goToHome];
+        } else {
+            TeamSelectionViewController *teamVC = [[TeamSelectionViewController alloc] init];
+            [self.navigationController pushViewController:teamVC animated:YES];
+        }
 
     } failure:^(NSError * _Nonnull error) {
         [MBProgressHUD hideHUDForView:self.view animated:YES];
         [QMUITips showError:error.localizedDescription];
     }];
+}
+- (void)goToHome {
+    MainTabBarController *tabBar = [[MainTabBarController alloc] init];
+    UIWindow *window = self.view.window ?: [UIApplication sharedApplication].windows.firstObject;
+    if (window) {
+        window.rootViewController = tabBar;
+    } else {
+        [self presentViewController:tabBar animated:YES completion:nil];
+    }
 }
 
 - (void)handleBack {

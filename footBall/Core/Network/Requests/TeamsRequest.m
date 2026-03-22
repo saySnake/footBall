@@ -154,6 +154,8 @@
 
     [[APIManager sharedManager] GET:APIPathValueTeamsMyFollow parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
+            NSArray *teams = [NSArray yy_modelArrayWithClass:Team.class json:responseObject.data];
+            responseObject.dataObject = teams;
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);
@@ -175,6 +177,8 @@
 
     [[APIManager sharedManager] GET:APIPathValueMyTeamIcons parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
+            NSArray *teams = [NSArray yy_modelArrayWithClass:TeamIcon.class json:responseObject.data];
+            responseObject.dataObject = teams;
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);

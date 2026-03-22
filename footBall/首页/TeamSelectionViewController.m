@@ -452,7 +452,7 @@
         
         UIImageView *logoView = [[UIImageView alloc] init];
         logoView.contentMode = UIViewContentModeScaleAspectFit;
-        logoView.image = [UIImage imageNamed:m.logo];
+        [logoView sd_setImageWithURL:[NSURL URLWithString:m.logo]];
         
         UIButton *removeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
         if (@available(iOS 13.0, *)) {
@@ -655,8 +655,9 @@
         return item.teamId;
     }];
     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
-    [TeamsRequest.shared followTeams:teamIds success:^(HTTPResponse * _Nullable responseObject) {
+    [TeamsRequest.shared onboardingFollows:teamIds success:^(HTTPResponse * _Nullable responseObject) {
         [MBProgressHUD hideHUDForView:self.view animated:YES];
+        [UserRequest.shared completeNewUserOnboardingSuccess:nil failure:nil];
         PassNomadWelcomeViewController *welcomeVC = [[PassNomadWelcomeViewController alloc] init];
         __weak typeof(self) wself = self;
         welcomeVC.onExploreBlock = ^{

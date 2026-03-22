@@ -29,7 +29,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// 拦截错误（在请求失败时调用）
 /// @param error 错误信息
 /// @return 处理后的错误，返回nil表示错误已处理
-- (nullable NSError *)interceptError:(NSError *)error task:(NSURLSessionDataTask *)task tokenRefreshed:(void (^)(void))tokenRefreshed;
+- (nullable NSError *)interceptError:(NSError *)error task:(NSURLSessionDataTask *)task tokenRefreshed:(void (^)(BOOL))tokenRefreshed;
 
 @end
 

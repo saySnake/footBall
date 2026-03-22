@@ -46,6 +46,7 @@
     [[APIManager sharedManager] GET:APIPathValueUser parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
             UserProfile *user = [UserProfile yy_modelWithJSON:responseObject.data];
+            responseObject.dataObject = user;
             AuthManager.sharedManager.user.profile = user;
             [AuthManager.sharedManager saveUser];
             success(responseObject);

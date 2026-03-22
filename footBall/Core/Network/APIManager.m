@@ -87,7 +87,9 @@ NSString * const TokenExpiredNotification = @"TokenExpiredNotification";
 - (void)setResponseSerializer:(AFJSONResponseSerializer *)serializer {
     self.sessionManager.responseSerializer = serializer;
 }
-
+- (void)clearAuthorizationHeader {
+    [self.sessionManager.requestSerializer clearAuthorizationHeader];
+}
 - (NSURLSessionDataTask *)requestWithMethod:(HTTPMethod)method
                                    URLString:(NSString *)URLString
                                   parameters:(nullable id)parameters
@@ -153,7 +155,6 @@ NSString * const TokenExpiredNotification = @"TokenExpiredNotification";
         [self.sessionManager.requestSerializer setValue:interceptedRequest.allHTTPHeaderFields[key] 
                                      forHTTPHeaderField:key];
     }
-    
     // 包装成功和失败回调，执行响应拦截器
     __weak typeof(self) weakSelf = self;
      void (^wrappedSuccess)(id,id) = ^(NSURLSessionDataTask * task,id responseObject) {
@@ -192,19 +193,26 @@ NSString * const TokenExpiredNotification = @"TokenExpiredNotification";
         NSError *finalError = apiError;
         for (id<APIRequestInterceptor> interceptor in weakSelf.interceptors) {
             if ([interceptor respondsToSelector:@selector(interceptError:task:tokenRefreshed:)]) {
-                NSError *interceptedError = [interceptor interceptError:finalError task:task tokenRefreshed:^{
+                NSError *interceptedError = [interceptor interceptError:finalError task:task tokenRefreshed:^(BOOL succ){
                     // 重新发起请求
-                    [weakSelf requestWithMethod:method
-                                      URLString:URLString
-                                     parameters:parameters
-                                        headers:headers
-                                        success:^(NSURLSessionDataTask * task,id responseObject) {
-                        // 重试成功，清理重试计数
-                        [weakSelf.retryCountMap removeObjectForKey:requestKey];
-                        if (success) {
-                            success(task,responseObject);
+                    if (succ == false) {
+                        if (failure) {
+                            failure(task,finalError);
                         }
-                    } failure:weakWrappedFailure]; // 使用相同的wrappedFailure，继续重试逻辑
+                    } else {
+                        NSLog(@"✅ [API Request] token刷新成功，即将重新发起请求");
+                        [weakSelf requestWithMethod:method
+                                          URLString:URLString
+                                         parameters:parameters
+                                            headers:headers
+                                            success:^(NSURLSessionDataTask * task,id responseObject) {
+                            // 重试成功，清理重试计数
+                            [weakSelf.retryCountMap removeObjectForKey:requestKey];
+                            if (success) {
+                                success(task,responseObject);
+                            }
+                        } failure:weakWrappedFailure]; // 使用相同的wrappedFailure，继续重试逻辑
+                    }
                 }];
                 if (!interceptedError) {
                     // 错误已被处理，不继续传播
