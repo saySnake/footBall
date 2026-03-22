@@ -86,6 +86,9 @@
             return [[AuthManager sharedManager] user].accessToken;
         }];
     [apiManager addInterceptor:authInterceptor];
+    // error拦截器
+    APIErrorHandlingInterceptor *errorIntercaptor = [APIErrorHandlingInterceptor.alloc init];
+    [apiManager addInterceptor:errorIntercaptor];
     NSLog(@"✅ 认证拦截器已配置，将自动添加Authorization请求头");
     
     // Debug模式下添加日志拦截器

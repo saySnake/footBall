@@ -21,15 +21,27 @@ FOUNDATION_EXPORT NSString * const APIPathValueGetUser(NSString *userId);
 /// 搜索用户
 FOUNDATION_EXPORT NSString * const APIPathValueSearchUser;
 
-#pragma mark - 认证模块
+#pragma mark - 登录模块
 /// 发送验证码
 FOUNDATION_EXPORT NSString * const APIPathValueSendCode;
 /// 手机登录
-FOUNDATION_EXPORT NSString * const APIPathValueAuthLoginPhone;
+FOUNDATION_EXPORT NSString * const APIPathValueLoginPhone;
 /// 登出路径
-FOUNDATION_EXPORT NSString * const APIPathValueAuthLogout;
+FOUNDATION_EXPORT NSString * const APIPathValueLogout;
 /// 刷新Token路径
-FOUNDATION_EXPORT NSString * const APIPathValueAuthRefresh;
+FOUNDATION_EXPORT NSString * const APIPathValueRefreshToken;
+
+#pragma mark - 身份认证模块
+/// 获取当前用户认证状态
+FOUNDATION_EXPORT NSString * const APIPathValueVerificationStatus;
+/// 提交职业认证申请
+FOUNDATION_EXPORT NSString * const APIPathValueVerificationProfessional;
+/// 提交实名认证申请
+FOUNDATION_EXPORT NSString * const APIPathValueVerificationRealname;
+/// 获取实名认证信息
+FOUNDATION_EXPORT NSString * const APIPathValueVerificationRealnameInfo;
+/// 获取认证历史记录
+FOUNDATION_EXPORT NSString * const APIPathValueVerificationHistory;
 
 #pragma mark - 文件模块
 /// 获取OSS临时上传凭证(STS Token)
@@ -52,5 +64,104 @@ FOUNDATION_EXPORT NSString * const APIPathValueTeamsFollow(NSString *teamId);
 FOUNDATION_EXPORT NSString * const APIPathValueTeamsBatchFollow;
 /// 获取我关注的球队列表
 FOUNDATION_EXPORT NSString * const APIPathValueTeamsMyFollow;
+/// 获取当前用户关注球队的队徽列表
+FOUNDATION_EXPORT NSString * const APIPathValueMyTeamIcons;
 
+#pragma mark - 比赛、赛事相关模块
+/// 获取精选比赛卡片
+FOUNDATION_EXPORT NSString * const APIPathValueMatchFeatured;
+/// 获取比赛日程列表
+FOUNDATION_EXPORT NSString * const APIPathValueMatchSchedule;
+/// 获取指定月份有比赛的日期列表
+FOUNDATION_EXPORT NSString * const APIPathValueMatchScheduleDates;
+/// 按日期查询 Nami 比赛列表
+FOUNDATION_EXPORT NSString * const APIPathValueMatchNamiSchedule;
+/// 查询正在进行的 Nami 比赛
+FOUNDATION_EXPORT NSString * const APIPathValueMatchNamiLive;
+/// 获取 Nami 比赛详情（比赛 + 实时比分 + 统计 + 事件）
+FOUNDATION_EXPORT NSString * const APIPathValueMatchNamiDetail(NSString *matchId);
+/// 获取 Nami 比赛实时数据（实时比分 + 统计 + 事件 + 文字直播）
+FOUNDATION_EXPORT NSString * const APIPathValueMatchNamiLiveDetail(NSString *matchId);
+/// 获取 Nami 比赛趋势数据
+FOUNDATION_EXPORT NSString * const APIPathValueMatchNamiTrend(NSString *matchId);
+/// 获取 Nami 比赛阵容
+FOUNDATION_EXPORT NSString * const APIPathValueMatchNamiLineup(NSString *matchId);
+/// 获取 Nami 比赛球员统计
+FOUNDATION_EXPORT NSString * const APIPathValueMatchNamiPlayerStats(NSString *matchId);
+/// 获取 Nami 比赛直播地址
+FOUNDATION_EXPORT NSString * const APIPathValueMatchNamiStream(NSString *matchId);
+/// 获取 Nami 比赛集锦录像
+FOUNDATION_EXPORT NSString * const APIPathValueMatchNamiVideos(NSString *matchId);
+/// 搜索比赛
+FOUNDATION_EXPORT NSString * const APIPathValueMatchSearch;
+/// 获取比赛详情
+FOUNDATION_EXPORT NSString * const APIPathValueMatchDetail(NSString *matchId);
+/// 获取指定月份有比赛的日期列表
+FOUNDATION_EXPORT NSString * const APIPathValueMatchCalendar;
+/// 获取关注球队的比赛列表
+FOUNDATION_EXPORT NSString * const APIPathValueMatchMyTeams;
+/// POST收藏比赛 / DELETE取消收藏比赛
+FOUNDATION_EXPORT NSString * const APIPathValueMatchFavorite(NSString *matchId);
+/// 获取收藏的比赛列表
+FOUNDATION_EXPORT NSString * const APIPathValueMatchGetFavorites;
+/// 创建观赛记录
+FOUNDATION_EXPORT NSString * const APIPathValueMatchRecordsCreate;
+/// 更新观赛记录
+FOUNDATION_EXPORT NSString * const APIPathValueMatchRecordsUpdate(NSString *recordId);
+/// 获取观赛记录详情
+FOUNDATION_EXPORT NSString * const APIPathValueMatchRecordDetail(NSString *recordId);
+/// POST点赞比赛 / DELETE取消点赞比赛
+FOUNDATION_EXPORT NSString * const APIPathValueMatchInteractionsLike(NSString *matchId);
+/// 记录比赛浏览量
+FOUNDATION_EXPORT NSString * const APIPathValueMatchInteractionsView(NSString *matchId);
+/// 提交比赛认证（打卡）
+FOUNDATION_EXPORT NSString * const APIPathValueMatchRecordVerify(NSString *recordId);
+
+#pragma mark - 邮票模块
+/// 邮票夹主页 - 按分类组织，每分类max10个，含锁定邮票+解锁进度+新标记
+/// 获取邮票动态分类列表
+/// 查看指定分类全部邮票（网格布局）
+/// 获取邮票详情
+/// 更新邮票展示位置（长按编辑）
+#pragma mark - 关注模块
+/// POST关注用户 / DELETE取消关注用户
+/// 获取我关注的用户列表
+/// 获取关注我的用户列表（粉丝）
+/// 获取关注统计
+#pragma mark - 好友模块
+/// 发送好友请求
+/// 获取好友请求列表
+/// 获取待处理好友请求数量
+/// 处理好友请求
+/// 获取好友列表
+/// 删除好友
+/// 扫描二维码添加好友
+/// 获取推荐好友列表
+/// 获取好友统计
+#pragma mark - 消费记录模块
+/// 添加消费记录
+/// 查询消费记录列表
+/// PUT更新消费记录 / DELETE删除消费记录
+/// 获取消费汇总统计
+#pragma mark - 隐私设置模块
+/// 获取当前用户隐私设置
+/// 更新隐私设置
+#pragma mark - 护照模块
+/// 获取当前用户护照
+/// 查看他人护照
+/// 获取当前用户观赛记录列表
+#pragma mark - 社区模块
+/// 获取社区好友列表
+/// 查看好友邮票收藏
+/// 查看好友数据统计
+#pragma mark - 会员模块
+/// 获取会员方案列表
+/// Apple IAP收据验证并激活会员
+/// 获取当前用户会员状态
+/// 获取会员权益列表
+/// 获取订阅记录
+#pragma mark - 数据统计模块
+/// 获取当前用户数据统计
+#pragma mark - 排行榜模块
+/// 获取排行榜
 NS_ASSUME_NONNULL_END

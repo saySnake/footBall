@@ -28,8 +28,8 @@ NS_ASSUME_NONNULL_BEGIN
                   failure:(nullable APIFailureBlock)failure;
 /// 批量关注球队
 - (void)followTeams:(NSArray <NSString *> *)teamIds
-                  success:(nullable APISuccessBlock)success
-                  failure:(nullable APIFailureBlock)failure;
+            success:(nullable APISuccessBlock)success
+            failure:(nullable APIFailureBlock)failure;
 
 /// 关注单个球队
 - (void)followTeam:(NSString *)teamId
@@ -37,11 +37,16 @@ NS_ASSUME_NONNULL_BEGIN
            failure:(nullable APIFailureBlock)failure;
 /// 取消关注球队
 - (void)cancelFollowTeam:(NSString *)teamId
-           success:(nullable APISuccessBlock)success
-           failure:(nullable APIFailureBlock)failure;
+                 success:(nullable APISuccessBlock)success
+                 failure:(nullable APIFailureBlock)failure;
 /// 获取我关注的球队列表
 - (void)getFollowTeamsSuccess:(nullable APISuccessBlock)success
                       failure:(nullable APIFailureBlock)failure;
+
+/// 获取当前用户关注球队的队徽列表
+- (void)getFollowTeamIconsSuccess:(nullable APISuccessBlock)success
+                      failure:(nullable APIFailureBlock)failure;
+
 @end
 
 NS_ASSUME_NONNULL_END

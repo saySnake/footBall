@@ -22,7 +22,7 @@
     return self;
 }
 
-- (nullable NSURLRequest *)interceptRequest:(NSURLRequest *)request task:(NSURLSessionDataTask *)task{
+- (nullable NSURLRequest *)interceptRequest:(NSURLRequest *)request{
     if (!self.tokenProvider) {
         return request;
     }

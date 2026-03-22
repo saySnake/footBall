@@ -8,14 +8,6 @@
 #import <Masonry/Masonry.h>
 #import <math.h>
 
-@interface TeamModel : NSObject
-@property (nonatomic, copy) NSString *name;
-@property (nonatomic, copy) NSString *logoName;
-@end
-
-@implementation TeamModel
-@end
-
 /// 选择球队确认后展示的「欢迎来到 Pass Nomad」中间页，点击「立即探索」后执行 onExploreBlock 并关闭
 @interface PassNomadWelcomeViewController : UIViewController
 @property (nonatomic, copy) void (^onExploreBlock)(void);
@@ -206,9 +198,9 @@
 @property (nonatomic, strong) UIButton *skipButton;
 @property (nonatomic, strong) UIButton *confirmButton;
 
-@property (nonatomic, strong) NSArray<TeamModel *> *allTeams;
-@property (nonatomic, strong) NSArray<TeamModel *> *filteredTeams;
-@property (nonatomic, strong) NSMutableArray<TeamModel *> *selectedTeams;
+@property (nonatomic, strong) NSArray<Team *> *allTeams;
+@property (nonatomic, strong) NSArray<Team *> *filteredTeams;
+@property (nonatomic, strong) NSMutableArray<Team *> *selectedTeams;
 
 @property (nonatomic, strong) UIView *bottomSheet;
 
@@ -229,29 +221,36 @@
 }
 
 - (void)buildData {
-    NSMutableArray *arr = [NSMutableArray array];
-    NSArray *names = @[
-        NSLocalizedString(@"team_name_manutd", nil),
-        NSLocalizedString(@"team_name_liverpool", nil),
-        NSLocalizedString(@"team_name_chelsea", nil),
-        NSLocalizedString(@"team_name_arsenal", nil),
-        NSLocalizedString(@"team_name_mancity", nil),
-        NSLocalizedString(@"team_name_spurs", nil),
-        NSLocalizedString(@"team_name_brentford", nil),
-        NSLocalizedString(@"team_name_wolves", nil),
-        NSLocalizedString(@"team_name_brighton", nil)
-    ];
-    for (NSString *name in names) {
-        TeamModel *m = [TeamModel new];
-        m.name = name;
-        m.logoName = @"team_placeholder";
-        [arr addObject:m];
-    }
-    self.allTeams = arr;
-    self.filteredTeams = arr;
-    self.selectedTeams = [NSMutableArray array];
+//    NSMutableArray *arr = [NSMutableArray array];
+//    NSArray *names = @[
+//        NSLocalizedString(@"team_name_manutd", nil),
+//        NSLocalizedString(@"team_name_liverpool", nil),
+//        NSLocalizedString(@"team_name_chelsea", nil),
+//        NSLocalizedString(@"team_name_arsenal", nil),
+//        NSLocalizedString(@"team_name_mancity", nil),
+//        NSLocalizedString(@"team_name_spurs", nil),
+//        NSLocalizedString(@"team_name_brentford", nil),
+//        NSLocalizedString(@"team_name_wolves", nil),
+//        NSLocalizedString(@"team_name_brighton", nil)
+//    ];
+//    for (NSString *name in names) {
+//        TeamModel *m = [TeamModel new];
+//        m.name = name;
+//        m.logoName = @"team_placeholder";
+//        [arr addObject:m];
+//    }
     
-//    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+    [TeamsRequest.shared searchTeams:@"" leagueId:nil page:1 pageSize:20 success:^(HTTPResponse <NSArray<Team*>*>* _Nullable responseObject) {
+        [MBProgressHUD hideHUDForView:self.view animated:YES];
+        self.allTeams = responseObject.dataObject;
+        self.filteredTeams = responseObject.dataObject;
+        self.selectedTeams = [NSMutableArray array];
+        [self.collectionView reloadData];
+    } failure:^(NSError * _Nonnull error) {
+        [MBProgressHUD hideHUDForView:self.view animated:YES];
+        [QMUITips showError:error.localizedDescription];
+    }];
 //    [AuthManager.sharedManager loginPhone:self.phoneNumber verify:self.codeTextField.text success:^(HTTPResponse * _Nonnull response) {
 //        [MBProgressHUD hideHUDForView:self.view animated:YES];
 //        // 登录成功后进入选择球队界面
@@ -364,9 +363,9 @@
 
 - (__kindof UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
     TeamCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"TeamCell" forIndexPath:indexPath];
-    TeamModel *m = self.filteredTeams[indexPath.item];
+    Team *m = self.filteredTeams[indexPath.item];
     cell.nameLabel.text = m.name;
-    cell.logoView.image = [UIImage imageNamed:m.logoName];
+    cell.logoView.image = [UIImage imageNamed:m.logo];
     BOOL selected = [self.selectedTeams containsObject:m];
     cell.checkmarkView.hidden = !selected;
     // 按设计图：选中 = 圆形加粗绿色描边；未选中 = 圆形细浅灰描边（描边在圆形容器上）
@@ -380,7 +379,7 @@
 }
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-    TeamModel *m = self.filteredTeams[indexPath.item];
+    Team *m = self.filteredTeams[indexPath.item];
     if ([self.selectedTeams containsObject:m]) {
         [self.selectedTeams removeObject:m];
     } else {
@@ -395,7 +394,7 @@
     if (searchText.length == 0) {
         self.filteredTeams = self.allTeams;
     } else {
-        NSPredicate *predicate = [NSPredicate predicateWithBlock:^BOOL(TeamModel *evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
+        NSPredicate *predicate = [NSPredicate predicateWithBlock:^BOOL(Team *evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
             return [evaluatedObject.name containsString:searchText];
         }];
         self.filteredTeams = [self.allTeams filteredArrayUsingPredicate:predicate];
@@ -450,7 +449,7 @@
     stack.spacing = 12;
     
     // 选中球队的小圆图标，可删除
-    [self.selectedTeams enumerateObjectsUsingBlock:^(TeamModel *m, NSUInteger idx, BOOL *stop) {
+    [self.selectedTeams enumerateObjectsUsingBlock:^(Team *m, NSUInteger idx, BOOL *stop) {
         UIView *chipContainer = [[UIView alloc] init];
         chipContainer.backgroundColor = [UIColor clearColor];
         
@@ -464,7 +463,7 @@
         
         UIImageView *logoView = [[UIImageView alloc] init];
         logoView.contentMode = UIViewContentModeScaleAspectFit;
-        logoView.image = [UIImage imageNamed:m.logoName];
+        logoView.image = [UIImage imageNamed:m.logo];
         
         UIButton *removeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
         if (@available(iOS 13.0, *)) {
@@ -581,7 +580,7 @@
 - (void)sheetRemoveTeamTapped:(UIButton *)sender {
     NSInteger index = sender.tag;
     if (index >= 0 && index < (NSInteger)self.selectedTeams.count) {
-        TeamModel *m = self.selectedTeams[(NSUInteger)index];
+        Team *m = self.selectedTeams[(NSUInteger)index];
         [self.selectedTeams removeObject:m];
         [self.collectionView reloadData];
         if (self.selectedTeams.count == 0) {

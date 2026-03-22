@@ -25,7 +25,7 @@ typedef NS_ENUM(NSInteger, HTTPMethod) {
 /// 网络请求成功回调
 typedef void(^APISuccessBlock)(HTTPResponse * _Nullable responseObject);
 /// 网络请求失败回调
-typedef void(^APIFailureBlock)(NSError *error);
+typedef void(^APIFailureBlock)(NSError  *error);
 /// 网络请求进度回调
 typedef void(^APIProgressBlock)(NSProgress *progress);
 

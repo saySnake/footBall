@@ -75,6 +75,13 @@
 
 #pragma mark - 项目核心类 - Auth
 #import "AuthManager.h"
+#import "TeamsRequest.h"
+#import "FileRequest.h"
+#import "UserRequest.h"
+#import "MatchRequest.h"
+
+#pragma mark - 项目核心类 - models
+#import "Team.h"
 
 #pragma mark - 项目核心类 - Image
 #import "SDImageManager.h"

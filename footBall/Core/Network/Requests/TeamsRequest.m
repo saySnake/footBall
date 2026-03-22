@@ -26,6 +26,8 @@
 
     [[APIManager sharedManager] GET:APIPathValueTeamsSearch parameters:dict headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
+            NSArray *teams = [NSArray yy_modelArrayWithClass:Team.class json:responseObject.data[@"list"]];
+            responseObject.dataObject = teams;
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);
@@ -160,5 +162,25 @@
         failure(error);
     }];
 }
+- (void)getFollowTeamIconsSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    if (!AuthManager.sharedManager.isLoggedIn) {
+        if (failure) {
+            NSError *error = [NSError errorWithDomain:@"AuthManagerErrorDomain"
+                                                  code:-1
+                                              userInfo:@{NSLocalizedDescriptionKey: @"用户未登录"}];
+            failure(error);
+        }
+        return;
+    }
 
+    [[APIManager sharedManager] GET:APIPathValueMyTeamIcons parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            success(responseObject);
+        } else {
+            failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        failure(error);
+    }];
+}
 @end

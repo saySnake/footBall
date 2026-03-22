@@ -81,7 +81,7 @@ static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
         return;
     }
 
-    [[APIManager sharedManager] POST:APIPathValueAuthLoginPhone parameters:@{@"phone":phone,@"code":verify} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+    [[APIManager sharedManager] POST:APIPathValueLoginPhone parameters:@{@"phone":phone,@"code":verify} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
             NSDictionary *data = responseObject.data;
             User *user = [User yy_modelWithJSON:data];
@@ -107,7 +107,7 @@ static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
         }
         return;
     }
-    [[APIManager sharedManager] POST:APIPathValueAuthRefresh parameters:@{@"refreshToken":refreshToken} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+    [[APIManager sharedManager] POST:APIPathValueRefreshToken parameters:@{@"refreshToken":refreshToken} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
             NSDictionary *data = responseObject.data;
             NSString *accessToken = data[@"accessToken"];
@@ -126,7 +126,7 @@ static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
     }];
 }
 - (void)logoutSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
-    [[APIManager sharedManager] POST:APIPathValueAuthLogout parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+    [[APIManager sharedManager] POST:APIPathValueLogout parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
             self.user = nil;
             [self removeUser];

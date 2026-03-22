@@ -66,7 +66,7 @@
         if (responseObject.success) {
             STSToken *token = [STSToken yy_modelWithJSON:responseObject.data];
             self.stsToken = token;
-            responseObject.data = token;
+            responseObject.dataObject = token;
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);
