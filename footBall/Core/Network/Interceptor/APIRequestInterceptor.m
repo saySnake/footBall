@@ -61,16 +61,16 @@
         return request;
     }
     
-    NSLog(@"🌐 [API Request] %@ %@", request.HTTPMethod, request.URL.absoluteString);
-    
-    if (self.logLevel >= 2 && request.HTTPBody) {
-        NSString *bodyString = [[NSString alloc] initWithData:request.HTTPBody encoding:NSUTF8StringEncoding];
-        NSLog(@"📤 [Request Body] %@", bodyString);
-    }
-    
-    if (self.logLevel >= 2 && request.allHTTPHeaderFields.count > 0) {
-        NSLog(@"📋 [Request Headers] %@", request.allHTTPHeaderFields);
-    }
+//    NSLog(@"🌐 [API Request] %@ %@", request.HTTPMethod, request.URL.absoluteString);
+//    
+//    if (self.logLevel >= 2 && request.HTTPBody) {
+//        NSString *bodyString = [[NSString alloc] initWithData:request.HTTPBody encoding:NSUTF8StringEncoding];
+//        NSLog(@"📤 [Request Body] %@", bodyString);
+//    }
+//    
+//    if (self.logLevel >= 2 && request.allHTTPHeaderFields.count > 0) {
+//        NSLog(@"📋 [Request Headers] %@", request.allHTTPHeaderFields);
+//    }
     
     return request;
 }
@@ -79,20 +79,28 @@
     if (!self.enabled || self.logLevel < 1) {
         return YES;
     }
+    NSURLRequest *request = task.currentRequest;
+    NSLog(@"🌐 [HTTP Request] %@ %@", request.HTTPMethod, request.URL.absoluteString);
+    
+    if (self.logLevel >= 2 && request.HTTPBody) {
+        NSString *bodyString = [[NSString alloc] initWithData:request.HTTPBody encoding:NSUTF8StringEncoding];
+        NSLog(@"📤 [HTTP Body] %@", bodyString);
+    }
+    
+    if (self.logLevel >= 2 && request.allHTTPHeaderFields.count > 0) {
+        NSLog(@"📋 [HTTP Headers] %@", request.allHTTPHeaderFields);
+    }
     NSHTTPURLResponse *httpResp = (NSHTTPURLResponse *)task.response;
-    NSLog(@"✅ [API Response] %@", httpResp.URL);
-    NSLog(@"✅ [API StatusCode] %ld", httpResp.statusCode);
     if (self.logLevel >= 2 && response) {
-        NSLog(@"✅ [API Body]***************** \n%@\n✅ [API Body]***************** ",response);
+        NSLog(@"✅ [HTTP Response] %ld ***************** \n%@\n✅ [HTTP Response]***************** ",httpResp.statusCode,response);
     }
     
     return YES;
 }
 - (NSError *)interceptError:(NSError *)error task:(NSURLSessionDataTask *)task{
+    
     NSHTTPURLResponse *httpResp = (NSHTTPURLResponse *)task.response;
-    NSLog(@"❌ [API Response] %@", httpResp.URL);
-    NSLog(@"❌ [API StatusCode] %ld", httpResp.statusCode);
-    NSLog(@"❌ [API ERROR]***************** \n%@\n❌ [API ERROR]*****************",error);
+    NSLog(@"❌ [HTTP Response] %ld %@\n ❌ [HTTP ERROR]***************** \n%@\n❌ [HTTP ERROR]*****************",httpResp.statusCode,httpResp.URL,error);
     return error;
 }
 @end
