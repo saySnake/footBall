@@ -7,16 +7,6 @@
 #import "MoreDatePickerController.h"
 #import <Masonry/Masonry.h>
 
-@interface MoreMatchModel : NSObject
-@property (nonatomic, copy) NSString *homeName;
-@property (nonatomic, copy) NSString *awayName;
-@property (nonatomic, copy) NSString *time;
-@property (nonatomic, copy) NSString *homeLogoName;
-@property (nonatomic, copy) NSString *awayLogoName;
-@end
-@implementation MoreMatchModel
-@end
-
 @interface MoreMatchCell : UITableViewCell
 @property (nonatomic, strong) UIImageView *homeLogo;
 @property (nonatomic, strong) UIImageView *awayLogo;
@@ -115,7 +105,7 @@
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UILabel *monthLabel;
 @property (nonatomic, strong) UITableView *tableView;
-@property (nonatomic, strong) NSArray<MoreMatchModel *> *matches;
+@property (nonatomic, strong) NSArray<Match *> *matches;
 @property (nonatomic, strong) NSDate *selectedDate;        // 当前选中的日期（默认今天）
 @property (nonatomic, strong) NSDate *weekStartDate;       // 当前周的周日日期
 @property (nonatomic, strong) NSCalendar *calendar;
@@ -305,15 +295,7 @@
     __weak typeof(self) weakSelf = self;
     [[MatchRequest shared] getMatchScheduleWithDate:dateStr myTeamOnly:NO page:1 pageSize:50 success:^(HTTPResponse * _Nullable responseObject) {
         NSArray *matches = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
-        NSMutableArray *arr = [NSMutableArray arrayWithCapacity:matches.count];
-        for (Match *match in matches) {
-            MoreMatchModel *m = [MoreMatchModel new];
-            m.homeName = match.homeTeamName ?: @"-";
-            m.awayName = match.awayTeamName ?: @"-";
-            m.time = [weakSelf timeTextFromMatchDate:match.matchDate];
-            [arr addObject:m];
-        }
-        weakSelf.matches = arr;
+        weakSelf.matches = matches;
         [weakSelf.tableView reloadData];
     } failure:^(NSError * _Nonnull error) {
         weakSelf.matches = @[];
@@ -449,10 +431,10 @@
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     MoreMatchCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MoreMatchCell" forIndexPath:indexPath];
-    MoreMatchModel *m = self.matches[indexPath.row];
-    cell.homeLabel.text = m.homeName;
-    cell.awayLabel.text = m.awayName;
-    [cell.timePill setTitle:m.time forState:UIControlStateNormal];
+    Match *m = self.matches[indexPath.row];
+    cell.homeLabel.text = m.homeTeamName ?: @"-";
+    cell.awayLabel.text = m.awayTeamName ?: @"-";
+    [cell.timePill setTitle:[self timeTextFromMatchDate:m.matchDate] forState:UIControlStateNormal];
     cell.homeLogo.backgroundColor = [UIColor colorWithWhite:0.9 alpha:1.0];
     cell.awayLogo.backgroundColor = [UIColor colorWithWhite:0.9 alpha:1.0];
     return cell;

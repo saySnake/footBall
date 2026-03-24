@@ -12,15 +12,6 @@ static UIColor *kConsumeGreen(void) {
     return [ColorManager sharedManager].primaryColor;
 }
 
-@interface ConsumeRecordItem : NSObject
-@property (nonatomic, copy) NSString *title;
-@property (nonatomic, copy) NSString *time;
-@property (nonatomic, copy) NSString *amount;
-@property (nonatomic, strong) UIImage *iconImage;
-@end
-@implementation ConsumeRecordItem
-@end
-
 @interface ConsumeRecordCell : UITableViewCell
 @property (nonatomic, strong) UIView *iconWrap;
 @property (nonatomic, strong) UIImageView *iconView;
@@ -125,7 +116,7 @@ static UIColor *kConsumeGreen(void) {
 @property (nonatomic, strong) NSDate *selectedDate;
 @property (nonatomic, strong) NSDate *weekStartDate;
 @property (nonatomic, strong) NSCalendar *calendar;
-@property (nonatomic, strong) NSArray<ConsumeRecordItem *> *records;
+@property (nonatomic, strong) NSArray<PNExpense *> *records;
 @end
 
 @implementation ConsumptionRecordViewController
@@ -367,23 +358,9 @@ static UIColor *kConsumeGreen(void) {
     NSString *monthStr = [formatter stringFromDate:self.selectedDate ?: NSDate.date];
     __weak typeof(self) weakSelf = self;
     [[ExpenseRequest shared] getExpensesWithMonth:monthStr page:1 pageSize:100 success:^(HTTPResponse * _Nullable responseObject) {
-        NSArray *list = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
-        NSMutableArray *arr = [NSMutableArray arrayWithCapacity:list.count];
-        for (NSDictionary *dict in list) {
-            if (![dict isKindOfClass:NSDictionary.class]) continue;
-            ConsumeRecordItem *item = [ConsumeRecordItem new];
-            item.title = [dict[@"itemName"] isKindOfClass:NSString.class] ? dict[@"itemName"] : @"消费";
-            item.time = [weakSelf shortTimeFromString:dict[@"createTime"] ?: dict[@"expenseDate"] ?: @""];
-            id amount = dict[@"amount"];
-            if ([amount respondsToSelector:@selector(stringValue)]) {
-                item.amount = [NSString stringWithFormat:@"-%@", [amount stringValue]];
-            } else {
-                item.amount = @"-0";
-            }
-            item.iconImage = nil;
-            [arr addObject:item];
-        }
-        weakSelf.records = arr;
+        PNExpensePage *page = [responseObject.dataObject isKindOfClass:PNExpensePage.class] ? responseObject.dataObject : nil;
+        NSArray<PNExpense *> *list = page.list ?: @[];
+        weakSelf.records = list;
         [weakSelf.tableView reloadData];
     } failure:^(NSError * _Nonnull error) {
         weakSelf.records = @[];
@@ -453,17 +430,13 @@ static UIColor *kConsumeGreen(void) {
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     ConsumeRecordCell *cell = [tableView dequeueReusableCellWithIdentifier:@"ConsumeRecordCell" forIndexPath:indexPath];
-    ConsumeRecordItem *item = self.records[indexPath.row];
-    cell.titleLabel.text = item.title;
-    cell.timeLabel.text = item.time;
-    cell.amountLabel.text = item.amount;
-    if (item.iconImage) {
-        cell.iconView.image = item.iconImage;
-        cell.iconView.backgroundColor = [UIColor clearColor];
-    } else {
-        cell.iconView.image = nil;
-        cell.iconView.backgroundColor = [UIColor colorWithRed:0.85 green:0.2 blue:0.2 alpha:0.3];
-    }
+    PNExpense *item = self.records[indexPath.row];
+    cell.titleLabel.text = item.itemName.length > 0 ? item.itemName : @"消费";
+    cell.timeLabel.text = [self shortTimeFromString:item.createTime.length > 0 ? item.createTime : item.expenseDate];
+    id amount = item.amount;
+    cell.amountLabel.text = [amount respondsToSelector:@selector(stringValue)] ? [NSString stringWithFormat:@"-%@", [amount stringValue]] : @"-0";
+    cell.iconView.image = nil;
+    cell.iconView.backgroundColor = [UIColor colorWithRed:0.85 green:0.2 blue:0.2 alpha:0.3];
     return cell;
 }
 

@@ -662,12 +662,12 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         [weakSelf refreshTabs];
     }];
     [[ProfileRequest shared] getMyStatisticsWithPeriod:@"all" success:^(HTTPResponse * _Nullable responseObject) {
-        NSDictionary *data = [responseObject.data isKindOfClass:NSDictionary.class] ? responseObject.data : @{};
-        weakSelf.statAValue.text = [weakSelf stringValue:data[@"totalMatches"] defaultText:@"0"];
-        weakSelf.statBValue.text = [weakSelf stringValue:data[@"totalMinutes"] defaultText:@"0"];
-        weakSelf.statCValue.text = [weakSelf stringValue:data[@"totalStadiums"] defaultText:@"0"];
-        weakSelf.statDValue.text = [weakSelf stringValue:data[@"totalLeagues"] defaultText:@"0"];
-        weakSelf.statEValue.text = [weakSelf stringValue:data[@"totalCountries"] defaultText:@"0"];
+        PNStatistics *statistics = [responseObject.dataObject isKindOfClass:PNStatistics.class] ? responseObject.dataObject : nil;
+        weakSelf.statAValue.text = [NSString stringWithFormat:@"%ld", (long)MAX(statistics.basicStats.totalMatches, 0)];
+        weakSelf.statBValue.text = [NSString stringWithFormat:@"%ld", (long)MAX(statistics.cumulativeWatchTime, 0)];
+        weakSelf.statCValue.text = [NSString stringWithFormat:@"%ld", (long)MAX(statistics.stadiumRanking.count, 0)];
+        weakSelf.statDValue.text = [NSString stringWithFormat:@"%ld", (long)MAX(statistics.leagueStats.count, 0)];
+        weakSelf.statEValue.text = @"0";
     } failure:^(NSError * _Nonnull error) {
         weakSelf.statAValue.text = @"0";
         weakSelf.statBValue.text = @"0";
@@ -741,11 +741,6 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     return date;
 }
 
-- (NSString *)stringValue:(id)value defaultText:(NSString *)defaultText {
-    if ([value isKindOfClass:NSString.class]) return value;
-    if ([value respondsToSelector:@selector(stringValue)]) return [value stringValue];
-    return defaultText;
-}
 
 - (NSArray<DiscoverMatch *> *)currentDataSource {
     return self.currentType == DiscoverMatchTypeUpcoming ? self.upcomingMatches : self.finishedMatches;

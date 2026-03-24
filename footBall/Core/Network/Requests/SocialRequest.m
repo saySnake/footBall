@@ -12,7 +12,11 @@
 
 - (void)getFriendRequestsSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     [[APIManager sharedManager] GET:APIPathValueFriendsRequests parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
-        if (responseObject.success) success(responseObject);
+        if (responseObject.success) {
+            PNFriendRequestPage *page = [PNFriendRequestPage yy_modelWithJSON:responseObject.data];
+            responseObject.dataObject = page;
+            success(responseObject);
+        }
         else failure([APIError errorWithResponse:responseObject]);
     } failure:^(NSError * _Nonnull error) {
         failure(error);
@@ -21,7 +25,10 @@
 
 - (void)getFriendRequestsPendingCountSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     [[APIManager sharedManager] GET:APIPathValueFriendsRequestsPendingCount parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
-        if (responseObject.success) success(responseObject);
+        if (responseObject.success) {
+            responseObject.dataObject = @([responseObject.data respondsToSelector:@selector(integerValue)] ? [responseObject.data integerValue] : 0);
+            success(responseObject);
+        }
         else failure([APIError errorWithResponse:responseObject]);
     } failure:^(NSError * _Nonnull error) {
         failure(error);
@@ -44,7 +51,11 @@
 
 - (void)getFriendsSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     [[APIManager sharedManager] GET:APIPathValueFriendsList parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
-        if (responseObject.success) success(responseObject);
+        if (responseObject.success) {
+            PNFriendPage *page = [PNFriendPage yy_modelWithJSON:responseObject.data];
+            responseObject.dataObject = page;
+            success(responseObject);
+        }
         else failure([APIError errorWithResponse:responseObject]);
     } failure:^(NSError * _Nonnull error) {
         failure(error);
@@ -53,7 +64,11 @@
 
 - (void)getFollowingSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     [[APIManager sharedManager] GET:APIPathValueFollowsFollowing parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
-        if (responseObject.success) success(responseObject);
+        if (responseObject.success) {
+            PNUserPage *page = [PNUserPage yy_modelWithJSON:responseObject.data];
+            responseObject.dataObject = page;
+            success(responseObject);
+        }
         else failure([APIError errorWithResponse:responseObject]);
     } failure:^(NSError * _Nonnull error) {
         failure(error);
@@ -62,7 +77,11 @@
 
 - (void)getFollowersSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     [[APIManager sharedManager] GET:APIPathValueFollowsFollowers parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
-        if (responseObject.success) success(responseObject);
+        if (responseObject.success) {
+            PNUserPage *page = [PNUserPage yy_modelWithJSON:responseObject.data];
+            responseObject.dataObject = page;
+            success(responseObject);
+        }
         else failure([APIError errorWithResponse:responseObject]);
     } failure:^(NSError * _Nonnull error) {
         failure(error);
@@ -71,7 +90,11 @@
 
 - (void)getRecommendFriendsSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     [[APIManager sharedManager] GET:APIPathValueFriendsRecommend parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
-        if (responseObject.success) success(responseObject);
+        if (responseObject.success) {
+            NSArray *users = [NSArray yy_modelArrayWithClass:PNUser.class json:responseObject.data];
+            responseObject.dataObject = users;
+            success(responseObject);
+        }
         else failure([APIError errorWithResponse:responseObject]);
     } failure:^(NSError * _Nonnull error) {
         failure(error);

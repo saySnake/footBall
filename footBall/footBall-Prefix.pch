@@ -86,6 +86,11 @@
 #pragma mark - 项目核心类 - models
 #import "Team.h"
 #import "Match.h"
+#import "ExpenseModels.h"
+#import "SocialModels.h"
+#import "LeaderboardModels.h"
+#import "StatisticsModels.h"
+#import "Passport.h"
 
 #pragma mark - 项目核心类 - Image
 #import "SDImageManager.h"

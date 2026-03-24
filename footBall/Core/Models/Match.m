@@ -9,6 +9,13 @@
 
 @implementation Match
 +(NSDictionary<NSString *,id> *)modelCustomPropertyMapper {
-    return @{@"matchId":@"id"};
+    return @{@"matchId": @"id",
+             @"homeTeamId": @"homeTeamId",
+             @"awayTeamId": @"awayTeamId",
+             @"homeTeamLogo": @"homeTeamLogo",
+             @"awayTeamLogo": @"awayTeamLogo"};
 }
+@end
+
+@implementation MatchDetail
 @end

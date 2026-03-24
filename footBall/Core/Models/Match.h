@@ -39,4 +39,20 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
+@interface MatchDetail : Match
+@property (nonatomic, assign) NSInteger halfHomeScore;
+@property (nonatomic, assign) NSInteger halfAwayScore;
+@property (nonatomic, copy) NSString *stadiumId;
+@property (nonatomic, copy) NSString *stadiumName;
+@property (nonatomic, copy) NSString *leagueId;
+@property (nonatomic, copy) NSString *leagueName;
+@property (nonatomic, assign) NSInteger duration;
+@property (nonatomic, assign) NSInteger yellowCards;
+@property (nonatomic, assign) NSInteger redCards;
+@property (nonatomic, assign) NSInteger attendance;
+@property (nonatomic, copy) NSString *homeResult;
+@property (nonatomic, copy) NSString *awayResult;
+@property (nonatomic, assign) BOOL favorited;
+@end
+
 NS_ASSUME_NONNULL_END

@@ -110,7 +110,7 @@
     }
     [[APIManager sharedManager] GET:APIPathValueMatchDetail(matchId) parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            Match *match = [Match yy_modelWithJSON:responseObject.data];
+            MatchDetail *match = [MatchDetail yy_modelWithJSON:responseObject.data];
             responseObject.dataObject = match;
             success(responseObject);
         } else {

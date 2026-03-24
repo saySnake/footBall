@@ -16,31 +16,6 @@
 #define kTimePillGreen [UIColor colorWithRed:0.94 green:0.97 blue:0.93 alpha:1.0]
 static NSString *const kLogoPlaceholder = @"team_placeholder";
 
-#pragma mark - 顶部关注球队项（与 TeamSelection 的 TeamModel 区分）
-@interface HomeTeamItem : NSObject
-@property (nonatomic, copy) NSString *teamId;
-@property (nonatomic, copy) NSString *name;
-@end
-@implementation HomeTeamItem
-@end
-
-#pragma mark - 赛程模型
-@interface MatchModel : NSObject
-@property (nonatomic, copy) NSString *date;           // 2025-12
-@property (nonatomic, copy) NSString *homeTeamId;
-@property (nonatomic, copy) NSString *awayTeamId;
-@property (nonatomic, copy) NSString *homeTeamLogo;
-@property (nonatomic, copy) NSString *awayTeamLogo;
-@property (nonatomic, copy) NSString *homeTeam;
-@property (nonatomic, copy) NSString *awayTeam;
-@property (nonatomic, copy) NSString *score;
-@property (nonatomic, copy) NSString *time;
-@property (nonatomic, assign) BOOL finished;
-@property (nonatomic, copy) NSString *dateDetail;      // 15 Dec, 2025
-@end
-@implementation MatchModel
-@end
-
 #pragma mark - 顶部球队 Cell
 @interface HomeTeamCell : UICollectionViewCell
 @property (nonatomic, strong) UIView *circleView;
@@ -209,10 +184,10 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
 @property (nonatomic, strong) NSArray<TeamIcon *> *teamItems;
 @property (nonatomic, copy, nullable) NSString *selectedTeamId; // nil = 全部
 
-@property (nonatomic, strong) NSMutableArray<MatchModel *> *dataSource;
-@property (nonatomic, strong) NSMutableArray<MatchModel *> *filteredData;
-@property (nonatomic, strong) MatchModel *highlightFinished;
-@property (nonatomic, strong) MatchModel *highlightUpcoming;
+@property (nonatomic, strong) NSMutableArray<Match *> *dataSource;
+@property (nonatomic, strong) NSMutableArray<Match *> *filteredData;
+@property (nonatomic, strong) Match *highlightFinished;
+@property (nonatomic, strong) Match *highlightUpcoming;
 
 @property (nonatomic, strong) UIScrollView *scrollView;
 @property (nonatomic, strong) UIView *contentView;
@@ -281,7 +256,7 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
         _filteredData = [_dataSource mutableCopy];
     } else {
         NSMutableArray *arr = [NSMutableArray array];
-        for (MatchModel *m in _dataSource) {
+        for (Match *m in _dataSource) {
             if ([m.homeTeamId isEqualToString:_selectedTeamId] || [m.awayTeamId isEqualToString:_selectedTeamId])
                 [arr addObject:m];
         }
@@ -472,7 +447,9 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
     CGFloat headerH = 40.f, footerH = 0.01f, rowH = 103.f;
     CGFloat total = 0;
     for (NSString *date in dates) {
-        NSPredicate *p = [NSPredicate predicateWithFormat:@"date == %@", date];
+        NSPredicate *p = [NSPredicate predicateWithBlock:^BOOL(Match *evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
+            return [[self monthTextFromRaw:evaluatedObject.matchDate] isEqualToString:date];
+        }];
         NSInteger rows = [[_filteredData filteredArrayUsingPredicate:p] count];
         total += headerH + footerH + rows * rowH;
     }
@@ -508,14 +485,14 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
     }];
 }
 
-- (UIView *)cardWithModel:(MatchModel *)m bg:(UIColor *)bg textColor:(UIColor *)textColor showScore:(BOOL)showScore {
+- (UIView *)cardWithModel:(Match *)m bg:(UIColor *)bg textColor:(UIColor *)textColor showScore:(BOOL)showScore {
     if (!m) {
-        m = MatchModel.new;
-        m.homeTeam = @"-";
-        m.awayTeam = @"-";
-        m.time = @"--:--";
-        m.dateDetail = @"--";
-        m.score = @"0 : 0";
+        m = Match.new;
+        m.homeTeamName = @"-";
+        m.awayTeamName = @"-";
+        m.matchDate = @"";
+        m.homeScore = 0;
+        m.awayScore = 0;
     }
     UIView *card = [[UIView alloc] init];
     card.backgroundColor = bg;
@@ -528,17 +505,18 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
     UILabel *timeL = [[UILabel alloc] init];
     // Fri/11:00 pm：优先从 dateDetail 里取星期缩写
     NSString *weekday = @"";
-    if ([m.dateDetail containsString:@","]) {
-        weekday = [[m.dateDetail componentsSeparatedByString:@","] firstObject] ?: @"";
+    NSString *detailText = [self dateDetailFromRaw:m.matchDate];
+    if ([detailText containsString:@","]) {
+        weekday = [[detailText componentsSeparatedByString:@","] firstObject] ?: @"";
     }
     weekday = [weekday stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (weekday.length == 0) weekday = @"Fri";
-    NSString *t = m.time.length ? m.time : @"11:00 pm";
+    NSString *t = [self timeTextFromRaw:m.matchDate];
     timeL.text = [NSString stringWithFormat:@"%@/%@", weekday, t];
     timeL.font = [UIFont systemFontOfSize:28 weight:UIFontWeightSemibold];
     timeL.textColor = textColor;
     UILabel *dateL = [[UILabel alloc] init];
-    dateL.text = m.dateDetail;
+    dateL.text = detailText;
     dateL.font = [UIFont systemFontOfSize:11];
     dateL.textColor = [textColor colorWithAlphaComponent:0.9];
     UIImageView *homeIcon = [[UIImageView alloc] init];
@@ -553,15 +531,14 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
     awayIcon.clipsToBounds = YES;
     UIImage *placeImg = [UIImage imageNamed:kLogoPlaceholder];
     if (placeImg) { homeIcon.image = placeImg; awayIcon.image = placeImg; }
-    NSArray *scoreParts = [m.score componentsSeparatedByString:@" : "];
-    NSString *homeScore = scoreParts.count > 0 ? [scoreParts[0] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]] : @"";
-    NSString *awayScore = scoreParts.count > 1 ? [scoreParts[1] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]] : @"";
+    NSString *homeScore = [NSString stringWithFormat:@"%ld", (long)m.homeScore];
+    NSString *awayScore = [NSString stringWithFormat:@"%ld", (long)m.awayScore];
     UILabel *homeL = [[UILabel alloc] init];
-    homeL.text = m.homeTeam;
+    homeL.text = m.homeTeamName;
     homeL.font = [UIFont systemFontOfSize:22 weight:UIFontWeightSemibold];
     homeL.textColor = textColor;
     UILabel *awayL = [[UILabel alloc] init];
-    awayL.text = m.awayTeam;
+    awayL.text = m.awayTeamName;
     awayL.font = [UIFont systemFontOfSize:22 weight:UIFontWeightSemibold];
     awayL.textColor = textColor;
     [card addSubview:timeL];
@@ -639,21 +616,18 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
 - (void)fetchFeatureMatchs {
     [MatchRequest.shared getFeaturesMatchsSuccess:^(HTTPResponse <NSArray <Match*> *>* _Nullable responseObject) {
         NSArray<Match *> *list = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
-        NSMutableArray *models = NSMutableArray.array;
-        for (Match *match in list) {
-            [models addObject:[self modelFromMatch:match]];
-        }
-        self.dataSource = models;
-        self.filteredData = models.mutableCopy;
-        MatchModel *firstFinished = nil;
-        MatchModel *firstUpcoming = nil;
-        for (MatchModel *m in models) {
-            if (m.finished && !firstFinished) firstFinished = m;
-            if (!m.finished && !firstUpcoming) firstUpcoming = m;
+        self.dataSource = list.mutableCopy;
+        self.filteredData = list.mutableCopy;
+        Match *firstFinished = nil;
+        Match *firstUpcoming = nil;
+        for (Match *m in list) {
+            BOOL finished = [m.matchStatus isEqualToString:@"FINISHED"];
+            if (finished && !firstFinished) firstFinished = m;
+            if (!finished && !firstUpcoming) firstUpcoming = m;
             if (firstFinished && firstUpcoming) break;
         }
-        self.highlightFinished = firstFinished ?: models.firstObject;
-        self.highlightUpcoming = firstUpcoming ?: models.firstObject;
+        self.highlightFinished = firstFinished ?: list.firstObject;
+        self.highlightUpcoming = firstUpcoming ?: list.firstObject;
         [self buildTwoCards];
         [self filterData];
         [self updateTableHeight];
@@ -663,6 +637,7 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
         [self.tableView reloadData];
     }];
 }
+
 - (void)fetchUserProfile {
     [UserRequest.shared getLoginUserInfoSuccess:^(HTTPResponse <User *>* _Nullable responseObject) {
         [self refreshUserProfile];
@@ -681,22 +656,6 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
     [_avatarView sd_setImageWithURL:[NSURL URLWithString:AuthManager.sharedManager.user.profile.avatar]];
     _challengerLabel.text = AuthManager.sharedManager.user.profile.nickname;
     _dateLabel.text = AuthManager.sharedManager.user.profile.birthDate;
-}
-
-- (MatchModel *)modelFromMatch:(Match *)match {
-    MatchModel *m = MatchModel.new;
-    m.homeTeamId = match.homeTeamId ?: @"";
-    m.awayTeamId = match.awayTeamId ?: @"";
-    m.homeTeam = match.homeTeamName ?: @"-";
-    m.awayTeam = match.awayTeamName ?: @"-";
-    m.homeTeamLogo = match.homeTeamLogo ?: @"";
-    m.awayTeamLogo = match.awayTeamLogo ?: @"";
-    m.finished = [match.matchStatus isEqualToString:@"FINISHED"];
-    m.score = [NSString stringWithFormat:@"%ld : %ld", (long)match.homeScore, (long)match.awayScore];
-    m.time = [self timeTextFromRaw:match.matchDate];
-    m.date = [self monthTextFromRaw:match.matchDate];
-    m.dateDetail = [self dateDetailFromRaw:match.matchDate];
-    return m;
 }
 
 - (NSDate *)dateFromRaw:(NSString *)raw {
@@ -735,6 +694,7 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
     fmt.dateFormat = @"dd MMM, yyyy";
     return [fmt stringFromDate:date];
 }
+
 #pragma mark - UICollectionView
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
     return _teamItems.count;
@@ -753,7 +713,7 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
     return CGSizeMake(60, 80);
 }
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-    HomeTeamItem *item = _teamItems[indexPath.item];
+    TeamIcon *item = _teamItems[indexPath.item];
     _selectedTeamId = item.teamId; // nil 表示全部
     [collectionView reloadData];
     [self filterData];
@@ -761,7 +721,10 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
 
 #pragma mark - UITableView（按日期倒序、分组）
 - (NSArray *)sortedDates {
-    NSArray *dates = [_filteredData valueForKey:@"date"];
+    NSMutableArray *dates = NSMutableArray.array;
+    for (Match *m in _filteredData) {
+        [dates addObject:[self monthTextFromRaw:m.matchDate]];
+    }
     NSArray *unique = [[NSSet setWithArray:dates] allObjects];
     return [unique sortedArrayUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
         return [b compare:a];
@@ -772,7 +735,9 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
 }
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     NSString *date = [self sortedDates][section];
-    NSPredicate *p = [NSPredicate predicateWithFormat:@"date == %@", date];
+    NSPredicate *p = [NSPredicate predicateWithBlock:^BOOL(Match *evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
+        return [[self monthTextFromRaw:evaluatedObject.matchDate] isEqualToString:date];
+    }];
     return [[_filteredData filteredArrayUsingPredicate:p] count];
 }
 - (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
@@ -804,20 +769,23 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
     return 103;
 }
-- (MatchModel *)modelAtIndexPath:(NSIndexPath *)indexPath {
+- (Match *)modelAtIndexPath:(NSIndexPath *)indexPath {
     NSString *date = [self sortedDates][indexPath.section];
-    NSPredicate *p = [NSPredicate predicateWithFormat:@"date == %@", date];
+    NSPredicate *p = [NSPredicate predicateWithBlock:^BOOL(Match *evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
+        return [[self monthTextFromRaw:evaluatedObject.matchDate] isEqualToString:date];
+    }];
     NSArray *arr = [_filteredData filteredArrayUsingPredicate:p];
     return arr[indexPath.row];
 }
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     MatchCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MatchCell"];
-    MatchModel *m = [self modelAtIndexPath:indexPath];
-    cell.homeLabel.text = m.homeTeam;
-    cell.awayLabel.text = m.awayTeam;
-    cell.dateLabel.text = m.dateDetail;
-    [cell.timePill setTitle:m.time forState:UIControlStateNormal];
-    cell.centerLabel.text = m.finished ? m.score : m.time;
+    Match *m = [self modelAtIndexPath:indexPath];
+    cell.homeLabel.text = m.homeTeamName;
+    cell.awayLabel.text = m.awayTeamName;
+    cell.dateLabel.text = [self dateDetailFromRaw:m.matchDate];
+    [cell.timePill setTitle:[self timeTextFromRaw:m.matchDate] forState:UIControlStateNormal];
+    BOOL finished = [m.matchStatus isEqualToString:@"FINISHED"];
+    cell.centerLabel.text = finished ? [NSString stringWithFormat:@"%ld : %ld", (long)m.homeScore, (long)m.awayScore] : [self timeTextFromRaw:m.matchDate];
     [cell.homeLogo sd_setImageWithURL:[NSURL URLWithString:m.homeTeamLogo] placeholderImage:[UIImage imageNamed:kLogoPlaceholder]];
     [cell.awayLogo sd_setImageWithURL:[NSURL URLWithString:m.awayTeamLogo] placeholderImage:[UIImage imageNamed:kLogoPlaceholder]];
     UIImage *img = [UIImage imageNamed:kLogoPlaceholder];

@@ -17,6 +17,8 @@
     }
     [[APIManager sharedManager] GET:APIPathValuePassportMe parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
+            PNPassport *passport = [PNPassport yy_modelWithJSON:responseObject.data];
+            responseObject.dataObject = passport;
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);
@@ -30,6 +32,8 @@
     NSString *safePeriod = period.length > 0 ? period : @"all";
     [[APIManager sharedManager] GET:APIPathValueStatisticsMe parameters:@{@"period": safePeriod} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
+            PNStatistics *statistics = [PNStatistics yy_modelWithJSON:responseObject.data];
+            responseObject.dataObject = statistics;
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);
@@ -46,6 +50,8 @@
                              @"pageSize": @(MAX(pageSize, 1))};
     [[APIManager sharedManager] GET:APIPathValueLeaderboard parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
+            PNLeaderboard *leaderboard = [PNLeaderboard yy_modelWithJSON:responseObject.data];
+            responseObject.dataObject = leaderboard;
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);

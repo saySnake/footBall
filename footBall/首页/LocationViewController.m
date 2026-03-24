@@ -17,30 +17,11 @@ static NSString * const kCommunityPendingCountDidChangeNotification = @"communit
 static NSString * const kCommunityAddedFriendsKey = @"community_added_friends";
 static NSString * const kCommunityFriendsDidChangeNotification = @"community_friends_did_change";
 
-@interface CommunityFriend : NSObject
-@property (nonatomic, copy) NSString *name;
-@property (nonatomic, copy) NSString *odId;
-@property (nonatomic, copy) NSString *statusText;
-@property (nonatomic, assign) BOOL isOnline;
-@end
-
-@implementation CommunityFriend
-@end
-
 typedef NS_ENUM(NSInteger, CommunityRankType) {
     CommunityRankTypeWeek,
     CommunityRankTypeMonth,
     CommunityRankTypeSeason
 };
-
-@interface CommunityRankItem : NSObject
-@property (nonatomic, copy) NSString *name;
-@property (nonatomic, copy) NSString *team;
-@property (nonatomic, copy) NSString *gamesText;
-@end
-
-@implementation CommunityRankItem
-@end
 
 @interface CommunityFriendCell : UITableViewCell
 @property (nonatomic, strong) UIView *cardView;
@@ -50,7 +31,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 @property (nonatomic, strong) UILabel *statusLabel;
 @property (nonatomic, strong) UIButton *stampBtn;
 @property (nonatomic, strong) UIButton *dataBtn;
-- (void)configureWithFriend:(CommunityFriend *)f;
+- (void)configureWithFriend:(PNFriend *)f;
 @end
 
 @implementation CommunityFriendCell
@@ -137,11 +118,11 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     return self;
 }
 
-- (void)configureWithFriend:(CommunityFriend *)f {
-    self.nameLabel.text = f.name;
-    self.idLabel.text = [NSString stringWithFormat:NSLocalizedString(@"community_id_format", nil), f.odId];
-    self.statusLabel.text = f.statusText;
-    self.statusLabel.textColor = f.isOnline ? [UIColor colorWithRed:0.10 green:0.70 blue:0.30 alpha:1.0] : [UIColor grayColor];
+- (void)configureWithFriend:(PNFriend *)f {
+    self.nameLabel.text = f.nickname;
+    self.idLabel.text = [NSString stringWithFormat:NSLocalizedString(@"community_id_format", nil), f.userId];
+    self.statusLabel.text = f.online ? NSLocalizedString(@"community_online_15m", nil) : NSLocalizedString(@"community_online_5m_ago", nil);
+    self.statusLabel.textColor = f.online ? [UIColor colorWithRed:0.10 green:0.70 blue:0.30 alpha:1.0] : [UIColor grayColor];
     [self.stampBtn setTitle:NSLocalizedString(@"community_view_stamps", nil) forState:UIControlStateNormal];
     [self.dataBtn setTitle:NSLocalizedString(@"community_view_data", nil) forState:UIControlStateNormal];
 
@@ -159,7 +140,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 @property (nonatomic, strong) UILabel *nameLabel;
 @property (nonatomic, strong) UILabel *teamLabel;
 @property (nonatomic, strong) UILabel *gamesLabel;
-- (void)configureWithItem:(CommunityRankItem *)item rank:(NSInteger)rank;
+- (void)configureWithItem:(PNLeaderboardEntry *)item rank:(NSInteger)rank;
 @end
 
 @implementation CommunityRankCell
@@ -215,11 +196,12 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     return self;
 }
 
-- (void)configureWithItem:(CommunityRankItem *)item rank:(NSInteger)rank {
+- (void)configureWithItem:(PNLeaderboardEntry *)item rank:(NSInteger)rank {
     self.rankLabel.text = [NSString stringWithFormat:@"%ld", (long)rank];
-    self.nameLabel.text = item.name;
-    self.teamLabel.text = item.team;
-    self.gamesLabel.text = item.gamesText;
+    self.nameLabel.text = item.nickname;
+    TeamIcon *team = item.followedTeams.firstObject;
+    self.teamLabel.text = team.name.length > 0 ? team.name : @"-";
+    self.gamesLabel.text = [NSString stringWithFormat:@"%ld 场", (long)MAX(item.matchCount, 0)];
     if (@available(iOS 13.0, *)) {
         self.avatarView.image = [UIImage systemImageNamed:@"person.crop.circle.fill"];
         self.avatarView.tintColor = [UIColor colorWithWhite:0.7 alpha:1.0];
@@ -240,10 +222,10 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 @property (nonatomic, strong) UILabel *pendingBadgeLabel;
 @property (nonatomic, strong) UILabel *sectionLabel;
 @property (nonatomic, strong) UITableView *tableView;
-@property (nonatomic, strong) NSArray<CommunityFriend *> *friends;
-@property (nonatomic, strong) NSArray<CommunityRankItem *> *weekRanks;
-@property (nonatomic, strong) NSArray<CommunityRankItem *> *monthRanks;
-@property (nonatomic, strong) NSArray<CommunityRankItem *> *seasonRanks;
+@property (nonatomic, strong) NSArray<PNFriend *> *friends;
+@property (nonatomic, strong) NSArray<PNLeaderboardEntry *> *weekRanks;
+@property (nonatomic, strong) NSArray<PNLeaderboardEntry *> *monthRanks;
+@property (nonatomic, strong) NSArray<PNLeaderboardEntry *> *seasonRanks;
 @property (nonatomic, assign) CommunityRankType currentRankType;
 @property (nonatomic, assign) BOOL isFriendsTab;
 @property (nonatomic, assign) NSInteger pendingCount;
@@ -295,18 +277,8 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 - (void)loadRemoteFriends {
     __weak typeof(self) weakSelf = self;
     [SocialRequest.shared getFriendsSuccess:^(HTTPResponse * _Nullable responseObject) {
-        NSArray *list = [responseObject.data[@"list"] isKindOfClass:NSArray.class] ? responseObject.data[@"list"] : ([responseObject.data isKindOfClass:NSArray.class] ? responseObject.data : @[]);
-        NSMutableArray *arr = NSMutableArray.array;
-        for (NSDictionary *item in list) {
-            if (![item isKindOfClass:NSDictionary.class]) continue;
-            CommunityFriend *f = CommunityFriend.new;
-            f.name = [item[@"nickname"] isKindOfClass:NSString.class] ? item[@"nickname"] : NSLocalizedString(@"team_name_arsenal", nil);
-            f.odId = [[item[@"userId"] respondsToSelector:@selector(stringValue)] ? [item[@"userId"] stringValue] : @"12653795" copy];
-            f.isOnline = [item[@"online"] boolValue];
-            f.statusText = f.isOnline ? NSLocalizedString(@"community_online_15m", nil) : NSLocalizedString(@"community_online_5m_ago", nil);
-            [arr addObject:f];
-        }
-        weakSelf.friends = arr;
+        PNFriendPage *page = [responseObject.dataObject isKindOfClass:PNFriendPage.class] ? responseObject.dataObject : nil;
+        weakSelf.friends = page.list ?: @[];
         [weakSelf.tableView reloadData];
     } failure:^(NSError * _Nonnull error) {
         weakSelf.friends = @[];
@@ -314,7 +286,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     }];
 
     [SocialRequest.shared getFriendRequestsPendingCountSuccess:^(HTTPResponse * _Nullable responseObject) {
-        NSInteger count = [responseObject.data respondsToSelector:@selector(integerValue)] ? [responseObject.data integerValue] : [responseObject.data[@"count"] integerValue];
+        NSInteger count = [responseObject.dataObject respondsToSelector:@selector(integerValue)] ? [responseObject.dataObject integerValue] : 0;
         weakSelf.pendingCount = MAX(count, 0);
         [[NSUserDefaults standardUserDefaults] setInteger:weakSelf.pendingCount forKey:kCommunityPendingCountKey];
         [weakSelf updatePendingBadge];
@@ -638,7 +610,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         return cell;
     }
     CommunityRankCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CommunityRankCell" forIndexPath:indexPath];
-    NSArray<CommunityRankItem *> *source = self.currentRankType == CommunityRankTypeWeek ? self.weekRanks : (self.currentRankType == CommunityRankTypeMonth ? self.monthRanks : self.seasonRanks);
+    NSArray<PNLeaderboardEntry *> *source = self.currentRankType == CommunityRankTypeWeek ? self.weekRanks : (self.currentRankType == CommunityRankTypeMonth ? self.monthRanks : self.seasonRanks);
     [cell configureWithItem:source[indexPath.row] rank:indexPath.row + 1];
     return cell;
 }
@@ -656,36 +628,24 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 }
 
 - (void)loadRemoteRanks {
-    [self loadLeaderboardForPeriod:@"week" completion:^(NSArray<CommunityRankItem *> *items) {
+    [self loadLeaderboardForPeriod:@"week" completion:^(NSArray<PNLeaderboardEntry *> *items) {
         self.weekRanks = items;
         [self.tableView reloadData];
     }];
-    [self loadLeaderboardForPeriod:@"month" completion:^(NSArray<CommunityRankItem *> *items) {
+    [self loadLeaderboardForPeriod:@"month" completion:^(NSArray<PNLeaderboardEntry *> *items) {
         self.monthRanks = items;
         [self.tableView reloadData];
     }];
-    [self loadLeaderboardForPeriod:@"season" completion:^(NSArray<CommunityRankItem *> *items) {
+    [self loadLeaderboardForPeriod:@"season" completion:^(NSArray<PNLeaderboardEntry *> *items) {
         self.seasonRanks = items;
         [self.tableView reloadData];
     }];
 }
 
-- (void)loadLeaderboardForPeriod:(NSString *)period completion:(void(^)(NSArray<CommunityRankItem *> *items))completion {
+- (void)loadLeaderboardForPeriod:(NSString *)period completion:(void(^)(NSArray<PNLeaderboardEntry *> *items))completion {
     [ProfileRequest.shared getLeaderboardWithPeriod:period page:1 pageSize:30 success:^(HTTPResponse * _Nullable responseObject) {
-        NSArray *list = [responseObject.data[@"list"] isKindOfClass:NSArray.class] ? responseObject.data[@"list"] : @[];
-        NSMutableArray *items = NSMutableArray.array;
-        for (NSDictionary *dict in list) {
-            if (![dict isKindOfClass:NSDictionary.class]) continue;
-            CommunityRankItem *item = CommunityRankItem.new;
-            item.name = [dict[@"nickname"] isKindOfClass:NSString.class] ? dict[@"nickname"] : @"-";
-            NSArray *followedTeams = [dict[@"followedTeams"] isKindOfClass:NSArray.class] ? dict[@"followedTeams"] : @[];
-            NSDictionary *firstTeam = followedTeams.count > 0 && [followedTeams.firstObject isKindOfClass:NSDictionary.class] ? followedTeams.firstObject : nil;
-            item.team = [firstTeam[@"name"] isKindOfClass:NSString.class] ? firstTeam[@"name"] : @"-";
-            NSInteger matches = [dict[@"matchCount"] integerValue];
-            item.gamesText = [NSString stringWithFormat:@"%ld 场", (long)MAX(matches, 0)];
-            [items addObject:item];
-        }
-        completion(items);
+        PNLeaderboard *board = [responseObject.dataObject isKindOfClass:PNLeaderboard.class] ? responseObject.dataObject : nil;
+        completion(board.list ?: @[]);
     } failure:^(NSError * _Nonnull error) {
         completion(@[]);
     }];

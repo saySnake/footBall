@@ -19,11 +19,12 @@
     params[@"pageSize"] = @(MAX(pageSize, 1));
     [[APIManager sharedManager] GET:APIPathValueExpenses parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            NSArray *list = responseObject.data[@"list"];
-            if (![list isKindOfClass:NSArray.class]) {
-                list = [responseObject.data isKindOfClass:NSArray.class] ? responseObject.data : @[];
+            PNExpensePage *pageModel = [PNExpensePage yy_modelWithJSON:responseObject.data];
+            if (!pageModel && [responseObject.data isKindOfClass:NSArray.class]) {
+                pageModel = [PNExpensePage new];
+                pageModel.list = [NSArray yy_modelArrayWithClass:PNExpense.class json:responseObject.data];
             }
-            responseObject.dataObject = list;
+            responseObject.dataObject = pageModel;
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);
@@ -40,6 +41,8 @@
     }
     [[APIManager sharedManager] GET:APIPathValueExpensesSummary parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
+            PNExpenseSummary *summary = [PNExpenseSummary yy_modelWithJSON:responseObject.data];
+            responseObject.dataObject = summary;
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);

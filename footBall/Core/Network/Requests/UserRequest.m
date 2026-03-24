@@ -23,12 +23,12 @@
             AuthManager.sharedManager.user.onboardingCompleted = YES;
             AuthManager.sharedManager.user.profile.onboardingCompleted = YES;
             [AuthManager.sharedManager saveUser];
-            success(responseObject);
+            if (success)success(responseObject);
         } else {
-            failure([APIError errorWithResponse:responseObject]);
+            if(failure)failure([APIError errorWithResponse:responseObject]);
         }
     } failure:^(NSError * _Nonnull error) {
-        failure(error);
+        if(failure)failure(error);
     }];
 }
 

@@ -14,15 +14,6 @@
 static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_search_friend_ids";
 
-@interface SearchFriendResult : NSObject
-@property (nonatomic, copy) NSString *name;
-@property (nonatomic, copy) NSString *odId;
-@property (nonatomic, copy) NSString *statusText;
-@property (nonatomic, assign) BOOL isOnline;
-@end
-@implementation SearchFriendResult
-@end
-
 @interface SearchResultCell : UITableViewCell
 @property (nonatomic, strong) UIView *cardView;
 @property (nonatomic, strong) UIImageView *avatarView;
@@ -30,7 +21,7 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 @property (nonatomic, strong) UILabel *idLabel;
 @property (nonatomic, strong) UILabel *statusLabel;
 @property (nonatomic, strong) UIButton *addBtn;
-- (void)configureWithResult:(SearchFriendResult *)r;
+- (void)configureWithResult:(PNUser *)r;
 @end
 
 @implementation SearchResultCell
@@ -73,11 +64,11 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     }
     return self;
 }
-- (void)configureWithResult:(SearchFriendResult *)r {
-    _nameLabel.text = r.name;
-    _idLabel.text = [NSString stringWithFormat:NSLocalizedString(@"community_id_format", nil), r.odId];
-    _statusLabel.text = r.statusText;
-    _statusLabel.textColor = r.isOnline ? [UIColor colorWithRed:0.10 green:0.70 blue:0.30 alpha:1.0] : [UIColor grayColor];
+- (void)configureWithResult:(PNUser *)r {
+    _nameLabel.text = r.nickname;
+    _idLabel.text = [NSString stringWithFormat:NSLocalizedString(@"community_id_format", nil), r.userId];
+    _statusLabel.text = r.lastOnlineTime.length > 0 ? NSLocalizedString(@"community_online_15m", nil) : NSLocalizedString(@"community_online_5m_ago", nil);
+    _statusLabel.textColor = r.lastOnlineTime.length > 0 ? [UIColor colorWithRed:0.10 green:0.70 blue:0.30 alpha:1.0] : [UIColor grayColor];
     if (@available(iOS 13.0, *)) { _avatarView.image = [UIImage systemImageNamed:@"person.crop.circle.fill"]; _avatarView.tintColor = [UIColor colorWithWhite:0.7 alpha:1.0]; }
 }
 @end
@@ -139,8 +130,8 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 @property (nonatomic, strong) UITextField *searchField;
 @property (nonatomic, strong) UIButton *searchBtn;
 @property (nonatomic, strong) UITableView *tableView;
-@property (nonatomic, strong) NSArray<SearchFriendResult *> *searchResults;
-@property (nonatomic, strong) NSArray<SearchFriendResult *> *searchPool;
+@property (nonatomic, strong) NSArray<PNUser *> *searchResults;
+@property (nonatomic, strong) NSArray<PNUser *> *searchPool;
 @property (nonatomic, strong) NSMutableSet<NSString *> *sentFriendIds;
 @property (nonatomic, assign) BOOL isSearching;
 @property (nonatomic, assign) NSInteger pendingRequestCount;
@@ -238,9 +229,9 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
         self.isSearching = YES;
         NSMutableArray *arr = [NSMutableArray arrayWithCapacity:self.searchPool.count];
         NSString *lower = text.lowercaseString;
-        for (SearchFriendResult *r in self.searchPool) {
-            BOOL matchId = [r.odId containsString:text];
-            BOOL matchName = [r.name.lowercaseString containsString:lower];
+        for (PNUser *r in self.searchPool) {
+            BOOL matchId = [r.userId containsString:text];
+            BOOL matchName = [r.nickname.lowercaseString containsString:lower];
             if (matchId || matchName) {
                 [arr addObject:r];
             }
@@ -283,9 +274,9 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     if (self.isSearching) {
         SearchResultCell *cell = [tableView dequeueReusableCellWithIdentifier:@"SearchResultCell" forIndexPath:indexPath];
-        SearchFriendResult *result = self.searchResults[indexPath.row];
+        PNUser *result = self.searchResults[indexPath.row];
         [cell configureWithResult:result];
-        BOOL sent = [self.sentFriendIds containsObject:result.odId];
+        BOOL sent = [self.sentFriendIds containsObject:result.userId];
         NSString *title = sent ? NSLocalizedString(@"community_request_sent", nil) : NSLocalizedString(@"community_add_friend", nil);
         [cell.addBtn setTitle:title forState:UIControlStateNormal];
         [cell.addBtn setTitleColor:(sent ? [UIColor grayColor] : [UIColor blackColor]) forState:UIControlStateNormal];
@@ -328,53 +319,23 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 }
 
 - (void)buildSearchPool {
-    SearchFriendResult *a = [SearchFriendResult new];
-    a.name = NSLocalizedString(@"team_name_arsenal", nil);
-    a.odId = @"12653795";
-    a.statusText = NSLocalizedString(@"community_online_15m", nil);
-    a.isOnline = YES;
-
-    SearchFriendResult *b = [SearchFriendResult new];
-    b.name = NSLocalizedString(@"team_name_mancity", nil);
-    b.odId = @"521467395";
-    b.statusText = NSLocalizedString(@"community_online_5m_ago", nil);
-    b.isOnline = NO;
-
-    SearchFriendResult *c = [SearchFriendResult new];
-    c.name = NSLocalizedString(@"team_name_liverpool", nil);
-    c.odId = @"912653795";
-    c.statusText = NSLocalizedString(@"community_online_15m", nil);
-    c.isOnline = YES;
-
-    SearchFriendResult *d = [SearchFriendResult new];
-    d.name = NSLocalizedString(@"team_name_chelsea", nil);
-    d.odId = @"770034821";
-    d.statusText = NSLocalizedString(@"community_online_5m_ago", nil);
-    d.isOnline = NO;
-
-    SearchFriendResult *e = [SearchFriendResult new];
-    e.name = NSLocalizedString(@"team_name_spurs", nil);
-    e.odId = @"300198426";
-    e.statusText = NSLocalizedString(@"community_online_15m", nil);
-    e.isOnline = YES;
-
-    SearchFriendResult *f = [SearchFriendResult new];
-    f.name = NSLocalizedString(@"team_name_manutd", nil);
-    f.odId = @"450762190";
-    f.statusText = NSLocalizedString(@"community_online_5m_ago", nil);
-    f.isOnline = NO;
-
+    PNUser *a = [PNUser yy_modelWithJSON:@{@"nickname": NSLocalizedString(@"team_name_arsenal", nil), @"userId": @"12653795", @"lastOnlineTime": @"1"}];
+    PNUser *b = [PNUser yy_modelWithJSON:@{@"nickname": NSLocalizedString(@"team_name_mancity", nil), @"userId": @"521467395", @"lastOnlineTime": @""}];
+    PNUser *c = [PNUser yy_modelWithJSON:@{@"nickname": NSLocalizedString(@"team_name_liverpool", nil), @"userId": @"912653795", @"lastOnlineTime": @"1"}];
+    PNUser *d = [PNUser yy_modelWithJSON:@{@"nickname": NSLocalizedString(@"team_name_chelsea", nil), @"userId": @"770034821", @"lastOnlineTime": @""}];
+    PNUser *e = [PNUser yy_modelWithJSON:@{@"nickname": NSLocalizedString(@"team_name_spurs", nil), @"userId": @"300198426", @"lastOnlineTime": @"1"}];
+    PNUser *f = [PNUser yy_modelWithJSON:@{@"nickname": NSLocalizedString(@"team_name_manutd", nil), @"userId": @"450762190", @"lastOnlineTime": @""}];
     self.searchPool = @[a, b, c, d, e, f];
 }
 
 - (void)onAddSearchFriendTapped:(UIButton *)sender {
     if (sender.tag < 0 || sender.tag >= self.searchResults.count) return;
-    SearchFriendResult *result = self.searchResults[sender.tag];
-    if ([self.sentFriendIds containsObject:result.odId]) {
+    PNUser *result = self.searchResults[sender.tag];
+    if ([self.sentFriendIds containsObject:result.userId]) {
         [self showSuccess:NSLocalizedString(@"community_request_sent", nil)];
         return;
     }
-    [self.sentFriendIds addObject:result.odId];
+    [self.sentFriendIds addObject:result.userId];
     [[NSUserDefaults standardUserDefaults] setObject:self.sentFriendIds.allObjects forKey:kCommunitySentSearchFriendIdsKey];
     [self.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:sender.tag inSection:0]] withRowAnimation:UITableViewRowAnimationNone];
     [self showSuccess:NSLocalizedString(@"community_request_sent", nil)];
