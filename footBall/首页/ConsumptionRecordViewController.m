@@ -362,47 +362,53 @@ static UIColor *kConsumeGreen(void) {
 }
 
 - (void)reloadRecordsForSelectedDate {
-    // 假数据：根据选中日期构造不同的消费记录，切换日期时列表内容会变化
-    NSInteger day = 0, month = 0;
-    if (self.selectedDate) {
-        NSDateComponents *comp = [self.calendar components:NSCalendarUnitDay|NSCalendarUnitMonth fromDate:self.selectedDate];
-        day = comp.day;
-        month = comp.month;
-    }
-    NSInteger seed = day * 7 + (month % 5);
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+    formatter.dateFormat = @"yyyy-MM";
+    NSString *monthStr = [formatter stringFromDate:self.selectedDate ?: NSDate.date];
+    __weak typeof(self) weakSelf = self;
+    [[ExpenseRequest shared] getExpensesWithMonth:monthStr page:1 pageSize:100 success:^(HTTPResponse * _Nullable responseObject) {
+        NSArray *list = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+        NSMutableArray *arr = [NSMutableArray arrayWithCapacity:list.count];
+        for (NSDictionary *dict in list) {
+            if (![dict isKindOfClass:NSDictionary.class]) continue;
+            ConsumeRecordItem *item = [ConsumeRecordItem new];
+            item.title = [dict[@"itemName"] isKindOfClass:NSString.class] ? dict[@"itemName"] : @"消费";
+            item.time = [weakSelf shortTimeFromString:dict[@"createTime"] ?: dict[@"expenseDate"] ?: @""];
+            id amount = dict[@"amount"];
+            if ([amount respondsToSelector:@selector(stringValue)]) {
+                item.amount = [NSString stringWithFormat:@"-%@", [amount stringValue]];
+            } else {
+                item.amount = @"-0";
+            }
+            item.iconImage = nil;
+            [arr addObject:item];
+        }
+        weakSelf.records = arr;
+        [weakSelf.tableView reloadData];
+    } failure:^(NSError * _Nonnull error) {
+        weakSelf.records = @[];
+        [weakSelf.tableView reloadData];
+    }];
+}
 
-    NSArray *allTemplates = @[
-        @[ @"消费标题", @"10:30", @"-800.00" ],
-        @[ @"赛事周边购买", @"14:00", @"-299.00" ],
-        @[ @"观赛门票", @"18:45", @"-1200.00" ],
-        @[ @"球场餐饮", @"12:15", @"-65.00" ],
-        @[ @"会员续费", @"09:00", @"-199.00" ],
-        @[ @"球衣定制", @"11:20", @"-458.00" ],
-        @[ @"VIP包厢", @"19:00", @"-2680.00" ],
-        @[ @"停车费", @"08:45", @"-30.00" ],
-        @[ @"纪念品", @"16:30", @"-128.00" ],
-        @[ @"饮料小食", @"13:00", @"-52.00" ],
-        @[ @"儿童票", @"09:30", @"-120.00" ],
-        @[ @"年卡续费", @"10:00", @"-599.00" ],
-        @[ @"现场照片打印", @"15:20", @"-25.00" ],
-        @[ @"应援物资", @"12:40", @"-88.00" ],
-        @[ @"寄存服务", @"17:10", @"-15.00" ],
-    ];
-    NSInteger count = 3 + (seed % 5);
-    if (count > (NSInteger)allTemplates.count) count = (NSInteger)allTemplates.count;
-    NSMutableArray *arr = [NSMutableArray arrayWithCapacity:count];
-    for (NSInteger i = 0; i < count; i++) {
-        NSInteger idx = (seed + i * 3) % (NSInteger)allTemplates.count;
-        NSArray *t = allTemplates[idx];
-        ConsumeRecordItem *item = [ConsumeRecordItem new];
-        item.title = t[0];
-        item.time = t[1];
-        item.amount = t[2];
-        item.iconImage = nil;
-        [arr addObject:item];
+- (NSString *)shortTimeFromString:(NSString *)raw {
+    if (raw.length == 0) return @"--:--";
+    NSDateFormatter *input = [[NSDateFormatter alloc] init];
+    input.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    input.dateFormat = @"yyyy-MM-dd'T'HH:mm:ssZ";
+    NSDate *date = [input dateFromString:raw];
+    if (!date) {
+        input.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+        date = [input dateFromString:raw];
     }
-    self.records = [arr copy];
-    [self.tableView reloadData];
+    if (!date) {
+        input.dateFormat = @"yyyy-MM-dd";
+        date = [input dateFromString:raw];
+    }
+    if (!date) return @"--:--";
+    NSDateFormatter *output = [[NSDateFormatter alloc] init];
+    output.dateFormat = @"HH:mm";
+    return [output stringFromDate:date];
 }
 
 #pragma mark - Actions

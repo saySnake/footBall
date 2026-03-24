@@ -79,9 +79,13 @@
 #import "FileRequest.h"
 #import "UserRequest.h"
 #import "MatchRequest.h"
+#import "ExpenseRequest.h"
+#import "ProfileRequest.h"
+#import "SocialRequest.h"
 
 #pragma mark - 项目核心类 - models
 #import "Team.h"
+#import "Match.h"
 
 #pragma mark - 项目核心类 - Image
 #import "SDImageManager.h"

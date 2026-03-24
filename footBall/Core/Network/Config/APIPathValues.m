@@ -136,3 +136,76 @@ NSString * const APIPathValueMatchInteractionsView(NSString *matchId) {
 NSString * const APIPathValueMatchRecordVerify(NSString *recordId) {
     return [NSString stringWithFormat:@"/api/v1/match-records/%@/verify",recordId];
 };
+
+#pragma mark - 邮票模块
+NSString * const APIPathValueStampsCollection = @"/api/v1/stamps/collection";
+NSString * const APIPathValueStampsCategories = @"/api/v1/stamps/categories";
+NSString * const APIPathValueStampsCategoryAll(NSString *categoryId) {
+    return [NSString stringWithFormat:@"/api/v1/stamps/categories/%@/all",categoryId];
+}
+NSString * const APIPathValueStampsDetail(NSString *stampId) {
+    return [NSString stringWithFormat:@"/api/v1/stamps/%@",stampId];
+}
+NSString * const APIPathValueStampsDisplay = @"/api/v1/stamps/display";
+
+#pragma mark - 关注模块
+NSString * const APIPathValueFollowsUser(NSString *userId) {
+    return [NSString stringWithFormat:@"/api/v1/follows/%@",userId];
+}
+NSString * const APIPathValueFollowsFollowing = @"/api/v1/follows/following";
+NSString * const APIPathValueFollowsFollowers = @"/api/v1/follows/followers";
+NSString * const APIPathValueFollowsStats = @"/api/v1/follows/stats";
+
+#pragma mark - 好友模块
+NSString * const APIPathValueFriendsRequests = @"/api/v1/friends/requests";
+NSString * const APIPathValueFriendsRequestsPendingCount = @"/api/v1/friends/requests/pending-count";
+NSString * const APIPathValueFriendsRequestProcess(NSString *requestId) {
+    return [NSString stringWithFormat:@"/api/v1/friends/requests/%@",requestId];
+}
+NSString * const APIPathValueFriendsList = @"/api/v1/friends";
+NSString * const APIPathValueFriendsDelete(NSString *friendId) {
+    return [NSString stringWithFormat:@"/api/v1/friends/%@",friendId];
+}
+NSString * const APIPathValueFriendsScan = @"/api/v1/friends/scan";
+NSString * const APIPathValueFriendsRecommend = @"/api/v1/friends/recommend";
+NSString * const APIPathValueFriendsStats = @"/api/v1/friends/stats";
+
+#pragma mark - 消费记录模块
+NSString * const APIPathValueExpenses = @"/api/v1/expenses";
+NSString * const APIPathValueExpensesDetail(NSString *expenseId) {
+    return [NSString stringWithFormat:@"/api/v1/expenses/%@",expenseId];
+}
+NSString * const APIPathValueExpensesSummary = @"/api/v1/expenses/summary";
+
+#pragma mark - 隐私设置模块
+NSString * const APIPathValuePrivacySettings = @"/api/v1/privacy/settings";
+
+#pragma mark - 护照模块
+NSString * const APIPathValuePassportMe = @"/api/v1/passport/me";
+NSString * const APIPathValuePassportUser(NSString *userId) {
+    return [NSString stringWithFormat:@"/api/v1/passport/%@",userId];
+}
+NSString * const APIPathValuePassportMeRecords = @"/api/v1/passport/me/records";
+
+#pragma mark - 社区模块
+NSString * const APIPathValueCommunityFriends = @"/api/v1/community/friends";
+NSString * const APIPathValueCommunityFriendStamps(NSString *friendId) {
+    return [NSString stringWithFormat:@"/api/v1/community/friends/%@/stamps",friendId];
+}
+NSString * const APIPathValueCommunityFriendData(NSString *friendId) {
+    return [NSString stringWithFormat:@"/api/v1/community/friends/%@/data",friendId];
+}
+
+#pragma mark - 会员模块
+NSString * const APIPathValueMembershipPlans = @"/api/v1/membership/plans";
+NSString * const APIPathValueMembershipPurchase = @"/api/v1/membership/purchase";
+NSString * const APIPathValueMembershipStatus = @"/api/v1/membership/status";
+NSString * const APIPathValueMembershipBenefits = @"/api/v1/membership/benefits";
+NSString * const APIPathValueMembershipRecords = @"/api/v1/membership/records";
+NSString * const APIPathValueMembershipAppleCallback = @"/api/v1/membership/apple/callback";
+
+#pragma mark - 数据统计模块
+NSString * const APIPathValueStatisticsMe = @"/api/v1/statistics/me";
+
+#pragma mark - 排行榜模块
+NSString * const APIPathValueLeaderboard = @"/api/v1/leaderboard";

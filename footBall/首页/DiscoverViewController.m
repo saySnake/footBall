@@ -22,6 +22,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 };
 
 @interface DiscoverMatch : NSObject
+@property (nonatomic, copy) NSString *matchId;
 @property (nonatomic, copy) NSString *homeName;
 @property (nonatomic, copy) NSString *awayName;
 @property (nonatomic, copy) NSString *dateText;
@@ -217,7 +218,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 
     [self buildHeader];
     [self buildBody];
-    [self loadFakeData];
+    [self loadRemoteData];
     [self switchToType:DiscoverMatchTypeFinished];
 }
 
@@ -642,70 +643,108 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     }];
 }
 
-- (void)loadFakeData {
-    NSMutableArray *upcoming = [NSMutableArray array];
-    NSMutableArray *finished = [NSMutableArray array];
-
-    NSString *verifiedTicket = (NSLocalizedString(@"discover_verified_ticket", nil) ?: @"认证球票");
-    // 未来观赛：中间展示时间，右侧为「认证球票」（假数据多一些）
-    NSArray *upcomingRaw = @[
-        @[ @"诺丁汉森林队", @"利物浦", @"06:30", @"15 Dec, 2025", verifiedTicket ],
-        @[ @"曼城", @"布莱顿", @"07:30", @"16 Dec, 2025", verifiedTicket ],
-        @[ @"狼队", @"阿森纳", @"08:30", @"16 Dec, 2025", verifiedTicket ],
-        @[ @"伯恩利", @"布伦特福德", @"09:00", @"17 Dec, 2025", verifiedTicket ],
-        @[ @"阿森纳", @"布莱顿", @"11:00", @"18 Dec, 2025", verifiedTicket ],
-        @[ @"曼联", @"切尔西", @"19:30", @"18 Dec, 2025", verifiedTicket ],
-        @[ @"热刺", @"曼城", @"20:00", @"19 Dec, 2025", verifiedTicket ],
-        @[ @"利物浦", @"狼队", @"21:15", @"19 Dec, 2025", verifiedTicket ]
-    ];
-    for (NSArray *info in upcomingRaw) {
-        DiscoverMatch *m = [DiscoverMatch new];
-        m.homeName = info[0];
-        m.awayName = info[1];
-        m.scoreText = info[2]; // 复用字段显示时间
-        m.dateText = info[3];
-        m.verifiedText = info[4];
-        m.type = DiscoverMatchTypeUpcoming;
-        [upcoming addObject:m];
-    }
-
-    NSString *verifiedMinutesFormat = (NSLocalizedString(@"discover_verified_minutes_format", nil) ?: @"已认证%ld分钟");
-    // 已经观赛：中间展示比分，右侧为「已认证xx分钟」
-    NSArray *finishedRaw = @[
-        @[ @"阿森纳", @"布莱顿", @"2 : 0", @"15 Dec, 2025", [NSString stringWithFormat:verifiedMinutesFormat, (long)98] ],
-        @[ @"阿森纳", @"布莱顿", @"3 : 1", @"12 Dec, 2025", [NSString stringWithFormat:verifiedMinutesFormat, (long)123] ],
-        @[ @"曼城", @"利物浦", @"1 : 1", @"10 Dec, 2025", [NSString stringWithFormat:verifiedMinutesFormat, (long)104] ],
-        @[ @"狼队", @"阿森纳", @"0 : 2", @"08 Dec, 2025", [NSString stringWithFormat:verifiedMinutesFormat, (long)91] ],
-        @[ @"诺丁汉森林队", @"利物浦", @"0 : 2", @"05 Dec, 2025", [NSString stringWithFormat:verifiedMinutesFormat, (long)110] ],
-        @[ @"伯恩利", @"布伦特福德", @"2 : 1", @"02 Dec, 2025", [NSString stringWithFormat:verifiedMinutesFormat, (long)96] ]
-    ];
-    [finishedRaw enumerateObjectsUsingBlock:^(NSArray *info, NSUInteger idx, BOOL *stop) {
-        DiscoverMatch *m = [DiscoverMatch new];
-        m.homeName = info[0];
-        m.awayName = info[1];
-        m.scoreText = info[2];
-        m.dateText = info[3];
-        m.verifiedText = info[4];
-        m.type = DiscoverMatchTypeFinished;
-        // 仅为假数据：第 5 条（索引 4）视为“已经输入信息 + 已经认证比赛”，其它都未完成
-        m.hasInputInfo = (idx == 4);
-        m.hasVerified = (idx == 4);
-        [finished addObject:m];
+- (void)loadRemoteData {
+    __weak typeof(self) weakSelf = self;
+    [[MatchRequest shared] getMyTeamMatchesWithPage:1 pageSize:20 success:^(HTTPResponse * _Nullable responseObject) {
+        NSArray *matches = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+        weakSelf.upcomingMatches = [weakSelf discoverMatchesFrom:matches type:DiscoverMatchTypeUpcoming];
+        [weakSelf refreshTabs];
+    } failure:^(NSError * _Nonnull error) {
+        weakSelf.upcomingMatches = @[];
+        [weakSelf refreshTabs];
     }];
+    [[MatchRequest shared] getFavoriteMatchesWithPage:1 pageSize:20 success:^(HTTPResponse * _Nullable responseObject) {
+        NSArray *matches = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+        weakSelf.finishedMatches = [weakSelf discoverMatchesFrom:matches type:DiscoverMatchTypeFinished];
+        [weakSelf refreshTabs];
+    } failure:^(NSError * _Nonnull error) {
+        weakSelf.finishedMatches = @[];
+        [weakSelf refreshTabs];
+    }];
+    [[ProfileRequest shared] getMyStatisticsWithPeriod:@"all" success:^(HTTPResponse * _Nullable responseObject) {
+        NSDictionary *data = [responseObject.data isKindOfClass:NSDictionary.class] ? responseObject.data : @{};
+        weakSelf.statAValue.text = [weakSelf stringValue:data[@"totalMatches"] defaultText:@"0"];
+        weakSelf.statBValue.text = [weakSelf stringValue:data[@"totalMinutes"] defaultText:@"0"];
+        weakSelf.statCValue.text = [weakSelf stringValue:data[@"totalStadiums"] defaultText:@"0"];
+        weakSelf.statDValue.text = [weakSelf stringValue:data[@"totalLeagues"] defaultText:@"0"];
+        weakSelf.statEValue.text = [weakSelf stringValue:data[@"totalCountries"] defaultText:@"0"];
+    } failure:^(NSError * _Nonnull error) {
+        weakSelf.statAValue.text = @"0";
+        weakSelf.statBValue.text = @"0";
+        weakSelf.statCValue.text = @"0";
+        weakSelf.statDValue.text = @"0";
+        weakSelf.statEValue.text = @"0";
+    }];
+}
 
-    self.upcomingMatches = upcoming;
-    self.finishedMatches = finished;
+- (NSArray<DiscoverMatch *> *)discoverMatchesFrom:(NSArray<Match *> *)matches type:(DiscoverMatchType)type {
+    NSMutableArray *result = [NSMutableArray arrayWithCapacity:matches.count];
+    NSString *verifiedTicket = (NSLocalizedString(@"discover_verified_ticket", nil) ?: @"认证球票");
+    for (Match *match in matches) {
+        DiscoverMatch *m = [DiscoverMatch new];
+        m.matchId = match.matchId ?: @"";
+        m.homeName = match.homeTeamName ?: @"-";
+        m.awayName = match.awayTeamName ?: @"-";
+        m.dateText = [self shortDateText:match.matchDate];
+        if (type == DiscoverMatchTypeUpcoming) {
+            m.scoreText = [self shortTimeText:match.matchDate];
+            m.verifiedText = verifiedTicket;
+        } else {
+            m.scoreText = [NSString stringWithFormat:@"%ld : %ld", (long)match.homeScore, (long)match.awayScore];
+            NSInteger minutes = [match.viewCount integerValue];
+            NSString *fmt = (NSLocalizedString(@"discover_verified_minutes_format", nil) ?: @"已认证%ld分钟");
+            m.verifiedText = [NSString stringWithFormat:fmt, (long)MAX(minutes, 0)];
+            m.hasInputInfo = NO;
+            m.hasVerified = NO;
+        }
+        m.type = type;
+        [result addObject:m];
+    }
+    return result;
+}
 
+- (void)refreshTabs {
     NSString *fmtUpcoming = (NSLocalizedString(@"discover_tab_upcoming_format", nil) ?: @"未来观赛(%ld)");
     NSString *fmtFinished = (NSLocalizedString(@"discover_tab_finished_format", nil) ?: @"已经观赛(%ld)");
-    [self.upcomingPill setTitle:[NSString stringWithFormat:fmtUpcoming, (long)upcoming.count] forState:UIControlStateNormal];
-    [self.finishedPill setTitle:[NSString stringWithFormat:fmtFinished, (long)finished.count] forState:UIControlStateNormal];
+    [self.upcomingPill setTitle:[NSString stringWithFormat:fmtUpcoming, (long)self.upcomingMatches.count] forState:UIControlStateNormal];
+    [self.finishedPill setTitle:[NSString stringWithFormat:fmtFinished, (long)self.finishedMatches.count] forState:UIControlStateNormal];
+    [self.tableView reloadData];
+    [self updateTableHeight];
+}
 
-    self.statAValue.text = @"29";
-    self.statBValue.text = @"3455";
-    self.statCValue.text = @"18";
-    self.statDValue.text = @"4";
-    self.statEValue.text = @"6";
+- (NSString *)shortTimeText:(NSString *)raw {
+    NSDate *date = [self dateFromRaw:raw];
+    if (!date) return @"--:--";
+    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+    fmt.dateFormat = @"HH:mm";
+    return [fmt stringFromDate:date];
+}
+
+- (NSString *)shortDateText:(NSString *)raw {
+    NSDate *date = [self dateFromRaw:raw];
+    if (!date) return @"--";
+    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+    fmt.dateFormat = @"dd MMM, yyyy";
+    return [fmt stringFromDate:date];
+}
+
+- (NSDate *)dateFromRaw:(NSString *)raw {
+    if (raw.length == 0) return nil;
+    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    fmt.dateFormat = @"yyyy-MM-dd'T'HH:mm:ssZ";
+    NSDate *date = [fmt dateFromString:raw];
+    if (!date) {
+        fmt.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+        date = [fmt dateFromString:raw];
+    }
+    return date;
+}
+
+- (NSString *)stringValue:(id)value defaultText:(NSString *)defaultText {
+    if ([value isKindOfClass:NSString.class]) return value;
+    if ([value respondsToSelector:@selector(stringValue)]) return [value stringValue];
+    return defaultText;
 }
 
 - (NSArray<DiscoverMatch *> *)currentDataSource {
@@ -905,6 +944,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 
 - (void)showMatchDetailForMatch:(DiscoverMatch *)match {
     PNMatchDetailViewController *vc = [[PNMatchDetailViewController alloc] init];
+    vc.matchId = match.matchId;
     vc.homeName = match.homeName;
     vc.awayName = match.awayName;
     vc.hidesBottomBarWhenPushed = YES;

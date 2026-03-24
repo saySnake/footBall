@@ -5,7 +5,7 @@
 
 #import <UIKit/UIKit.h>
 
-/// 观赛信息输入弹层（底部卡片），仅使用假数据填充
+/// 观赛信息输入弹层（底部卡片）
 @interface PNMatchInfoInputViewController : UIViewController
 
 /// 主队名称（用于上方“比赛”占位）

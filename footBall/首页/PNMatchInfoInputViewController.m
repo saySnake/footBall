@@ -56,7 +56,7 @@ static UIColor *PNInputGreenColor(void) {
     self.selectedIdentities = [NSMutableSet set];
     
     [self buildUI];
-    [self fillFakeDefaults];
+    [self fillDefaultValues];
     [self.emotionButton setTitle:[self.selectedEmotion stringByAppendingString:@" "] forState:UIControlStateNormal];
 }
 
@@ -638,7 +638,7 @@ static UIColor *PNInputGreenColor(void) {
     return buttons;
 }
 
-- (void)fillFakeDefaults {
+- (void)fillDefaultValues {
     // 比赛名默认填充当前对阵
     if (self.homeName.length > 0 && self.awayName.length > 0) {
         self.matchField.text = [NSString stringWithFormat:@"%@ VS %@", self.homeName, self.awayName];
@@ -651,15 +651,7 @@ static UIColor *PNInputGreenColor(void) {
     [self.selectedIdentities addObject:@"媒体记者"];
     
     self.priceField.text = @"55.5";
-    // 默认观赛日期时间：复用假数据（2025-12-20 21:30）
-    NSDateComponents *comp = [[NSDateComponents alloc] init];
-    comp.year = 2025;
-    comp.month = 12;
-    comp.day = 20;
-    comp.hour = 21;
-    comp.minute = 30;
-    NSCalendar *cal = [[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian];
-    self.selectedDate = [cal dateFromComponents:comp] ?: [NSDate date];
+    self.selectedDate = [NSDate date];
     [self refreshDateTimeButtons];
     self.commentView.text = @"";
 
@@ -888,7 +880,7 @@ shouldChangeTextInRange:(NSRange)range
 }
 
 - (void)onConfirmTapped {
-    // 当前仅为假数据：认为只要用户点击确认，就视为已经完成观赛信息填写 + 认证
+    // 当前仅回传完成状态，具体字段提交由上层接口接入时处理
     if (self.completion) {
         self.completion();
     }

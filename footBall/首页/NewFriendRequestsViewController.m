@@ -23,6 +23,7 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
 };
 
 @interface FriendRequest : NSObject
+@property (nonatomic, copy) NSString *requestId;
 @property (nonatomic, copy) NSString *name;
 @property (nonatomic, copy) NSString *odId;
 @property (nonatomic, copy) NSString *statusText;
@@ -226,67 +227,62 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
 
 - (void)viewDidLoad {
     self.hidesBottomBarWhenPushed = YES;
-    [self loadFakeData];
+    [self loadRemoteData];
     [super viewDidLoad];
     self.view.backgroundColor = kRequestPageBg;
     self.shouldShowNavigationBar = NO;
 }
 
-- (void)loadFakeData {
-    // 三天内：第一条有留言，第二条无留言（仅在线状态）
-    FriendRequest *a = [FriendRequest new];
-    a.name = @"Marcus Chen"; a.odId = @"10234567";
-    a.message = NSLocalizedString(@"community_request_message", nil);
-    a.status = FriendRequestStatusPending;
-
-    FriendRequest *b = [FriendRequest new];
-    b.name = @"James Walker"; b.odId = @"20384951";
-    b.statusText = NSLocalizedString(@"community_online_15m", nil); b.isOnline = YES;
-    b.status = FriendRequestStatusPending;
-
-    // 一周前
-    FriendRequest *c = [FriendRequest new];
-    c.name = @"Sophie Turner"; c.odId = @"30192847";
-    c.message = NSLocalizedString(@"community_request_message", nil);
-    c.status = FriendRequestStatusPending;
-
-    FriendRequest *d = [FriendRequest new];
-    d.name = @"Kevin Hart"; d.odId = @"40283756";
-    d.message = NSLocalizedString(@"community_request_message", nil);
-    d.status = FriendRequestStatusExpired;
-
-    FriendRequest *e = [FriendRequest new];
-    e.name = @"Lily Zhang"; e.odId = @"50192736";
-    e.statusText = NSLocalizedString(@"community_online_15m", nil); e.isOnline = YES;
-    e.status = FriendRequestStatusAdded;
-
-    self.recentRequests = [NSMutableArray arrayWithArray:@[a, b]];
-    self.olderRequests = [NSMutableArray arrayWithArray:@[c, d, e]];
-
-    // 搜索候选池
-    FriendRequest *s1 = [FriendRequest new];
-    s1.name = @"Marcus Chen"; s1.odId = @"10234567";
-    s1.statusText = NSLocalizedString(@"community_online_15m", nil); s1.isOnline = YES;
-    s1.status = FriendRequestStatusAdded;
-
-    FriendRequest *s2 = [FriendRequest new];
-    s2.name = @"James Walker"; s2.odId = @"20384951";
-    s2.statusText = NSLocalizedString(@"community_online_5m_ago", nil); s2.isOnline = NO;
-    s2.status = FriendRequestStatusAdded;
-
-    FriendRequest *s3 = [FriendRequest new];
-    s3.name = @"Sophie Turner"; s3.odId = @"30192847";
-    s3.statusText = NSLocalizedString(@"community_online_15m", nil); s3.isOnline = YES;
-    s3.status = FriendRequestStatusAdded;
-
-    FriendRequest *s4 = [FriendRequest new];
-    s4.name = @"Kevin Hart"; s4.odId = @"40283756";
-    s4.statusText = NSLocalizedString(@"community_online_5m_ago", nil); s4.isOnline = NO;
-    s4.status = FriendRequestStatusAdded;
-
-    self.searchCandidates = @[s1, s2, s3, s4];
+- (void)loadRemoteData {
+    self.recentRequests = NSMutableArray.array;
+    self.olderRequests = NSMutableArray.array;
     self.filteredSearchResults = @[];
     self.isSearching = NO;
+    __weak typeof(self) weakSelf = self;
+    [SocialRequest.shared getFriendRequestsSuccess:^(HTTPResponse * _Nullable responseObject) {
+        NSArray *list = [responseObject.data[@"list"] isKindOfClass:NSArray.class] ? responseObject.data[@"list"] : ([responseObject.data isKindOfClass:NSArray.class] ? responseObject.data : @[]);
+        NSMutableArray *all = NSMutableArray.array;
+        for (NSDictionary *dict in list) {
+            if (![dict isKindOfClass:NSDictionary.class]) continue;
+            FriendRequest *r = FriendRequest.new;
+            r.requestId = [[dict[@"requestId"] respondsToSelector:@selector(stringValue)] ? [dict[@"requestId"] stringValue] : @"" copy];
+            r.name = [dict[@"fromUserNickname"] isKindOfClass:NSString.class] ? dict[@"fromUserNickname"] : @"-";
+            r.odId = [[dict[@"fromUserId"] respondsToSelector:@selector(stringValue)] ? [dict[@"fromUserId"] stringValue] : @"" copy];
+            r.message = [dict[@"message"] isKindOfClass:NSString.class] ? dict[@"message"] : @"";
+            NSString *status = [dict[@"status"] isKindOfClass:NSString.class] ? dict[@"status"] : @"PENDING";
+            if ([status isEqualToString:@"EXPIRED"]) r.status = FriendRequestStatusExpired;
+            else if ([status isEqualToString:@"ACCEPTED"]) r.status = FriendRequestStatusAdded;
+            else r.status = FriendRequestStatusPending;
+            [all addObject:r];
+        }
+        weakSelf.recentRequests = all;
+        weakSelf.olderRequests = NSMutableArray.array;
+        [weakSelf.tableView reloadData];
+    } failure:^(NSError * _Nonnull error) {
+        [weakSelf.tableView reloadData];
+    }];
+
+    [SocialRequest.shared getFriendsSuccess:^(HTTPResponse * _Nullable responseObject) {
+        NSArray *list = [responseObject.data[@"list"] isKindOfClass:NSArray.class] ? responseObject.data[@"list"] : ([responseObject.data isKindOfClass:NSArray.class] ? responseObject.data : @[]);
+        NSMutableArray *candidates = NSMutableArray.array;
+        for (NSDictionary *dict in list) {
+            if (![dict isKindOfClass:NSDictionary.class]) continue;
+            FriendRequest *r = FriendRequest.new;
+            r.name = [dict[@"nickname"] isKindOfClass:NSString.class] ? dict[@"nickname"] : @"-";
+            r.odId = [[dict[@"userId"] respondsToSelector:@selector(stringValue)] ? [dict[@"userId"] stringValue] : @"" copy];
+            r.status = FriendRequestStatusAdded;
+            [candidates addObject:r];
+        }
+        weakSelf.searchCandidates = candidates;
+    } failure:^(NSError * _Nonnull error) {
+        weakSelf.searchCandidates = @[];
+    }];
+
+    [SocialRequest.shared getFriendRequestsPendingCountSuccess:^(HTTPResponse * _Nullable responseObject) {
+        NSInteger count = [responseObject.data respondsToSelector:@selector(integerValue)] ? [responseObject.data integerValue] : [responseObject.data[@"count"] integerValue];
+        [[NSUserDefaults standardUserDefaults] setInteger:MAX(count, 0) forKey:kCommunityPendingCountKey];
+    } failure:^(NSError * _Nonnull error) {
+    }];
 }
 
 - (void)setupUI {
@@ -424,12 +420,16 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     if (row < 0 || row >= arr.count) return;
     FriendRequest *request = arr[row];
     if (request.status != FriendRequestStatusPending) return;
-    if (accept) {
-        [self addFriendToCommunityList:request];
-    }
-    [arr removeObjectAtIndex:row];
-    [self decreasePendingCountIfNeeded];
-    [self.tableView reloadData];
+    __weak typeof(self) weakSelf = self;
+    [SocialRequest.shared processFriendRequest:request.requestId accept:accept success:^(HTTPResponse * _Nullable responseObject) {
+        if (accept) {
+            [weakSelf addFriendToCommunityList:request];
+        }
+        [arr removeObjectAtIndex:row];
+        [weakSelf decreasePendingCountIfNeeded];
+        [weakSelf.tableView reloadData];
+    } failure:^(NSError * _Nonnull error) {
+    }];
 }
 
 - (void)decreasePendingCountIfNeeded {

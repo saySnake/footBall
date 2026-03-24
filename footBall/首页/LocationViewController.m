@@ -262,14 +262,9 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 - (void)viewDidLoad {
     self.isFriendsTab = YES;
     self.currentRankType = CommunityRankTypeWeek;
-    NSInteger storedCount = [[NSUserDefaults standardUserDefaults] integerForKey:kCommunityPendingCountKey];
-    if (storedCount <= 0) {
-        storedCount = 23;
-        [[NSUserDefaults standardUserDefaults] setInteger:storedCount forKey:kCommunityPendingCountKey];
-    }
-    self.pendingCount = storedCount;
-    [self loadFakeData];
-    [self loadRankFakeDataIfNeeded];
+    self.pendingCount = [[NSUserDefaults standardUserDefaults] integerForKey:kCommunityPendingCountKey];
+    [self loadRemoteFriends];
+    [self loadRemoteRanks];
     [super viewDidLoad];
     self.view.backgroundColor = kCommunityPageBg;
     self.shouldShowNavigationBar = NO;
@@ -288,7 +283,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     self.pendingCount = [[NSUserDefaults standardUserDefaults] integerForKey:kCommunityPendingCountKey];
-    [self loadFakeData];
+    [self loadRemoteFriends];
     [self.tableView reloadData];
     [self updatePendingBadge];
 }
@@ -297,38 +292,34 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
-- (void)loadFakeData {
-    NSMutableArray *arr = [NSMutableArray array];
-    NSArray *statuses = @[
-        NSLocalizedString(@"community_online_15m", nil),
-        NSLocalizedString(@"community_online_5m_ago", nil),
-        NSLocalizedString(@"community_online_15m", nil),
-        NSLocalizedString(@"community_online_5m_ago", nil),
-        NSLocalizedString(@"community_online_5m_ago", nil),
-        NSLocalizedString(@"community_online_5m_ago", nil),
-        NSLocalizedString(@"community_online_5m_ago", nil),
-        NSLocalizedString(@"community_online_5m_ago", nil)
-    ];
-    NSArray *onlines = @[@YES, @NO, @YES, @NO, @NO, @NO,@NO,@NO];
-    NSString *name = NSLocalizedString(@"team_name_arsenal", nil);
-    for (NSInteger i = 0; i < 8; i++) {
-        CommunityFriend *f = [CommunityFriend new];
-        f.name = name;
-        f.odId = @"12653795";
-        f.statusText = statuses[i];
-        f.isOnline = [onlines[i] boolValue];
-        [arr addObject:f];
-    }
-    NSArray *addedFriends = [[NSUserDefaults standardUserDefaults] arrayForKey:kCommunityAddedFriendsKey];
-    for (NSDictionary *item in addedFriends) {
-        CommunityFriend *f = [CommunityFriend new];
-        f.name = item[@"name"] ?: NSLocalizedString(@"team_name_arsenal", nil);
-        f.odId = item[@"odId"] ?: @"12653795";
-        f.statusText = item[@"statusText"] ?: NSLocalizedString(@"community_online_5m_ago", nil);
-        f.isOnline = [item[@"isOnline"] boolValue];
-        [arr insertObject:f atIndex:0];
-    }
-    self.friends = arr;
+- (void)loadRemoteFriends {
+    __weak typeof(self) weakSelf = self;
+    [SocialRequest.shared getFriendsSuccess:^(HTTPResponse * _Nullable responseObject) {
+        NSArray *list = [responseObject.data[@"list"] isKindOfClass:NSArray.class] ? responseObject.data[@"list"] : ([responseObject.data isKindOfClass:NSArray.class] ? responseObject.data : @[]);
+        NSMutableArray *arr = NSMutableArray.array;
+        for (NSDictionary *item in list) {
+            if (![item isKindOfClass:NSDictionary.class]) continue;
+            CommunityFriend *f = CommunityFriend.new;
+            f.name = [item[@"nickname"] isKindOfClass:NSString.class] ? item[@"nickname"] : NSLocalizedString(@"team_name_arsenal", nil);
+            f.odId = [[item[@"userId"] respondsToSelector:@selector(stringValue)] ? [item[@"userId"] stringValue] : @"12653795" copy];
+            f.isOnline = [item[@"online"] boolValue];
+            f.statusText = f.isOnline ? NSLocalizedString(@"community_online_15m", nil) : NSLocalizedString(@"community_online_5m_ago", nil);
+            [arr addObject:f];
+        }
+        weakSelf.friends = arr;
+        [weakSelf.tableView reloadData];
+    } failure:^(NSError * _Nonnull error) {
+        weakSelf.friends = @[];
+        [weakSelf.tableView reloadData];
+    }];
+
+    [SocialRequest.shared getFriendRequestsPendingCountSuccess:^(HTTPResponse * _Nullable responseObject) {
+        NSInteger count = [responseObject.data respondsToSelector:@selector(integerValue)] ? [responseObject.data integerValue] : [responseObject.data[@"count"] integerValue];
+        weakSelf.pendingCount = MAX(count, 0);
+        [[NSUserDefaults standardUserDefaults] setInteger:weakSelf.pendingCount forKey:kCommunityPendingCountKey];
+        [weakSelf updatePendingBadge];
+    } failure:^(NSError * _Nonnull error) {
+    }];
 }
 
 - (UIButton *)makeOutlinedButton {
@@ -614,7 +605,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 }
 
 - (void)onFriendsChanged {
-    [self loadFakeData];
+    [self loadRemoteFriends];
     [self.tableView reloadData];
 }
 
@@ -660,77 +651,44 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     [self.addFriendBtn setTitle:[NSString stringWithFormat:@"  %@  ", NSLocalizedString(@"community_add_friend", nil)] forState:UIControlStateNormal];
     [self.qrCodeBtn setTitle:[NSString stringWithFormat:@"  %@  ", NSLocalizedString(@"community_my_qrcode", nil)] forState:UIControlStateNormal];
     self.sectionLabel.text = NSLocalizedString(@"community_section_friends", nil);
-    [self loadRankFakeDataIfNeeded];
+    [self loadRemoteRanks];
     [self.tableView reloadData];
 }
 
-- (void)loadRankFakeDataIfNeeded {
-    if (self.weekRanks.count > 0) return;
+- (void)loadRemoteRanks {
+    [self loadLeaderboardForPeriod:@"week" completion:^(NSArray<CommunityRankItem *> *items) {
+        self.weekRanks = items;
+        [self.tableView reloadData];
+    }];
+    [self loadLeaderboardForPeriod:@"month" completion:^(NSArray<CommunityRankItem *> *items) {
+        self.monthRanks = items;
+        [self.tableView reloadData];
+    }];
+    [self loadLeaderboardForPeriod:@"season" completion:^(NSArray<CommunityRankItem *> *items) {
+        self.seasonRanks = items;
+        [self.tableView reloadData];
+    }];
+}
 
-    // 周榜
-    NSArray *weekRaw = @[
-        @[@"Erling Haaland",      @"Man City",      @"9 场"],
-        @[@"Kylian Mbappé",       @"Real Madrid",   @"8 场"],
-        @[@"Harry Kane",          @"Bayern Munich", @"7 场"],
-        @[@"Mohamed Salah",       @"Liverpool",     @"7 场"],
-        @[@"Bukayo Saka",         @"Arsenal",       @"6 场"],
-        @[@"Vinicius Jr.",        @"Real Madrid",   @"6 场"],
-        @[@"Son Heung-min",       @"Tottenham",     @"5 场"],
-        @[@"Marcus Rashford",     @"Man United",    @"5 场"],
-        @[@"Phil Foden",          @"Man City",      @"4 场"],
-        @[@"Rodri",               @"Man City",      @"4 场"],
-        @[@"Bruno Fernandes",     @"Man United",    @"3 场"],
-        @[@"Trent Alexander",     @"Liverpool",     @"3 场"],
-        @[@"Bernardo Silva",      @"Man City",      @"2 场"],
-        @[@"Jadon Sancho",        @"Dortmund",      @"2 场"],
-    ];
-
-    // 月榜
-    NSArray *monthRaw = @[
-        @[@"Harry Kane",          @"Bayern Munich",@"32 场"],
-        @[@"Erling Haaland",      @"Man City",     @"30 场"],
-        @[@"Robert Lewandowski",  @"Barcelona",    @"28 场"],
-        @[@"Kylian Mbappé",       @"Real Madrid",  @"27 场"],
-        @[@"Lautaro Martínez",    @"Inter Milan",  @"25 场"],
-        @[@"Mohamed Salah",       @"Liverpool",    @"24 场"],
-        @[@"Vinicius Jr.",        @"Real Madrid",  @"22 场"],
-    ];
-
-    // 赛季榜
-    NSArray *seasonRaw = @[
-        @[@"Erling Haaland",      @"Man City",     @"128 场"],
-        @[@"Robert Lewandowski",  @"Barcelona",    @"119 场"],
-        @[@"Harry Kane",          @"Bayern Munich",@"115 场"],
-        @[@"Kylian Mbappé",       @"Real Madrid",  @"108 场"],
-        @[@"Mohamed Salah",       @"Liverpool",    @"102 场"],
-        @[@"Lautaro Martínez",    @"Inter Milan",  @"97 场"],
-        @[@"Bukayo Saka",         @"Arsenal",      @"89 场"],
-    ];
-
-    NSMutableArray *week = [NSMutableArray array];
-    for (NSArray *line in weekRaw) {
-        CommunityRankItem *item = [CommunityRankItem new];
-        item.name = line[0]; item.team = line[1]; item.gamesText = line[2];
-        [week addObject:item];
-    }
-
-    NSMutableArray *month = [NSMutableArray array];
-    for (NSArray *line in monthRaw) {
-        CommunityRankItem *item = [CommunityRankItem new];
-        item.name = line[0]; item.team = line[1]; item.gamesText = line[2];
-        [month addObject:item];
-    }
-
-    NSMutableArray *season = [NSMutableArray array];
-    for (NSArray *line in seasonRaw) {
-        CommunityRankItem *item = [CommunityRankItem new];
-        item.name = line[0]; item.team = line[1]; item.gamesText = line[2];
-        [season addObject:item];
-    }
-
-    self.weekRanks = week;
-    self.monthRanks = month;
-    self.seasonRanks = season;
+- (void)loadLeaderboardForPeriod:(NSString *)period completion:(void(^)(NSArray<CommunityRankItem *> *items))completion {
+    [ProfileRequest.shared getLeaderboardWithPeriod:period page:1 pageSize:30 success:^(HTTPResponse * _Nullable responseObject) {
+        NSArray *list = [responseObject.data[@"list"] isKindOfClass:NSArray.class] ? responseObject.data[@"list"] : @[];
+        NSMutableArray *items = NSMutableArray.array;
+        for (NSDictionary *dict in list) {
+            if (![dict isKindOfClass:NSDictionary.class]) continue;
+            CommunityRankItem *item = CommunityRankItem.new;
+            item.name = [dict[@"nickname"] isKindOfClass:NSString.class] ? dict[@"nickname"] : @"-";
+            NSArray *followedTeams = [dict[@"followedTeams"] isKindOfClass:NSArray.class] ? dict[@"followedTeams"] : @[];
+            NSDictionary *firstTeam = followedTeams.count > 0 && [followedTeams.firstObject isKindOfClass:NSDictionary.class] ? followedTeams.firstObject : nil;
+            item.team = [firstTeam[@"name"] isKindOfClass:NSString.class] ? firstTeam[@"name"] : @"-";
+            NSInteger matches = [dict[@"matchCount"] integerValue];
+            item.gamesText = [NSString stringWithFormat:@"%ld 场", (long)MAX(matches, 0)];
+            [items addObject:item];
+        }
+        completion(items);
+    } failure:^(NSError * _Nonnull error) {
+        completion(@[]);
+    }];
 }
 
 @end

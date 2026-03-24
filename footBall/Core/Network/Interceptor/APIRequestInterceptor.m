@@ -79,7 +79,7 @@
     if (!self.enabled || self.logLevel < 1) {
         return YES;
     }
-    NSURLRequest *request = task.currentRequest;
+    NSURLRequest *request = task.originalRequest;
     NSLog(@"🌐 [HTTP Request] %@ %@", request.HTTPMethod, request.URL.absoluteString);
     
     if (self.logLevel >= 2 && request.HTTPBody) {

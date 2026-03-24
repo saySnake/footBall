@@ -30,7 +30,7 @@ static UIColor *PNMatchGreenColor(void) {
     [super viewDidLoad];
     self.view.backgroundColor = [UIColor whiteColor];
     [self buildUI];
-    [self fillFakeData];
+    [self loadRemoteData];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -384,18 +384,42 @@ static UIColor *PNMatchGreenColor(void) {
     return lab;
 }
 
-- (void)fillFakeData {
-    // 比赛信息（日期/时间等，先使用静态文案，与效果图一致）
-    self.watchStatusLabel.text = @"在球场";
-    self.timeLabel.text = @"2025-12-20 21:30";
-    self.seatLabel.text = @"VIP看台";
-    self.reasonLabel.text = @"球迷";
-    self.priceLabel.text = @"55.5";
-    
-    // 观赛身份、情绪已在 buildUI 中按设计图写死，此处可省略
-    
-    // 这里暂时不区分每场比赛的具体详情，所有假数据一致即可
-    // 如后续需要按场次展示不同内容，可新增字段到 DiscoverMatch 中再填充
+- (void)loadRemoteData {
+    self.watchStatusLabel.text = @"-";
+    self.timeLabel.text = @"-";
+    self.seatLabel.text = @"-";
+    self.reasonLabel.text = @"-";
+    self.priceLabel.text = @"-";
+    if (self.matchId.length == 0) {
+        return;
+    }
+    __weak typeof(self) weakSelf = self;
+    [[MatchRequest shared] getMatchDetail:self.matchId success:^(HTTPResponse * _Nullable responseObject) {
+        Match *match = [responseObject.dataObject isKindOfClass:Match.class] ? responseObject.dataObject : nil;
+        if (!match) return;
+        weakSelf.timeLabel.text = [weakSelf dateTimeText:match.matchDate];
+        weakSelf.watchStatusLabel.text = match.matchStatus.length > 0 ? match.matchStatus : @"-";
+        weakSelf.reasonLabel.text = @"球迷";
+        weakSelf.seatLabel.text = @"-";
+        weakSelf.priceLabel.text = @"-";
+    } failure:^(NSError * _Nonnull error) {
+    }];
+}
+
+- (NSString *)dateTimeText:(NSString *)raw {
+    if (raw.length == 0) return @"-";
+    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    fmt.dateFormat = @"yyyy-MM-dd'T'HH:mm:ssZ";
+    NSDate *date = [fmt dateFromString:raw];
+    if (!date) {
+        fmt.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+        date = [fmt dateFromString:raw];
+    }
+    if (!date) return raw;
+    NSDateFormatter *output = [[NSDateFormatter alloc] init];
+    output.dateFormat = @"yyyy-MM-dd HH:mm";
+    return [output stringFromDate:date];
 }
 
 - (void)onBack {

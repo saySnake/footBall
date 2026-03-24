@@ -119,49 +119,85 @@ FOUNDATION_EXPORT NSString * const APIPathValueMatchRecordVerify(NSString *recor
 
 #pragma mark - 邮票模块
 /// 邮票夹主页 - 按分类组织，每分类max10个，含锁定邮票+解锁进度+新标记
+FOUNDATION_EXPORT NSString * const APIPathValueStampsCollection;
 /// 获取邮票动态分类列表
+FOUNDATION_EXPORT NSString * const APIPathValueStampsCategories;
 /// 查看指定分类全部邮票（网格布局）
+FOUNDATION_EXPORT NSString * const APIPathValueStampsCategoryAll(NSString *categoryId);
 /// 获取邮票详情
+FOUNDATION_EXPORT NSString * const APIPathValueStampsDetail(NSString *stampId);
 /// 更新邮票展示位置（长按编辑）
+FOUNDATION_EXPORT NSString * const APIPathValueStampsDisplay;
 #pragma mark - 关注模块
 /// POST关注用户 / DELETE取消关注用户
+FOUNDATION_EXPORT NSString * const APIPathValueFollowsUser(NSString *userId);
 /// 获取我关注的用户列表
+FOUNDATION_EXPORT NSString * const APIPathValueFollowsFollowing;
 /// 获取关注我的用户列表（粉丝）
+FOUNDATION_EXPORT NSString * const APIPathValueFollowsFollowers;
 /// 获取关注统计
+FOUNDATION_EXPORT NSString * const APIPathValueFollowsStats;
 #pragma mark - 好友模块
 /// 发送好友请求
+FOUNDATION_EXPORT NSString * const APIPathValueFriendsRequests;
 /// 获取好友请求列表
 /// 获取待处理好友请求数量
+FOUNDATION_EXPORT NSString * const APIPathValueFriendsRequestsPendingCount;
 /// 处理好友请求
+FOUNDATION_EXPORT NSString * const APIPathValueFriendsRequestProcess(NSString *requestId);
 /// 获取好友列表
+FOUNDATION_EXPORT NSString * const APIPathValueFriendsList;
 /// 删除好友
+FOUNDATION_EXPORT NSString * const APIPathValueFriendsDelete(NSString *friendId);
 /// 扫描二维码添加好友
+FOUNDATION_EXPORT NSString * const APIPathValueFriendsScan;
 /// 获取推荐好友列表
+FOUNDATION_EXPORT NSString * const APIPathValueFriendsRecommend;
 /// 获取好友统计
+FOUNDATION_EXPORT NSString * const APIPathValueFriendsStats;
 #pragma mark - 消费记录模块
 /// 添加消费记录
+FOUNDATION_EXPORT NSString * const APIPathValueExpenses;
 /// 查询消费记录列表
 /// PUT更新消费记录 / DELETE删除消费记录
+FOUNDATION_EXPORT NSString * const APIPathValueExpensesDetail(NSString *expenseId);
 /// 获取消费汇总统计
+FOUNDATION_EXPORT NSString * const APIPathValueExpensesSummary;
 #pragma mark - 隐私设置模块
 /// 获取当前用户隐私设置
 /// 更新隐私设置
+FOUNDATION_EXPORT NSString * const APIPathValuePrivacySettings;
 #pragma mark - 护照模块
 /// 获取当前用户护照
+FOUNDATION_EXPORT NSString * const APIPathValuePassportMe;
 /// 查看他人护照
+FOUNDATION_EXPORT NSString * const APIPathValuePassportUser(NSString *userId);
 /// 获取当前用户观赛记录列表
+FOUNDATION_EXPORT NSString * const APIPathValuePassportMeRecords;
 #pragma mark - 社区模块
 /// 获取社区好友列表
+FOUNDATION_EXPORT NSString * const APIPathValueCommunityFriends;
 /// 查看好友邮票收藏
+FOUNDATION_EXPORT NSString * const APIPathValueCommunityFriendStamps(NSString *friendId);
 /// 查看好友数据统计
+FOUNDATION_EXPORT NSString * const APIPathValueCommunityFriendData(NSString *friendId);
 #pragma mark - 会员模块
 /// 获取会员方案列表
+FOUNDATION_EXPORT NSString * const APIPathValueMembershipPlans;
 /// Apple IAP收据验证并激活会员
+FOUNDATION_EXPORT NSString * const APIPathValueMembershipPurchase;
 /// 获取当前用户会员状态
+FOUNDATION_EXPORT NSString * const APIPathValueMembershipStatus;
 /// 获取会员权益列表
+FOUNDATION_EXPORT NSString * const APIPathValueMembershipBenefits;
 /// 获取订阅记录
+FOUNDATION_EXPORT NSString * const APIPathValueMembershipRecords;
+/// Apple S2S 回调
+FOUNDATION_EXPORT NSString * const APIPathValueMembershipAppleCallback;
 #pragma mark - 数据统计模块
 /// 获取当前用户数据统计
+FOUNDATION_EXPORT NSString * const APIPathValueStatisticsMe;
 #pragma mark - 排行榜模块
 /// 获取排行榜
+FOUNDATION_EXPORT NSString * const APIPathValueLeaderboard;
 NS_ASSUME_NONNULL_END

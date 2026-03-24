@@ -10,10 +10,17 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @interface MatchRequest : NSObject
++(instancetype)shared;
 /// 获取精选比赛卡片
 - (void)getFeaturesMatchsSuccess:(nullable APISuccessBlock)success
                          failure:(nullable APIFailureBlock)failure;
 /// 获取比赛日程列表
+- (void)getMatchScheduleWithDate:(nullable NSString *)date
+                       myTeamOnly:(BOOL)myTeamOnly
+                             page:(NSInteger)page
+                         pageSize:(NSInteger)pageSize
+                          success:(nullable APISuccessBlock)success
+                          failure:(nullable APIFailureBlock)failure;
 
 /// 获取指定月份有比赛的日期列表
 /// 按日期查询 Nami 比赛列表
@@ -27,11 +34,22 @@ NS_ASSUME_NONNULL_BEGIN
 /// 获取 Nami 比赛集锦录像
 /// 搜索比赛
 /// 获取比赛详情
+- (void)getMatchDetail:(NSString *)matchId
+               success:(nullable APISuccessBlock)success
+               failure:(nullable APIFailureBlock)failure;
 /// 获取指定月份有比赛的日期列表
 /// 获取关注球队的比赛列表
+- (void)getMyTeamMatchesWithPage:(NSInteger)page
+                        pageSize:(NSInteger)pageSize
+                         success:(nullable APISuccessBlock)success
+                         failure:(nullable APIFailureBlock)failure;
 /// 收藏比赛
 /// 取消收藏比赛
 /// 获取收藏的比赛列表
+- (void)getFavoriteMatchesWithPage:(NSInteger)page
+                          pageSize:(NSInteger)pageSize
+                           success:(nullable APISuccessBlock)success
+                           failure:(nullable APIFailureBlock)failure;
 /// 创建观赛记录
 /// 更新观赛记录
 /// 获取观赛记录详情

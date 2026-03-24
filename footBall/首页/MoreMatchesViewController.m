@@ -299,52 +299,42 @@
 
 - (void)reloadDataForSelectedDate {
     if (!self.selectedDate) self.selectedDate = [NSDate date];
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+    formatter.dateFormat = @"yyyy-MM-dd";
+    NSString *dateStr = [formatter stringFromDate:self.selectedDate];
+    __weak typeof(self) weakSelf = self;
+    [[MatchRequest shared] getMatchScheduleWithDate:dateStr myTeamOnly:NO page:1 pageSize:50 success:^(HTTPResponse * _Nullable responseObject) {
+        NSArray *matches = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+        NSMutableArray *arr = [NSMutableArray arrayWithCapacity:matches.count];
+        for (Match *match in matches) {
+            MoreMatchModel *m = [MoreMatchModel new];
+            m.homeName = match.homeTeamName ?: @"-";
+            m.awayName = match.awayTeamName ?: @"-";
+            m.time = [weakSelf timeTextFromMatchDate:match.matchDate];
+            [arr addObject:m];
+        }
+        weakSelf.matches = arr;
+        [weakSelf.tableView reloadData];
+    } failure:^(NSError * _Nonnull error) {
+        weakSelf.matches = @[];
+        [weakSelf.tableView reloadData];
+    }];
+}
 
-    NSDateComponents *comp = [self.calendar components:NSCalendarUnitYear|NSCalendarUnitMonth|NSCalendarUnitDay|NSCalendarUnitWeekday fromDate:self.selectedDate];
-    NSInteger weekday = comp.weekday; // 1=周日...7=周六
-
-    // 根据星期简单切换一些假数据，方便看到“刷新效果”
-    NSArray *templatePairs;
-    switch (weekday) {
-        case 1: // 周日
-            templatePairs = @[
-                @[ @"诺丁汉森林队", @"利物浦", @"06:30" ],
-                @[ @"曼城", @"布莱顿", @"07:30" ],
-                @[ @"狼队", @"阿森纳", @"08:30" ],
-            ];
-            break;
-        case 2: // 周一
-            templatePairs = @[
-                @[ @"阿森纳", @"布莱顿", @"06:00" ],
-                @[ @"曼联", @"利物浦", @"08:00" ],
-            ];
-            break;
-        case 3: // 周二
-            templatePairs = @[
-                @[ @"曼城", @"阿森纳", @"07:00" ],
-                @[ @"诺丁汉森林队", @"布伦特福德", @"09:15" ],
-                @[ @"狼队", @"布莱顿", @"10:00" ],
-            ];
-            break;
-        default:
-            templatePairs = @[
-                @[ @"曼城", @"布莱顿", @"07:30" ],
-                @[ @"狼队", @"阿森纳", @"08:30" ],
-                @[ @"诺丁汉森林队", @"利物浦", @"06:30" ],
-            ];
-            break;
+- (NSString *)timeTextFromMatchDate:(NSString *)matchDate {
+    if (matchDate.length == 0) return @"--:--";
+    NSDateFormatter *input = [[NSDateFormatter alloc] init];
+    input.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    input.dateFormat = @"yyyy-MM-dd'T'HH:mm:ssZ";
+    NSDate *date = [input dateFromString:matchDate];
+    if (!date) {
+        input.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+        date = [input dateFromString:matchDate];
     }
-
-    NSMutableArray *arr = [NSMutableArray array];
-    for (NSArray *info in templatePairs) {
-        MoreMatchModel *m = [MoreMatchModel new];
-        m.homeName = info[0];
-        m.awayName = info[1];
-        m.time = info[2];
-        [arr addObject:m];
-    }
-    self.matches = arr;
-    [self.tableView reloadData];
+    if (!date) return @"--:--";
+    NSDateFormatter *output = [[NSDateFormatter alloc] init];
+    output.dateFormat = @"HH:mm";
+    return [output stringFromDate:date];
 }
 
 - (void)updateWeekHeaderForSelectedDate {
