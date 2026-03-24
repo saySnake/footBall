@@ -30,55 +30,55 @@
 #pragma mark - 字体属性（按大小命名）
 
 - (UIFont *)font14Bold {
-    return [UIFont fontWithName:@"aliBody" size:14.0f];
+    return [UIFont boldSystemFontOfSize:14.0];
 }
 
 - (UIFont *)font16Bold {
-    return [UIFont fontWithName:@"aliBody" size:16.0f];
+    return [UIFont boldSystemFontOfSize:16.0];
 }
 
 - (UIFont *)font18Bold {
-    return [UIFont fontWithName:@"aliBody" size:18.0f];
+    return [UIFont boldSystemFontOfSize:18.0];
 }
 
 - (UIFont *)font20Bold {
-    return [UIFont fontWithName:@"aliBody" size:20.0f];
+    return [UIFont boldSystemFontOfSize:20.0];
 }
 
 - (UIFont *)font22Bold {
-    return [UIFont fontWithName:@"aliBody" size:22.0f];
+    return [UIFont boldSystemFontOfSize:22.0];
 }
 
 - (UIFont *)font24Bold {
-    return [UIFont fontWithName:@"aliBody" size:24.0f];
+    return [UIFont boldSystemFontOfSize:24.0];
 }
 
 - (UIFont *)font26Bold {
-    return [UIFont fontWithName:@"aliBody" size:26.0f];
+    return [UIFont boldSystemFontOfSize:26.0];
 }
 
 - (UIFont *)font28Bold {
-    return [UIFont fontWithName:@"aliBody" size:28.0f];
+    return [UIFont boldSystemFontOfSize:28.0f];
 }
 
 - (UIFont *)font30Bold {
-    return [UIFont fontWithName:@"aliBody" size:30.0f];
+    return [UIFont boldSystemFontOfSize:30.0f];
 }
 
 - (UIFont *)font32Bold {
-    return [UIFont fontWithName:@"aliBody" size:32.0f];
+    return [UIFont boldSystemFontOfSize:32.0f];
 }
 
 - (UIFont *)font34Bold {
-    return [UIFont fontWithName:@"aliBody" size:34.0f];
+    return [UIFont boldSystemFontOfSize:34.0f];
 }
 
 - (UIFont *)font36Bold {
-    return [UIFont fontWithName:@"aliBody" size:36.0f];
+    return [UIFont boldSystemFontOfSize:36.0f];
 }
 
 - (UIFont *)font38Bold {
-    return [UIFont fontWithName:@"aliBody" size:38.0f];
+    return [UIFont boldSystemFontOfSize:38.0f];
 }
 
 - (UIFont *)font36Regular {
