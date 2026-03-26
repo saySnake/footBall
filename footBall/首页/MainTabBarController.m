@@ -146,12 +146,12 @@ static const CGFloat kPillCircleSize = 44.f;
     self.pillView = pill;
 
     NSMutableArray<UIButton *> *buttons = [NSMutableArray array];
-    NSArray<NSString *> *iconNames = @[ @"house", @"bolt.fill", @"safari", @"quote.bubble" ];
+    NSArray<NSString *> *iconNames = @[ @"tab_home", @"tab_home2", @"tab_home3", @"tab_home4" ];
     for (NSInteger i = 0; i < iconNames.count; i++) {
         UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
         btn.tag = i;
-        UIImage *img = [self imageWithSystemName:iconNames[i]];
-        if (img && @available(iOS 13.0, *)) {
+        UIImage *img = [UIImage imageNamed:iconNames[i]];
+        if (@available(iOS 13.0, *)){
             img = [img imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
         }
         [btn setImage:img forState:UIControlStateNormal];
