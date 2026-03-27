@@ -11,8 +11,8 @@
 #import "ProfileTeamsStore.h"
 #import <Masonry/Masonry.h>
 
-#define kProfileHeaderBg  [UIColor colorWithRed:0.04 green:0.14 blue:0.12 alpha:1.0]
-#define kProfilePageBg    [UIColor colorWithRed:0.96 green:0.96 blue:0.96 alpha:1.0]
+#define kProfileHeaderBg  [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0]
+#define kProfilePageBg    [UIColor colorWithRed:0.969 green:0.969 blue:0.969 alpha:1.0]
 #define kProfileCardBg    [UIColor whiteColor]
 
 static NSArray<NSString *> * _menuKeys(void) {
@@ -31,28 +31,28 @@ static NSArray<NSString *> * _menuKeys(void) {
     if (self = [super initWithFrame:frame]) {
         _iconBg = [UIView new];
         _iconBg.backgroundColor = [UIColor colorWithWhite:0.92 alpha:1.0];
-        _iconBg.layer.cornerRadius = 28;
+        _iconBg.layer.cornerRadius = 27;
         _iconBg.clipsToBounds = YES;
         _iconView = [UIImageView new];
         _iconView.contentMode = UIViewContentModeScaleAspectFit;
         _nameLabel = [UILabel new];
-        _nameLabel.font = [UIFont systemFontOfSize:11];
-        _nameLabel.textColor = [UIColor darkGrayColor];
+        _nameLabel.font = [UIFont systemFontOfSize:12];
+        _nameLabel.textColor = [UIColor blackColor];
         _nameLabel.textAlignment = NSTextAlignmentCenter;
-        _nameLabel.numberOfLines = 2;
+        _nameLabel.numberOfLines = 1;
         [self addSubview:_iconBg];
         [_iconBg addSubview:_iconView];
         [self addSubview:_nameLabel];
         [_iconBg mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.centerX.equalTo(self);
-            make.size.mas_equalTo(CGSizeMake(56, 56));
+            make.size.mas_equalTo(CGSizeMake(54, 54));
         }];
         [_iconView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.center.equalTo(_iconBg);
-            make.size.mas_equalTo(CGSizeMake(32, 32));
+            make.size.mas_equalTo(CGSizeMake(34, 34));
         }];
         [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(_iconBg.mas_bottom).offset(6);
+            make.top.equalTo(_iconBg.mas_bottom).offset(4);
             make.leading.trailing.equalTo(self);
         }];
     }
@@ -171,24 +171,24 @@ static NSArray<NSString *> * _menuKeys(void) {
     [self.contentWrap addSubview:self.headerView];
     [self.headerView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.leading.trailing.equalTo(self.contentWrap);
-        make.height.mas_equalTo(260);
+        make.height.mas_equalTo(318);
     }];
 
     // 头像 + VIP
     UIView *avatarRing = [UIView new];
-    avatarRing.layer.cornerRadius = 40;
+    avatarRing.layer.cornerRadius = 45;
     avatarRing.clipsToBounds = YES;
     avatarRing.backgroundColor = [UIColor colorWithWhite:0.3 alpha:1.0];
     [self.headerView addSubview:avatarRing];
     [avatarRing mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.headerView).offset(56);
+        make.top.equalTo(self.headerView).offset(83);
         make.centerX.equalTo(self.headerView);
-        make.size.mas_equalTo(CGSizeMake(80, 80));
+        make.size.mas_equalTo(CGSizeMake(90, 90));
     }];
 
     self.avatarView = [UIImageView new];
     self.avatarView.backgroundColor = [UIColor colorWithWhite:0.5 alpha:1.0];
-    self.avatarView.layer.cornerRadius = 36;
+    self.avatarView.layer.cornerRadius = 45;
     self.avatarView.clipsToBounds = YES;
     self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
     if (@available(iOS 13.0, *)) {
@@ -198,34 +198,34 @@ static NSArray<NSString *> * _menuKeys(void) {
     [avatarRing addSubview:self.avatarView];
     [self.avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.center.equalTo(avatarRing);
-        make.size.mas_equalTo(CGSizeMake(72, 72));
+        make.size.mas_equalTo(CGSizeMake(90, 90));
     }];
 
     self.vipLabel = [UILabel new];
     self.vipLabel.text = @"VIP";
-    self.vipLabel.font = [UIFont boldSystemFontOfSize:10];
-    self.vipLabel.textColor = [UIColor whiteColor];
-    self.vipLabel.backgroundColor = [UIColor colorWithRed:0.85 green:0.65 blue:0.13 alpha:1.0];
+    self.vipLabel.font = [UIFont boldSystemFontOfSize:9];
+    self.vipLabel.textColor = [UIColor blackColor];
+    self.vipLabel.backgroundColor = [UIColor colorWithRed:0.96 green:0.82 blue:0.42 alpha:1.0];
     self.vipLabel.layer.cornerRadius = 8;
     self.vipLabel.clipsToBounds = YES;
     self.vipLabel.textAlignment = NSTextAlignmentCenter;
     [avatarRing addSubview:self.vipLabel];
     [self.vipLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.bottom.trailing.equalTo(avatarRing).offset(2);
-        make.size.mas_equalTo(CGSizeMake(24, 16));
+        make.size.mas_equalTo(CGSizeMake(40, 16));
     }];
 
     // 姓名 + 记者
     UIView *nameRow = [UIView new];
     [self.headerView addSubview:nameRow];
     [nameRow mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(avatarRing.mas_bottom).offset(12);
+        make.top.equalTo(avatarRing.mas_bottom).offset(8);
         make.centerX.equalTo(self.headerView);
     }];
 
     self.nameLabel = [UILabel new];
     self.nameLabel.text = @"Arisha Ireen";
-    self.nameLabel.font = [UIFont boldSystemFontOfSize:20];
+    self.nameLabel.font = [UIFont systemFontOfSize:32 weight:UIFontWeightSemibold];
     self.nameLabel.textColor = [UIColor whiteColor];
     [nameRow addSubview:self.nameLabel];
     [self.nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -240,12 +240,12 @@ static NSArray<NSString *> * _menuKeys(void) {
         make.leading.equalTo(self.nameLabel.mas_trailing).offset(8);
         make.centerY.equalTo(nameRow);
         make.trailing.equalTo(nameRow);
-        make.height.mas_equalTo(20);
+        make.height.mas_equalTo(16);
     }];
 
     self.reporterLabel = [UILabel new];
     self.reporterLabel.text = NSLocalizedString(@"profile_badge_verified", nil);
-    self.reporterLabel.font = [UIFont systemFontOfSize:11];
+    self.reporterLabel.font = [UIFont systemFontOfSize:12];
     self.reporterLabel.textColor = [UIColor whiteColor];
     [self.reporterBadge addSubview:self.reporterLabel];
     [self.reporterLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -253,11 +253,11 @@ static NSArray<NSString *> * _menuKeys(void) {
     }];
 
     self.idLabel = [UILabel new];
-    self.idLabel.font = [UIFont systemFontOfSize:13];
-    self.idLabel.textColor = [UIColor colorWithWhite:0.72 alpha:1.0];
+    self.idLabel.font = [UIFont systemFontOfSize:14];
+    self.idLabel.textColor = [UIColor whiteColor];
     [self.headerView addSubview:self.idLabel];
     [self.idLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(nameRow.mas_bottom).offset(6);
+        make.top.equalTo(nameRow.mas_bottom).offset(2);
         make.centerX.equalTo(self.headerView);
     }];
 
@@ -265,7 +265,7 @@ static NSArray<NSString *> * _menuKeys(void) {
     UIView *statsBar = [UIView new];
     [self.headerView addSubview:statsBar];
     [statsBar mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.idLabel.mas_bottom).offset(16);
+        make.top.equalTo(self.idLabel.mas_bottom).offset(22);
         make.leading.trailing.equalTo(self.headerView);
         make.height.mas_equalTo(52);
     }];
@@ -287,7 +287,7 @@ static NSArray<NSString *> * _menuKeys(void) {
         }];
         UILabel *n = numL[i];
         n.text = nums[i];
-        n.font = [UIFont boldSystemFontOfSize:20];
+        n.font = [UIFont boldSystemFontOfSize:18];
         n.textColor = [UIColor whiteColor];
         n.textAlignment = NSTextAlignmentCenter;
         [col addSubview:n];
@@ -297,8 +297,8 @@ static NSArray<NSString *> * _menuKeys(void) {
         }];
         UILabel *t = titL[i];
         t.text = @[ NSLocalizedString(@"profile_stat_friends", nil), NSLocalizedString(@"profile_stat_follow", nil), NSLocalizedString(@"profile_stat_stamps", nil) ][i];
-        t.font = [UIFont systemFontOfSize:12];
-        t.textColor = [UIColor colorWithWhite:0.65 alpha:1.0];
+        t.font = [UIFont systemFontOfSize:14];
+        t.textColor = [UIColor whiteColor];
         t.textAlignment = NSTextAlignmentCenter;
         [col addSubview:t];
         [t mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -310,7 +310,7 @@ static NSArray<NSString *> * _menuKeys(void) {
     // 我关注的球队 卡片
     self.teamsCard = [UIControl new];
     self.teamsCard.backgroundColor = kProfileCardBg;
-    self.teamsCard.layer.cornerRadius = 12;
+    self.teamsCard.layer.cornerRadius = 6;
     [self.teamsCard addTarget:self action:@selector(onTeamsTapped) forControlEvents:UIControlEventTouchUpInside];
     [self.contentWrap addSubview:self.teamsCard];
     [self.teamsCard mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -321,7 +321,7 @@ static NSArray<NSString *> * _menuKeys(void) {
 
     self.teamsTitleLabel = [UILabel new];
     self.teamsTitleLabel.text = NSLocalizedString(@"profile_section_teams", nil);
-    self.teamsTitleLabel.font = [UIFont systemFontOfSize:16];
+    self.teamsTitleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
     self.teamsTitleLabel.textColor = [UIColor blackColor];
     [self.teamsCard addSubview:self.teamsTitleLabel];
 
@@ -374,21 +374,21 @@ static NSArray<NSString *> * _menuKeys(void) {
         NSString *key = _menuKeys()[i];
         UIControl *card = [UIControl new];
         card.backgroundColor = kProfileCardBg;
-        card.layer.cornerRadius = 12;
+        card.layer.cornerRadius = 6;
         card.tag = i;
         [card addTarget:self action:@selector(onMenuTapped:) forControlEvents:UIControlEventTouchUpInside];
         [self.contentWrap addSubview:card];
         [card mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(self.contentWrap).offset(12);
             make.trailing.equalTo(self.contentWrap).offset(-12);
-            make.height.mas_equalTo(52);
+            make.height.mas_equalTo(50);
             if (prevCard) make.top.equalTo(prevCard.mas_bottom).offset(10);
             else          make.top.equalTo(self.teamsCard.mas_bottom).offset(12);
         }];
 
         UILabel *lbl = [UILabel new];
         lbl.text = NSLocalizedString(key, nil);
-        lbl.font = [UIFont systemFontOfSize:16];
+        lbl.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
         lbl.textColor = [UIColor blackColor];
         [card addSubview:lbl];
         [lbl mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -433,9 +433,9 @@ static NSArray<NSString *> * _menuKeys(void) {
         make.leading.equalTo(self.contentWrap).offset(12);
         make.trailing.equalTo(self.contentWrap).offset(-12);
         if (hasData) {
-            make.bottom.equalTo(self.teamsContentWrap.mas_bottom).offset(16);
+            make.height.mas_equalTo(143);
         } else {
-            make.height.mas_equalTo(52);
+            make.height.mas_equalTo(50);
         }
     }];
 
@@ -459,13 +459,10 @@ static NSArray<NSString *> * _menuKeys(void) {
     }];
 
     [self.teamsContentWrap mas_remakeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.teamsTitleLabel.mas_bottom).offset(12);
+            make.top.equalTo(self.teamsTitleLabel.mas_bottom).offset(12);
         make.leading.equalTo(self.teamsCard).offset(14);
         make.trailing.equalTo(self.teamsCard).offset(-14);
-        make.height.mas_equalTo(hasData ? 90 : 0);
-        if (hasData) {
-            make.bottom.equalTo(self.teamsCard).offset(-16);
-        }
+        make.height.mas_equalTo(hasData ? 80 : 0);
     }];
 
     if (hasData) {

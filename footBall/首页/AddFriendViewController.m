@@ -7,10 +7,11 @@
 #import "NewFriendRequestsViewController.h"
 #import <Masonry/Masonry.h>
 #import "ColorManager.h"
+#import <SDWebImage/SDWebImage.h>
 
-#define kAddFriendGreen    [ColorManager sharedManager].primaryColor
-#define kAddFriendHeaderBg [ColorManager sharedManager].primaryDarkColor
-#define kAddFriendPageBg   [ColorManager sharedManager].secondaryBackgroundColor
+#define kAddFriendGreen    [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0] // #285D4B
+#define kAddFriendHeaderBg [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0] // #0D2122
+#define kAddFriendPageBg   [UIColor colorWithRed:0.969 green:0.969 blue:0.969 alpha:1.0] // #F7F7F7
 static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_search_friend_ids";
 
@@ -19,6 +20,7 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 @property (nonatomic, strong) UIImageView *avatarView;
 @property (nonatomic, strong) UILabel *nameLabel;
 @property (nonatomic, strong) UILabel *idLabel;
+@property (nonatomic, strong) UIView *statusDot;
 @property (nonatomic, strong) UILabel *statusLabel;
 @property (nonatomic, strong) UIButton *addBtn;
 - (void)configureWithResult:(PNUser *)r;
@@ -31,21 +33,24 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
         self.selectionStyle = UITableViewCellSelectionStyleNone;
         _cardView = [UIView new];
         _cardView.backgroundColor = [UIColor whiteColor];
-        _cardView.layer.cornerRadius = 8;
+        _cardView.layer.cornerRadius = 6;
         _avatarView = [UIImageView new];
-        _avatarView.layer.cornerRadius = 20;
+        _avatarView.layer.cornerRadius = 27;
         _avatarView.clipsToBounds = YES;
         _nameLabel = [UILabel new];
-        _nameLabel.font = [UIFont boldSystemFontOfSize:15];
+        _nameLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
         _idLabel = [UILabel new];
         _idLabel.font = [UIFont systemFontOfSize:12];
-        _idLabel.textColor = [UIColor grayColor];
+        _idLabel.textColor = [UIColor colorWithWhite:0.26 alpha:1.0]; // #424242
+        _statusDot = [UIView new];
+        _statusDot.layer.cornerRadius = 4;
+        _statusDot.backgroundColor = [UIColor colorWithWhite:0.65 alpha:1.0];
         _statusLabel = [UILabel new];
-        _statusLabel.font = [UIFont systemFontOfSize:11];
+        _statusLabel.font = [UIFont systemFontOfSize:10];
         _addBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-        _addBtn.layer.cornerRadius = 14;
-        _addBtn.layer.borderWidth = 1;
-        _addBtn.layer.borderColor = [UIColor colorWithWhite:0.75 alpha:1.0].CGColor;
+        _addBtn.layer.cornerRadius = 15;
+        _addBtn.layer.borderWidth = 0.6;
+        _addBtn.layer.borderColor = kAddFriendHeaderBg.CGColor;
         _addBtn.titleLabel.font = [UIFont systemFontOfSize:12];
         [_addBtn setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
         [_addBtn setTitle:NSLocalizedString(@"community_add_friend", nil) forState:UIControlStateNormal];
@@ -53,14 +58,16 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
         [_cardView addSubview:_avatarView];
         [_cardView addSubview:_nameLabel];
         [_cardView addSubview:_idLabel];
+        [_cardView addSubview:_statusDot];
         [_cardView addSubview:_statusLabel];
         [_cardView addSubview:_addBtn];
-        [_cardView mas_makeConstraints:^(MASConstraintMaker *make) { make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(4, 12, 4, 12)); }];
-        [_avatarView mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_cardView).offset(10); make.centerY.equalTo(_cardView); make.size.mas_equalTo(CGSizeMake(40, 40)); }];
-        [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_avatarView.mas_trailing).offset(10); make.top.equalTo(_cardView).offset(9); }];
+        [_cardView mas_makeConstraints:^(MASConstraintMaker *make) { make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 18, 6, 14)); }];
+        [_avatarView mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_cardView).offset(10); make.centerY.equalTo(_cardView); make.size.mas_equalTo(CGSizeMake(54, 54)); }];
+        [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_avatarView.mas_trailing).offset(10); make.top.equalTo(_cardView).offset(12); }];
         [_idLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_nameLabel); make.top.equalTo(_nameLabel.mas_bottom).offset(1); }];
-        [_statusLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_nameLabel); make.top.equalTo(_idLabel.mas_bottom).offset(1); }];
-        [_addBtn mas_makeConstraints:^(MASConstraintMaker *make) { make.trailing.equalTo(_cardView).offset(-10); make.centerY.equalTo(_cardView); make.size.mas_equalTo(CGSizeMake(74, 28)); }];
+        [_statusDot mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_nameLabel); make.top.equalTo(_idLabel.mas_bottom).offset(5); make.size.mas_equalTo(CGSizeMake(8, 8)); }];
+        [_statusLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_statusDot.mas_trailing).offset(6); make.centerY.equalTo(_statusDot); }];
+        [_addBtn mas_makeConstraints:^(MASConstraintMaker *make) { make.trailing.equalTo(_cardView).offset(-12); make.centerY.equalTo(_cardView); make.size.mas_equalTo(CGSizeMake(76, 30)); }];
     }
     return self;
 }
@@ -69,12 +76,18 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     _idLabel.text = [NSString stringWithFormat:NSLocalizedString(@"community_id_format", nil), r.userId];
     _statusLabel.text = r.lastOnlineTime.length > 0 ? NSLocalizedString(@"community_online_15m", nil) : NSLocalizedString(@"community_online_5m_ago", nil);
     _statusLabel.textColor = r.lastOnlineTime.length > 0 ? [UIColor colorWithRed:0.10 green:0.70 blue:0.30 alpha:1.0] : [UIColor grayColor];
-    if (@available(iOS 13.0, *)) { _avatarView.image = [UIImage systemImageNamed:@"person.crop.circle.fill"]; _avatarView.tintColor = [UIColor colorWithWhite:0.7 alpha:1.0]; }
+    BOOL online = (r.lastOnlineTime.length > 0);
+    _statusDot.backgroundColor = online ? [UIColor colorWithRed:0.0 green:0.71 blue:0.12 alpha:1.0] : [UIColor colorWithWhite:0.65 alpha:1.0];
+    NSURL *url = r.avatar.length > 0 ? [NSURL URLWithString:r.avatar] : nil;
+    UIImage *placeholder = (@available(iOS 13.0, *)) ? [UIImage systemImageNamed:@"person.crop.circle.fill"] : nil;
+    [_avatarView sd_setImageWithURL:url placeholderImage:placeholder];
+    if (!_avatarView.image && @available(iOS 13.0, *)) { _avatarView.tintColor = [UIColor colorWithWhite:0.7 alpha:1.0]; _avatarView.contentMode = UIViewContentModeCenter; } else { _avatarView.contentMode = UIViewContentModeScaleAspectFill; }
 }
 @end
 
 @interface MenuItemCell : UITableViewCell
 @property (nonatomic, strong) UIView *cardView;
+@property (nonatomic, strong) UIView *iconBg;
 @property (nonatomic, strong) UIImageView *iconView;
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UILabel *subtitleLabel;
@@ -89,36 +102,37 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
         self.selectionStyle = UITableViewCellSelectionStyleNone;
         _cardView = [UIView new];
         _cardView.backgroundColor = [UIColor whiteColor];
-        _cardView.layer.cornerRadius = 8;
+        _cardView.layer.cornerRadius = 6;
+        _iconBg = [UIView new];
+        _iconBg.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+        _iconBg.layer.cornerRadius = 22.5;
         _iconView = [UIImageView new];
         _iconView.tintColor = [UIColor darkGrayColor];
         _titleLabel = [UILabel new];
-        _titleLabel.font = [UIFont boldSystemFontOfSize:15];
+        _titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
         _subtitleLabel = [UILabel new];
         _subtitleLabel.font = [UIFont systemFontOfSize:12];
-        _subtitleLabel.textColor = [UIColor grayColor];
+        _subtitleLabel.textColor = [UIColor colorWithWhite:0.49 alpha:1.0];
         _badgeView = [UIView new];
         _badgeView.backgroundColor = [UIColor colorWithRed:0.95 green:0.25 blue:0.24 alpha:1.0];
-        _badgeView.layer.cornerRadius = 9;
+        _badgeView.layer.cornerRadius = 10;
         _badgeLabel = [UILabel new];
         _badgeLabel.font = [UIFont boldSystemFontOfSize:11];
         _badgeLabel.textColor = [UIColor whiteColor];
         [_badgeView addSubview:_badgeLabel];
-        UIImageView *arrow = [UIImageView new];
-        if (@available(iOS 13.0, *)) { arrow.image = [UIImage systemImageNamed:@"chevron.right"]; arrow.tintColor = [UIColor lightGrayColor]; }
         [self.contentView addSubview:_cardView];
-        [_cardView addSubview:_iconView];
+        [_cardView addSubview:_iconBg];
+        [_iconBg addSubview:_iconView];
         [_cardView addSubview:_titleLabel];
         [_cardView addSubview:_subtitleLabel];
         [_cardView addSubview:_badgeView];
-        [_cardView addSubview:arrow];
-        [_cardView mas_makeConstraints:^(MASConstraintMaker *make) { make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 12, 6, 12)); }];
-        [_iconView mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_cardView).offset(12); make.centerY.equalTo(_cardView); make.size.mas_equalTo(CGSizeMake(30, 30)); }];
-        [_titleLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_iconView.mas_trailing).offset(10); make.top.equalTo(_cardView).offset(12); }];
-        [_badgeView mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_titleLabel.mas_trailing).offset(6); make.centerY.equalTo(_titleLabel); make.height.mas_equalTo(18); make.width.mas_greaterThanOrEqualTo(18); }];
+        [_cardView mas_makeConstraints:^(MASConstraintMaker *make) { make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 18, 6, 14)); }];
+        [_iconBg mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_cardView).offset(12); make.centerY.equalTo(_cardView); make.size.mas_equalTo(CGSizeMake(45, 45)); }];
+        [_iconView mas_makeConstraints:^(MASConstraintMaker *make) { make.center.equalTo(_iconBg); make.size.mas_equalTo(CGSizeMake(22, 22)); }];
+        [_titleLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_iconBg.mas_trailing).offset(12); make.top.equalTo(_cardView).offset(16); }];
+        [_badgeView mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_titleLabel.mas_trailing).offset(6); make.centerY.equalTo(_titleLabel); make.size.mas_equalTo(CGSizeMake(20, 20)); }];
         [_badgeLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.edges.equalTo(_badgeView).insets(UIEdgeInsetsMake(2, 5, 2, 5)); }];
         [_subtitleLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_titleLabel); make.top.equalTo(_titleLabel.mas_bottom).offset(2); }];
-        [arrow mas_makeConstraints:^(MASConstraintMaker *make) { make.trailing.equalTo(_cardView).offset(-12); make.centerY.equalTo(_cardView); make.size.mas_equalTo(CGSizeMake(14, 14)); }];
     }
     return self;
 }
@@ -149,6 +163,8 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     [super viewDidLoad];
     self.view.backgroundColor = kAddFriendPageBg;
     self.shouldShowNavigationBar = NO;
+    [self setupUI];
+    [self updateLocalizedStrings];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -172,7 +188,7 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     [self.headerView addSubview:backBtn];
 
     self.titleLabel = [UILabel new];
-    self.titleLabel.font = [UIFont boldSystemFontOfSize:30];
+    self.titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
     self.titleLabel.textColor = [UIColor whiteColor];
     [self.headerView addSubview:self.titleLabel];
 
@@ -189,14 +205,16 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     self.searchField.font = [UIFont systemFontOfSize:14];
     self.searchField.delegate = self;
     self.searchField.returnKeyType = UIReturnKeySearch;
+    self.searchField.placeholder = NSLocalizedString(@"community_search_placeholder", nil);
     [searchBg addSubview:self.searchField];
 
     self.searchBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     self.searchBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [self.searchBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     self.searchBtn.backgroundColor = kAddFriendGreen;
-    self.searchBtn.layer.cornerRadius = 18;
+    self.searchBtn.layer.cornerRadius = 20;
     [self.searchBtn addTarget:self action:@selector(onSearch) forControlEvents:UIControlEventTouchUpInside];
+    [self.searchBtn setTitle:NSLocalizedString(@"community_search", nil) forState:UIControlStateNormal];
     [searchBg addSubview:self.searchBtn];
 
     self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
@@ -208,12 +226,12 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     [self.tableView registerClass:[SearchResultCell class] forCellReuseIdentifier:@"SearchResultCell"];
     [self.view addSubview:self.tableView];
 
-    [self.headerView mas_makeConstraints:^(MASConstraintMaker *make) { make.top.leading.trailing.equalTo(self.view); make.height.mas_equalTo(148); }];
+    [self.headerView mas_makeConstraints:^(MASConstraintMaker *make) { make.top.leading.trailing.equalTo(self.view); make.height.mas_equalTo(162); }];
     [backBtn mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(self.headerView).offset(12); make.top.equalTo(self.headerView.mas_safeAreaLayoutGuideTop).offset(8); make.size.mas_equalTo(CGSizeMake(32, 32)); }];
     [self.titleLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.centerX.equalTo(self.headerView); make.centerY.equalTo(backBtn); }];
-    [searchBg mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(self.headerView).offset(12); make.trailing.equalTo(self.headerView).offset(-12); make.bottom.equalTo(self.headerView).offset(-12); make.height.mas_equalTo(44); }];
+    [searchBg mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(self.headerView).offset(16); make.trailing.equalTo(self.headerView).offset(-16); make.bottom.equalTo(self.headerView).offset(-15); make.height.mas_equalTo(44); }];
     [searchIcon mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(searchBg).offset(12); make.centerY.equalTo(searchBg); make.size.mas_equalTo(CGSizeMake(18, 18)); }];
-    [self.searchBtn mas_makeConstraints:^(MASConstraintMaker *make) { make.trailing.equalTo(searchBg).offset(-4); make.centerY.equalTo(searchBg); make.size.mas_equalTo(CGSizeMake(58, 36)); }];
+    [self.searchBtn mas_makeConstraints:^(MASConstraintMaker *make) { make.trailing.equalTo(searchBg).offset(-4); make.centerY.equalTo(searchBg); make.size.mas_equalTo(CGSizeMake(77, 40)); }];
     [self.searchField mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(searchIcon.mas_trailing).offset(8); make.trailing.equalTo(self.searchBtn.mas_leading).offset(-6); make.centerY.equalTo(searchBg); }];
     [self.tableView mas_makeConstraints:^(MASConstraintMaker *make) { make.top.equalTo(self.headerView.mas_bottom).offset(8); make.leading.trailing.bottom.equalTo(self.view); }];
 }
@@ -252,7 +270,7 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    return self.isSearching ? 74 : 78;
+    return self.isSearching ? 74 : 77;
 }
 
 - (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
@@ -260,15 +278,16 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     UIView *header = [UIView new];
     header.backgroundColor = [UIColor clearColor];
     UILabel *label = [UILabel new];
-    label.font = [UIFont boldSystemFontOfSize:14];
-    label.text = [NSString stringWithFormat:NSLocalizedString(@"community_search_result_format", nil), (long)self.searchResults.count];
+    label.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    label.textColor = [UIColor blackColor];
+    label.text = [NSString stringWithFormat:@"搜索结果（%ld）", (long)self.searchResults.count];
     [header addSubview:label];
-    [label mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(header).offset(14); make.centerY.equalTo(header); }];
+    [label mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(header).offset(18); make.centerY.equalTo(header); }];
     return header;
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-    return self.isSearching ? 28 : 0;
+    return self.isSearching ? 44 : 0;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {

@@ -7,10 +7,10 @@
 #import <Masonry/Masonry.h>
 #import "ColorManager.h"
 
-#define kRequestGreen    [ColorManager sharedManager].primaryColor
-#define kRequestHeaderBg [ColorManager sharedManager].primaryDarkColor
-#define kRequestRed      [ColorManager sharedManager].errorColor
-#define kRequestPageBg   [ColorManager sharedManager].secondaryBackgroundColor
+#define kRequestGreen    [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0] // #285D4B
+#define kRequestHeaderBg [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0] // #0D2122
+#define kRequestRed      [UIColor colorWithRed:1.0 green:0.031 blue:0.047 alpha:1.0]   // #FF080C
+#define kRequestPageBg   [UIColor colorWithRed:0.969 green:0.969 blue:0.969 alpha:1.0] // #F7F7F7
 static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 static NSString * const kCommunityPendingCountDidChangeNotification = @"community_pending_count_did_change";
 static NSString * const kCommunityAddedFriendsKey = @"community_added_friends";
@@ -49,7 +49,7 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
 
         _cardView = [UIView new];
         _cardView.backgroundColor = [UIColor whiteColor];
-        _cardView.layer.cornerRadius = 8;
+        _cardView.layer.cornerRadius = 6;
         _cardView.clipsToBounds = YES;
 
         _avatarView = [UIImageView new];
@@ -74,20 +74,20 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
         _messageLabel.numberOfLines = 2;
 
         _acceptBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-        _acceptBtn.layer.cornerRadius = 14;
+        _acceptBtn.layer.cornerRadius = 15;
         _acceptBtn.backgroundColor = kRequestGreen;
         _acceptBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
         [_acceptBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
 
         _rejectBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-        _rejectBtn.layer.cornerRadius = 14;
+        _rejectBtn.layer.cornerRadius = 15;
         _rejectBtn.backgroundColor = kRequestRed;
         _rejectBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
         [_rejectBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
 
         _statusBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-        _statusBtn.layer.cornerRadius = 14;
-        _statusBtn.layer.borderWidth = 1;
+        _statusBtn.layer.cornerRadius = 15;
+        _statusBtn.layer.borderWidth = 0.6;
         _statusBtn.userInteractionEnabled = NO;
         _statusBtn.titleLabel.font = [UIFont systemFontOfSize:12];
 
@@ -113,31 +113,31 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
         [_acceptBtn mas_makeConstraints:^(MASConstraintMaker *make) {
             make.trailing.equalTo(_cardView).offset(-10);
             make.centerY.equalTo(_cardView).offset(-18);
-            make.size.mas_equalTo(CGSizeMake(56, 28));
+            make.size.mas_equalTo(CGSizeMake(75, 30));
         }];
         [_rejectBtn mas_makeConstraints:^(MASConstraintMaker *make) {
             make.trailing.equalTo(_cardView).offset(-10);
             make.centerY.equalTo(_cardView).offset(18);
-            make.size.mas_equalTo(CGSizeMake(56, 28));
+            make.size.mas_equalTo(CGSizeMake(75, 30));
         }];
         // 状态按钮（已添加/已过期）居中
         [_statusBtn mas_makeConstraints:^(MASConstraintMaker *make) {
             make.trailing.equalTo(_cardView).offset(-10);
             make.centerY.equalTo(_cardView);
-            make.size.mas_equalTo(CGSizeMake(64, 28));
+            make.size.mas_equalTo(CGSizeMake(76, 30));
         }];
 
         // 头像：左侧固定，顶部距 cardView 12pt，固定 40×40，底部约束撑起无 message 时的最小高度
         [_avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_cardView).offset(12);
             make.top.equalTo(_cardView).offset(12);
-            make.size.mas_equalTo(CGSizeMake(40, 40));
+            make.size.mas_equalTo(CGSizeMake(54, 54));
             make.bottom.lessThanOrEqualTo(_cardView).offset(-12);
         }];
 
         // 文字区域：头像右侧，纵向依次排列
         [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_avatarView.mas_trailing).offset(10);
+            make.leading.equalTo(_avatarView.mas_trailing).offset(8);
             make.top.equalTo(_cardView).offset(12);
             make.trailing.lessThanOrEqualTo(_acceptBtn.mas_leading).offset(-8);
         }];
@@ -153,8 +153,8 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
         }];
         // messageLabel：在 statusLabel 下方，bottom 撑起 cardView（有内容时生效）
         [_messageLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_avatarView.mas_trailing).offset(10);
-            make.trailing.equalTo(_cardView).offset(-80);
+            make.leading.equalTo(_cardView).offset(12);
+            make.trailing.equalTo(_cardView).offset(-90);
             make.top.equalTo(_statusLabel.mas_bottom).offset(6);
             make.bottom.equalTo(_cardView).offset(-12);
         }];
@@ -224,6 +224,8 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     [super viewDidLoad];
     self.view.backgroundColor = kRequestPageBg;
     self.shouldShowNavigationBar = NO;
+    [self setupUI];
+    [self updateLocalizedStrings];
 }
 
 - (void)loadRemoteData {
@@ -266,7 +268,7 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     [backBtn addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
     [self.headerView addSubview:backBtn];
     self.titleLabel = [UILabel new];
-    self.titleLabel.font = [UIFont boldSystemFontOfSize:30];
+    self.titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
     self.titleLabel.textColor = [UIColor whiteColor];
     [self.headerView addSubview:self.titleLabel];
     UIView *searchBg = [UIView new];
@@ -280,13 +282,15 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     self.searchField.font = [UIFont systemFontOfSize:14];
     self.searchField.delegate = self;
     self.searchField.returnKeyType = UIReturnKeySearch;
+    self.searchField.placeholder = NSLocalizedString(@"community_search_placeholder", nil);
     [searchBg addSubview:self.searchField];
     self.searchBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     self.searchBtn.backgroundColor = kRequestGreen;
-    self.searchBtn.layer.cornerRadius = 18;
+    self.searchBtn.layer.cornerRadius = 20;
     self.searchBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [self.searchBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     [self.searchBtn addTarget:self action:@selector(onSearchTapped) forControlEvents:UIControlEventTouchUpInside];
+    [self.searchBtn setTitle:NSLocalizedString(@"community_search", nil) forState:UIControlStateNormal];
     [searchBg addSubview:self.searchBtn];
     self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
     self.tableView.backgroundColor = [UIColor clearColor];
@@ -297,12 +301,12 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     self.tableView.estimatedRowHeight = 80;
     [self.tableView registerClass:[FriendRequestCell class] forCellReuseIdentifier:@"FriendRequestCell"];
     [self.view addSubview:self.tableView];
-    [self.headerView mas_makeConstraints:^(MASConstraintMaker *make) { make.top.leading.trailing.equalTo(self.view); make.height.mas_equalTo(148); }];
+    [self.headerView mas_makeConstraints:^(MASConstraintMaker *make) { make.top.leading.trailing.equalTo(self.view); make.height.mas_equalTo(162); }];
     [backBtn mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(self.headerView).offset(12); make.top.equalTo(self.headerView.mas_safeAreaLayoutGuideTop).offset(8); make.size.mas_equalTo(CGSizeMake(32, 32)); }];
     [self.titleLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.centerX.equalTo(self.headerView); make.centerY.equalTo(backBtn); }];
-    [searchBg mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(self.headerView).offset(12); make.trailing.equalTo(self.headerView).offset(-12); make.bottom.equalTo(self.headerView).offset(-12); make.height.mas_equalTo(44); }];
+    [searchBg mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(self.headerView).offset(16); make.trailing.equalTo(self.headerView).offset(-16); make.bottom.equalTo(self.headerView).offset(-15); make.height.mas_equalTo(44); }];
     [searchIcon mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(searchBg).offset(12); make.centerY.equalTo(searchBg); make.size.mas_equalTo(CGSizeMake(18, 18)); }];
-    [self.searchBtn mas_makeConstraints:^(MASConstraintMaker *make) { make.trailing.equalTo(searchBg).offset(-4); make.centerY.equalTo(searchBg); make.size.mas_equalTo(CGSizeMake(58, 36)); }];
+    [self.searchBtn mas_makeConstraints:^(MASConstraintMaker *make) { make.trailing.equalTo(searchBg).offset(-4); make.centerY.equalTo(searchBg); make.size.mas_equalTo(CGSizeMake(77, 40)); }];
     [self.searchField mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(searchIcon.mas_trailing).offset(8); make.trailing.equalTo(self.searchBtn.mas_leading).offset(-6); make.centerY.equalTo(searchBg); }];
     [self.tableView mas_makeConstraints:^(MASConstraintMaker *make) { make.top.equalTo(self.headerView.mas_bottom).offset(8); make.leading.trailing.bottom.equalTo(self.view); }];
 }
@@ -346,13 +350,13 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     UIView *header = [UIView new];
     header.backgroundColor = [UIColor clearColor];
     UILabel *label = [UILabel new];
-    label.font = [UIFont boldSystemFontOfSize:14];
+    label.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
     label.text = self.isSearching ? NSLocalizedString(@"community_week_ago", nil) : (section == 0 ? NSLocalizedString(@"community_recent_3days", nil) : NSLocalizedString(@"community_week_ago", nil));
     [header addSubview:label];
-    [label mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(header).offset(14); make.centerY.equalTo(header); }];
+    [label mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(header).offset(16); make.centerY.equalTo(header); }];
     return header;
 }
-- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section { return 30; }
+- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section { return 36; }
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     FriendRequestCell *cell = [tableView dequeueReusableCellWithIdentifier:@"FriendRequestCell" forIndexPath:indexPath];
     if (self.isSearching) {

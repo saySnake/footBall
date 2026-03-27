@@ -11,10 +11,11 @@
 #import "PNMatchDetailViewController.h"
 #import "PNMatchInfoInputViewController.h"
 
-#define kDiscoverHeaderBg     [UIColor colorWithRed:0.05 green:0.16 blue:0.15 alpha:1.0]
-#define kDiscoverGreen        [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0]
-#define kDiscoverPillGreen    [UIColor colorWithRed:0.15 green:0.46 blue:0.34 alpha:1.0]
-#define kDiscoverCardBg       [UIColor colorWithWhite:0.97 alpha:1.0]
+#define kDiscoverHeaderBg     [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0]   // #0D2122
+#define kDiscoverGreen        [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0]   // #285D4B
+#define kDiscoverPillGreen    kDiscoverGreen
+#define kDiscoverCardBg       [UIColor colorWithRed:0.976 green:0.976 blue:0.976 alpha:1.0]   // #F9F9F9
+#define kDiscoverCellBg       [UIColor colorWithRed:0.961 green:0.961 blue:0.961 alpha:1.0]   // #F5F5F5
 
 typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     DiscoverMatchTypeUpcoming,
@@ -25,6 +26,8 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 @property (nonatomic, copy) NSString *matchId;
 @property (nonatomic, copy) NSString *homeName;
 @property (nonatomic, copy) NSString *awayName;
+/// 比赛时间（HH:mm），用于中间时间胶囊
+@property (nonatomic, copy) NSString *timeText;
 @property (nonatomic, copy) NSString *dateText;
 @property (nonatomic, copy) NSString *scoreText;
 @property (nonatomic, copy) NSString *verifiedText;
@@ -41,6 +44,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 @interface DiscoverMatchCell : UITableViewCell
 @property (nonatomic, strong) UIImageView *homeLogo;
 @property (nonatomic, strong) UIImageView *awayLogo;
+@property (nonatomic, strong) UIImageView *middleBadge;
 @property (nonatomic, strong) UILabel *homeLabel;
 @property (nonatomic, strong) UILabel *awayLabel;
 @property (nonatomic, strong) UILabel *scoreLabel;
@@ -57,114 +61,132 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         self.backgroundColor = [UIColor clearColor];
 
         UIView *card = [[UIView alloc] init];
-        card.backgroundColor = kDiscoverCardBg;
-        card.layer.cornerRadius = 14;
+        card.backgroundColor = kDiscoverCellBg;
+        card.layer.cornerRadius = 8;
         [self.contentView addSubview:card];
         [card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 16, 6, 16));
+            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(5, 16, 5, 16));
         }];
 
         _homeLogo = [[UIImageView alloc] init];
-        _homeLogo.backgroundColor = [UIColor colorWithWhite:0.9 alpha:1.0];
-        _homeLogo.layer.cornerRadius = 14;
+        _homeLogo.backgroundColor = [UIColor clearColor];
+        _homeLogo.layer.cornerRadius = 12;
         _homeLogo.clipsToBounds = YES;
         _homeLogo.contentMode = UIViewContentModeScaleAspectFit;
         _awayLogo = [[UIImageView alloc] init];
-        _awayLogo.backgroundColor = [UIColor colorWithWhite:0.9 alpha:1.0];
-        _awayLogo.layer.cornerRadius = 14;
+        _awayLogo.backgroundColor = [UIColor clearColor];
+        _awayLogo.layer.cornerRadius = 12;
         _awayLogo.clipsToBounds = YES;
         _awayLogo.contentMode = UIViewContentModeScaleAspectFit;
 
+        _middleBadge = [[UIImageView alloc] init];
+        _middleBadge.contentMode = UIViewContentModeScaleAspectFit;
+
         _homeLabel = [[UILabel alloc] init];
-        _homeLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
-        _homeLabel.textColor = [UIColor blackColor];
+        _homeLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+        _homeLabel.textColor = [UIColor colorWithRed:0.208 green:0.200 blue:0.208 alpha:1.0]; // #353335
+        _homeLabel.textAlignment = NSTextAlignmentRight;
         _awayLabel = [[UILabel alloc] init];
-        _awayLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
-        _awayLabel.textColor = [UIColor blackColor];
-        _awayLabel.textAlignment = NSTextAlignmentRight;
+        _awayLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+        _awayLabel.textColor = [UIColor colorWithRed:0.208 green:0.200 blue:0.208 alpha:1.0]; // #353335
+        _awayLabel.textAlignment = NSTextAlignmentLeft;
 
         _scoreLabel = [[UILabel alloc] init];
-        _scoreLabel.font = [UIFont boldSystemFontOfSize:16];
-        _scoreLabel.textColor = [UIColor blackColor];
+        _scoreLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+        _scoreLabel.textColor = kDiscoverGreen;
         _scoreLabel.textAlignment = NSTextAlignmentCenter;
+        _scoreLabel.layer.cornerRadius = 12;
+        _scoreLabel.layer.borderWidth = 0.5;
+        _scoreLabel.layer.borderColor = kDiscoverGreen.CGColor;
+        _scoreLabel.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.18];
+        _scoreLabel.clipsToBounds = YES;
 
         _dateLabel = [[UILabel alloc] init];
-        _dateLabel.font = [UIFont systemFontOfSize:11];
-        _dateLabel.textColor = [UIColor darkGrayColor];
+        _dateLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+        _dateLabel.textColor = [UIColor colorWithWhite:0.47 alpha:1.0]; // #787878
         _dateLabel.textAlignment = NSTextAlignmentCenter;
 
         _inputButton = [UIButton buttonWithType:UIButtonTypeSystem];
         _inputButton.titleLabel.font = [UIFont systemFontOfSize:12];
         [_inputButton setTitle:(NSLocalizedString(@"discover_input_info", nil) ?: @"输入信息") forState:UIControlStateNormal];
-        [_inputButton setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
-        _inputButton.layer.cornerRadius = 14;
-        _inputButton.layer.borderWidth = 1;
-        _inputButton.layer.borderColor = [UIColor colorWithWhite:0.85 alpha:1.0].CGColor;
-        if (@available(iOS 13.0, *)) {
-            UIImage *icon = [[UIImage systemImageNamed:@"square.and.pencil"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-            [_inputButton setImage:icon forState:UIControlStateNormal];
-            _inputButton.tintColor = [UIColor blackColor];
-            _inputButton.imageEdgeInsets = UIEdgeInsetsMake(0, -4, 0, 0);
-        }
+        [_inputButton setTitleColor:[UIColor colorWithRed:0.192 green:0.192 blue:0.192 alpha:1.0] forState:UIControlStateNormal]; // #313131
+        _inputButton.layer.cornerRadius = 13;
+        _inputButton.layer.borderWidth = 0.5;
+        _inputButton.layer.borderColor = [UIColor blackColor].CGColor;
+        [_inputButton setImage:[UIImage imageNamed:@"edit_icon"] forState:UIControlStateNormal];
+        _inputButton.tintColor = [UIColor colorWithRed:0.192 green:0.192 blue:0.192 alpha:1.0];
+        _inputButton.imageEdgeInsets = UIEdgeInsetsMake(0, -4, 0, 0);
 
         _verifiedPill = [UIButton buttonWithType:UIButtonTypeSystem];
         _verifiedPill.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-        _verifiedPill.layer.cornerRadius = 14;
+        _verifiedPill.layer.cornerRadius = 13;
         _verifiedPill.backgroundColor = kDiscoverPillGreen;
         [_verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-        if (@available(iOS 13.0, *)) {
-            UIImage *check = [[UIImage systemImageNamed:@"checkmark.circle"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-            [_verifiedPill setImage:check forState:UIControlStateNormal];
-            _verifiedPill.tintColor = [UIColor whiteColor];
-            _verifiedPill.imageEdgeInsets = UIEdgeInsetsMake(0, -4, 0, 0);
-        }
+        [_verifiedPill setImage:[UIImage imageNamed:@"verified_icon"] forState:UIControlStateNormal];
+        _verifiedPill.tintColor = [UIColor whiteColor];
+        _verifiedPill.imageEdgeInsets = UIEdgeInsetsMake(0, -4, 0, 0);
 
         [card addSubview:_homeLogo];
         [card addSubview:_homeLabel];
         [card addSubview:_awayLogo];
         [card addSubview:_awayLabel];
+        [card addSubview:_middleBadge];
         [card addSubview:_scoreLabel];
         [card addSubview:_dateLabel];
         [card addSubview:_inputButton];
         [card addSubview:_verifiedPill];
 
-        [_homeLogo mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(card).offset(16);
-            make.top.equalTo(card).offset(12);
-            make.width.height.mas_equalTo(28);
-        }];
+        // 顶部一行：主队名(右对齐) - 主队队徽 - 时间胶囊 - 客队队徽 - 客队名(左对齐)
         [_homeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_homeLogo.mas_trailing).offset(8);
+            make.leading.equalTo(card).offset(16);
             make.centerY.equalTo(_homeLogo);
+            make.width.mas_equalTo(80);
         }];
-        [_awayLogo mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.trailing.equalTo(card).offset(-16);
-            make.top.equalTo(card).offset(12);
-            make.width.height.mas_equalTo(28);
-        }];
-        [_awayLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.trailing.equalTo(_awayLogo.mas_leading).offset(-8);
-            make.centerY.equalTo(_awayLogo);
+        [_homeLogo mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(_homeLabel.mas_trailing).offset(6);
+            make.top.equalTo(card).offset(14);
+            make.width.height.mas_equalTo(24);
         }];
         [_scoreLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.centerX.equalTo(card);
+            make.leading.equalTo(_homeLogo.mas_trailing).offset(10);
             make.centerY.equalTo(_homeLogo);
+            make.height.mas_equalTo(24);
+            make.width.mas_greaterThanOrEqualTo(60);
         }];
+        [_awayLogo mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(_scoreLabel.mas_trailing).offset(10);
+            make.centerY.equalTo(_homeLogo);
+            make.width.height.mas_equalTo(24);
+        }];
+        [_awayLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(_awayLogo.mas_trailing).offset(6);
+            make.centerY.equalTo(_homeLogo);
+            make.trailing.lessThanOrEqualTo(card).offset(-16);
+        }];
+        // Figma 里“中间徽章”与客队队徽重叠/相邻，这里保留占位但隐藏，避免影响布局
+        _middleBadge.hidden = YES;
+        [_middleBadge mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(_awayLogo);
+            make.centerY.equalTo(_awayLogo);
+            make.width.height.mas_equalTo(0);
+        }];
+
+        // 日期：在时间胶囊下方，左对齐到时间胶囊
         [_dateLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.centerX.equalTo(card);
+            make.leading.equalTo(_scoreLabel);
             make.top.equalTo(_scoreLabel.mas_bottom).offset(10);
         }];
         [_inputButton mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(card).offset(16);
             make.bottom.equalTo(card).offset(-12);
-            make.height.mas_equalTo(28);
-            make.width.mas_equalTo(96);
+            make.height.mas_equalTo(26);
+            make.width.mas_equalTo(86);
         }];
         [_verifiedPill mas_makeConstraints:^(MASConstraintMaker *make) {
             make.trailing.equalTo(card).offset(-16);
             make.bottom.equalTo(card).offset(-12);
-            make.height.mas_equalTo(28);
-            make.width.mas_greaterThanOrEqualTo(120);
+            make.height.mas_equalTo(26);
+            make.width.mas_equalTo(86);
         }];
     }
     return self;
@@ -183,6 +205,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 @property (nonatomic, strong) UILabel *nameLabel;
 @property (nonatomic, strong) UILabel *headerDateLabel;
 @property (nonatomic, strong) UILabel *passportTitleLabel;
+@property (nonatomic, strong) UIImageView *passportSubIcon;
 @property (nonatomic, strong) UILabel *passportSubLabel;
 
 @property (nonatomic, strong) UILabel *statAValue;
@@ -201,6 +224,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 
 @property (nonatomic, strong) UIButton *upcomingPill;
 @property (nonatomic, strong) UIButton *finishedPill;
+@property (nonatomic, strong) UIView *tabBar;
 
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) MASConstraint *tableHeightConstraint;
@@ -275,9 +299,12 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 
     _passportTitleLabel = [[UILabel alloc] init];
     _passportTitleLabel.text = NSLocalizedString(@"discover_passport_title", nil) ?: @"我的足球护照";
-    _passportTitleLabel.font = [UIFont boldSystemFontOfSize:18];
+    _passportTitleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
     _passportTitleLabel.textColor = [UIColor whiteColor];
 
+    _passportSubIcon = [[UIImageView alloc] init];
+    _passportSubIcon.image = [UIImage imageNamed:@"passport"];
+    
     _passportSubLabel = [[UILabel alloc] init];
     _passportSubLabel.text = (NSLocalizedString(@"discover_passport_subtitle", nil) ?: @"护照·通行证");
     _passportSubLabel.font = [UIFont systemFontOfSize:11];
@@ -287,11 +314,12 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     [header addSubview:_nameLabel];
     [header addSubview:_headerDateLabel];
     [header addSubview:_passportTitleLabel];
+    [header addSubview:_passportSubIcon];
     [header addSubview:_passportSubLabel];
 
     UILabel* (^makeValue)(void) = ^UILabel*{
         UILabel *l = [[UILabel alloc] init];
-        l.font = [UIFont boldSystemFontOfSize:22];
+        l.font = [UIFont systemFontOfSize:30 weight:UIFontWeightRegular];
         l.textColor = [UIColor whiteColor];
         return l;
     };
@@ -324,30 +352,34 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     [row2 addSubview:statEDesc];
 
     _consumeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    _consumeBtn.layer.cornerRadius = 12;
+    _consumeBtn.layer.cornerRadius = 8;
     _consumeBtn.layer.borderWidth = 1;
-    _consumeBtn.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.18].CGColor;
-    _consumeBtn.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.08];
-    [_consumeBtn setTitle:(NSLocalizedString(@"discover_consume_record", nil) ?: @"  消费记录  ") forState:UIControlStateNormal];
-    [_consumeBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    _consumeBtn.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
-    if (@available(iOS 13.0, *)) { [_consumeBtn setImage:[UIImage systemImageNamed:@"doc.text"] forState:UIControlStateNormal]; _consumeBtn.tintColor = [UIColor whiteColor]; }
+    _consumeBtn.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.20].CGColor;
+    _consumeBtn.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.15];
+    [_consumeBtn setTitle:(NSLocalizedString(@"discover_consume_record", nil) ?: @"  消费记录") forState:UIControlStateNormal];
+    [_consumeBtn setTitleColor:[UIColor colorWithWhite:1 alpha:0.8] forState:UIControlStateNormal];
+    _consumeBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
+    [_consumeBtn setImage:[UIImage imageNamed:@"payment_record"] forState:UIControlStateNormal];
+    _consumeBtn.tintColor = [UIColor colorWithWhite:1 alpha:0.8];
     [_consumeBtn addTarget:self action:@selector(onConsumeRecordTapped) forControlEvents:UIControlEventTouchUpInside];
 
     _myPassportBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    _myPassportBtn.layer.cornerRadius = 12;
+    _myPassportBtn.layer.cornerRadius = 8;
     _myPassportBtn.layer.borderWidth = 1;
-    _myPassportBtn.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.18].CGColor;
-    _myPassportBtn.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.08];
-    [_myPassportBtn setTitle:(NSLocalizedString(@"discover_my_passport_btn", nil) ?: @"  我的足球护照  ") forState:UIControlStateNormal];
-    [_myPassportBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    _myPassportBtn.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
-    if (@available(iOS 13.0, *)) { [_myPassportBtn setImage:[UIImage systemImageNamed:@"soccerball"] forState:UIControlStateNormal]; _myPassportBtn.tintColor = [UIColor whiteColor]; }
+    _myPassportBtn.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.20].CGColor;
+    _myPassportBtn.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.15];
+    [_myPassportBtn setTitle:(NSLocalizedString(@"discover_my_passport_btn", nil) ?: @"  我的足球护照") forState:UIControlStateNormal];
+    [_myPassportBtn setTitleColor:[UIColor colorWithWhite:1 alpha:0.8] forState:UIControlStateNormal];
+    _myPassportBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
+    [_myPassportBtn setImage:[UIImage imageNamed:@"football_passport"] forState:UIControlStateNormal];
+    _myPassportBtn.tintColor = [UIColor colorWithWhite:1 alpha:0.8];
 
     UIButton *arrow1 = [UIButton buttonWithType:UIButtonTypeSystem];
     UIButton *arrow2 = [UIButton buttonWithType:UIButtonTypeSystem];
-    if (@available(iOS 13.0, *)) { [arrow1 setImage:[UIImage systemImageNamed:@"chevron.right"] forState:UIControlStateNormal]; [arrow2 setImage:[UIImage systemImageNamed:@"chevron.right"] forState:UIControlStateNormal]; }
-    arrow1.tintColor = arrow2.tintColor = [UIColor whiteColor];
+    UIImage *arr = [UIImage imageNamed:@"arrow_right"];
+    [arrow1 setImage:arr forState:UIControlStateNormal];
+    [arrow2 setImage:arr forState:UIControlStateNormal];
+    arrow1.tintColor = arrow2.tintColor = [UIColor colorWithWhite:1 alpha:0.8];
     arrow1.userInteractionEnabled = arrow2.userInteractionEnabled = NO;
 
     [header addSubview:_consumeBtn];
@@ -358,7 +390,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     [header mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.leading.trailing.equalTo(_contentView);
         // 让 header 高度随底部两个按钮自适应，避免下方白色容器遮挡按钮
-        make.bottom.equalTo(_consumeBtn.mas_bottom).offset(16);
+        make.bottom.equalTo(_consumeBtn.mas_bottom).offset(36);
         make.height.mas_greaterThanOrEqualTo(330);
     }];
     [_avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -378,9 +410,13 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         make.leading.equalTo(header).offset(20);
         make.top.equalTo(_avatarView.mas_bottom).offset(22);
     }];
-    [_passportSubLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    [_passportSubIcon mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(_passportTitleLabel);
         make.top.equalTo(_passportTitleLabel.mas_bottom).offset(8);
+    }];
+    [_passportSubLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(_passportSubIcon.mas_trailing).offset(2);
+        make.centerY.equalTo(_passportSubIcon.mas_centerY);
     }];
     [_statAValue mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(header).offset(20);
@@ -391,11 +427,11 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         make.top.equalTo(_statAValue.mas_bottom).offset(4);
     }];
     [_statBValue mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(header).offset(-20);
+        make.leading.equalTo(header.mas_centerX).offset(-20);
         make.top.equalTo(_statAValue);
     }];
     [statBDesc mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(_statBValue);
+        make.leading.equalTo(_statBValue);
         make.top.equalTo(_statBValue.mas_bottom).offset(4);
     }];
 
@@ -405,29 +441,53 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         make.top.equalTo(statADesc.mas_bottom).offset(16);
         make.height.mas_equalTo(52);
     }];
-    NSArray *vals = @[ _statCValue, _statDValue, _statEValue ];
-    NSArray *descs = @[ statCDesc, statDDesc, statEDesc ];
-    UILabel *prev = nil;
-    for (NSInteger i = 0; i < vals.count; i++) {
-        UILabel *v = vals[i];
-        UILabel *d = descs[i];
-        [v mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(row2);
-            if (prev) { make.leading.equalTo(prev.mas_trailing); make.width.equalTo(prev); }
-            else { make.leading.equalTo(row2); }
-        }];
-        [d mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(v.mas_bottom).offset(4);
-            make.centerX.equalTo(v);
-        }];
-        prev = v;
-    }
-    [prev mas_makeConstraints:^(MASConstraintMaker *make) { make.trailing.equalTo(row2); }];
+//    NSArray *vals = @[ _statCValue, _statDValue, _statEValue ];
+//    NSArray *descs = @[ statCDesc, statDDesc, statEDesc ];
+//    UILabel *prev = nil;
+//    for (NSInteger i = 0; i < vals.count; i++) {
+//        UILabel *v = vals[i];
+//        UILabel *d = descs[i];
+//        [v mas_makeConstraints:^(MASConstraintMaker *make) {
+//            make.top.equalTo(row2);
+//            if (prev) { make.leading.equalTo(prev.mas_trailing); make.width.equalTo(prev); }
+//            else { make.leading.equalTo(row2); }
+//        }];
+//        [d mas_makeConstraints:^(MASConstraintMaker *make) {
+//            make.top.equalTo(v.mas_bottom).offset(4);
+//            make.centerX.equalTo(v);
+//        }];
+//        prev = v;
+//    }
+//    [prev mas_makeConstraints:^(MASConstraintMaker *make) { make.trailing.equalTo(row2); }];
+    [_statCValue mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(row2);
+        make.top.equalTo(row2);
+    }];
+    [statCDesc mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(_statCValue);
+        make.top.equalTo(_statCValue.mas_bottom).offset(4);
+    }];
+    [_statDValue mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(row2).offset(-10);
+        make.top.equalTo(row2);
+    }];
+    [statDDesc mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(_statDValue);
+        make.top.equalTo(_statDValue.mas_bottom).offset(4);
+    }];
+    [_statEValue mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(row2);
+        make.leading.equalTo(row2.mas_centerX).offset(120);
+    }];
+    [statEDesc mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(_statEValue);
+        make.top.equalTo(_statEValue.mas_bottom).offset(4);
+    }];
 
     [_consumeBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(header).offset(20);
         make.top.equalTo(row2.mas_bottom).offset(16);
-        make.height.mas_equalTo(44);
+        make.height.mas_equalTo(40);
         make.width.equalTo(_myPassportBtn);
     }];
     [_myPassportBtn mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -451,15 +511,13 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 - (void)buildBody {
     UIView *white = [[UIView alloc] init];
     white.backgroundColor = [UIColor whiteColor];
-    white.layer.cornerRadius = 26;
+    white.layer.cornerRadius = 24;
     white.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
     white.layer.masksToBounds = YES;
     [_contentView addSubview:white];
     self.whiteContainer = white;
 
-    UIView *topLine = [[UIView alloc] init];
-    topLine.backgroundColor = [UIColor colorWithRed:0.14 green:0.45 blue:0.90 alpha:1.0];
-    [white addSubview:topLine];
+    // Figma：白色容器顶部无彩色分割线
 
     UILabel *leagueTitle = [[UILabel alloc] init];
     leagueTitle.text = (NSLocalizedString(@"discover_league_info", nil) ?: @"联赛信息");
@@ -469,13 +527,13 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 
     UIView *leagueCard = [[UIView alloc] init];
     leagueCard.backgroundColor = kDiscoverCardBg;
-    leagueCard.layer.cornerRadius = 14;
+    leagueCard.layer.cornerRadius = 8;
     [white addSubview:leagueCard];
     self.leagueCard = leagueCard;
 
     UILabel* (^bigNum)(void) = ^UILabel*{
         UILabel *l = [[UILabel alloc] init];
-        l.font = [UIFont boldSystemFontOfSize:22];
+        l.font = [UIFont systemFontOfSize:36 weight:UIFontWeightRegular];
         l.textColor = [UIColor blackColor];
         l.textAlignment = NSTextAlignmentCenter;
         return l;
@@ -483,7 +541,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     UILabel* (^smallLab)(NSString *) = ^UILabel*(NSString *t){
         UILabel *l = [[UILabel alloc] init];
         l.text = t;
-        l.font = [UIFont systemFontOfSize:11];
+        l.font = [UIFont systemFontOfSize:12];
         l.textColor = [UIColor darkGrayColor];
         l.textAlignment = NSTextAlignmentCenter;
         return l;
@@ -526,46 +584,73 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     [bottomRow mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(w40d.mas_bottom).offset(14);
         make.leading.trailing.equalTo(leagueCard);
-        make.bottom.equalTo(leagueCard).offset(-14);
         make.height.mas_equalTo(48);
     }];
-    NSArray *botNums = @[ k2, q2 ];
-    NSArray *botDescs = @[ k2d, q2d ];
-    UILabel *prevBot = nil;
-    for (NSInteger i = 0; i < botNums.count; i++) {
-        UILabel *n = botNums[i];
-        UILabel *d = botDescs[i];
-        [bottomRow addSubview:n];
-        [bottomRow addSubview:d];
-        [n mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(bottomRow);
-            if (prevBot) { make.leading.equalTo(prevBot.mas_trailing); make.width.equalTo(prevBot); }
-            else { make.leading.equalTo(bottomRow); }
-        }];
-        [d mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(n.mas_bottom).offset(4);
-            make.centerX.equalTo(n);
-        }];
-        prevBot = n;
-    }
-    [prevBot mas_makeConstraints:^(MASConstraintMaker *make) { make.trailing.equalTo(bottomRow); }];
+//    NSArray *botNums = @[ k2, q2 ];
+//    NSArray *botDescs = @[ k2d, q2d ];
+//    UILabel *prevBot = nil;
+//    for (NSInteger i = 0; i < botNums.count; i++) {
+//        UILabel *n = botNums[i];
+//        UILabel *d = botDescs[i];
+//        [bottomRow addSubview:n];
+//        [bottomRow addSubview:d];
+//        [n mas_makeConstraints:^(MASConstraintMaker *make) {
+//            make.top.equalTo(bottomRow);
+//            if (prevBot) { make.leading.equalTo(prevBot.mas_trailing); make.width.equalTo(prevBot); }
+//            else { make.leading.equalTo(bottomRow); }
+//        }];
+//        [d mas_makeConstraints:^(MASConstraintMaker *make) {
+//            make.top.equalTo(n.mas_bottom).offset(4);
+//            make.centerX.equalTo(n);
+//        }];
+//        prevBot = n;
+//    }
+//    [prevBot mas_makeConstraints:^(MASConstraintMaker *make) { make.trailing.equalTo(bottomRow); }];
+    [bottomRow addSubview:k2];
+    [bottomRow addSubview:k2d];
+    [bottomRow addSubview:q2];
+    [bottomRow addSubview:q2d];
+    [k2 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(bottomRow);
+        make.centerX.equalTo(w40.mas_centerX);
+    }];
+    [k2d mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(k2.mas_bottom).offset(4);
+        make.centerX.equalTo(k2);
+    }];
+    [q2 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(bottomRow);
+        make.centerX.equalTo(d20.mas_centerX);
+    }];
+    [q2d mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(q2.mas_bottom).offset(4);
+        make.centerX.equalTo(q2);
+    }];
 
-    UIButton* (^outlineBtn)(NSString *, NSString *) = ^UIButton*(NSString *t, NSString *sys){
+    UIButton* (^outlineBtn)(NSString *, NSString *) = ^UIButton*(NSString *t, NSString *asset){
         UIButton *b = [UIButton buttonWithType:UIButtonTypeSystem];
         [b setTitle:[NSString stringWithFormat:@"  %@  ", t] forState:UIControlStateNormal];
         [b setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
-        b.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
-        b.layer.cornerRadius = 20;
+        b.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+        b.layer.cornerRadius = 25;
         b.layer.borderWidth = 1;
-        b.layer.borderColor = [UIColor colorWithWhite:0.75 alpha:1.0].CGColor;
-        if (@available(iOS 13.0, *)) { [b setImage:[UIImage systemImageNamed:sys] forState:UIControlStateNormal]; b.tintColor = [UIColor blackColor]; }
+        b.layer.borderColor = [UIColor colorWithWhite:0.11 alpha:1.0].CGColor;
+        [b setImage:[UIImage imageNamed:asset] forState:UIControlStateNormal];
+        b.tintColor = [UIColor blackColor];
         return b;
     };
-    _addConsumeBtn = outlineBtn((NSLocalizedString(@"discover_add_consume", nil) ?: @"添加消费"), @"plus.circle");
-    _stampBtn = outlineBtn((NSLocalizedString(@"discover_stamp_album", nil) ?: @"邮票夹"), @"qrcode.viewfinder");
+    _addConsumeBtn = outlineBtn((NSLocalizedString(@"discover_add_consume", nil) ?: @"添加消费"), @"add_icon");
+    _stampBtn = outlineBtn((NSLocalizedString(@"discover_stamp_album", nil) ?: @"邮票夹"), @"post_icon");
     [white addSubview:_addConsumeBtn];
     [white addSubview:_stampBtn];
     [_addConsumeBtn addTarget:self action:@selector(onAddConsumeTapped) forControlEvents:UIControlEventTouchUpInside];
+
+    UIView *tabBar = [[UIView alloc] init];
+    tabBar.backgroundColor = [UIColor whiteColor];
+    tabBar.layer.cornerRadius = 23.5;
+    tabBar.layer.masksToBounds = YES;
+    [white addSubview:tabBar];
+    self.tabBar = tabBar;
 
     _upcomingPill = [UIButton buttonWithType:UIButtonTypeSystem];
     _finishedPill = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -576,9 +661,9 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     for (NSInteger i = 0; i < tabs.count; i++) {
         UIButton *b = tabs[i];
         [b setTitle:tabTitles[i] forState:UIControlStateNormal];
-        b.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
-        b.layer.cornerRadius = 18;
-        [white addSubview:b];
+        b.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+        b.layer.cornerRadius = 20.5;
+        [tabBar addSubview:b];
     }
     [_upcomingPill addTarget:self action:@selector(onUpcomingTapped) forControlEvents:UIControlEventTouchUpInside];
     [_finishedPill addTarget:self action:@selector(onFinishedTapped) forControlEvents:UIControlEventTouchUpInside];
@@ -593,13 +678,9 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     [white addSubview:_tableView];
 
     [white mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.headerView.mas_bottom).offset(-18);
+        make.top.equalTo(self.headerView.mas_bottom).offset(-26);
         make.leading.trailing.equalTo(_contentView);
         make.bottom.equalTo(_contentView);
-    }];
-    [topLine mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.leading.trailing.equalTo(white);
-        make.height.mas_equalTo(2);
     }];
     [leagueTitle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(white).offset(18);
@@ -609,34 +690,40 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         make.top.equalTo(leagueTitle.mas_bottom).offset(10);
         make.leading.equalTo(white).offset(16);
         make.trailing.equalTo(white).offset(-16);
-        make.height.mas_equalTo(140);
+        make.height.mas_equalTo(160);
     }];
     [_addConsumeBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(leagueCard.mas_bottom).offset(14);
+        make.top.equalTo(leagueCard.mas_bottom).offset(16);
         make.leading.equalTo(white).offset(16);
         make.trailing.equalTo(white.mas_centerX).offset(-8);
-        make.height.mas_equalTo(40);
+        make.height.mas_equalTo(50);
     }];
     [_stampBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(leagueCard.mas_bottom).offset(14);
+        make.top.equalTo(leagueCard.mas_bottom).offset(16);
         make.leading.equalTo(white.mas_centerX).offset(8);
         make.trailing.equalTo(white).offset(-16);
-        make.height.mas_equalTo(40);
+        make.height.mas_equalTo(50);
+    }];
+    [self.tabBar mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(_addConsumeBtn.mas_bottom).offset(16);
+        make.leading.equalTo(white).offset(16);
+        make.trailing.equalTo(white).offset(-16);
+        make.height.mas_equalTo(47);
     }];
     [_upcomingPill mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_addConsumeBtn.mas_bottom).offset(14);
-        make.leading.equalTo(white).offset(16);
-        make.height.mas_equalTo(36);
-        make.trailing.equalTo(white.mas_centerX).offset(-8);
+        make.leading.equalTo(self.tabBar).offset(4);
+        make.top.equalTo(self.tabBar).offset(3);
+        make.bottom.equalTo(self.tabBar).offset(-3);
     }];
     [_finishedPill mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_addConsumeBtn.mas_bottom).offset(14);
-        make.leading.equalTo(white.mas_centerX).offset(8);
-        make.height.mas_equalTo(36);
-        make.trailing.equalTo(white).offset(-16);
+        make.trailing.equalTo(self.tabBar).offset(-4);
+        make.top.equalTo(self.tabBar).offset(3);
+        make.bottom.equalTo(self.tabBar).offset(-3);
+        make.leading.equalTo(_upcomingPill.mas_trailing).offset(1);
+        make.width.equalTo(_upcomingPill);
     }];
     [_tableView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_upcomingPill.mas_bottom).offset(10);
+        make.top.equalTo(self.tabBar.mas_bottom).offset(10);
         make.leading.trailing.equalTo(white);
         self.tableHeightConstraint = make.height.mas_equalTo(0);
         make.bottom.equalTo(white).offset(-24);
@@ -685,6 +772,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         m.matchId = match.matchId ?: @"";
         m.homeName = match.homeTeamName ?: @"-";
         m.awayName = match.awayTeamName ?: @"-";
+        m.timeText = [self shortTimeText:match.matchDate];
         m.dateText = [self shortDateText:match.matchDate];
         if (type == DiscoverMatchTypeUpcoming) {
             m.scoreText = [self shortTimeText:match.matchDate];
@@ -753,9 +841,6 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     self.finishedPill.backgroundColor = upcomingSel ? [UIColor clearColor] : kDiscoverGreen;
     [self.upcomingPill setTitleColor:upcomingSel ? [UIColor whiteColor] : kDiscoverGreen forState:UIControlStateNormal];
     [self.finishedPill setTitleColor:upcomingSel ? kDiscoverGreen : [UIColor whiteColor] forState:UIControlStateNormal];
-    // 未选中按原型：不显示描边
-    self.upcomingPill.layer.borderWidth = 0;
-    self.finishedPill.layer.borderWidth = 0;
     [self.tableView reloadData];
     [self updateTableHeight];
 }
@@ -783,7 +868,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 
 - (void)updateTableHeight {
     NSInteger rows = [self currentDataSource].count;
-    self.tableHeightConstraint.offset = rows * 86.f;
+    self.tableHeightConstraint.offset = rows * 87.f;
     [self.view layoutIfNeeded];
 }
 
@@ -794,7 +879,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    return 86;
+    return 87;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -803,14 +888,15 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 
     cell.homeLabel.text = m.homeName;
     cell.awayLabel.text = m.awayName;
-    cell.scoreLabel.text = m.scoreText;
+    // Figma：中间展示的是“比赛时间”胶囊（统一来自 matchDate）
+    cell.scoreLabel.text = m.timeText.length > 0 ? m.timeText : @"--:--";
     cell.dateLabel.text = m.dateText;
 
     if (m.type == DiscoverMatchTypeUpcoming) {
         // 未来观赛：不显示输入信息、认证比赛按钮
         cell.inputButton.hidden = YES;
         cell.verifiedPill.hidden = YES;
-        cell.scoreLabel.font = [UIFont boldSystemFontOfSize:14];
+        cell.scoreLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
     } else {
         // 已经观赛：底部仍然是左侧“输入信息”、右侧 pill，
         // 但当 hasInputInfo=YES 时，隐藏“输入信息”，并将中间时间挪到左侧展示
@@ -828,23 +914,23 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
             [cell.verifiedPill setImage:img forState:UIControlStateNormal];
             cell.verifiedPill.tintColor = [UIColor whiteColor];
         }
-        cell.scoreLabel.font = [UIFont boldSystemFontOfSize:16];
+        cell.scoreLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
 
         if (m.hasInputInfo) {
             // 已完成：隐藏“输入信息”按钮
             cell.inputButton.hidden = YES;
-            // 时间标签从居中改为靠左，贴合“时间向左移动”的设计
+            // 日期标签保持左对齐到“时间胶囊”
             cell.dateLabel.textAlignment = NSTextAlignmentLeft;
             [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
-                make.leading.equalTo(cell.homeLogo);                   // 与左侧球队图标对齐
+                make.leading.equalTo(cell.scoreLabel);                // 与时间胶囊对齐
                 make.top.equalTo(cell.scoreLabel.mas_bottom).offset(10);
             }];
         } else {
             // 未完成：保留原始布局（中间时间 + 左侧输入信息按钮）
             cell.inputButton.hidden = NO;
-            cell.dateLabel.textAlignment = NSTextAlignmentCenter;
+            cell.dateLabel.textAlignment = NSTextAlignmentLeft;
             [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
-                make.centerX.equalTo(cell.contentView);
+                make.leading.equalTo(cell.scoreLabel);
                 make.top.equalTo(cell.scoreLabel.mas_bottom).offset(10);
             }];
         }

@@ -8,10 +8,11 @@
 #import "MyQRCodeViewController.h"
 #import <Masonry/Masonry.h>
 #import "ColorManager.h"
+#import <SDWebImage/SDWebImage.h>
 
-#define kCommunityGreen    [ColorManager sharedManager].primaryColor
-#define kCommunityHeaderBg [ColorManager sharedManager].primaryDarkColor
-#define kCommunityPageBg   [ColorManager sharedManager].secondaryBackgroundColor
+#define kCommunityGreen    [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0] // #285D4B
+#define kCommunityHeaderBg [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0] // #0D2122
+#define kCommunityPageBg   [UIColor colorWithRed:0.969 green:0.969 blue:0.969 alpha:1.0] // #F7F7F7
 static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 static NSString * const kCommunityPendingCountDidChangeNotification = @"community_pending_count_did_change";
 static NSString * const kCommunityAddedFriendsKey = @"community_added_friends";
@@ -28,6 +29,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 @property (nonatomic, strong) UIImageView *avatarView;
 @property (nonatomic, strong) UILabel *nameLabel;
 @property (nonatomic, strong) UILabel *idLabel;
+@property (nonatomic, strong) UIView *statusDot;
 @property (nonatomic, strong) UILabel *statusLabel;
 @property (nonatomic, strong) UIButton *stampBtn;
 @property (nonatomic, strong) UIButton *dataBtn;
@@ -43,34 +45,38 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
         _cardView = [[UIView alloc] init];
         _cardView.backgroundColor = [UIColor whiteColor];
-        _cardView.layer.cornerRadius = 10;
+        _cardView.layer.cornerRadius = 6;
 
         _avatarView = [[UIImageView alloc] init];
-        _avatarView.layer.cornerRadius = 20;
+        _avatarView.layer.cornerRadius = 27;
         _avatarView.clipsToBounds = YES;
         _avatarView.backgroundColor = [UIColor colorWithWhite:0.9 alpha:1.0];
 
         _nameLabel = [[UILabel alloc] init];
-        _nameLabel.font = [UIFont boldSystemFontOfSize:15];
+        _nameLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
 
         _idLabel = [[UILabel alloc] init];
         _idLabel.font = [UIFont systemFontOfSize:12];
-        _idLabel.textColor = [UIColor grayColor];
+        _idLabel.textColor = [UIColor colorWithWhite:0.26 alpha:1.0];
+
+        _statusDot = [[UIView alloc] init];
+        _statusDot.layer.cornerRadius = 4;
+        _statusDot.backgroundColor = [UIColor colorWithRed:0.0 green:0.71 blue:0.12 alpha:1.0];
 
         _statusLabel = [[UILabel alloc] init];
-        _statusLabel.font = [UIFont systemFontOfSize:11];
+        _statusLabel.font = [UIFont systemFontOfSize:10];
 
         _stampBtn = [UIButton buttonWithType:UIButtonTypeSystem];
         _stampBtn.titleLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
-        _stampBtn.layer.cornerRadius = 11;
-        _stampBtn.layer.borderWidth = 1;
+        _stampBtn.layer.cornerRadius = 12;
+        _stampBtn.layer.borderWidth = 0.6;
         _stampBtn.layer.borderColor = kCommunityGreen.CGColor;
         [_stampBtn setTitleColor:kCommunityGreen forState:UIControlStateNormal];
 
         _dataBtn = [UIButton buttonWithType:UIButtonTypeSystem];
         _dataBtn.titleLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
-        _dataBtn.layer.cornerRadius = 11;
-        _dataBtn.layer.borderWidth = 1;
+        _dataBtn.layer.cornerRadius = 12;
+        _dataBtn.layer.borderWidth = 0.6;
         _dataBtn.layer.borderColor = kCommunityGreen.CGColor;
         [_dataBtn setTitleColor:kCommunityGreen forState:UIControlStateNormal];
 
@@ -78,35 +84,41 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         [_cardView addSubview:_avatarView];
         [_cardView addSubview:_nameLabel];
         [_cardView addSubview:_idLabel];
+        [_cardView addSubview:_statusDot];
         [_cardView addSubview:_statusLabel];
         [_cardView addSubview:_stampBtn];
         [_cardView addSubview:_dataBtn];
 
         [_cardView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(5, 12, 5, 12));
+            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(5, 18, 5, 14));
         }];
         [_avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_cardView).offset(10);
             make.centerY.equalTo(_cardView);
-            make.width.height.mas_equalTo(40);
+            make.width.height.mas_equalTo(54);
         }];
         [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_avatarView.mas_trailing).offset(10);
-            make.top.equalTo(_cardView).offset(10);
+            make.top.equalTo(_cardView).offset(8);
         }];
         [_idLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_nameLabel);
             make.top.equalTo(_nameLabel.mas_bottom).offset(1);
         }];
-        [_statusLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        [_statusDot mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_nameLabel);
-            make.top.equalTo(_idLabel.mas_bottom).offset(1);
+            make.top.equalTo(_idLabel.mas_bottom).offset(5);
+            make.width.height.mas_equalTo(8);
+        }];
+        [_statusLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(_statusDot.mas_trailing).offset(6);
+            make.centerY.equalTo(_statusDot);
         }];
         [_stampBtn mas_makeConstraints:^(MASConstraintMaker *make) {
             make.trailing.equalTo(_cardView).offset(-10);
             make.top.equalTo(_cardView).offset(10);
-            make.width.mas_equalTo(62);
-            make.height.mas_equalTo(22);
+            make.width.mas_equalTo(67);
+            make.height.mas_equalTo(24);
         }];
         [_dataBtn mas_makeConstraints:^(MASConstraintMaker *make) {
             make.trailing.equalTo(_stampBtn);
@@ -119,16 +131,22 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 }
 
 - (void)configureWithFriend:(PNFriend *)f {
-    self.nameLabel.text = f.nickname;
+    self.nameLabel.text = f.nickname.length > 0 ? f.nickname : @"-";
     self.idLabel.text = [NSString stringWithFormat:NSLocalizedString(@"community_id_format", nil), f.userId];
     self.statusLabel.text = f.online ? NSLocalizedString(@"community_online_15m", nil) : NSLocalizedString(@"community_online_5m_ago", nil);
     self.statusLabel.textColor = f.online ? [UIColor colorWithRed:0.10 green:0.70 blue:0.30 alpha:1.0] : [UIColor grayColor];
+    self.statusDot.backgroundColor = f.online ? [UIColor colorWithRed:0.0 green:0.71 blue:0.12 alpha:1.0] : [UIColor colorWithWhite:0.65 alpha:1.0];
     [self.stampBtn setTitle:NSLocalizedString(@"community_view_stamps", nil) forState:UIControlStateNormal];
     [self.dataBtn setTitle:NSLocalizedString(@"community_view_data", nil) forState:UIControlStateNormal];
 
-    if (@available(iOS 13.0, *)) {
-        self.avatarView.image = [UIImage systemImageNamed:@"person.crop.circle.fill"];
+    NSURL *url = f.avatar.length > 0 ? [NSURL URLWithString:f.avatar] : nil;
+    UIImage *placeholder = (@available(iOS 13.0, *)) ? [UIImage systemImageNamed:@"person.crop.circle.fill"] : nil;
+    [self.avatarView sd_setImageWithURL:url placeholderImage:placeholder];
+    if (!self.avatarView.image && @available(iOS 13.0, *)) {
         self.avatarView.tintColor = [UIColor colorWithWhite:0.7 alpha:1.0];
+        self.avatarView.contentMode = UIViewContentModeCenter;
+    } else {
+        self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
     }
 }
 
@@ -150,19 +168,21 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         self.selectionStyle = UITableViewCellSelectionStyleNone;
         self.backgroundColor = [UIColor clearColor];
         _rankLabel = [UILabel new];
-        _rankLabel.font = [UIFont systemFontOfSize:28 weight:UIFontWeightRegular];
+        _rankLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
         _rankLabel.textColor = [UIColor blackColor];
-        _rankLabel.textAlignment = NSTextAlignmentCenter;
+        _rankLabel.textAlignment = NSTextAlignmentLeft;
         _avatarView = [UIImageView new];
-        _avatarView.layer.cornerRadius = 22;
+        _avatarView.layer.cornerRadius = 30;
         _avatarView.clipsToBounds = YES;
         _nameLabel = [UILabel new];
-        _nameLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+        _nameLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+        _nameLabel.textColor = [UIColor blackColor];
         _teamLabel = [UILabel new];
         _teamLabel.font = [UIFont systemFontOfSize:12];
-        _teamLabel.textColor = [UIColor grayColor];
+        _teamLabel.textColor = [UIColor colorWithRed:0.612 green:0.643 blue:0.671 alpha:1.0]; // #9CA4AB
         _gamesLabel = [UILabel new];
-        _gamesLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
+        _gamesLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+        _gamesLabel.textColor = [UIColor blackColor];
         _gamesLabel.textAlignment = NSTextAlignmentRight;
         [self.contentView addSubview:_rankLabel];
         [self.contentView addSubview:_avatarView];
@@ -170,27 +190,29 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         [self.contentView addSubview:_teamLabel];
         [self.contentView addSubview:_gamesLabel];
         [_rankLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(self.contentView).offset(8);
+            make.leading.equalTo(self.contentView).offset(24);
             make.centerY.equalTo(self.contentView);
-            make.width.mas_equalTo(34);
+            make.width.mas_greaterThanOrEqualTo(12);
         }];
         [_avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_rankLabel.mas_trailing).offset(10);
             make.centerY.equalTo(self.contentView);
-            make.size.mas_equalTo(CGSizeMake(46, 46));
+            make.size.mas_equalTo(CGSizeMake(60, 60));
         }];
         [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_avatarView.mas_trailing).offset(10);
-            make.top.equalTo(self.contentView).offset(8);
+            make.top.equalTo(_avatarView).offset(4);
+            make.trailing.lessThanOrEqualTo(_gamesLabel.mas_leading).offset(-10);
         }];
         [_teamLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_nameLabel);
             make.top.equalTo(_nameLabel.mas_bottom).offset(2);
+            make.trailing.lessThanOrEqualTo(_gamesLabel.mas_leading).offset(-10);
         }];
         [_gamesLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.trailing.equalTo(self.contentView).offset(-14);
+            make.trailing.equalTo(self.contentView).offset(-24);
             make.centerY.equalTo(self.contentView);
-            make.leading.greaterThanOrEqualTo(_nameLabel.mas_trailing).offset(10);
+            make.width.mas_greaterThanOrEqualTo(70);
         }];
     }
     return self;
@@ -201,10 +223,15 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     self.nameLabel.text = item.nickname;
     TeamIcon *team = item.followedTeams.firstObject;
     self.teamLabel.text = team.name.length > 0 ? team.name : @"-";
-    self.gamesLabel.text = [NSString stringWithFormat:@"%ld 场", (long)MAX(item.matchCount, 0)];
-    if (@available(iOS 13.0, *)) {
-        self.avatarView.image = [UIImage systemImageNamed:@"person.crop.circle.fill"];
+    self.gamesLabel.text = [NSString stringWithFormat:@"%ld Games", (long)MAX(item.matchCount, 0)];
+    NSURL *url = item.avatar.length > 0 ? [NSURL URLWithString:item.avatar] : nil;
+    UIImage *placeholder = (@available(iOS 13.0, *)) ? [UIImage systemImageNamed:@"person.crop.circle.fill"] : nil;
+    [self.avatarView sd_setImageWithURL:url placeholderImage:placeholder];
+    if (!self.avatarView.image && @available(iOS 13.0, *)) {
         self.avatarView.tintColor = [UIColor colorWithWhite:0.7 alpha:1.0];
+        self.avatarView.contentMode = UIViewContentModeCenter;
+    } else {
+        self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
     }
 }
 
@@ -218,6 +245,14 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 @property (nonatomic, strong) UIButton *rankTab;
 @property (nonatomic, strong) UIButton *addFriendBtn;
 @property (nonatomic, strong) UIButton *qrCodeBtn;
+@property (nonatomic, strong) UIView *requestCardView;
+@property (nonatomic, strong) UIImageView *requestAvatarView;
+@property (nonatomic, strong) UILabel *requestNameLabel;
+@property (nonatomic, strong) UILabel *requestIdLabel;
+@property (nonatomic, strong) UILabel *requestMessageLabel;
+@property (nonatomic, strong) UIButton *requestAgreeBtn;
+@property (nonatomic, strong) UIButton *requestCloseBtn;
+@property (nonatomic, copy) NSString *pendingRequestId;
 @property (nonatomic, strong) UIView *pendingBadgeView;
 @property (nonatomic, strong) UILabel *pendingBadgeLabel;
 @property (nonatomic, strong) UILabel *sectionLabel;
@@ -285,6 +320,24 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         [weakSelf.tableView reloadData];
     }];
 
+    [SocialRequest.shared getFriendRequestsSuccess:^(HTTPResponse * _Nullable responseObject) {
+        PNFriendRequestPage *page = [responseObject.dataObject isKindOfClass:PNFriendRequestPage.class] ? responseObject.dataObject : nil;
+        PNFriendRequest *req = page.list.firstObject;
+        if (!req) return;
+        // 仅展示待处理的请求
+        if (req.status.length > 0 && ![req.status isEqualToString:@"PENDING"]) return;
+        weakSelf.pendingRequestId = req.requestId ?: @"";
+        weakSelf.requestNameLabel.text = req.fromUserNickname.length > 0 ? req.fromUserNickname : @"-";
+        weakSelf.requestIdLabel.text = [NSString stringWithFormat:NSLocalizedString(@"community_id_format", nil), (req.fromUserId ?: @"")];
+        weakSelf.requestMessageLabel.text = req.message.length > 0 ? req.message : (NSLocalizedString(@"community_request_message", nil).length > 0 ? NSLocalizedString(@"community_request_message", nil) : @"看你的护照很精彩，想添加您为好友");
+        NSURL *url = req.fromUserAvatar.length > 0 ? [NSURL URLWithString:req.fromUserAvatar] : nil;
+        UIImage *placeholder = (@available(iOS 13.0, *)) ? [UIImage systemImageNamed:@"person.crop.circle.fill"] : nil;
+        [weakSelf.requestAvatarView sd_setImageWithURL:url placeholderImage:placeholder];
+        weakSelf.requestAvatarView.contentMode = url ? UIViewContentModeScaleAspectFill : UIViewContentModeCenter;
+        weakSelf.requestCardView.hidden = (weakSelf.pendingCount <= 0 || !weakSelf.isFriendsTab);
+    } failure:^(NSError * _Nonnull error) {
+    }];
+
     [SocialRequest.shared getFriendRequestsPendingCountSuccess:^(HTTPResponse * _Nullable responseObject) {
         NSInteger count = [responseObject.dataObject respondsToSelector:@selector(integerValue)] ? [responseObject.dataObject integerValue] : 0;
         weakSelf.pendingCount = MAX(count, 0);
@@ -297,9 +350,9 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 - (UIButton *)makeOutlinedButton {
     UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
     btn.layer.cornerRadius = 8;
-    btn.layer.borderWidth = 1;
-    btn.layer.borderColor = [UIColor colorWithWhite:0.45 alpha:1.0].CGColor;
-    btn.backgroundColor = [UIColor clearColor];
+    btn.layer.borderWidth = 0.8;
+    btn.layer.borderColor = [UIColor blackColor].CGColor;
+    btn.backgroundColor = [UIColor whiteColor];
     btn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [btn setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
     return btn;
@@ -317,26 +370,24 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
     self.switchBgView = [[UIView alloc] init];
     self.switchBgView.backgroundColor = [UIColor whiteColor];
-    self.switchBgView.layer.cornerRadius = 18;
+    self.switchBgView.layer.cornerRadius = 23.5;
     [self.headerView addSubview:self.switchBgView];
 
     self.friendsTab = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.friendsTab.layer.cornerRadius = 16;
-    self.friendsTab.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    self.friendsTab.layer.cornerRadius = 20.5;
+    self.friendsTab.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
     [self.friendsTab addTarget:self action:@selector(onFriendsTab) forControlEvents:UIControlEventTouchUpInside];
     [self.switchBgView addSubview:self.friendsTab];
 
     self.rankTab = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.rankTab.layer.cornerRadius = 16;
-    self.rankTab.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    self.rankTab.layer.cornerRadius = 20.5;
+    self.rankTab.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [self.rankTab addTarget:self action:@selector(onRankTab) forControlEvents:UIControlEventTouchUpInside];
     [self.switchBgView addSubview:self.rankTab];
 
     self.addFriendBtn = [self makeOutlinedButton];
-    if (@available(iOS 13.0, *)) {
-        [self.addFriendBtn setImage:[UIImage systemImageNamed:@"plus"] forState:UIControlStateNormal];
-        self.addFriendBtn.tintColor = [UIColor blackColor];
-    }
+    [self.addFriendBtn setImage:[UIImage imageNamed:@"add_friend_icon"] forState:UIControlStateNormal];
+    self.addFriendBtn.tintColor = [UIColor blackColor];
     [self.addFriendBtn addTarget:self action:@selector(onAddFriend) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.addFriendBtn];
 
@@ -357,16 +408,55 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     }];
 
     self.qrCodeBtn = [self makeOutlinedButton];
-    if (@available(iOS 13.0, *)) {
-        [self.qrCodeBtn setImage:[UIImage systemImageNamed:@"qrcode"] forState:UIControlStateNormal];
-        self.qrCodeBtn.tintColor = [UIColor blackColor];
-    }
+    [self.qrCodeBtn setImage:[UIImage imageNamed:@"qrcode_icon"] forState:UIControlStateNormal];
+    self.qrCodeBtn.tintColor = [UIColor blackColor];
     [self.qrCodeBtn addTarget:self action:@selector(onQRCode) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.qrCodeBtn];
 
     self.sectionLabel = [[UILabel alloc] init];
-    self.sectionLabel.font = [UIFont boldSystemFontOfSize:24];
+    self.sectionLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
     [self.view addSubview:self.sectionLabel];
+
+    self.requestCardView = [[UIView alloc] init];
+    self.requestCardView.backgroundColor = [UIColor whiteColor];
+    self.requestCardView.layer.cornerRadius = 6;
+    [self.view addSubview:self.requestCardView];
+    self.requestAvatarView = [[UIImageView alloc] init];
+    self.requestAvatarView.layer.cornerRadius = 20;
+    self.requestAvatarView.clipsToBounds = YES;
+    self.requestAvatarView.backgroundColor = [UIColor colorWithWhite:0.9 alpha:1.0];
+    [self.requestCardView addSubview:self.requestAvatarView];
+    self.requestNameLabel = [[UILabel alloc] init];
+    self.requestNameLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+    [self.requestCardView addSubview:self.requestNameLabel];
+    self.requestIdLabel = [[UILabel alloc] init];
+    self.requestIdLabel.font = [UIFont systemFontOfSize:12];
+    self.requestIdLabel.textColor = [UIColor colorWithWhite:0.41 alpha:1.0];
+    [self.requestCardView addSubview:self.requestIdLabel];
+    self.requestMessageLabel = [[UILabel alloc] init];
+    self.requestMessageLabel.font = [UIFont systemFontOfSize:12];
+    self.requestMessageLabel.textColor = [UIColor colorWithWhite:0.40 alpha:1.0];
+    self.requestMessageLabel.numberOfLines = 1;
+    [self.requestCardView addSubview:self.requestMessageLabel];
+    self.requestAgreeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.requestAgreeBtn.layer.cornerRadius = 15;
+    self.requestAgreeBtn.backgroundColor = kCommunityGreen;
+    self.requestAgreeBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+    [self.requestAgreeBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    [self.requestAgreeBtn addTarget:self action:@selector(onAcceptPendingRequest) forControlEvents:UIControlEventTouchUpInside];
+    [self.requestCardView addSubview:self.requestAgreeBtn];
+    self.requestCloseBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.requestCloseBtn.layer.cornerRadius = 10;
+    self.requestCloseBtn.backgroundColor = [UIColor blackColor];
+    [self.requestCloseBtn setTitle:@"×" forState:UIControlStateNormal];
+    [self.requestCloseBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    self.requestCloseBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightBold];
+    [self.requestCloseBtn addTarget:self action:@selector(onDismissRequestCard) forControlEvents:UIControlEventTouchUpInside];
+    [self.requestCardView addSubview:self.requestCloseBtn];
+    if (@available(iOS 13.0, *)) {
+        self.requestAvatarView.image = [UIImage systemImageNamed:@"person.crop.circle.fill"];
+        self.requestAvatarView.tintColor = [UIColor colorWithWhite:0.7 alpha:1.0];
+    }
 
     self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
     self.tableView.backgroundColor = [UIColor clearColor];
@@ -379,7 +469,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
     [self.headerView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.leading.trailing.equalTo(self.view);
-        self.headerHeightConstraint = make.height.mas_equalTo(152);
+        self.headerHeightConstraint = make.height.mas_equalTo(166);
     }];
     [self.titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self.headerView);
@@ -388,15 +478,15 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     [self.switchBgView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(self.headerView).offset(12);
         make.trailing.equalTo(self.headerView).offset(-12);
-        make.top.equalTo(self.titleLabel.mas_bottom).offset(16);
-        make.height.mas_equalTo(36);
+        make.top.equalTo(self.titleLabel.mas_bottom).offset(12);
+        make.height.mas_equalTo(47);
     }];
     [self.friendsTab mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.top.bottom.equalTo(self.switchBgView).insets(UIEdgeInsetsMake(2, 2, 2, 0));
+        make.leading.top.bottom.equalTo(self.switchBgView).insets(UIEdgeInsetsMake(3, 4, 3, 0));
         make.trailing.equalTo(self.switchBgView.mas_centerX).offset(-2);
     }];
     [self.rankTab mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.top.bottom.equalTo(self.switchBgView).insets(UIEdgeInsetsMake(2, 0, 2, 2));
+        make.trailing.top.bottom.equalTo(self.switchBgView).insets(UIEdgeInsetsMake(3, 0, 3, 4));
         make.leading.equalTo(self.switchBgView.mas_centerX).offset(2);
     }];
 
@@ -459,19 +549,54 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         make.height.mas_equalTo(3);
     }];
     [self.addFriendBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.headerView.mas_bottom).offset(12);
-        make.leading.equalTo(self.view).offset(12);
+        make.top.equalTo(self.requestCardView.mas_bottom).offset(18);
+        make.leading.equalTo(self.view).offset(18);
         make.trailing.equalTo(self.view.mas_centerX).offset(-5);
-        make.height.mas_equalTo(36);
+        make.height.mas_equalTo(50);
     }];
     [self.qrCodeBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.height.equalTo(self.addFriendBtn);
         make.leading.equalTo(self.view.mas_centerX).offset(5);
-        make.trailing.equalTo(self.view).offset(-12);
+        make.trailing.equalTo(self.view).offset(-18);
+    }];
+    [self.requestCardView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.headerView.mas_bottom).offset(17);
+        make.leading.equalTo(self.view).offset(16);
+        make.trailing.equalTo(self.view).offset(-16);
+        make.height.mas_equalTo(84);
+    }];
+    [self.requestAvatarView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.requestCardView).offset(12);
+        make.top.equalTo(self.requestCardView).offset(12);
+        make.width.height.mas_equalTo(40);
+    }];
+    [self.requestNameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.requestAvatarView.mas_trailing).offset(8);
+        make.top.equalTo(self.requestAvatarView).offset(-2);
+    }];
+    [self.requestIdLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.requestNameLabel);
+        make.top.equalTo(self.requestNameLabel.mas_bottom).offset(1);
+    }];
+    [self.requestMessageLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.requestAvatarView);
+        make.bottom.equalTo(self.requestCardView).offset(-10);
+        make.trailing.lessThanOrEqualTo(self.requestAgreeBtn.mas_leading).offset(-8);
+    }];
+    [self.requestAgreeBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.equalTo(self.requestCardView).offset(-12);
+        make.centerY.equalTo(self.requestCardView);
+        make.width.mas_equalTo(65);
+        make.height.mas_equalTo(30);
+    }];
+    [self.requestCloseBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.equalTo(self.requestCardView).offset(6);
+        make.top.equalTo(self.requestCardView).offset(-8);
+        make.width.height.mas_equalTo(20);
     }];
     [self.sectionLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.addFriendBtn.mas_bottom).offset(12);
-        make.leading.equalTo(self.view).offset(14);
+        make.top.equalTo(self.addFriendBtn.mas_bottom).offset(16);
+        make.leading.equalTo(self.view).offset(18);
     }];
     [self.tableView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.sectionLabel.mas_bottom).offset(6);
@@ -519,10 +644,11 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
 - (void)refreshTableHeaderForCurrentMode {
     if (self.isFriendsTab) {
-        self.headerHeightConstraint.offset = 152;
+        self.headerHeightConstraint.offset = 166;
         self.sectionLabel.hidden = NO;
         self.addFriendBtn.hidden = NO;
         self.qrCodeBtn.hidden = NO;
+        self.requestCardView.hidden = NO;
         self.rankFilterContainer.hidden = YES;
         [self.tableView mas_remakeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(self.sectionLabel.mas_bottom).offset(6);
@@ -534,6 +660,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     self.sectionLabel.hidden = YES;
     self.addFriendBtn.hidden = YES;
     self.qrCodeBtn.hidden = YES;
+    self.requestCardView.hidden = YES;
     self.rankFilterContainer.hidden = NO;
     [self.weekBtn setTitle:NSLocalizedString(@"community_rank_week", nil) forState:UIControlStateNormal];
     [self.monthBtn setTitle:NSLocalizedString(@"community_rank_month", nil) forState:UIControlStateNormal];
@@ -574,6 +701,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 - (void)onPendingCountChanged {
     self.pendingCount = [[NSUserDefaults standardUserDefaults] integerForKey:kCommunityPendingCountKey];
     [self updatePendingBadge];
+    self.requestCardView.hidden = (self.pendingCount <= 0 || !self.isFriendsTab);
 }
 
 - (void)onFriendsChanged {
@@ -584,10 +712,31 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 - (void)updatePendingBadge {
     BOOL shouldShow = self.pendingCount > 0;
     self.pendingBadgeView.hidden = !shouldShow;
+    self.requestCardView.hidden = (!shouldShow || !self.isFriendsTab);
     if (!shouldShow) {
         return;
     }
     self.pendingBadgeLabel.text = self.pendingCount > 99 ? @"99+" : [NSString stringWithFormat:@"%ld", (long)self.pendingCount];
+}
+
+- (void)onDismissRequestCard {
+    self.requestCardView.hidden = YES;
+}
+
+- (void)onAcceptPendingRequest {
+    if (self.pendingRequestId.length == 0) {
+        self.requestCardView.hidden = YES;
+        return;
+    }
+    __weak typeof(self) weakSelf = self;
+    [SocialRequest.shared processFriendRequest:self.pendingRequestId accept:YES success:^(HTTPResponse * _Nullable responseObject) {
+        weakSelf.pendingCount = MAX(weakSelf.pendingCount - 1, 0);
+        [[NSUserDefaults standardUserDefaults] setInteger:weakSelf.pendingCount forKey:kCommunityPendingCountKey];
+        [weakSelf updatePendingBadge];
+        weakSelf.requestCardView.hidden = YES;
+        [weakSelf loadRemoteFriends];
+    } failure:^(NSError * _Nonnull error) {
+    }];
 }
 
 #pragma mark - UITableView
@@ -600,7 +749,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    return self.isFriendsTab ? 76 : 68;
+    return self.isFriendsTab ? 84 : 80;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -623,6 +772,10 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     [self.addFriendBtn setTitle:[NSString stringWithFormat:@"  %@  ", NSLocalizedString(@"community_add_friend", nil)] forState:UIControlStateNormal];
     [self.qrCodeBtn setTitle:[NSString stringWithFormat:@"  %@  ", NSLocalizedString(@"community_my_qrcode", nil)] forState:UIControlStateNormal];
     self.sectionLabel.text = NSLocalizedString(@"community_section_friends", nil);
+    self.requestNameLabel.text = @"Arsenal";
+    self.requestIdLabel.text = [NSString stringWithFormat:NSLocalizedString(@"community_id_format", nil), @"12653795"];
+    self.requestMessageLabel.text = NSLocalizedString(@"community_request_message", nil).length > 0 ? NSLocalizedString(@"community_request_message", nil) : @"看你的护照很精彩，想添加您为好友";
+    [self.requestAgreeBtn setTitle:(NSLocalizedString(@"community_request_accept", nil).length > 0 ? NSLocalizedString(@"community_request_accept", nil) : @"同意") forState:UIControlStateNormal];
     [self loadRemoteRanks];
     [self.tableView reloadData];
 }
