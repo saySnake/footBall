@@ -1,0 +1,270 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""为 world-zh.json 每个 feature.properties 添加 iso、name（中文）、name_en（英文）。"""
+import json
+import os
+
+# 已是中文的 name -> (iso3166-1 alpha-2, 英文常用名)
+ZH_TABLE = {
+    "中国": ("CN", "China"),
+    "丹麦": ("DK", "Denmark"),
+    "乌克兰": ("UA", "Ukraine"),
+    "乌兹别克斯坦": ("UZ", "Uzbekistan"),
+    "乌干达": ("UG", "Uganda"),
+    "乌拉圭": ("UY", "Uruguay"),
+    "乍得": ("TD", "Chad"),
+    "也门": ("YE", "Yemen"),
+    "亚美尼亚": ("AM", "Armenia"),
+    "以色列": ("IL", "Israel"),
+    "伊拉克": ("IQ", "Iraq"),
+    "伊朗": ("IR", "Iran"),
+    "伯利兹": ("BZ", "Belize"),
+    "佛得角": ("CV", "Cape Verde"),
+    "俄罗斯": ("RU", "Russia"),
+    "保加利亚": ("BG", "Bulgaria"),
+    "克罗地亚": ("HR", "Croatia"),
+    "冈比亚": ("GM", "Gambia"),
+    "冰岛": ("IS", "Iceland"),
+    "几内亚": ("GN", "Guinea"),
+    "几内亚比绍": ("GW", "Guinea-Bissau"),
+    "刚果": ("CG", "Congo"),
+    "利比亚": ("LY", "Libya"),
+    "利比里亚": ("LR", "Liberia"),
+    "加拿大": ("CA", "Canada"),
+    "加纳": ("GH", "Ghana"),
+    "加蓬": ("GA", "Gabon"),
+    "匈牙利": ("HU", "Hungary"),
+    "南非": ("ZA", "South Africa"),
+    "博茨瓦纳": ("BW", "Botswana"),
+    "卡塔尔": ("QA", "Qatar"),
+    "卢旺达": ("RW", "Rwanda"),
+    "卢森堡": ("LU", "Luxembourg"),
+    "印度": ("IN", "India"),
+    "印度尼西亚": ("ID", "Indonesia"),
+    "危地马拉": ("GT", "Guatemala"),
+    "厄瓜多尔": ("EC", "Ecuador"),
+    "叙利亚": ("SY", "Syria"),
+    "古巴": ("CU", "Cuba"),
+    "吉尔吉斯斯坦": ("KG", "Kyrgyzstan"),
+    "吉布提": ("DJ", "Djibouti"),
+    "哈萨克斯坦": ("KZ", "Kazakhstan"),
+    "哥伦比亚": ("CO", "Colombia"),
+    "哥斯达黎加": ("CR", "Costa Rica"),
+    "喀麦隆": ("CM", "Cameroon"),
+    "土库曼斯坦": ("TM", "Turkmenistan"),
+    "土耳其": ("TR", "Turkey"),
+    "圭亚那": ("GY", "Guyana"),
+    "坦桑尼亚": ("TZ", "Tanzania"),
+    "埃及": ("EG", "Egypt"),
+    "埃塞俄比亚": ("ET", "Ethiopia"),
+    "塔吉克斯坦": ("TJ", "Tajikistan"),
+    "塞内加尔": ("SN", "Senegal"),
+    "塞尔维亚": ("RS", "Serbia"),
+    "塞拉利昂": ("SL", "Sierra Leone"),
+    "塞浦路斯": ("CY", "Cyprus"),
+    "墨西哥": ("MX", "Mexico"),
+    "多哥": ("TG", "Togo"),
+    "多米尼克": ("DM", "Dominica"),
+    "奥地利": ("AT", "Austria"),
+    "委内瑞拉": ("VE", "Venezuela"),
+    "孟加拉国": ("BD", "Bangladesh"),
+    "安哥拉": ("AO", "Angola"),
+    "密克罗尼西亚": ("FM", "Micronesia"),
+    "尼加拉瓜": ("NI", "Nicaragua"),
+    "尼日利亚": ("NG", "Nigeria"),
+    "尼日尔": ("NE", "Niger"),
+    "尼泊尔": ("NP", "Nepal"),
+    "巴哈马": ("BS", "Bahamas"),
+    "巴基斯坦": ("PK", "Pakistan"),
+    "巴布亚新几内亚": ("PG", "Papua New Guinea"),
+    "巴拉圭": ("PY", "Paraguay"),
+    "巴拿马": ("PA", "Panama"),
+    "巴林": ("BH", "Bahrain"),
+    "巴西": ("BR", "Brazil"),
+    "布基纳法索": ("BF", "Burkina Faso"),
+    "布隆迪": ("BI", "Burundi"),
+    "希腊": ("GR", "Greece"),
+    "德国": ("DE", "Germany"),
+    "意大利": ("IT", "Italy"),
+    "拉脱维亚": ("LV", "Latvia"),
+    "挪威": ("NO", "Norway"),
+    "摩尔多瓦": ("MD", "Moldova"),
+    "摩洛哥": ("MA", "Morocco"),
+    "文莱": ("BN", "Brunei"),
+    "斐济": ("FJ", "Fiji"),
+    "斯威士兰": ("SZ", "Eswatini"),
+    "斯洛伐克": ("SK", "Slovakia"),
+    "斯洛文尼亚": ("SI", "Slovenia"),
+    "斯里兰卡": ("LK", "Sri Lanka"),
+    "新加坡": ("SG", "Singapore"),
+    "新西兰": ("NZ", "New Zealand"),
+    "日本": ("JP", "Japan"),
+    "智利": ("CL", "Chile"),
+    "柬埔寨": ("KH", "Cambodia"),
+    "格鲁吉亚": ("GE", "Georgia"),
+    "比利时": ("BE", "Belgium"),
+    "毛里塔尼亚": ("MR", "Mauritania"),
+    "毛里求斯": ("MU", "Mauritius"),
+    "沙特阿拉伯": ("SA", "Saudi Arabia"),
+    "法国": ("FR", "France"),
+    "波兰": ("PL", "Poland"),
+    "波多黎各": ("PR", "Puerto Rico"),
+    "泰国": ("TH", "Thailand"),
+    "津巴布韦": ("ZW", "Zimbabwe"),
+    "洪都拉斯": ("HN", "Honduras"),
+    "海地": ("HT", "Haiti"),
+    "澳大利亚": ("AU", "Australia"),
+    "爱尔兰": ("IE", "Ireland"),
+    "爱沙尼亚": ("EE", "Estonia"),
+    "牙买加": ("JM", "Jamaica"),
+    "特立尼达和多巴哥": ("TT", "Trinidad and Tobago"),
+    "玻利维亚": ("BO", "Bolivia"),
+    "瑞典": ("SE", "Sweden"),
+    "瑞士": ("CH", "Switzerland"),
+    "瓦努阿图": ("VU", "Vanuatu"),
+    "白俄罗斯": ("BY", "Belarus"),
+    "科威特": ("KW", "Kuwait"),
+    "科摩罗": ("KM", "Comoros"),
+    "秘鲁": ("PE", "Peru"),
+    "突尼斯": ("TN", "Tunisia"),
+    "立陶宛": ("LT", "Lithuania"),
+    "索马里": ("SO", "Somalia"),
+    "约旦": ("JO", "Jordan"),
+    "纳米比亚": ("NA", "Namibia"),
+    "缅甸": ("MM", "Myanmar"),
+    "罗马尼亚": ("RO", "Romania"),
+    "美国": ("US", "United States"),
+    "肯尼亚": ("KE", "Kenya"),
+    "芬兰": ("FI", "Finland"),
+    "苏里南": ("SR", "Suriname"),
+    "英国": ("GB", "United Kingdom"),
+    "荷兰": ("NL", "Netherlands"),
+    "莫桑比克": ("MZ", "Mozambique"),
+    "莱索托": ("LS", "Lesotho"),
+    "菲律宾": ("PH", "Philippines"),
+    "萨尔瓦多": ("SV", "El Salvador"),
+    "萨摩亚": ("WS", "Samoa"),
+    "葡萄牙": ("PT", "Portugal"),
+    "蒙古": ("MN", "Mongolia"),
+    "西班牙": ("ES", "Spain"),
+    "贝宁": ("BJ", "Benin"),
+    "赞比亚": ("ZM", "Zambia"),
+    "越南": ("VN", "Vietnam"),
+    "阿塞拜疆": ("AZ", "Azerbaijan"),
+    "阿富汗": ("AF", "Afghanistan"),
+    "阿尔及利亚": ("DZ", "Algeria"),
+    "阿尔巴尼亚": ("AL", "Albania"),
+    "阿曼": ("OM", "Oman"),
+    "阿根廷": ("AR", "Argentina"),
+    "阿联酋": ("AE", "United Arab Emirates"),
+    "马拉维": ("MW", "Malawi"),
+    "马来西亚": ("MY", "Malaysia"),
+    "马耳他": ("MT", "Malta"),
+    "马达加斯加": ("MG", "Madagascar"),
+    "马里": ("ML", "Mali"),
+    "黎巴嫩": ("LB", "Lebanon"),
+    "黑山": ("ME", "Montenegro"),
+}
+
+# 英文 / 缩写名 -> (iso, 中文名, 英文名)
+EN_TABLE = {
+    "Aland": ("AX", "奥兰群岛", "Åland Islands"),
+    "American Samoa": ("AS", "美属萨摩亚", "American Samoa"),
+    "Andorra": ("AD", "安道尔", "Andorra"),
+    "Antigua and Barb.": ("AG", "安提瓜和巴布达", "Antigua and Barbuda"),
+    "Barbados": ("BB", "巴巴多斯", "Barbados"),
+    "Bermuda": ("BM", "百慕大", "Bermuda"),
+    "Bhutan": ("BT", "不丹", "Bhutan"),
+    "Bosnia and Herz.": ("BA", "波斯尼亚和黑塞哥维那", "Bosnia and Herzegovina"),
+    "Br. Indian Ocean Ter.": ("IO", "英属印度洋领地", "British Indian Ocean Territory"),
+    "Cayman Is.": ("KY", "开曼群岛", "Cayman Islands"),
+    "Central African Rep.": ("CF", "中非共和国", "Central African Republic"),
+    "Curaçao": ("CW", "库拉索", "Curaçao"),
+    "Czech Rep.": ("CZ", "捷克", "Czech Republic"),
+    "Côte d'Ivoire": ("CI", "科特迪瓦", "Côte d'Ivoire"),
+    "Dem. Rep. Congo": ("CD", "刚果民主共和国", "Democratic Republic of the Congo"),
+    "Dem. Rep. Korea": ("KP", "朝鲜", "North Korea"),
+    "Dominican Rep.": ("DO", "多米尼加共和国", "Dominican Republic"),
+    "Eq. Guinea": ("GQ", "赤道几内亚", "Equatorial Guinea"),
+    "Eritrea": ("ER", "厄立特里亚", "Eritrea"),
+    "Faeroe Is.": ("FO", "法罗群岛", "Faroe Islands"),
+    "Falkland Is.": ("FK", "福克兰群岛", "Falkland Islands"),
+    "Fr. Polynesia": ("PF", "法属波利尼西亚", "French Polynesia"),
+    "Fr. S. Antarctic Lands": ("TF", "法属南部和南极领地", "French Southern and Antarctic Lands"),
+    "Greenland": ("GL", "格陵兰", "Greenland"),
+    "Grenada": ("GD", "格林纳达", "Grenada"),
+    "Guam": ("GU", "关岛", "Guam"),
+    "Heard I. and McDonald Is.": ("HM", "赫德岛和麦克唐纳群岛", "Heard Island and McDonald Islands"),
+    "Isle of Man": ("IM", "马恩岛", "Isle of Man"),
+    "Jersey": ("JE", "泽西", "Jersey"),
+    "Kiribati": ("KI", "基里巴斯", "Kiribati"),
+    "Korea": ("KR", "韩国", "South Korea"),
+    "Lao PDR": ("LA", "老挝", "Laos"),
+    "Liechtenstein": ("LI", "列支敦士登", "Liechtenstein"),
+    "Macedonia": ("MK", "北马其顿", "North Macedonia"),
+    "Montserrat": ("MS", "蒙特塞拉特", "Montserrat"),
+    "N. Cyprus": ("", "北塞浦路斯", "Northern Cyprus"),
+    "N. Mariana Is.": ("MP", "北马里亚纳群岛", "Northern Mariana Islands"),
+    "New Caledonia": ("NC", "新喀里多尼亚", "New Caledonia"),
+    "Niue": ("NU", "纽埃", "Niue"),
+    "Palau": ("PW", "帕劳", "Palau"),
+    "Palestine": ("PS", "巴勒斯坦", "Palestine"),
+    "S. Geo. and S. Sandw. Is.": ("GS", "南乔治亚和南桑威奇群岛", "South Georgia and the South Sandwich Islands"),
+    "S. Sudan": ("SS", "南苏丹", "South Sudan"),
+    "Saint Helena": ("SH", "圣赫勒拿", "Saint Helena"),
+    "Saint Lucia": ("LC", "圣卢西亚", "Saint Lucia"),
+    "Seychelles": ("SC", "塞舌尔", "Seychelles"),
+    "Siachen Glacier": ("", "锡亚琴冰川", "Siachen Glacier"),
+    "Solomon Is.": ("SB", "所罗门群岛", "Solomon Islands"),
+    "St. Pierre and Miquelon": ("PM", "圣皮埃尔和密克隆", "Saint Pierre and Miquelon"),
+    "St. Vin. and Gren.": ("VC", "圣文森特和格林纳丁斯", "Saint Vincent and the Grenadines"),
+    "Sudan": ("SD", "苏丹", "Sudan"),
+    "São Tomé and Principe": ("ST", "圣多美和普林西比", "São Tomé and Príncipe"),
+    "Timor-Leste": ("TL", "东帝汶", "Timor-Leste"),
+    "Tonga": ("TO", "汤加", "Tonga"),
+    "Turks and Caicos Is.": ("TC", "特克斯和凯科斯群岛", "Turks and Caicos Islands"),
+    "U.S. Virgin Is.": ("VI", "美属维尔京群岛", "United States Virgin Islands"),
+    "W. Sahara": ("EH", "西撒哈拉", "Western Sahara"),
+}
+
+# 无 properties.name 的多边形（按 feature 下标）
+INDEX_TABLE = {
+    215: ("", "未定界地区（西）", "Undelimited area (west)"),
+    216: ("", "未定界地区（东）", "Undelimited area (east)"),
+}
+
+
+def build_new_properties(old_name: str, index: int, child_num) -> dict:
+    if index in INDEX_TABLE:
+        iso, zh, en = INDEX_TABLE[index]
+        return {"iso": iso, "name": zh, "name_en": en, "childNum": child_num}
+    if old_name in ZH_TABLE:
+        iso, en = ZH_TABLE[old_name]
+        return {"iso": iso, "name": old_name, "name_en": en, "childNum": child_num}
+    if old_name in EN_TABLE:
+        iso, zh, en = EN_TABLE[old_name]
+        return {"iso": iso, "name": zh, "name_en": en, "childNum": child_num}
+    raise KeyError(f"未配置国家: name={old_name!r} index={index}")
+
+
+def main():
+    base = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(base, "world-zh.json")
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    for i, feat in enumerate(data["features"]):
+        op = feat.get("properties", {})
+        old = op.get("name", "")
+        child_num = op.get("childNum", 1)
+        feat["properties"] = build_new_properties(old, i, child_num)
+
+    out = path
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+    print("OK:", out, "features:", len(data["features"]))
+
+
+if __name__ == "__main__":
+    main()

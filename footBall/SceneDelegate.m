@@ -51,20 +51,20 @@
         // 注意：必须在 window makeKeyAndVisible 之后初始化
         #ifdef DEBUG
             // 延迟一下确保 window 完全显示
-            dispatch_async(dispatch_get_main_queue(), ^{
-                // 检查是否为生产环境
-                BOOL isProduction = [BVAPPEnvironmentHostManager shareInstance].productFlag;
-                NSLog(@"🔍 当前环境 productFlag: %@", isProduction ? @"YES (生产环境)" : @"NO (非生产环境)");
-                
-                if (!isProduction) {
-                    // 非生产环境，初始化调试工具
-                    NSLog(@"✅ 开始初始化 DoKit...");
-                    [BVAPPDebugTool setup];
-                } else {
-                    // 生产环境，不显示 DoKit
-                    NSLog(@"⚠️ 生产环境，DoKit 已禁用");
-                }
-            });
+//            dispatch_async(dispatch_get_main_queue(), ^{
+//                // 检查是否为生产环境
+//                BOOL isProduction = [BVAPPEnvironmentHostManager shareInstance].productFlag;
+//                NSLog(@"🔍 当前环境 productFlag: %@", isProduction ? @"YES (生产环境)" : @"NO (非生产环境)");
+//                
+//                if (!isProduction) {
+//                    // 非生产环境，初始化调试工具
+//                    NSLog(@"✅ 开始初始化 DoKit...");
+//                    [BVAPPDebugTool setup];
+//                } else {
+//                    // 生产环境，不显示 DoKit
+//                    NSLog(@"⚠️ 生产环境，DoKit 已禁用");
+//                }
+//            });
         #endif
     }
 }

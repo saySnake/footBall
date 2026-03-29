@@ -8,6 +8,7 @@
 #import "PNAddConsumeViewController.h"
 #import "PNMatchVerifyViewController.h"
 #import "ConsumptionRecordViewController.h"
+#import "PassportViewController.h"
 #import "PNMatchDetailViewController.h"
 #import "PNMatchInfoInputViewController.h"
 
@@ -373,6 +374,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     _myPassportBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
     [_myPassportBtn setImage:[UIImage imageNamed:@"football_passport"] forState:UIControlStateNormal];
     _myPassportBtn.tintColor = [UIColor colorWithWhite:1 alpha:0.8];
+    [_myPassportBtn addTarget:self action:@selector(onMyPassportTapped) forControlEvents:UIControlEventTouchUpInside];
 
     UIButton *arrow1 = [UIButton buttonWithType:UIButtonTypeSystem];
     UIButton *arrow2 = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -863,6 +865,11 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 - (void)onConsumeRecordTapped {
     ConsumptionRecordViewController *vc = [[ConsumptionRecordViewController alloc] init];
     vc.hidesBottomBarWhenPushed = YES;
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (void)onMyPassportTapped {
+    PassportViewController *vc = [[PassportViewController alloc] init];
     [self.navigationController pushViewController:vc animated:YES];
 }
 

@@ -112,6 +112,60 @@
 "discover_verified_minutes_format" = "已认证%ld分钟";
 "discover_verify_match" = "认证比赛";
 
+/* Map legend */
+"map_legend_often" = "经常去";
+"map_legend_visited" = "已去过";
+"map_legend_not_yet" = "还未去";
+
+/* Passport */
+"passport_nav_title" = "我的护照";
+"passport_points_suffix" = "分";
+"passport_promo_car" = "特惠购车";
+"passport_year_tab_format" = "%ld年";
+"passport_regular_stats" = "常规赛数据";
+"passport_avg_duration" = "平均时长";
+"passport_matches_this_year" = "今年登场比赛场次";
+"passport_times_unit" = "次";
+"passport_avg_goals_per_match" = "单场平均进球";
+"passport_total_goals" = "总进球数";
+"passport_growth_ok" = "暂且看好";
+"passport_growth_vs_last" = "场均比去年增长";
+"passport_goal_trend_8" = "近8场比赛进球数";
+"passport_possession_title" = "1场平均控球/射门统计";
+"passport_per_game_shots" = "次/场";
+"passport_per_game_score" = "分/场";
+"passport_position_strength" = "各位置强度";
+"passport_position_fwd" = "前锋 Forward";
+"passport_position_mid" = "中场 Midfield";
+"passport_position_def" = "后卫 Defender";
+"passport_ability_detail" = "更详细的能力概览";
+"passport_ability_stamina" = "体力";
+"passport_ability_speed" = "速度";
+"passport_ability_pass" = "传球";
+"passport_ability_shoot" = "射门";
+"passport_ability_dribble" = "盘带";
+"passport_ability_defense" = "防守";
+"passport_ability_vision" = "视野";
+"passport_ability_physique" = "身体";
+"passport_ability_balance" = "平衡";
+"passport_ability_reaction" = "反应";
+"passport_ability_jump" = "弹跳";
+"passport_ability_stamina2" = "耐力";
+"passport_tactical_bias" = "战术偏向";
+"passport_style_attack" = "进攻";
+"passport_style_control" = "控制";
+"passport_style_defend" = "防守";
+"passport_recent_goals_title" = "6 场比赛进球";
+"passport_recent_goals_sub" = "进球分布, 数据统计";
+"passport_metric_shoot" = "射门";
+"passport_metric_pass" = "传球";
+"passport_metric_run" = "跑动";
+"passport_outcome_vs_last" = "比上场胜势情况";
+"passport_legend_win" = "胜";
+"passport_legend_draw" = "平";
+"passport_legend_loss" = "负";
+"passport_legend_other" = "其它";
+
 /* Add Consume */
 "add_consume_title" = "添加消费";
 "add_consume_upload_photo" = "上传照片（1张）";

@@ -112,6 +112,60 @@
 "discover_verified_minutes_format" = "Verified %ld min";
 "discover_verify_match" = "Verify Match";
 
+/* Map legend */
+"map_legend_often" = "Often visited";
+"map_legend_visited" = "Visited";
+"map_legend_not_yet" = "Not yet";
+
+/* Passport */
+"passport_nav_title" = "My Passport";
+"passport_points_suffix" = "pts";
+"passport_promo_car" = "Promo";
+"passport_year_tab_format" = "%ld";
+"passport_regular_stats" = "Regular season";
+"passport_avg_duration" = "Avg. duration";
+"passport_matches_this_year" = "Matches this year";
+"passport_times_unit" = "";
+"passport_avg_goals_per_match" = "Avg. goals / match";
+"passport_total_goals" = "Total goals";
+"passport_growth_ok" = "looking good";
+"passport_growth_vs_last" = "vs last year (per match)";
+"passport_goal_trend_8" = "Goals in last 8 matches";
+"passport_possession_title" = "Possession / shots (avg.)";
+"passport_per_game_shots" = "shots/game";
+"passport_per_game_score" = "pts/game";
+"passport_position_strength" = "By position";
+"passport_position_fwd" = "Forward";
+"passport_position_mid" = "Midfield";
+"passport_position_def" = "Defender";
+"passport_ability_detail" = "Ability overview";
+"passport_ability_stamina" = "Stamina";
+"passport_ability_speed" = "Speed";
+"passport_ability_pass" = "Passing";
+"passport_ability_shoot" = "Shooting";
+"passport_ability_dribble" = "Dribble";
+"passport_ability_defense" = "Defense";
+"passport_ability_vision" = "Vision";
+"passport_ability_physique" = "Physical";
+"passport_ability_balance" = "Balance";
+"passport_ability_reaction" = "Reaction";
+"passport_ability_jump" = "Jump";
+"passport_ability_stamina2" = "Endurance";
+"passport_tactical_bias" = "Tactical bias";
+"passport_style_attack" = "Attack";
+"passport_style_control" = "Control";
+"passport_style_defend" = "Defense";
+"passport_recent_goals_title" = "Goals in 6 matches";
+"passport_recent_goals_sub" = "Distribution";
+"passport_metric_shoot" = "Shots";
+"passport_metric_pass" = "Passes";
+"passport_metric_run" = "Running";
+"passport_outcome_vs_last" = "vs last match";
+"passport_legend_win" = "W";
+"passport_legend_draw" = "D";
+"passport_legend_loss" = "L";
+"passport_legend_other" = "Other";
+
 /* Add Consume */
 "add_consume_title" = "Add Expense";
 "add_consume_upload_photo" = "Upload Photo (1)";
