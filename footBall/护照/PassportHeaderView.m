@@ -9,6 +9,7 @@
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
 #import "WorldMapView.h"
+
 static UIColor *PassportGreen(void) {
     return [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0];
 }
@@ -49,7 +50,8 @@ static UIColor *PassportGreen(void) {
         UIImageView *footer = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"passport_header_sep"]];
         [self addSubview:footer];
 
-        
+        DashView *dashLine = [[DashView alloc] init];
+        [self addSubview:dashLine];
         
         [userInfoView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.top.equalTo(self);
@@ -96,10 +98,15 @@ static UIColor *PassportGreen(void) {
         [footer mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.right.equalTo(self);
             make.top.equalTo(scoresView.mas_bottom).offset(2);
-            make.bottom.equalTo(self);
         }];
         
-        
+        [dashLine mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.left.right.equalTo(self);
+            make.top.equalTo(footer.mas_bottom).offset(2);
+            make.height.equalTo(@1);
+            make.bottom.equalTo(self);
+        }];
+
     }
     return self;
 }
@@ -269,6 +276,17 @@ static UIColor *PassportGreen(void) {
     lbl.layer.borderWidth = 0.5;
     return lbl;
 }
+- (UIView *)cityView {
+    UIView *view = UIView.alloc.init;
+    
+    return view;
+}
+- (UIView *)ageView {
+    UIView *view = UIView.alloc.init;
+    
+    return view;
+}
+
 - (void)configureWithModel:(PassportViewModel *)model {
 }
 
