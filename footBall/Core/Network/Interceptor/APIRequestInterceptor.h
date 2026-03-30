@@ -31,6 +31,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// @return 处理后的错误，返回nil表示错误已处理
 - (nullable NSError *)interceptError:(NSError *)error task:(NSURLSessionDataTask *)task tokenRefreshed:(void (^)(BOOL))tokenRefreshed;
 
+- (nullable NSError *)interceptError:(NSError *)error task:(NSURLSessionDataTask *)task;
 @end
 
 /// 认证拦截器 - 自动添加Token等认证信息

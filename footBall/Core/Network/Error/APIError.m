@@ -42,7 +42,7 @@ static char kRetryCountKey;
                                               userInfo:userInfo];
     error.underlyingError = underlyingError;
     error.handlingStrategy = [APIError defaultHandlingStrategyForCode:code];
-    error.maxRetryCount = 3; // 默认最大重试3次
+    error.maxRetryCount = 0; // 默认最大重试3次
     error.retryInterval = 2.0; // 默认重试间隔2秒
     
     return error;

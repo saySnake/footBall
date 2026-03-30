@@ -36,8 +36,8 @@ NSString * const TokenExpiredNotification = @"TokenExpiredNotification";
     if (self) {
         // baseURL 已废弃，统一使用 APIEnvironmentManager 管理环境配置
         _baseURL = @"";
-        _timeoutInterval = 30.0;
-        _maxRetryCount = 3; // 默认最大重试3次
+        _timeoutInterval = 15.0;
+        _maxRetryCount = 0; // 默认最大重试3次
         _retryInterval = 2.0; // 默认重试间隔2秒
         _commonHeaders = @{};
         _tasks = [NSMutableArray array];
@@ -214,6 +214,14 @@ NSString * const TokenExpiredNotification = @"TokenExpiredNotification";
                         } failure:weakWrappedFailure]; // 使用相同的wrappedFailure，继续重试逻辑
                     }
                 }];
+                if (!interceptedError) {
+                    // 错误已被处理，不继续传播
+                    [weakSelf.retryCountMap removeObjectForKey:requestKey]; // 清理重试计数
+                    return;
+                }
+                finalError = interceptedError;
+            } else if ([interceptor respondsToSelector:@selector(interceptError:task:)]) {
+                NSError *interceptedError = [interceptor interceptError:finalError task:task];
                 if (!interceptedError) {
                     // 错误已被处理，不继续传播
                     [weakSelf.retryCountMap removeObjectForKey:requestKey]; // 清理重试计数

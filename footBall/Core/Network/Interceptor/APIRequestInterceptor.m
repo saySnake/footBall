@@ -99,8 +99,19 @@
 }
 - (NSError *)interceptError:(NSError *)error task:(NSURLSessionDataTask *)task{
     
+    NSURLRequest *request = task.originalRequest;
+    NSLog(@"🌐 [HTTP Request] %@ %@", request.HTTPMethod, request.URL.absoluteString);
+    
+    if (self.logLevel >= 2 && request.HTTPBody) {
+        NSString *bodyString = [[NSString alloc] initWithData:request.HTTPBody encoding:NSUTF8StringEncoding];
+        NSLog(@"📤 [HTTP Body] %@", bodyString);
+    }
+    
+    if (self.logLevel >= 2 && request.allHTTPHeaderFields.count > 0) {
+        NSLog(@"📋 [HTTP Headers] %@", request.allHTTPHeaderFields);
+    }
     NSHTTPURLResponse *httpResp = (NSHTTPURLResponse *)task.response;
-    NSLog(@"❌ [HTTP Response] %ld %@\n ❌ [HTTP ERROR]***************** \n%@\n❌ [HTTP ERROR]*****************",httpResp.statusCode,httpResp.URL,error);
+    NSLog(@"❌ [HTTP Response] %ld\n❌ [HTTP ERROR]***************** \n%@\n❌ [HTTP ERROR]*****************",httpResp.statusCode,error);
     return error;
 }
 @end

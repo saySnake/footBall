@@ -6,6 +6,7 @@
 #import "PassportHeaderView.h"
 #import "PassportViewModel.h"
 #import "PassportWeekLineChartView.h"
+#import "PassportHeader2View.h"
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
 #import "WorldMapView.h"
@@ -46,13 +47,19 @@ static UIColor *PassportGreen(void) {
         UIView *nothingView = [self nothingView];
         [self addSubview:nothingView];
 
+        PassportHeader2View *header2View = [[PassportHeader2View alloc] initWithFrame:CGRectZero];
+        [self addSubview:header2View];
+
         //P<<COOPER<<HELEN<<<<<<<<<COOPER<<<<<=
         UIImageView *footer = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"passport_header_sep"]];
         [self addSubview:footer];
-
         DashView *dashLine = [[DashView alloc] init];
         [self addSubview:dashLine];
         
+        //P<<COOPER<<HELEN<<<<<<<<<COOPER<<<<<=
+        UIImageView *footer2 = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"passport_header_sep"]];
+        [self addSubview:footer2];
+
         [userInfoView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.top.equalTo(self);
             make.height.equalTo(@(_circleLblWH*2));
@@ -94,7 +101,7 @@ static UIColor *PassportGreen(void) {
             make.top.equalTo(globalMapView.mas_bottom);
             make.height.equalTo(@(_circleLblWH));
         }];
-        
+
         [footer mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.right.equalTo(self);
             make.top.equalTo(scoresView.mas_bottom).offset(2);
@@ -104,9 +111,18 @@ static UIColor *PassportGreen(void) {
             make.left.right.equalTo(self);
             make.top.equalTo(footer.mas_bottom).offset(2);
             make.height.equalTo(@1);
+        }];
+        [header2View mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.left.right.equalTo(self);
+            make.top.equalTo(dashLine.mas_bottom).offset(10);
+            make.height.mas_equalTo(_circleLblWH * 5);
+        }];
+        
+        [footer2 mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.left.right.equalTo(self);
+            make.top.equalTo(header2View.mas_bottom).offset(2);
             make.bottom.equalTo(self);
         }];
-
     }
     return self;
 }
@@ -276,18 +292,9 @@ static UIColor *PassportGreen(void) {
     lbl.layer.borderWidth = 0.5;
     return lbl;
 }
-- (UIView *)cityView {
-    UIView *view = UIView.alloc.init;
-    
-    return view;
-}
-- (UIView *)ageView {
-    UIView *view = UIView.alloc.init;
-    
-    return view;
-}
 
 - (void)configureWithModel:(PassportViewModel *)model {
 }
 
 @end
+
