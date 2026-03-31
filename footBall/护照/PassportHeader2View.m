@@ -50,6 +50,7 @@ static UIColor *PassportCircleStrokeColor(void) {
         [self.layer addSublayer:_gridLayer];
 
         [self buildContent];
+        [self addLines];
     }
     return self;
 }
@@ -424,6 +425,73 @@ static UIColor *PassportCircleStrokeColor(void) {
     self.gridLayer.frame = self.bounds;
     self.gridLayer.path = p.CGPath;
 }
+- (UIView *)newLine {
+    UIView *line = UIView.new;
+    line.backgroundColor = [UIColor colorWithHexString:@"#000000"];
+    return line;
+}
+
+- (void)addLines{
+    CGFloat wh = self.circleWH;
+    UIView *leftLine = [self newLine];
+    [self addSubview:leftLine];
+    [leftLine mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.width.equalTo(@0.25);
+        make.left.equalTo(self);
+        make.top.equalTo(@(wh));
+        make.bottom.equalTo(@(0));
+    }];
+
+    UIView *topLine = [self newLine];
+    [self addSubview:topLine];
+    [topLine mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.height.equalTo(@0.25);
+        make.top.equalTo(self);
+        make.left.equalTo(@(0));
+        make.right.equalTo(@(0));
+    }];
+
+
+    // 内部view之间的水平线
+    UIView *subHorLine1= [self newLine];
+    [self addSubview:subHorLine1];
+    [subHorLine1 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.height.equalTo(@0.25);
+        make.top.equalTo(@(wh));
+        make.left.equalTo(self);
+        make.right.equalTo(self);
+    }];
+
+    UIView *subHorLine2= [self newLine];
+    [self addSubview:subHorLine2];
+    [subHorLine2 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.height.equalTo(@0.25);
+        make.top.equalTo(subHorLine1.mas_bottom).offset(wh);
+        make.left.equalTo(self);
+        make.right.equalTo(self).offset(-3*wh);
+    }];
+
+    UIView *subHorLine3= [self newLine];
+    [self addSubview:subHorLine3];
+    [subHorLine3 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.height.equalTo(@0.25);
+        make.top.equalTo(subHorLine2.mas_bottom).offset(wh);
+        make.left.equalTo(self);
+        make.right.equalTo(self);
+    }];
+    UIView *subHorLine4= [self newLine];
+    [self addSubview:subHorLine4];
+    [subHorLine4 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.height.equalTo(@0.25);
+        make.top.equalTo(subHorLine3.mas_bottom).offset(wh);
+        make.left.equalTo(self);
+        make.right.equalTo(self);
+    }];
+
+    
+    // 内部view之间的垂直线
+}
+
 
 @end
 
