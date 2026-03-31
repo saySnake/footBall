@@ -312,6 +312,28 @@ static UIColor *PassportPageBg(void) {
     }
 }
 
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
+    // DarkStatsCardCell 使用叠压布局（负间距），某些系统版本 AutomaticDimension 计算会偏小甚至为 0，直接给固定高度更稳
+    if (indexPath.row == 1) {
+        return 197;
+    }
+    // BarChartCardCell 设计稿固定高度
+    if (indexPath.row == 2) {
+        return 341;
+    }
+    return UITableViewAutomaticDimension;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView estimatedHeightForRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (indexPath.row == 1) {
+        return 197;
+    }
+    if (indexPath.row == 2) {
+        return 341;
+    }
+    return 200;
+}
+
 - (void)updateLocalizedStrings {
     [super updateLocalizedStrings];
     _titleLabel.text = NSLocalizedString(@"passport_nav_title", nil) ?: @"我的护照";

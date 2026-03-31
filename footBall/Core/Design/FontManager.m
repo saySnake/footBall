@@ -122,6 +122,14 @@ static NSString *FontManagerNeuePostScriptName(void) {
     return [UIFont boldSystemFontOfSize:38.0f];
 }
 
+- (UIFont *)font40Regular {
+    return [self neueFontOfSize:40.0f fallbackWeight:UIFontWeightRegular];
+}
+
+- (UIFont *)font75Regular {
+    return [self neueFontOfSize:75.0f fallbackWeight:UIFontWeightRegular];
+}
+
 - (UIFont *)font36Regular {
     return [self neueFontOfSize:36.0f fallbackWeight:UIFontWeightRegular];
 }
@@ -172,6 +180,10 @@ static NSString *FontManagerNeuePostScriptName(void) {
 
 - (UIFont *)font12Regular {
     return [self neueFontOfSize:12.0f fallbackWeight:UIFontWeightRegular];
+}
+
+- (UIFont *)font11Regular {
+    return [self neueFontOfSize:11.0f fallbackWeight:UIFontWeightRegular];
 }
 
 - (UIFont *)font10Regular {

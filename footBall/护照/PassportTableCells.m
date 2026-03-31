@@ -24,9 +24,12 @@ static UIColor *PCHex(NSString *hex) {
 #pragma mark - Dark stats
 
 @implementation PassportDarkStatsCardCell {
-    UIView *_card;
+    UIView *_headerCard;
     UILabel *_title;
-    UIStackView *_stack;
+    NSArray<UIView *> *_rows;
+    NSArray<UILabel *> *_rowLeftLabels;
+    NSArray<UILabel *> *_rowValueLabels;
+    NSArray<UILabel *> *_rowUnitLabels;
 }
 
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
@@ -34,66 +37,151 @@ static UIColor *PCHex(NSString *hex) {
         self.selectionStyle = UITableViewCellSelectionStyleNone;
         self.backgroundColor = [UIColor clearColor];
         self.contentView.backgroundColor = [UIColor clearColor];
-        _card = [[UIView alloc] init];
-        _card.backgroundColor = PCDarkCard();
-        _card.layer.cornerRadius = 16;
-        [self.contentView addSubview:_card];
+        self.separatorInset = UIEdgeInsetsZero;
+        self.layoutMargins = UIEdgeInsetsZero;
+        self.preservesSuperviewLayoutMargins = NO;
+        self.contentView.layoutMargins = UIEdgeInsetsZero;
+        self.contentView.preservesSuperviewLayoutMargins = NO;
+        _headerCard = [[UIView alloc] init];
+        _headerCard.backgroundColor = PCDarkCard();
+        _headerCard.layer.cornerRadius = 16;
+        _headerCard.clipsToBounds = YES;
+        [self.contentView addSubview:_headerCard];
         _title = [[UILabel alloc] init];
-        _title.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+        _title.font = [UIFont systemFontOfSize:24 weight:UIFontWeightBold];
         _title.textColor = [UIColor whiteColor];
-        [_card addSubview:_title];
-        _stack = [[UIStackView alloc] init];
-        _stack.axis = UILayoutConstraintAxisVertical;
-        _stack.spacing = 14;
-        [_card addSubview:_stack];
-        [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 16, 6, 16));
+        [_headerCard addSubview:_title];
+
+        NSMutableArray<UIView *> *rows = [NSMutableArray array];
+        NSMutableArray<UILabel *> *ls = [NSMutableArray array];
+        NSMutableArray<UILabel *> *vs = [NSMutableArray array];
+        NSMutableArray<UILabel *> *us = [NSMutableArray array];
+
+        // 纯色（不透明），按设计稿从上到下逐渐变亮一点
+        NSArray<UIColor *> *rowColors = @[
+            PCHex(@"2A2B30"),
+            PCHex(@"303138"),
+            PCHex(@"353742"),
+            PCHex(@"3A3D4A"),
+        ];
+        for (NSInteger i = 0; i < rowColors.count; i++) {
+            UIView *rowCard = [[UIView alloc] init];
+            rowCard.backgroundColor = rowColors[i];
+            rowCard.layer.cornerRadius = 18;
+            rowCard.clipsToBounds = YES;
+            [self.contentView addSubview:rowCard];
+
+            UILabel *left = [[UILabel alloc] init];
+            left.font = [UIFont systemFontOfSize:14];
+            left.textColor = [UIColor whiteColor];
+            left.numberOfLines = 1;
+            [rowCard addSubview:left];
+
+            UILabel *val = [[UILabel alloc] init];
+            val.font = FontManager.sharedManager.font40Regular;
+            val.textColor = [UIColor whiteColor];
+            val.textAlignment = NSTextAlignmentRight;
+            [rowCard addSubview:val];
+
+            UILabel *unit = [[UILabel alloc] init];
+            unit.font = [UIFont systemFontOfSize:16];
+            unit.textColor = [UIColor whiteColor];
+            unit.textAlignment = NSTextAlignmentLeft;
+            [rowCard addSubview:unit];
+
+            [left mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.left.equalTo(rowCard).offset(18);
+                make.centerY.equalTo(rowCard);
+                make.right.lessThanOrEqualTo(val.mas_left).offset(-12);
+            }];
+            [unit mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.right.equalTo(rowCard).offset(-18);
+                make.centerY.equalTo(val).offset(6);
+            }];
+            [val mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.right.equalTo(unit.mas_left).offset(-10);
+                make.centerY.equalTo(rowCard);
+            }];
+
+            [rows addObject:rowCard];
+            [ls addObject:left];
+            [vs addObject:val];
+            [us addObject:unit];
+        }
+        _rows = [rows copy];
+        _rowLeftLabels = [ls copy];
+        _rowValueLabels = [vs copy];
+        _rowUnitLabels = [us copy];
+
+        CGFloat cardH = 89.0;
+        CGFloat overlap = 21.0;
+
+        [_headerCard mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.left.right.equalTo(self.contentView);
+            make.top.equalTo(self.contentView).offset(6);
+            make.height.mas_equalTo(cardH);
         }];
         [_title mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.leading.equalTo(_card).offset(16);
-            make.trailing.equalTo(_card).offset(-16);
+            make.top.leading.equalTo(_headerCard).offset(16);
+            make.trailing.equalTo(_headerCard).offset(-16);
         }];
-        [_stack mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(_title.mas_bottom).offset(14);
-            make.leading.trailing.equalTo(_card).insets(UIEdgeInsetsMake(0, 16, 0, 16));
-            make.bottom.equalTo(_card).offset(-16);
-        }];
+
+        UIView *prev = _headerCard;
+        for (NSInteger i = 0; i < _rows.count; i++) {
+            UIView *row = _rows[i];
+            [row mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.left.right.equalTo(self.contentView);
+                make.height.mas_equalTo(cardH);
+                // 从第二个开始向上叠压 21（等价于 top = prev.bottom - 21）
+                make.top.equalTo(prev.mas_bottom).offset(-overlap);
+                if (i == _rows.count - 1) {
+                    make.bottom.equalTo(self.contentView).offset(-6);
+                }
+            }];
+            prev = row;
+        }
     }
     return self;
 }
 
-- (void)addRowTitle:(NSString *)t value:(NSString *)v {
-    UILabel *lt = [[UILabel alloc] init];
-    lt.text = t;
-    lt.font = [UIFont systemFontOfSize:13];
-    lt.textColor = [UIColor colorWithWhite:0.65 alpha:1.0];
-    UILabel *lv = [[UILabel alloc] init];
-    lv.text = v;
-    lv.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
-    lv.textColor = [UIColor whiteColor];
-    lv.textAlignment = NSTextAlignmentRight;
-    UIStackView *row = [[UIStackView alloc] initWithArrangedSubviews:@[ lt, lv ]];
-    row.axis = UILayoutConstraintAxisHorizontal;
-    row.distribution = UIStackViewDistributionFill;
-    [lv setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
-    [_stack addArrangedSubview:row];
-}
-
 - (void)prepareForReuse {
     [super prepareForReuse];
-    for (UIView *v in _stack.arrangedSubviews) {
-        [_stack removeArrangedSubview:v];
-        [v removeFromSuperview];
+    _title.text = nil;
+}
+
+- (void)setRowAtIndex:(NSInteger)idx left:(NSString *)leftText right:(NSString *)rightText {
+    if (idx < 0 || idx >= _rowLeftLabels.count) return;
+    _rowLeftLabels[idx].text = leftText ?: @"";
+
+    NSString *trim = [rightText stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trim.length == 0) {
+        _rowValueLabels[idx].text = @"";
+        _rowUnitLabels[idx].text = @"";
+        return;
     }
+
+    // 简单拆分：末尾汉字/字母当单位，其余当数值（适配 “8088 分钟”“3 天”“34:1”等）
+    NSCharacterSet *digits = [NSCharacterSet characterSetWithCharactersInString:@"0123456789:.,/"];
+    NSInteger split = trim.length;
+    for (NSInteger i = trim.length - 1; i >= 0; i--) {
+        unichar ch = [trim characterAtIndex:i];
+        if ([digits characterIsMember:ch] || ch == ' ') {
+            split = i + 1;
+            break;
+        }
+    }
+    NSString *val = [[trim substringToIndex:split] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    NSString *unit = [[trim substringFromIndex:split] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    _rowValueLabels[idx].text = val;
+    _rowUnitLabels[idx].text = unit;
 }
 
 - (void)configureWithModel:(PassportViewModel *)model {
-    [self prepareForReuse];
     _title.text = model.regularSeasonTitle;
-    [self addRowTitle:model.avgDurationTitle value:model.avgDurationValue];
-    [self addRowTitle:model.matchesYearTitle value:model.matchesYearValue];
-    [self addRowTitle:model.avgGoalsMatchTitle value:model.avgGoalsMatchValue];
-    [self addRowTitle:model.totalGoalsTitle value:model.totalGoalsValue];
+    [self setRowAtIndex:0 left:model.avgDurationTitle right:model.avgDurationValue];
+    [self setRowAtIndex:1 left:model.matchesYearTitle right:model.matchesYearValue];
+    [self setRowAtIndex:2 left:model.avgGoalsMatchTitle right:model.avgGoalsMatchValue];
+    [self setRowAtIndex:3 left:model.totalGoalsTitle right:model.totalGoalsValue];
 }
 
 @end
@@ -102,8 +190,10 @@ static UIColor *PCHex(NSString *hex) {
 
 @implementation PassportGrowthBannerCell {
     UIView *_card;
-    UILabel *_head;
-    UILabel *_sub;
+    UILabel *_topLine;
+    UILabel *_percent;
+    UILabel *_suffix;
+    UILabel *_bottomLine;
 }
 
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
@@ -113,35 +203,71 @@ static UIColor *PCHex(NSString *hex) {
         self.contentView.backgroundColor = [UIColor clearColor];
         _card = [[UIView alloc] init];
         _card.backgroundColor = PCGreen();
-        _card.layer.cornerRadius = 16;
+        _card.layer.cornerRadius = 24;
+        _card.clipsToBounds = YES;
         [self.contentView addSubview:_card];
-        _head = [[UILabel alloc] init];
-        _head.font = [UIFont systemFontOfSize:20 weight:UIFontWeightBold];
-        _head.textColor = [UIColor whiteColor];
-        _sub = [[UILabel alloc] init];
-        _sub.font = [UIFont systemFontOfSize:12];
-        _sub.textColor = [UIColor colorWithWhite:1 alpha:0.85];
-        [_card addSubview:_head];
-        [_card addSubview:_sub];
+
+        _topLine = [[UILabel alloc] init];
+        _topLine.font = FontManager.sharedManager.font16Regular;
+        _topLine.textColor = [UIColor whiteColor];
+        _topLine.numberOfLines = 2;
+        [_card addSubview:_topLine];
+
+        _percent = [[UILabel alloc] init];
+        _percent.font = FontManager.sharedManager.font75Regular;
+        _percent.textColor = [UIColor whiteColor];
+        _percent.text = @"0%";
+        [_card addSubview:_percent];
+
+        _suffix = [[UILabel alloc] init];
+        _suffix.font = [UIFont systemFontOfSize:30 weight:UIFontWeightSemibold];
+        _suffix.textColor = [UIColor whiteColor];
+        _suffix.text = @"都在看球";
+        [_card addSubview:_suffix];
+
+        _bottomLine = [[UILabel alloc] init];
+        _bottomLine.font = FontManager.sharedManager.font11Regular;
+        _bottomLine.textColor = [UIColor whiteColor];
+        _bottomLine.text = @"睡眠按8小时为例";
+        [_card addSubview:_bottomLine];
+
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 16, 6, 16));
+            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 0, 6, 0));
         }];
-        [_head mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.leading.equalTo(_card).offset(16);
-            make.trailing.equalTo(_card).offset(-16);
+        [_topLine mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.equalTo(_card).offset(16);
+            make.left.equalTo(_card).offset(16);
+            make.right.equalTo(_card).offset(-16);
         }];
-        [_sub mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(_head.mas_bottom).offset(6);
-            make.leading.trailing.equalTo(_head);
+        [_percent mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.left.equalTo(_topLine);
+            make.top.equalTo(_topLine.mas_bottom).offset(10);
+        }];
+        [_suffix mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.left.equalTo(_percent.mas_right).offset(14);
+            // baseline 约束在部分字体/系统版本上可能触发异常，改为更稳定的 centerY 对齐
+            make.centerY.equalTo(_percent).offset(-6);
+            make.right.lessThanOrEqualTo(_card).offset(-16);
+        }];
+        [_bottomLine mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.left.equalTo(_topLine);
             make.bottom.equalTo(_card).offset(-16);
+            make.right.lessThanOrEqualTo(_card).offset(-16);
         }];
     }
     return self;
 }
 
 - (void)configureWithModel:(PassportViewModel *)model {
-    _head.text = model.growthHeadline;
-    _sub.text = model.growthSubtitle;
+    // growthHeadline 作为第一行；percent 与后缀先用 subtitle 里占位（后续可用 model 字段扩展）
+    _topLine.text = model.growthHeadline.length ? model.growthHeadline : @"2025年睡醒时间里的";
+    // 如果 subtitle 里形如 "0%"，则填充 percent；否则保持默认
+    NSString *t = [model.growthSubtitle stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([t hasSuffix:@"%"] && t.length <= 6) {
+        _percent.text = t;
+    } else if (t.length > 0) {
+        _bottomLine.text = t;
+    }
 }
 
 @end
@@ -164,23 +290,23 @@ static UIColor *PCHex(NSString *hex) {
         _card.layer.cornerRadius = 16;
         [self.contentView addSubview:_card];
         _title = [[UILabel alloc] init];
-        _title.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+        _title.font = FontManager.sharedManager.font18Regular;
         _title.textColor = [UIColor colorWithWhite:0.12 alpha:1.0];
         _chart = [[PassportBarChartView alloc] init];
         _chart.barColor = PCGreen();
+        _chart.barWidth = 20;
         [_card addSubview:_title];
         [_card addSubview:_chart];
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 16, 6, 16));
+            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 0, 6, 0));
         }];
         [_title mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.leading.equalTo(_card).offset(16);
             make.trailing.equalTo(_card).offset(-16);
         }];
         [_chart mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(_title.mas_bottom).offset(12);
+            make.top.equalTo(_card).offset(50);
             make.leading.trailing.equalTo(_card).insets(UIEdgeInsetsMake(16, 16, 16, 16));
-            make.height.mas_equalTo(140);
             make.bottom.equalTo(_card).offset(-16);
         }];
     }
@@ -189,7 +315,7 @@ static UIColor *PCHex(NSString *hex) {
 
 - (void)configureWithModel:(PassportViewModel *)model {
     _title.text = model.goalTrendTitle;
-    _chart.maxValue = 10;
+    _chart.maxValue = 100;
     _chart.values = model.goalTrendValues;
 }
 

@@ -57,6 +57,12 @@ NS_ASSUME_NONNULL_BEGIN
 /// 38pt 粗体（标题）
 @property (nonatomic, strong, readonly) UIFont *font38Bold;
 
+/// 40pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font40Regular;
+
+/// 75pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font75Regular;
+
 /// 36pt （数字）
 @property (nonatomic, strong, readonly) UIFont *font36Regular;
 
@@ -95,6 +101,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 12pt （数字）
 @property (nonatomic, strong, readonly) UIFont *font12Regular;
+
+/// 11pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font11Regular;
 
 /// 10pt （数字）
 @property (nonatomic, strong, readonly) UIFont *font10Regular;
