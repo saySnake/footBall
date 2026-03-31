@@ -41,7 +41,7 @@ static UIColor *PassportCircleStrokeColor(void) {
 - (instancetype)initWithFrame:(CGRect)frame {
     if (self = [super initWithFrame:frame]) {
         self.backgroundColor = [UIColor whiteColor];
-        self.circleWH = (frame.size.width == 0 ? SCREEN_WIDTH : frame.size.width) / 8.0;
+        self.circleWH = (SCREEN_WIDTH-32) / 8.0;
 
         _gridLayer = [CAShapeLayer layer];
         _gridLayer.fillColor = [UIColor clearColor].CGColor;
@@ -161,7 +161,7 @@ static UIColor *PassportCircleStrokeColor(void) {
     [matchesCircle addSubview:matchesUnitLabel];
     [matchesUnitLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.equalTo(_matchesLabel.mas_right);
-        make.bottom.equalTo(_matchesLabel);
+        make.bottom.equalTo(_matchesLabel).offset(-5);
     }];
 
     // “05 后”（第二行第二个圆）
@@ -185,7 +185,7 @@ static UIColor *PassportCircleStrokeColor(void) {
     [afterCircle addSubview:afterUnitLabel];
     [afterUnitLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.equalTo(_afterLabel.mas_right);
-        make.bottom.equalTo(_afterLabel);
+        make.bottom.equalTo(_afterLabel).offset(-5);
     }];
 
     // 2个空白占位
@@ -228,11 +228,11 @@ static UIColor *PassportCircleStrokeColor(void) {
     [minutesPill addSubview:_minutesUnitLabel];
     [_minutesValueLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerY.equalTo(minutesPill);
-        make.left.equalTo(minutesPill).offset(18);
+        make.centerX.equalTo(minutesPill).offset(-10);
     }];
     [_minutesUnitLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.equalTo(_minutesValueLabel.mas_right).offset(2);
-        make.bottom.equalTo(_minutesValueLabel).offset(-2);
+        make.bottom.equalTo(_minutesValueLabel).offset(-5);
     }];
 
     // 白色胶囊 “30 球” （第三行，居中偏右一个）
@@ -265,7 +265,7 @@ static UIColor *PassportCircleStrokeColor(void) {
     }];
     [_goalsUnitLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.equalTo(_goalsValueLabel.mas_right).offset(2);
-        make.bottom.equalTo(_goalsValueLabel).offset(-2);
+        make.bottom.equalTo(_goalsValueLabel).offset(-5);
     }];
 
     // 右侧两列统计（“20 城市”“6 国家”）
