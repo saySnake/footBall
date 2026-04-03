@@ -32,6 +32,23 @@ post_install do |installer|
     end
   end
 
+  # QMUIKit: iOS 部分版本下 `visualProvider.contentView` 不可 KVC，可能触发
+  # NSUnknownKeyException: key contentView。这里每次 pod install 后自动打补丁。
+  qmui_navbar_path = File.join(installer.sandbox.root.to_s, 'QMUIKit', 'QMUIKit', 'UIKitExtensions', 'UINavigationBar+QMUI.m')
+  if File.exist?(qmui_navbar_path)
+    system('chmod', 'u+w', qmui_navbar_path)
+    content = File.read(qmui_navbar_path)
+    # 仅在原始实现存在且尚未打过补丁时替换，保持幂等
+    if content.include?('return [self valueForKeyPath:@"visualProvider.contentView"];') && !content.include?('@try {')
+      content = content.gsub(
+        /- \(UIView \*\)qmui_contentView\s*\{\s*return \[self valueForKeyPath:@\"visualProvider\.contentView\"\];\s*\}/m,
+        %Q(- (UIView *)qmui_contentView {\n    // Some iOS versions no longer expose `visualProvider.contentView` via KVC.\n    // Use a safe fallback to avoid `NSUnknownKeyException` crashes.\n    @try {\n        return [self valueForKeyPath:@"visualProvider.contentView"];\n    } @catch (NSException *exception) {\n        return nil;\n    }\n})
+      )
+      File.write(qmui_navbar_path, content)
+      puts "[post_install] Patched QMUIKit UINavigationBar+QMUI.m (safe KVC)"
+    end
+  end
+
   afn_dir = File.join(installer.sandbox.root.to_s, 'AFNetworking', 'AFNetworking')
   if Dir.exist?(afn_dir)
     Dir.glob(File.join(afn_dir, '*.{h,m}')).each do |path|
