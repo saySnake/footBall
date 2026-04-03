@@ -63,6 +63,12 @@ NS_ASSUME_NONNULL_BEGIN
 /// 75pt （数字）
 @property (nonatomic, strong, readonly) UIFont *font75Regular;
 
+/// 70pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font70Regular;
+
+/// 60pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font60Regular;
+
 /// 36pt （数字）
 @property (nonatomic, strong, readonly) UIFont *font36Regular;
 

@@ -60,18 +60,32 @@
     m.positionMidfieldLabel = NSLocalizedString(@"passport_position_mid", nil) ?: @"中场 Midfield";
     m.positionDefenderLabel = NSLocalizedString(@"passport_position_def", nil) ?: @"后卫 Defender";
 
-    m.abilitySectionTitle = NSLocalizedString(@"passport_ability_detail", nil) ?: @"更详细的能力概览";
+    m.abilitySectionTitle = NSLocalizedString(@"passport_ability_detail", nil) ?: @"线下观赛数据观";
+    m.abilityAverageLevel = 1.45;
     m.abilityItems = [self defaultAbilityItems];
 
-    m.tacticalTitle = NSLocalizedString(@"passport_tactical_bias", nil) ?: @"战术偏向";
-    m.tacticalSegments = @[ @{@"p": @0.55, @"title": NSLocalizedString(@"passport_style_attack", nil) ?: @"进攻"}, @{@"p": @0.35, @"title": NSLocalizedString(@"passport_style_control", nil) ?: @"控制"}, @{@"p": @0.10, @"title": NSLocalizedString(@"passport_style_defend", nil) ?: @"防守"} ];
+    m.tacticalTitle = NSLocalizedString(@"passport_tactical_identity_title", nil) ?: @"观赛身份";
+    m.tacticalIdentityCount = 3;
+    m.tacticalSegments = @[
+        @{ @"p": @0.55, @"title": NSLocalizedString(@"passport_tactical_seg_pro", nil) ?: @"从业者身份" },
+        @{ @"p": @0.35, @"title": NSLocalizedString(@"passport_tactical_seg_media", nil) ?: @"媒体身份" },
+        @{ @"p": @0.10, @"title": NSLocalizedString(@"passport_tactical_seg_family", nil) ?: @"家属陪同" },
+    ];
 
     m.recentGoalsTitle = NSLocalizedString(@"passport_recent_goals_title", nil) ?: @"6 场比赛进球";
     m.recentGoalsSubtitle = NSLocalizedString(@"passport_recent_goals_sub", nil) ?: @"进球分布, 数据统计";
+    m.metricEmotionCount = 6;
+    m.metricHeaderAsideLine1 = NSLocalizedString(@"passport_metric_aside_1", nil) ?: @"我出现了";
+    m.metricHeaderAsideLine2 = NSLocalizedString(@"passport_metric_aside_2", nil) ?: @"种赛后情绪";
+    m.metricBarsPrompt = NSLocalizedString(@"passport_metric_prompt", nil) ?: @"看球之后，我更容易：";
     m.recentMetricBars = @[
-        @{@"title": NSLocalizedString(@"passport_metric_shoot", nil) ?: @"射门", @"v": @0.72},
-        @{@"title": NSLocalizedString(@"passport_metric_pass", nil) ?: @"传球", @"v": @0.58},
-        @{@"title": NSLocalizedString(@"passport_metric_run", nil) ?: @"跑动", @"v": @0.65},
+        @{ @"title": NSLocalizedString(@"passport_metric_emotion_0", nil) ?: @"兴奋", @"value": @21 },
+        @{ @"title": NSLocalizedString(@"passport_metric_emotion_1", nil) ?: @"激动", @"value": @73 },
+        @{ @"title": NSLocalizedString(@"passport_metric_emotion_2", nil) ?: @"希望", @"value": @17 },
+        @{ @"title": NSLocalizedString(@"passport_metric_emotion_3", nil) ?: @"平静", @"value": @12 },
+        @{ @"title": NSLocalizedString(@"passport_metric_emotion_4", nil) ?: @"失望", @"value": @9 },
+        @{ @"title": NSLocalizedString(@"passport_metric_emotion_5", nil) ?: @"遗憾", @"value": @12 },
+        @{ @"title": NSLocalizedString(@"passport_metric_emotion_6", nil) ?: @"暴躁", @"value": @6 },
     ];
 
     m.outcomeTitle = NSLocalizedString(@"passport_outcome_vs_last", nil) ?: @"比上场胜势情况";
@@ -88,23 +102,27 @@
 }
 
 + (NSArray<NSDictionary *> *)defaultAbilityItems {
-    NSArray *pairs = @[
-        @[NSLocalizedString(@"passport_ability_stamina", nil) ?: @"体力", @0.82],
-        @[NSLocalizedString(@"passport_ability_speed", nil) ?: @"速度", @0.71],
-        @[NSLocalizedString(@"passport_ability_pass", nil) ?: @"传球", @0.76],
-        @[NSLocalizedString(@"passport_ability_shoot", nil) ?: @"射门", @0.68],
-        @[NSLocalizedString(@"passport_ability_dribble", nil) ?: @"盘带", @0.55],
-        @[NSLocalizedString(@"passport_ability_defense", nil) ?: @"防守", @0.62],
-        @[NSLocalizedString(@"passport_ability_vision", nil) ?: @"视野", @0.74],
-        @[NSLocalizedString(@"passport_ability_physique", nil) ?: @"身体", @0.69],
-        @[NSLocalizedString(@"passport_ability_balance", nil) ?: @"平衡", @0.61],
-        @[NSLocalizedString(@"passport_ability_reaction", nil) ?: @"反应", @0.77],
-        @[NSLocalizedString(@"passport_ability_jump", nil) ?: @"弹跳", @0.52],
-        @[NSLocalizedString(@"passport_ability_stamina2", nil) ?: @"耐力", @0.79],
+    NSArray<NSString *> *titleKeys = @[
+        @"passport_ability_seat_0", @"passport_ability_seat_1", @"passport_ability_seat_2", @"passport_ability_seat_3",
+        @"passport_ability_seat_4", @"passport_ability_seat_5", @"passport_ability_seat_6", @"passport_ability_seat_7",
+        @"passport_ability_seat_8", @"passport_ability_seat_9", @"passport_ability_seat_10", @"passport_ability_seat_11",
+        @"passport_ability_seat_12", @"passport_ability_seat_13",
+    ];
+    NSArray<NSNumber *> *vals = @[
+        @21, @73, @17, @12, @9, @6, @21, @23, @25, @12, @9, @3, @12, @0,
+    ];
+    NSArray<NSString *> *zhFallbacks = @[
+        @"内场", @"1层", @"2层", @"3层", @"4层", @"包厢层", @"看台区", @"短边", @"场边",
+        @"VIP看台", @"山顶", @"主席台", @"球门后", @"曲线看球",
     ];
     NSMutableArray *out = [NSMutableArray array];
-    for (NSArray *row in pairs) {
-        [out addObject:@{@"title": row[0], @"value": row[1]}];
+    for (NSUInteger i = 0; i < titleKeys.count; i++) {
+        NSString *key = titleKeys[i];
+        NSString *t = NSLocalizedString(key, nil);
+        if (!t.length || [t isEqualToString:key]) {
+            t = zhFallbacks[i];
+        }
+        [out addObject:@{@"title": t, @"value": vals[i]}];
     }
     return [out copy];
 }

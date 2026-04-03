@@ -321,6 +321,30 @@ static UIColor *PassportPageBg(void) {
     if (indexPath.row == 2) {
         return 341;
     }
+    // PassportPossessionCardCell 设计稿固定高度
+    if (indexPath.row == 3) {
+        return 254;
+    }
+    // PassportPositionStrengthCell 设计稿固定高度
+    if (indexPath.row == 4) {
+        return 411;
+    }
+    // PassportAbilityBlockCell 设计稿固定高度
+    if (indexPath.row == 5) {
+        return 522;
+    }
+    // PassportTacticalCell 设计稿（深色标题 + 圆环外百分比 + 图例）
+    if (indexPath.row == 6) {
+        return 430;
+    }
+    // PassportMetricBarsCell 设计稿（90pt 数字 + 7 条情绪 bar）
+    if (indexPath.row == 7) {
+        return 368;
+    }
+    // PassportOutcomeCell 设计稿（标题 + 圆环 + 2x2 图例）
+    if (indexPath.row == 8) {
+        return 416;
+    }
     return UITableViewAutomaticDimension;
 }
 
@@ -330,6 +354,24 @@ static UIColor *PassportPageBg(void) {
     }
     if (indexPath.row == 2) {
         return 341;
+    }
+    if (indexPath.row == 3) {
+        return 254;
+    }
+    if (indexPath.row == 4) {
+        return 411;
+    }
+    if (indexPath.row == 5) {
+        return 522;
+    }
+    if (indexPath.row == 6) {
+        return 430;
+    }
+    if (indexPath.row == 7) {
+        return 368;
+    }
+    if (indexPath.row == 8) {
+        return 416;
     }
     return 200;
 }

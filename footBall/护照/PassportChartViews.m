@@ -112,16 +112,11 @@
     self.gridLayer.frame = self.bounds;
     self.gridLayer.path = grid.CGPath;
 
-    // 柱宽固定 20；居中分布
-    CGFloat barW = (self.barWidth > 0 ? self.barWidth : 20);
+    // X 方向按绘图区宽度均分 n 列，每根柱子在该列内水平居中
     NSInteger n = (NSInteger)self.values.count;
-    CGFloat gap = 6;
-    CGFloat totalW = n * barW + (n - 1) * gap;
-    if (totalW > plotW) {
-        gap = MAX(2, (plotW - n * barW) / MAX(n - 1, 1));
-        totalW = n * barW + (n - 1) * gap;
-    }
-    CGFloat startX = plotX + (plotW - totalW) * 0.5;
+    CGFloat segmentW = plotW / MAX((CGFloat)n, 1);
+    CGFloat desiredBarW = (self.barWidth > 0 ? self.barWidth : 20);
+    CGFloat barW = MIN(desiredBarW, segmentW * 0.72);
 
     // x 轴标题（系统 10）与柱顶数值（font18Regular）
     NSArray<NSString *> *titles = nil;
@@ -139,7 +134,8 @@
         CGFloat v = self.values[i].doubleValue;
         CGFloat ratio = MIN(1, MAX(0, v / maxV));
         CGFloat bh = MAX(4, plotH * ratio);
-        CGFloat x = startX + i * (barW + gap);
+        CGFloat colLeft = plotX + segmentW * i;
+        CGFloat x = colLeft + (segmentW - barW) * 0.5;
         CGFloat y = plotY + plotH - bh;
 
         UIView *bar = [[UIView alloc] initWithFrame:CGRectMake(x, y, barW, bh)];
@@ -149,7 +145,7 @@
         [self addSubview:bar];
         [self.barViews addObject:bar];
 
-        UILabel *vl = [[UILabel alloc] initWithFrame:CGRectMake(x - 12, y - 22, barW + 24, 22)];
+        UILabel *vl = [[UILabel alloc] initWithFrame:CGRectMake(colLeft, y - 22, segmentW, 22)];
         vl.font = FontManager.sharedManager.font18Regular;
         vl.textColor = (i == 3 ? [UIColor blackColor] : [UIColor colorWithWhite:0.5 alpha:1.0]);
         vl.textAlignment = NSTextAlignmentCenter;
@@ -157,7 +153,7 @@
         [self addSubview:vl];
         [self.valueLabels addObject:vl];
 
-        UILabel *xl = [[UILabel alloc] initWithFrame:CGRectMake(x - 24, plotY + plotH + 8, barW + 48, 14)];
+        UILabel *xl = [[UILabel alloc] initWithFrame:CGRectMake(colLeft, plotY + plotH + 8, segmentW, 14)];
         xl.font = [UIFont systemFontOfSize:10];
         xl.textColor = [UIColor colorWithWhite:0.55 alpha:1.0];
         xl.textAlignment = NSTextAlignmentCenter;
@@ -182,9 +178,49 @@
 - (instancetype)initWithFrame:(CGRect)frame {
     if (self = [super initWithFrame:frame]) {
         self.backgroundColor = [UIColor clearColor];
-        _lineWidth = 18;
+        _lineWidth = 24;
+        _ringInnerRadius = 0;
+        _ringTrackExtraWidth = 0;
+        _segmentGapPoints = 0;
+        _showsOutsidePercentLabels = NO;
+        _outsidePercentLabelColor = [UIColor whiteColor];
     }
     return self;
+}
+
+- (void)setRingTrackColor:(UIColor *)ringTrackColor {
+    _ringTrackColor = ringTrackColor;
+    [self setNeedsDisplay];
+}
+
+- (void)setRingTrackExtraWidth:(CGFloat)ringTrackExtraWidth {
+    _ringTrackExtraWidth = ringTrackExtraWidth;
+    [self setNeedsDisplay];
+}
+
+- (void)setSegmentGapPoints:(CGFloat)segmentGapPoints {
+    _segmentGapPoints = segmentGapPoints;
+    [self setNeedsDisplay];
+}
+
+- (void)setRingInnerRadius:(CGFloat)ringInnerRadius {
+    _ringInnerRadius = ringInnerRadius;
+    [self setNeedsDisplay];
+}
+
+- (void)setLineWidth:(CGFloat)lineWidth {
+    _lineWidth = lineWidth;
+    [self setNeedsDisplay];
+}
+
+- (void)setShowsOutsidePercentLabels:(BOOL)showsOutsidePercentLabels {
+    _showsOutsidePercentLabels = showsOutsidePercentLabels;
+    [self setNeedsDisplay];
+}
+
+- (void)setOutsidePercentLabelColor:(UIColor *)outsidePercentLabelColor {
+    _outsidePercentLabelColor = outsidePercentLabelColor ?: [UIColor whiteColor];
+    [self setNeedsDisplay];
 }
 
 - (void)setSegmentRatios:(NSArray<NSNumber *> *)segmentRatios {
@@ -205,31 +241,139 @@
 - (void)drawRect:(CGRect)rect {
     CGContextRef ctx = UIGraphicsGetCurrentContext();
     CGPoint c = CGPointMake(CGRectGetMidX(rect), CGRectGetMidY(rect));
-    CGFloat r = MIN(rect.size.width, rect.size.height) * 0.5f - self.lineWidth * 0.5f;
+    CGFloat half = MIN(rect.size.width, rect.size.height) * 0.5f;
     CGFloat lw = self.lineWidth;
+    CGFloat outsideReserve = self.showsOutsidePercentLabels ? 36.0f : 0.0f;
+    CGFloat trackStroke = lw;
+    if (self.ringTrackColor && self.ringTrackExtraWidth > 0) {
+        trackStroke = lw + self.ringTrackExtraWidth;
+    }
+    CGFloat r;
+    if (self.ringInnerRadius > 0) {
+        r = self.ringInnerRadius + lw * 0.5f;
+    } else {
+        r = half - trackStroke * 0.5f - outsideReserve;
+        if (r < 8.0f) r = 8.0f;
+    }
     CGFloat start = -M_PI_2;
     if (self.segmentRatios.count > 0 && self.segmentColors.count == self.segmentRatios.count) {
-        for (NSUInteger i = 0; i < self.segmentRatios.count; i++) {
+        if (self.ringTrackColor) {
+            UIBezierPath *baseTrack = [UIBezierPath bezierPathWithArcCenter:c radius:r startAngle:0 endAngle:(CGFloat)(2 * M_PI) clockwise:YES];
+            [self.ringTrackColor setStroke];
+            baseTrack.lineWidth = trackStroke;
+            baseTrack.lineCapStyle = kCGLineCapButt;
+            [baseTrack stroke];
+        }
+        NSUInteger n = self.segmentRatios.count;
+        CGFloat gapPt = MAX(0, self.segmentGapPoints);
+        CGFloat gapAngle = (r > 1.0f && gapPt > 0) ? (gapPt / r) : 0;
+        CGFloat totalGapAngle = gapAngle * (CGFloat)n;
+        CGFloat availableAngle = (CGFloat)(2 * M_PI) - totalGapAngle;
+        if (availableAngle < 0.01f) {
+            availableAngle = (CGFloat)(2 * M_PI);
+            gapAngle = 0;
+        }
+        for (NSUInteger i = 0; i < n; i++) {
             CGFloat t = self.segmentRatios[i].doubleValue;
-            CGFloat sweep = (CGFloat)(2 * M_PI * t);
+            CGFloat sweep = t * availableAngle;
             UIBezierPath *p = [UIBezierPath bezierPathWithArcCenter:c radius:r startAngle:start endAngle:start + sweep clockwise:YES];
             [self.segmentColors[i] setStroke];
             p.lineWidth = lw;
             p.lineCapStyle = kCGLineCapButt;
             [p stroke];
             start += sweep;
+            if (gapAngle > 0) {
+                start += gapAngle;
+            }
         }
     } else {
         UIBezierPath *track = [UIBezierPath bezierPathWithArcCenter:c radius:r startAngle:0 endAngle:(CGFloat)(2 * M_PI) clockwise:YES];
         [[UIColor colorWithWhite:0.9 alpha:1] setStroke];
-        track.lineWidth = lw;
+        track.lineWidth = self.ringTrackColor ? trackStroke : lw;
         [track stroke];
+    }
+    if (self.showsOutsidePercentLabels && self.segmentRatios.count > 0 && self.segmentColors.count == self.segmentRatios.count) {
+        UIFont *pf = [UIFont systemFontOfSize:24 weight:UIFontWeightBold];
+        UIColor *tc = self.outsidePercentLabelColor ?: [UIColor whiteColor];
+        NSDictionary *attrs = @{ NSFontAttributeName: pf, NSForegroundColorAttributeName: tc };
+        CGFloat rOuter = r + lw * 0.5f;
+        NSUInteger n = self.segmentRatios.count;
+        CGFloat gapPt = MAX(0, self.segmentGapPoints);
+        CGFloat gapAngle = (r > 1.0f && gapPt > 0) ? (gapPt / r) : 0;
+        CGFloat totalGapAngle = gapAngle * (CGFloat)n;
+        CGFloat availableAngle = (CGFloat)(2 * M_PI) - totalGapAngle;
+        if (availableAngle < 0.01f) {
+            availableAngle = (CGFloat)(2 * M_PI);
+            gapAngle = 0;
+        }
+        start = -M_PI_2;
+        for (NSUInteger i = 0; i < self.segmentRatios.count; i++) {
+            CGFloat t = self.segmentRatios[i].doubleValue;
+            CGFloat sweep = t * availableAngle;
+            CGFloat mid = start + sweep * 0.5f;
+            NSString *pct = [NSString stringWithFormat:@"%.0f%%", t * 100];
+            CGSize textSize = [pct boundingRectWithSize:CGSizeMake(200, 40)
+                                                 options:NSStringDrawingUsesLineFragmentOrigin
+                                              attributes:attrs
+                                                 context:nil].size;
+            textSize.width = ceil(textSize.width);
+            textSize.height = ceil(textSize.height);
+            // Web 扇形图常见 labelLine：圆环外缘 → 径向第一段 → 水平第二段接到文字边缘（无竖线）
+            CGFloat L1 = 20.0f;
+            CGPoint tip = CGPointMake(c.x + cos(mid) * rOuter, c.y + sin(mid) * rOuter);
+            CGPoint p1 = CGPointMake(c.x + cos(mid) * (rOuter + L1), c.y + sin(mid) * (rOuter + L1));
+            CGFloat hy = p1.y;
+            BOOL rightSide = cos(mid) >= 0.0;
+            CGFloat edgePad = 4.0f;
+            CGFloat horizGap = 10.0f;
+            CGFloat minX = 2.0f;
+            CGFloat maxX = CGRectGetWidth(rect) - 2.0f;
+            CGRect tr;
+            CGFloat pEndX = p1.x;
+            if (rightSide) {
+                CGFloat tx = MAX(p1.x + horizGap, c.x + rOuter + L1 + 6.0f);
+                tx = MIN(tx, maxX - textSize.width);
+                tr = CGRectMake(tx, hy - textSize.height * 0.5f, textSize.width, textSize.height);
+                pEndX = CGRectGetMinX(tr) - edgePad;
+                if (pEndX <= p1.x) {
+                    pEndX = p1.x + 2.0f;
+                }
+            } else {
+                CGFloat tx = p1.x - horizGap - textSize.width;
+                tx = MAX(tx, minX);
+                tr = CGRectMake(tx, hy - textSize.height * 0.5f, textSize.width, textSize.height);
+                pEndX = CGRectGetMaxX(tr) + edgePad;
+                if (pEndX >= p1.x) {
+                    pEndX = p1.x - 2.0f;
+                }
+            }
+            CGFloat inset = 2.0f;
+            if (CGRectGetMinY(tr) < inset) {
+                tr.origin.y = inset;
+            }
+            if (CGRectGetMaxY(tr) > CGRectGetHeight(rect) - inset) {
+                tr.origin.y = CGRectGetHeight(rect) - inset - textSize.height;
+            }
+            CGContextSaveGState(ctx);
+            CGContextSetStrokeColorWithColor(ctx, [[UIColor colorWithWhite:1 alpha:0.4] CGColor]);
+            CGContextSetLineWidth(ctx, 1);
+            CGContextMoveToPoint(ctx, tip.x, tip.y);
+            CGContextAddLineToPoint(ctx, p1.x, p1.y);
+            CGContextAddLineToPoint(ctx, pEndX, hy);
+            CGContextStrokePath(ctx);
+            CGContextRestoreGState(ctx);
+            [pct drawInRect:tr withAttributes:attrs];
+            start += sweep;
+            if (gapAngle > 0) {
+                start += gapAngle;
+            }
+        }
     }
     if (self.centerText.length) {
         NSMutableParagraphStyle *ps = [[NSMutableParagraphStyle alloc] init];
         ps.alignment = NSTextAlignmentCenter;
         NSDictionary *attr = @{
-            NSFontAttributeName: [UIFont systemFontOfSize:18 weight:UIFontWeightBold],
+            NSFontAttributeName: FontManager.sharedManager.font40Regular,
             NSForegroundColorAttributeName: [UIColor colorWithWhite:0.15 alpha:1],
             NSParagraphStyleAttributeName: ps
         };

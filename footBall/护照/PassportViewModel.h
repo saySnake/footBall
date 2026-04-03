@@ -52,13 +52,23 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSString *positionDefenderLabel;
 
 @property (nonatomic, copy) NSString *abilitySectionTitle;
+/// 副标题中间数字，如 1.45（线下观赛平均层数）
+@property (nonatomic, assign) CGFloat abilityAverageLevel;
 @property (nonatomic, copy) NSArray<NSDictionary *> *abilityItems;
 
 @property (nonatomic, copy) NSString *tacticalTitle;
+/// 副标题中的身份种类数量，如「我以 3 种身份看比赛」中的 3
+@property (nonatomic, assign) NSInteger tacticalIdentityCount;
 @property (nonatomic, strong) NSArray<NSDictionary *> *tacticalSegments;
 
 @property (nonatomic, copy) NSString *recentGoalsTitle;
 @property (nonatomic, copy) NSString *recentGoalsSubtitle;
+/// 赛后情绪条：左侧大数字（如 6），旁白两行说明
+@property (nonatomic, assign) NSInteger metricEmotionCount;
+@property (nonatomic, copy) NSString *metricHeaderAsideLine1;
+@property (nonatomic, copy) NSString *metricHeaderAsideLine2;
+@property (nonatomic, copy) NSString *metricBarsPrompt;
+/// 每项 @{ @"title": @"兴奋", @"value": @21 }，value 为整数，条长按同批最大值归一
 @property (nonatomic, copy) NSArray<NSDictionary *> *recentMetricBars;
 
 @property (nonatomic, copy) NSString *outcomeTitle;

@@ -130,6 +130,14 @@ static NSString *FontManagerNeuePostScriptName(void) {
     return [self neueFontOfSize:75.0f fallbackWeight:UIFontWeightRegular];
 }
 
+- (UIFont *)font70Regular {
+    return [self neueFontOfSize:70.0f fallbackWeight:UIFontWeightRegular];
+}
+
+- (UIFont *)font60Regular {
+    return [self neueFontOfSize:60.0f fallbackWeight:UIFontWeightRegular];
+}
+
 - (UIFont *)font36Regular {
     return [self neueFontOfSize:36.0f fallbackWeight:UIFontWeightRegular];
 }
