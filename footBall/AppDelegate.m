@@ -17,6 +17,7 @@
 #import <DoraemonKit/DoraemonManager.h>
 
 #ifdef DEBUG
+#import <easydebug/EasyDebug.h>
 #import "EasyDebugPositionConfig.h"
 #endif
 
@@ -101,21 +102,19 @@
     
     // 初始化DoKit（仅在Debug模式下启用）
     // 注意：DoKit 的初始化移到 SceneDelegate 中，通过 BVAPPDebugTool 统一管理
-    #ifdef DEBUG
-        NSLog(@"✅ AppDelegate: DoKit 将在 SceneDelegate 中初始化");
-        
-        
-//        [EasyDebugPositionConfig configButtonPosition:1  // 1=右下角
-//                                           offsetX:0
-//                                           offsetY:-10];
-
-//        // 记录启动日志
-//        [EasyDebug logWithTag:@"AppLifecycle" 
-//                          log:@"应用启动 - EasyDebug 已初始化"];
-        
-        NSLog(@"✅ EasyDebug 已初始化");
-    #endif
+#ifdef DEBUG
+    NSLog(@"✅ AppDelegate: DoKit 将在 SceneDelegate 中初始化");
     
+    // 初始化 EasyDebug
+    [EasyDebug shared].isOn = YES;
+    // 配置模块：网络监控 + 性能监控
+    EasyDebugModule modules = EasyDebugNetMonitor | EasyDebugPerformance;
+    [EasyDebug config:modules];
+    
+    
+    NSLog(@"✅ EasyDebug 已初始化");
+#endif
+
     
     return YES;
 }

@@ -6,14 +6,26 @@
 #import "MyQRCodeViewController.h"
 #import <Masonry/Masonry.h>
 #import <CoreImage/CoreImage.h>
-#import "ColorManager.h"
+#import <SDWebImage/SDWebImage.h>
+#import "AuthManager.h"
+#import "UserRequest.h"
 
-#define kQRGreen   [ColorManager sharedManager].primaryColor
-#define kQRBgColor [ColorManager sharedManager].primaryDarkColor
+/// 与社区页一致的深色背景 #0D2122
+static UIColor *kQRPageBg(void) {
+    return [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0];
+}
+/// 品牌绿 #285D4B
+static UIColor *kQRBrandGreen(void) {
+    return [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0];
+}
+static UIColor *kQRSecondaryText(void) {
+    return [UIColor colorWithRed:0.612 green:0.643 blue:0.671 alpha:1.0];
+}
 
 @interface MyQRCodeViewController ()
 @property (nonatomic, strong) UILabel *navTitleLabel;
-@property (nonatomic, strong) UIView  *cardView;
+@property (nonatomic, strong) UIView *navBar;
+@property (nonatomic, strong) UIView *cardView;
 @property (nonatomic, strong) UIImageView *avatarView;
 @property (nonatomic, strong) UILabel *nameLabel;
 @property (nonatomic, strong) UILabel *idLabel;
@@ -28,155 +40,179 @@
     self.hidesBottomBarWhenPushed = YES;
     [super viewDidLoad];
     self.shouldShowNavigationBar = NO;
-    self.view.backgroundColor = kQRBgColor;
+    self.view.backgroundColor = kQRPageBg();
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    __weak typeof(self) weakSelf = self;
+    [UserRequest.shared getUserQRCodeSuccess:^(HTTPResponse * _Nullable responseObject) {
+        [weakSelf applyProfileToQRImage];
+    } failure:^(NSError * _Nonnull error) {
+        [weakSelf applyProfileToQRImage];
+    }];
 }
 
 - (void)setupUI {
-    // 顶部导航栏
-    UIView *navBar = [UIView new];
-    navBar.backgroundColor = [UIColor clearColor];
-    [self.view addSubview:navBar];
-    [navBar mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.leading.trailing.equalTo(self.view);
-        make.height.mas_equalTo(88);
-    }];
+    self.view.backgroundColor = kQRPageBg();
+
+    self.navBar = [UIView new];
+    self.navBar.backgroundColor = kQRPageBg();
+    [self.view addSubview:self.navBar];
 
     UIButton *backBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    if (@available(iOS 13.0, *)) {
-        [backBtn setImage:[UIImage systemImageNamed:@"arrow.left"] forState:UIControlStateNormal];
+    UIImage *backIcon = [UIImage imageNamed:@"ad_left"];
+    if (!backIcon && @available(iOS 13.0, *)) {
+        backIcon = [UIImage systemImageNamed:@"arrow.left"];
     }
+    [backBtn setImage:backIcon forState:UIControlStateNormal];
     backBtn.tintColor = [UIColor whiteColor];
     [backBtn addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
-    [navBar addSubview:backBtn];
-    [backBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(navBar).offset(16);
-        make.bottom.equalTo(navBar).offset(-12);
-        make.size.mas_equalTo(CGSizeMake(32, 32));
-    }];
+    [self.navBar addSubview:backBtn];
 
     self.navTitleLabel = [UILabel new];
-    self.navTitleLabel.font = [UIFont boldSystemFontOfSize:17];
+    self.navTitleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
     self.navTitleLabel.textColor = [UIColor whiteColor];
-    [navBar addSubview:self.navTitleLabel];
+    self.navTitleLabel.text = NSLocalizedString(@"community_my_qrcode", nil);
+    [self.navBar addSubview:self.navTitleLabel];
+
+    [backBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.navBar).offset(12);
+        make.top.equalTo(self.view.mas_safeAreaLayoutGuideTop).offset(8);
+        make.size.mas_equalTo(CGSizeMake(32, 32));
+    }];
     [self.navTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(navBar);
+        make.centerX.equalTo(self.navBar);
         make.centerY.equalTo(backBtn);
     }];
+    [self.navBar mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.leading.trailing.equalTo(self.view);
+        make.bottom.equalTo(backBtn.mas_bottom).offset(12);
+    }];
 
-    // 白色卡片
     self.cardView = [UIView new];
     self.cardView.backgroundColor = [UIColor whiteColor];
-    self.cardView.layer.cornerRadius = 20;
+    self.cardView.layer.cornerRadius = 16;
+    self.cardView.layer.masksToBounds = NO;
     self.cardView.layer.shadowColor = [UIColor blackColor].CGColor;
-    self.cardView.layer.shadowOpacity = 0.15;
+    self.cardView.layer.shadowOpacity = 0.08;
     self.cardView.layer.shadowOffset = CGSizeMake(0, 4);
-    self.cardView.layer.shadowRadius = 12;
+    self.cardView.layer.shadowRadius = 16;
     [self.view addSubview:self.cardView];
-    [self.cardView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(navBar.mas_bottom).offset(24);
-        make.leading.equalTo(self.view).offset(24);
-        make.trailing.equalTo(self.view).offset(-24);
-    }];
-
-    // 头像（带彩色渐变边框环）
-    UIView *avatarRing = [UIView new];
-    avatarRing.layer.cornerRadius = 36;
-    avatarRing.clipsToBounds = YES;
-    // 渐变边框用 CAGradientLayer
-    CAGradientLayer *grad = [CAGradientLayer layer];
-    grad.colors = @[
-        (__bridge id)[UIColor colorWithRed:0.36 green:0.20 blue:0.90 alpha:1.0].CGColor,
-        (__bridge id)[UIColor colorWithRed:0.20 green:0.60 blue:0.95 alpha:1.0].CGColor,
-        (__bridge id)[UIColor colorWithRed:0.95 green:0.40 blue:0.20 alpha:1.0].CGColor,
-    ];
-    grad.startPoint = CGPointMake(0, 0);
-    grad.endPoint   = CGPointMake(1, 1);
-    grad.frame = CGRectMake(0, 0, 72, 72);
-    [avatarRing.layer addSublayer:grad];
-    [self.cardView addSubview:avatarRing];
-    [avatarRing mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.cardView).offset(24);
-        make.centerX.equalTo(self.cardView);
-        make.size.mas_equalTo(CGSizeMake(72, 72));
-    }];
 
     self.avatarView = [UIImageView new];
-    self.avatarView.layer.cornerRadius = 31;
-    self.avatarView.clipsToBounds = YES;
     self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
+    self.avatarView.layer.cornerRadius = 50;
+    self.avatarView.clipsToBounds = YES;
+    self.avatarView.layer.borderWidth = 3;
+    self.avatarView.layer.borderColor = [UIColor whiteColor].CGColor;
+    self.avatarView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
     if (@available(iOS 13.0, *)) {
         self.avatarView.image = [UIImage systemImageNamed:@"person.crop.circle.fill"];
-        self.avatarView.tintColor = [UIColor colorWithRed:0.55 green:0.40 blue:0.85 alpha:1.0];
+        self.avatarView.tintColor = [UIColor colorWithWhite:0.75 alpha:1.0];
     }
-    [avatarRing addSubview:self.avatarView];
+    [self.view addSubview:self.avatarView];
+    [self.view bringSubviewToFront:self.avatarView];
+
     [self.avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.center.equalTo(avatarRing);
-        make.size.mas_equalTo(CGSizeMake(62, 62));
+        make.centerX.equalTo(self.view);
+        make.top.equalTo(self.navTitleLabel.mas_bottom).offset(65);
+        make.size.mas_equalTo(CGSizeMake(100, 100));
+    }];
+    [self.cardView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.avatarView.mas_centerY);
+        make.leading.equalTo(self.view).offset(20);
+        make.trailing.equalTo(self.view).offset(-20);
     }];
 
-    // 姓名
     self.nameLabel = [UILabel new];
-    self.nameLabel.font = [UIFont boldSystemFontOfSize:17];
+    self.nameLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
     self.nameLabel.textColor = [UIColor blackColor];
-    self.nameLabel.text = @"Arisha Ireen";
     self.nameLabel.textAlignment = NSTextAlignmentCenter;
     [self.cardView addSubview:self.nameLabel];
     [self.nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(avatarRing.mas_bottom).offset(12);
-        make.centerX.equalTo(self.cardView);
-        make.leading.trailing.equalTo(self.cardView).insets(UIEdgeInsetsMake(0, 12, 0, 12));
+        make.top.equalTo(self.avatarView.mas_bottom).offset(12);
+        make.leading.equalTo(self.cardView).offset(16);
+        make.trailing.equalTo(self.cardView).offset(-16);
     }];
 
-    // ID
     self.idLabel = [UILabel new];
     self.idLabel.font = [UIFont systemFontOfSize:13];
-    self.idLabel.textColor = [UIColor grayColor];
-    self.idLabel.text = @"ID：145477487";
+    self.idLabel.textColor = [UIColor blackColor];
     self.idLabel.textAlignment = NSTextAlignmentCenter;
     [self.cardView addSubview:self.idLabel];
     [self.idLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.nameLabel.mas_bottom).offset(4);
+        make.top.equalTo(self.nameLabel.mas_bottom).offset(6);
         make.centerX.equalTo(self.cardView);
     }];
 
-    // 二维码图片
     self.qrImageView = [UIImageView new];
     self.qrImageView.contentMode = UIViewContentModeScaleAspectFit;
-    self.qrImageView.image = [self generateQRCodeWithString:@"footballapp://user/145477487" size:180];
+    self.qrImageView.backgroundColor = [UIColor whiteColor];
     [self.cardView addSubview:self.qrImageView];
     [self.qrImageView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.idLabel.mas_bottom).offset(20);
+        make.top.equalTo(self.idLabel.mas_bottom).offset(24);
         make.centerX.equalTo(self.cardView);
-        make.size.mas_equalTo(CGSizeMake(180, 180));
+        make.size.mas_equalTo(CGSizeMake(228, 228));
     }];
 
-    // 提示文字
     self.hintLabel = [UILabel new];
-    self.hintLabel.font = [UIFont systemFontOfSize:13];
-    self.hintLabel.textColor = [UIColor grayColor];
+    self.hintLabel.font = [FontManager fontOfSize:14];
+    self.hintLabel.textColor = [UIColor blackColor];
     self.hintLabel.textAlignment = NSTextAlignmentCenter;
+    self.hintLabel.numberOfLines = 2;
     [self.cardView addSubview:self.hintLabel];
     [self.hintLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.qrImageView.mas_bottom).offset(16);
-        make.centerX.equalTo(self.cardView);
+        make.top.equalTo(self.qrImageView.mas_bottom).offset(20);
+        make.leading.equalTo(self.cardView).offset(16);
+        make.trailing.equalTo(self.cardView).offset(-16);
         make.bottom.equalTo(self.cardView).offset(-24);
     }];
 
-    // 保存图片按钮
-    self.saveBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.saveBtn.backgroundColor = kQRGreen;
+    self.saveBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.saveBtn.backgroundColor = kQRBrandGreen();
     self.saveBtn.layer.cornerRadius = 22;
-    self.saveBtn.titleLabel.font = [UIFont boldSystemFontOfSize:16];
+    self.saveBtn.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
     [self.saveBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     [self.saveBtn addTarget:self action:@selector(onSave) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.saveBtn];
     [self.saveBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.cardView.mas_bottom).offset(32);
+        make.top.equalTo(self.cardView.mas_bottom).offset(67);
         make.leading.equalTo(self.view).offset(24);
         make.trailing.equalTo(self.view).offset(-24);
         make.height.mas_equalTo(44);
-        make.bottom.lessThanOrEqualTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-24);
+        make.bottom.lessThanOrEqualTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-20);
     }];
+
+    [self applyProfileToUI];
+}
+
+- (void)applyProfileToUI {
+    UserProfile *p = AuthManager.sharedManager.user.profile;
+    self.nameLabel.text = p.nickname.length > 0 ? p.nickname : @"-";
+    self.idLabel.text = [NSString stringWithFormat:NSLocalizedString(@"profile_id_format", nil), p.userId.length > 0 ? p.userId : @"-"];
+    NSURL *avURL = p.avatar.length > 0 ? [NSURL URLWithString:p.avatar] : nil;
+    UIImage *placeholder = (@available(iOS 13.0, *)) ? [UIImage systemImageNamed:@"person.crop.circle.fill"] : nil;
+    __weak typeof(self) weakSelf = self;
+    [self.avatarView sd_setImageWithURL:avURL placeholderImage:placeholder completed:^(UIImage * _Nullable image, NSError * _Nullable error, SDImageCacheType cacheType, NSURL * _Nullable imageURL) {
+        if (!image && @available(iOS 13.0, *)) {
+            weakSelf.avatarView.tintColor = [UIColor colorWithWhite:0.75 alpha:1.0];
+            weakSelf.avatarView.contentMode = UIViewContentModeCenter;
+        } else {
+            weakSelf.avatarView.tintColor = nil;
+            weakSelf.avatarView.contentMode = UIViewContentModeScaleAspectFill;
+        }
+    }];
+    [self applyProfileToQRImage];
+}
+
+- (void)applyProfileToQRImage {
+    UserProfile *p = AuthManager.sharedManager.user.profile;
+    NSString *payload = p.qrCode.length > 0 ? p.qrCode : [NSString stringWithFormat:@"footballapp://user/%@", p.userId ?: @""];
+    if (payload.length == 0) {
+        payload = @"footballapp://user";
+    }
+    self.qrImageView.image = [self generateQRCodeWithString:payload size:200];
 }
 
 - (void)updateLocalizedStrings {
@@ -191,14 +227,23 @@
 }
 
 - (void)onSave {
-    // 将卡片截图保存到相册
-    UIGraphicsBeginImageContextWithOptions(self.cardView.bounds.size, NO, [UIScreen mainScreen].scale);
-    [self.cardView drawViewHierarchyInRect:self.cardView.bounds afterScreenUpdates:YES];
+    [self.view layoutIfNeeded];
+    CGRect cardBounds = self.cardView.bounds;
+    if (cardBounds.size.width < 1.0 || cardBounds.size.height < 1.0) {
+        [self showToast:NSLocalizedString(@"community_qrcode_save_fail", nil)];
+        return;
+    }
+
+    UIGraphicsBeginImageContextWithOptions(cardBounds.size, NO, [UIScreen mainScreen].scale);
+    [self.cardView drawViewHierarchyInRect:cardBounds afterScreenUpdates:YES];
     UIImage *snapshot = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
-    if (snapshot) {
-        UIImageWriteToSavedPhotosAlbum(snapshot, self, @selector(image:didFinishSavingWithError:contextInfo:), nil);
+    if (!snapshot) {
+        [self showToast:NSLocalizedString(@"community_qrcode_save_fail", nil)];
+        return;
     }
+
+    UIImageWriteToSavedPhotosAlbum(snapshot, self, @selector(image:didFinishSavingWithError:contextInfo:), nil);
 }
 
 - (void)image:(UIImage *)image didFinishSavingWithError:(NSError *)error contextInfo:(void *)contextInfo {
@@ -211,7 +256,7 @@
     toast.text = message;
     toast.font = [UIFont systemFontOfSize:14];
     toast.textColor = [UIColor whiteColor];
-    toast.backgroundColor = [UIColor colorWithWhite:0 alpha:0.7];
+    toast.backgroundColor = [UIColor colorWithWhite:0 alpha:0.72];
     toast.textAlignment = NSTextAlignmentCenter;
     toast.layer.cornerRadius = 16;
     toast.clipsToBounds = YES;
@@ -234,7 +279,6 @@
     }];
 }
 
-// 生成二维码
 - (UIImage *)generateQRCodeWithString:(NSString *)string size:(CGFloat)size {
     NSData *data = [string dataUsingEncoding:NSUTF8StringEncoding];
     CIFilter *filter = [CIFilter filterWithName:@"CIQRCodeGenerator"];

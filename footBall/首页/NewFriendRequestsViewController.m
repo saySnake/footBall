@@ -224,8 +224,7 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     [super viewDidLoad];
     self.view.backgroundColor = kRequestPageBg;
     self.shouldShowNavigationBar = NO;
-    [self setupUI];
-    [self updateLocalizedStrings];
+    // 勿再次调用 setupUI / updateLocalizedStrings：QMBaseViewController.viewDidLoad 已调用，重复会导致头部与列表叠两层
 }
 
 - (void)loadRemoteData {
@@ -263,7 +262,11 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     self.headerView.backgroundColor = kRequestHeaderBg;
     [self.view addSubview:self.headerView];
     UIButton *backBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    if (@available(iOS 13.0, *)) [backBtn setImage:[UIImage systemImageNamed:@"arrow.left"] forState:UIControlStateNormal];
+    UIImage *backIcon = [UIImage imageNamed:@"ad_left"];
+    if (!backIcon && @available(iOS 13.0, *)) {
+        backIcon = [UIImage systemImageNamed:@"arrow.left"];
+    }
+    [backBtn setImage:backIcon forState:UIControlStateNormal];
     backBtn.tintColor = [UIColor whiteColor];
     [backBtn addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
     [self.headerView addSubview:backBtn];
@@ -282,8 +285,8 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     self.searchField.font = [UIFont systemFontOfSize:14];
     self.searchField.delegate = self;
     self.searchField.returnKeyType = UIReturnKeySearch;
-    self.searchField.placeholder = NSLocalizedString(@"community_search_placeholder", nil);
     [searchBg addSubview:self.searchField];
+    [self applySearchFieldPlaceholderAndColors];
     self.searchBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     self.searchBtn.backgroundColor = kRequestGreen;
     self.searchBtn.layer.cornerRadius = 20;
@@ -308,7 +311,24 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     [searchIcon mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(searchBg).offset(12); make.centerY.equalTo(searchBg); make.size.mas_equalTo(CGSizeMake(18, 18)); }];
     [self.searchBtn mas_makeConstraints:^(MASConstraintMaker *make) { make.trailing.equalTo(searchBg).offset(-4); make.centerY.equalTo(searchBg); make.size.mas_equalTo(CGSizeMake(77, 40)); }];
     [self.searchField mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(searchIcon.mas_trailing).offset(8); make.trailing.equalTo(self.searchBtn.mas_leading).offset(-6); make.centerY.equalTo(searchBg); }];
-    [self.tableView mas_makeConstraints:^(MASConstraintMaker *make) { make.top.equalTo(self.headerView.mas_bottom).offset(8); make.leading.trailing.bottom.equalTo(self.view); }];
+    [self.tableView mas_makeConstraints:^(MASConstraintMaker *make) { make.top.equalTo(self.headerView.mas_bottom); make.leading.trailing.bottom.equalTo(self.view); }];
+}
+
+- (void)applySearchFieldPlaceholderAndColors {
+    if (!self.searchField) return;
+    NSString *ph = NSLocalizedString(@"community_search_placeholder", nil);
+    UIFont *font = self.searchField.font ?: [UIFont systemFontOfSize:14];
+    UIColor *placeholderGreen = kRequestGreen;
+    UIColor *inputBlack = [UIColor blackColor];
+    self.searchField.textColor = inputBlack;
+    self.searchField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:ph attributes:@{
+        NSForegroundColorAttributeName: placeholderGreen,
+        NSFontAttributeName: font
+    }];
+    self.searchField.typingAttributes = @{
+        NSFontAttributeName: font,
+        NSForegroundColorAttributeName: inputBlack
+    };
 }
 
 - (void)onBack { [self.navigationController popViewControllerAnimated:YES]; }
@@ -351,9 +371,13 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     header.backgroundColor = [UIColor clearColor];
     UILabel *label = [UILabel new];
     label.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    label.textColor = [UIColor blackColor];
     label.text = self.isSearching ? NSLocalizedString(@"community_week_ago", nil) : (section == 0 ? NSLocalizedString(@"community_recent_3days", nil) : NSLocalizedString(@"community_week_ago", nil));
     [header addSubview:label];
-    [label mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(header).offset(16); make.centerY.equalTo(header); }];
+    [label mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(header).offset(16);
+        make.top.equalTo(header);
+    }];
     return header;
 }
 - (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section { return 36; }
@@ -455,7 +479,7 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
 - (void)updateLocalizedStrings {
     [super updateLocalizedStrings];
     self.titleLabel.text = NSLocalizedString(@"community_new_friends", nil);
-    self.searchField.placeholder = NSLocalizedString(@"community_search_placeholder", nil);
+    [self applySearchFieldPlaceholderAndColors];
     [self.searchBtn setTitle:NSLocalizedString(@"community_search", nil) forState:UIControlStateNormal];
     [self.tableView reloadData];
 }

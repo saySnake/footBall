@@ -152,6 +152,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
 @end
 
+//周榜cell
 @interface CommunityRankCell : UITableViewCell
 @property (nonatomic, strong) UILabel *rankLabel;
 @property (nonatomic, strong) UIImageView *avatarView;
@@ -201,7 +202,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         }];
         [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_avatarView.mas_trailing).offset(10);
-            make.top.equalTo(_avatarView).offset(4);
+            make.top.equalTo(_avatarView).offset(14);
             make.trailing.lessThanOrEqualTo(_gamesLabel.mas_leading).offset(-10);
         }];
         [_teamLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -245,14 +246,6 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 @property (nonatomic, strong) UIButton *rankTab;
 @property (nonatomic, strong) UIButton *addFriendBtn;
 @property (nonatomic, strong) UIButton *qrCodeBtn;
-@property (nonatomic, strong) UIView *requestCardView;
-@property (nonatomic, strong) UIImageView *requestAvatarView;
-@property (nonatomic, strong) UILabel *requestNameLabel;
-@property (nonatomic, strong) UILabel *requestIdLabel;
-@property (nonatomic, strong) UILabel *requestMessageLabel;
-@property (nonatomic, strong) UIButton *requestAgreeBtn;
-@property (nonatomic, strong) UIButton *requestCloseBtn;
-@property (nonatomic, copy) NSString *pendingRequestId;
 @property (nonatomic, strong) UIView *pendingBadgeView;
 @property (nonatomic, strong) UILabel *pendingBadgeLabel;
 @property (nonatomic, strong) UILabel *sectionLabel;
@@ -318,24 +311,6 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     } failure:^(NSError * _Nonnull error) {
         weakSelf.friends = @[];
         [weakSelf.tableView reloadData];
-    }];
-
-    [SocialRequest.shared getFriendRequestsSuccess:^(HTTPResponse * _Nullable responseObject) {
-        PNFriendRequestPage *page = [responseObject.dataObject isKindOfClass:PNFriendRequestPage.class] ? responseObject.dataObject : nil;
-        PNFriendRequest *req = page.list.firstObject;
-        if (!req) return;
-        // 仅展示待处理的请求
-        if (req.status.length > 0 && ![req.status isEqualToString:@"PENDING"]) return;
-        weakSelf.pendingRequestId = req.requestId ?: @"";
-        weakSelf.requestNameLabel.text = req.fromUserNickname.length > 0 ? req.fromUserNickname : @"-";
-        weakSelf.requestIdLabel.text = [NSString stringWithFormat:NSLocalizedString(@"community_id_format", nil), (req.fromUserId ?: @"")];
-        weakSelf.requestMessageLabel.text = req.message.length > 0 ? req.message : (NSLocalizedString(@"community_request_message", nil).length > 0 ? NSLocalizedString(@"community_request_message", nil) : @"看你的护照很精彩，想添加您为好友");
-        NSURL *url = req.fromUserAvatar.length > 0 ? [NSURL URLWithString:req.fromUserAvatar] : nil;
-        UIImage *placeholder = (@available(iOS 13.0, *)) ? [UIImage systemImageNamed:@"person.crop.circle.fill"] : nil;
-        [weakSelf.requestAvatarView sd_setImageWithURL:url placeholderImage:placeholder];
-        weakSelf.requestAvatarView.contentMode = url ? UIViewContentModeScaleAspectFill : UIViewContentModeCenter;
-        weakSelf.requestCardView.hidden = (weakSelf.pendingCount <= 0 || !weakSelf.isFriendsTab);
-    } failure:^(NSError * _Nonnull error) {
     }];
 
     [SocialRequest.shared getFriendRequestsPendingCountSuccess:^(HTTPResponse * _Nullable responseObject) {
@@ -414,49 +389,9 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     [self.view addSubview:self.qrCodeBtn];
 
     self.sectionLabel = [[UILabel alloc] init];
-    self.sectionLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    self.sectionLabel.textColor = [UIColor blackColor];
+    self.sectionLabel.font = FontManager.sharedManager.font16;
     [self.view addSubview:self.sectionLabel];
-
-    self.requestCardView = [[UIView alloc] init];
-    self.requestCardView.backgroundColor = [UIColor whiteColor];
-    self.requestCardView.layer.cornerRadius = 6;
-    [self.view addSubview:self.requestCardView];
-    self.requestAvatarView = [[UIImageView alloc] init];
-    self.requestAvatarView.layer.cornerRadius = 20;
-    self.requestAvatarView.clipsToBounds = YES;
-    self.requestAvatarView.backgroundColor = [UIColor colorWithWhite:0.9 alpha:1.0];
-    [self.requestCardView addSubview:self.requestAvatarView];
-    self.requestNameLabel = [[UILabel alloc] init];
-    self.requestNameLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
-    [self.requestCardView addSubview:self.requestNameLabel];
-    self.requestIdLabel = [[UILabel alloc] init];
-    self.requestIdLabel.font = [UIFont systemFontOfSize:12];
-    self.requestIdLabel.textColor = [UIColor colorWithWhite:0.41 alpha:1.0];
-    [self.requestCardView addSubview:self.requestIdLabel];
-    self.requestMessageLabel = [[UILabel alloc] init];
-    self.requestMessageLabel.font = [UIFont systemFontOfSize:12];
-    self.requestMessageLabel.textColor = [UIColor colorWithWhite:0.40 alpha:1.0];
-    self.requestMessageLabel.numberOfLines = 1;
-    [self.requestCardView addSubview:self.requestMessageLabel];
-    self.requestAgreeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.requestAgreeBtn.layer.cornerRadius = 15;
-    self.requestAgreeBtn.backgroundColor = kCommunityGreen;
-    self.requestAgreeBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
-    [self.requestAgreeBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    [self.requestAgreeBtn addTarget:self action:@selector(onAcceptPendingRequest) forControlEvents:UIControlEventTouchUpInside];
-    [self.requestCardView addSubview:self.requestAgreeBtn];
-    self.requestCloseBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.requestCloseBtn.layer.cornerRadius = 10;
-    self.requestCloseBtn.backgroundColor = [UIColor blackColor];
-    [self.requestCloseBtn setTitle:@"×" forState:UIControlStateNormal];
-    [self.requestCloseBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    self.requestCloseBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightBold];
-    [self.requestCloseBtn addTarget:self action:@selector(onDismissRequestCard) forControlEvents:UIControlEventTouchUpInside];
-    [self.requestCardView addSubview:self.requestCloseBtn];
-    if (@available(iOS 13.0, *)) {
-        self.requestAvatarView.image = [UIImage systemImageNamed:@"person.crop.circle.fill"];
-        self.requestAvatarView.tintColor = [UIColor colorWithWhite:0.7 alpha:1.0];
-    }
 
     self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
     self.tableView.backgroundColor = [UIColor clearColor];
@@ -469,7 +404,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
     [self.headerView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.leading.trailing.equalTo(self.view);
-        self.headerHeightConstraint = make.height.mas_equalTo(166);
+        self.headerHeightConstraint = make.height.mas_equalTo(146);
     }];
     [self.titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self.headerView);
@@ -513,7 +448,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     }
     [self.rankFilterContainer mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.trailing.equalTo(self.headerView);
-        make.top.equalTo(self.switchBgView.mas_bottom).offset(12);
+        make.top.equalTo(self.switchBgView.mas_bottom).offset(20);
         make.height.mas_equalTo(38);
     }];
     [self.weekBtn mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -549,7 +484,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         make.height.mas_equalTo(3);
     }];
     [self.addFriendBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.requestCardView.mas_bottom).offset(18);
+        make.top.equalTo(self.headerView.mas_bottom).offset(17);
         make.leading.equalTo(self.view).offset(18);
         make.trailing.equalTo(self.view.mas_centerX).offset(-5);
         make.height.mas_equalTo(50);
@@ -558,41 +493,6 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         make.top.height.equalTo(self.addFriendBtn);
         make.leading.equalTo(self.view.mas_centerX).offset(5);
         make.trailing.equalTo(self.view).offset(-18);
-    }];
-    [self.requestCardView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.headerView.mas_bottom).offset(17);
-        make.leading.equalTo(self.view).offset(16);
-        make.trailing.equalTo(self.view).offset(-16);
-        make.height.mas_equalTo(84);
-    }];
-    [self.requestAvatarView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.requestCardView).offset(12);
-        make.top.equalTo(self.requestCardView).offset(12);
-        make.width.height.mas_equalTo(40);
-    }];
-    [self.requestNameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.requestAvatarView.mas_trailing).offset(8);
-        make.top.equalTo(self.requestAvatarView).offset(-2);
-    }];
-    [self.requestIdLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.requestNameLabel);
-        make.top.equalTo(self.requestNameLabel.mas_bottom).offset(1);
-    }];
-    [self.requestMessageLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.requestAvatarView);
-        make.bottom.equalTo(self.requestCardView).offset(-10);
-        make.trailing.lessThanOrEqualTo(self.requestAgreeBtn.mas_leading).offset(-8);
-    }];
-    [self.requestAgreeBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(self.requestCardView).offset(-12);
-        make.centerY.equalTo(self.requestCardView);
-        make.width.mas_equalTo(65);
-        make.height.mas_equalTo(30);
-    }];
-    [self.requestCloseBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(self.requestCardView).offset(6);
-        make.top.equalTo(self.requestCardView).offset(-8);
-        make.width.height.mas_equalTo(20);
     }];
     [self.sectionLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.addFriendBtn.mas_bottom).offset(16);
@@ -644,11 +544,10 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
 - (void)refreshTableHeaderForCurrentMode {
     if (self.isFriendsTab) {
-        self.headerHeightConstraint.offset = 166;
+        self.headerHeightConstraint.offset = 146;
         self.sectionLabel.hidden = NO;
         self.addFriendBtn.hidden = NO;
         self.qrCodeBtn.hidden = NO;
-        self.requestCardView.hidden = NO;
         self.rankFilterContainer.hidden = YES;
         [self.tableView mas_remakeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(self.sectionLabel.mas_bottom).offset(6);
@@ -656,11 +555,10 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         }];
         return;
     }
-    self.headerHeightConstraint.offset = 206;
+    self.headerHeightConstraint.offset = 202;
     self.sectionLabel.hidden = YES;
     self.addFriendBtn.hidden = YES;
     self.qrCodeBtn.hidden = YES;
-    self.requestCardView.hidden = YES;
     self.rankFilterContainer.hidden = NO;
     [self.weekBtn setTitle:NSLocalizedString(@"community_rank_week", nil) forState:UIControlStateNormal];
     [self.monthBtn setTitle:NSLocalizedString(@"community_rank_month", nil) forState:UIControlStateNormal];
@@ -701,7 +599,6 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 - (void)onPendingCountChanged {
     self.pendingCount = [[NSUserDefaults standardUserDefaults] integerForKey:kCommunityPendingCountKey];
     [self updatePendingBadge];
-    self.requestCardView.hidden = (self.pendingCount <= 0 || !self.isFriendsTab);
 }
 
 - (void)onFriendsChanged {
@@ -712,31 +609,10 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 - (void)updatePendingBadge {
     BOOL shouldShow = self.pendingCount > 0;
     self.pendingBadgeView.hidden = !shouldShow;
-    self.requestCardView.hidden = (!shouldShow || !self.isFriendsTab);
     if (!shouldShow) {
         return;
     }
     self.pendingBadgeLabel.text = self.pendingCount > 99 ? @"99+" : [NSString stringWithFormat:@"%ld", (long)self.pendingCount];
-}
-
-- (void)onDismissRequestCard {
-    self.requestCardView.hidden = YES;
-}
-
-- (void)onAcceptPendingRequest {
-    if (self.pendingRequestId.length == 0) {
-        self.requestCardView.hidden = YES;
-        return;
-    }
-    __weak typeof(self) weakSelf = self;
-    [SocialRequest.shared processFriendRequest:self.pendingRequestId accept:YES success:^(HTTPResponse * _Nullable responseObject) {
-        weakSelf.pendingCount = MAX(weakSelf.pendingCount - 1, 0);
-        [[NSUserDefaults standardUserDefaults] setInteger:weakSelf.pendingCount forKey:kCommunityPendingCountKey];
-        [weakSelf updatePendingBadge];
-        weakSelf.requestCardView.hidden = YES;
-        [weakSelf loadRemoteFriends];
-    } failure:^(NSError * _Nonnull error) {
-    }];
 }
 
 #pragma mark - UITableView
@@ -772,10 +648,6 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     [self.addFriendBtn setTitle:[NSString stringWithFormat:@"  %@  ", NSLocalizedString(@"community_add_friend", nil)] forState:UIControlStateNormal];
     [self.qrCodeBtn setTitle:[NSString stringWithFormat:@"  %@  ", NSLocalizedString(@"community_my_qrcode", nil)] forState:UIControlStateNormal];
     self.sectionLabel.text = NSLocalizedString(@"community_section_friends", nil);
-    self.requestNameLabel.text = @"Arsenal";
-    self.requestIdLabel.text = [NSString stringWithFormat:NSLocalizedString(@"community_id_format", nil), @"12653795"];
-    self.requestMessageLabel.text = NSLocalizedString(@"community_request_message", nil).length > 0 ? NSLocalizedString(@"community_request_message", nil) : @"看你的护照很精彩，想添加您为好友";
-    [self.requestAgreeBtn setTitle:(NSLocalizedString(@"community_request_accept", nil).length > 0 ? NSLocalizedString(@"community_request_accept", nil) : @"同意") forState:UIControlStateNormal];
     [self loadRemoteRanks];
     [self.tableView reloadData];
 }
