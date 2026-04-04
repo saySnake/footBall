@@ -41,7 +41,11 @@ static UIColor *PassportCircleStrokeColor(void) {
 - (instancetype)initWithFrame:(CGRect)frame {
     if (self = [super initWithFrame:frame]) {
         self.backgroundColor = [UIColor whiteColor];
-        self.circleWH = (SCREEN_WIDTH-32) / 8.0;
+        if (frame.size.width > 0) {
+            self.circleWH = (frame.size.width-32) / 8.0;
+        } else {
+            self.circleWH = (SCREEN_WIDTH-32) / 8.0;
+        }
 
         _gridLayer = [CAShapeLayer layer];
         _gridLayer.fillColor = [UIColor clearColor].CGColor;
