@@ -7,6 +7,7 @@
 #import "NewFriendRequestsViewController.h"
 #import <Masonry/Masonry.h>
 #import "ColorManager.h"
+#import "SocialRequest.h"
 #import <SDWebImage/SDWebImage.h>
 
 #define kAddFriendGreen    [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0] // #285D4B
@@ -35,13 +36,14 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
         _cardView.backgroundColor = [UIColor whiteColor];
         _cardView.layer.cornerRadius = 6;
         _avatarView = [UIImageView new];
-        _avatarView.layer.cornerRadius = 27;
+        _avatarView.layer.cornerRadius = 24;
         _avatarView.clipsToBounds = YES;
         _nameLabel = [UILabel new];
         _nameLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+        _nameLabel.textColor = [UIColor blackColor];
         _idLabel = [UILabel new];
         _idLabel.font = [UIFont systemFontOfSize:12];
-        _idLabel.textColor = [UIColor colorWithWhite:0.26 alpha:1.0]; // #424242
+        _idLabel.textColor = [UIColor blackColor];
         _statusDot = [UIView new];
         _statusDot.layer.cornerRadius = 4;
         _statusDot.backgroundColor = [UIColor colorWithWhite:0.65 alpha:1.0];
@@ -61,9 +63,9 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
         [_cardView addSubview:_statusDot];
         [_cardView addSubview:_statusLabel];
         [_cardView addSubview:_addBtn];
-        [_cardView mas_makeConstraints:^(MASConstraintMaker *make) { make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 18, 6, 14)); }];
-        [_avatarView mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_cardView).offset(10); make.centerY.equalTo(_cardView); make.size.mas_equalTo(CGSizeMake(54, 54)); }];
-        [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_avatarView.mas_trailing).offset(10); make.top.equalTo(_cardView).offset(12); }];
+        [_cardView mas_makeConstraints:^(MASConstraintMaker *make) { make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(5, 18, 5, 14)); }];
+        [_avatarView mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_cardView).offset(10); make.centerY.equalTo(_cardView); make.size.mas_equalTo(CGSizeMake(48, 48)); }];
+        [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_avatarView.mas_trailing).offset(10); make.top.equalTo(_cardView).offset(9); }];
         [_idLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_nameLabel); make.top.equalTo(_nameLabel.mas_bottom).offset(1); }];
         [_statusDot mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_nameLabel); make.top.equalTo(_idLabel.mas_bottom).offset(5); make.size.mas_equalTo(CGSizeMake(8, 8)); }];
         [_statusLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_statusDot.mas_trailing).offset(6); make.centerY.equalTo(_statusDot); }];
@@ -89,6 +91,7 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 @property (nonatomic, strong) UIView *cardView;
 @property (nonatomic, strong) UIView *iconBg;
 @property (nonatomic, strong) UIImageView *iconView;
+@property (nonatomic, strong) UIStackView *titleRowStack;
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UILabel *subtitleLabel;
 @property (nonatomic, strong) UIView *badgeView;
@@ -102,37 +105,64 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
         self.selectionStyle = UITableViewCellSelectionStyleNone;
         _cardView = [UIView new];
         _cardView.backgroundColor = [UIColor whiteColor];
-        _cardView.layer.cornerRadius = 6;
+        _cardView.layer.cornerRadius = 8;
+        _cardView.layer.masksToBounds = YES;
         _iconBg = [UIView new];
         _iconBg.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
         _iconBg.layer.cornerRadius = 22.5;
         _iconView = [UIImageView new];
-        _iconView.tintColor = [UIColor darkGrayColor];
+        _iconView.contentMode = UIViewContentModeScaleAspectFit;
+        _iconView.tintColor = [UIColor blackColor];
         _titleLabel = [UILabel new];
-        _titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+        _titleLabel.font = [FontManager fontOfSize:14];
+        _titleLabel.textColor = [UIColor blackColor];
+        _titleLabel.numberOfLines = 1;
+        _titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
         _subtitleLabel = [UILabel new];
         _subtitleLabel.font = [UIFont systemFontOfSize:12];
-        _subtitleLabel.textColor = [UIColor colorWithWhite:0.49 alpha:1.0];
+        _subtitleLabel.textColor = [UIColor colorWithRed:0.612 green:0.643 blue:0.671 alpha:1.0];
         _badgeView = [UIView new];
         _badgeView.backgroundColor = [UIColor colorWithRed:0.95 green:0.25 blue:0.24 alpha:1.0];
-        _badgeView.layer.cornerRadius = 10;
+        _badgeView.layer.cornerRadius = 9;
+        _badgeView.layer.masksToBounds = YES;
         _badgeLabel = [UILabel new];
         _badgeLabel.font = [UIFont boldSystemFontOfSize:11];
         _badgeLabel.textColor = [UIColor whiteColor];
+        _badgeLabel.textAlignment = NSTextAlignmentCenter;
         [_badgeView addSubview:_badgeLabel];
+        _titleRowStack = [[UIStackView alloc] initWithArrangedSubviews:@[_titleLabel, _badgeView]];
+        _titleRowStack.axis = UILayoutConstraintAxisHorizontal;
+        _titleRowStack.spacing = 6;
+        _titleRowStack.alignment = UIStackViewAlignmentCenter;
+        _titleRowStack.distribution = UIStackViewDistributionFill;
+        [_titleLabel setContentCompressionResistancePriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
+        [_badgeView setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+        [_badgeView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.height.mas_equalTo(18);
+        }];
+        [_badgeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.centerY.equalTo(_badgeView);
+            make.leading.equalTo(_badgeView).offset(6);
+            make.trailing.equalTo(_badgeView).offset(-6);
+        }];
         [self.contentView addSubview:_cardView];
         [_cardView addSubview:_iconBg];
         [_iconBg addSubview:_iconView];
-        [_cardView addSubview:_titleLabel];
+        [_cardView addSubview:_titleRowStack];
         [_cardView addSubview:_subtitleLabel];
-        [_cardView addSubview:_badgeView];
-        [_cardView mas_makeConstraints:^(MASConstraintMaker *make) { make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 18, 6, 14)); }];
-        [_iconBg mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_cardView).offset(12); make.centerY.equalTo(_cardView); make.size.mas_equalTo(CGSizeMake(45, 45)); }];
+        [_cardView mas_makeConstraints:^(MASConstraintMaker *make) { make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 16, 6, 16)); }];
+        [_iconBg mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_cardView).offset(14); make.centerY.equalTo(_cardView); make.size.mas_equalTo(CGSizeMake(45, 45)); }];
         [_iconView mas_makeConstraints:^(MASConstraintMaker *make) { make.center.equalTo(_iconBg); make.size.mas_equalTo(CGSizeMake(22, 22)); }];
-        [_titleLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_iconBg.mas_trailing).offset(12); make.top.equalTo(_cardView).offset(16); }];
-        [_badgeView mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_titleLabel.mas_trailing).offset(6); make.centerY.equalTo(_titleLabel); make.size.mas_equalTo(CGSizeMake(20, 20)); }];
-        [_badgeLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.edges.equalTo(_badgeView).insets(UIEdgeInsetsMake(2, 5, 2, 5)); }];
-        [_subtitleLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_titleLabel); make.top.equalTo(_titleLabel.mas_bottom).offset(2); }];
+        [_titleRowStack mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(_iconBg.mas_trailing).offset(12);
+            make.top.equalTo(_cardView).offset(17);
+            make.trailing.lessThanOrEqualTo(_cardView).offset(-14);
+        }];
+        [_subtitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(_titleRowStack);
+            make.top.equalTo(_titleRowStack.mas_bottom).offset(4);
+            make.trailing.lessThanOrEqualTo(_cardView).offset(-14);
+        }];
     }
     return self;
 }
@@ -145,7 +175,6 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 @property (nonatomic, strong) UIButton *searchBtn;
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) NSArray<PNUser *> *searchResults;
-@property (nonatomic, strong) NSArray<PNUser *> *searchPool;
 @property (nonatomic, strong) NSMutableSet<NSString *> *sentFriendIds;
 @property (nonatomic, assign) BOOL isSearching;
 @property (nonatomic, assign) NSInteger pendingRequestCount;
@@ -153,18 +182,30 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 
 @implementation AddFriendViewController
 
+- (void)updateSearchFieldPlaceholder {
+    if (!self.searchField) return;
+    NSString *ph = NSLocalizedString(@"community_search_placeholder", nil);
+    UIFont *font = self.searchField.font ?: [UIFont systemFontOfSize:14];
+    self.searchField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:ph attributes:@{
+        NSForegroundColorAttributeName: kAddFriendGreen,
+        NSFontAttributeName: font
+    }];
+    self.searchField.typingAttributes = @{
+        NSFontAttributeName: font,
+        NSForegroundColorAttributeName: [UIColor blackColor]
+    };
+}
+
 - (void)viewDidLoad {
     self.hidesBottomBarWhenPushed = YES;
     NSInteger storedCount = [[NSUserDefaults standardUserDefaults] integerForKey:kCommunityPendingCountKey];
-    self.pendingRequestCount = storedCount > 0 ? storedCount : 23;
+    self.pendingRequestCount = MAX(0, storedCount);
     NSArray *sentIds = [[NSUserDefaults standardUserDefaults] arrayForKey:kCommunitySentSearchFriendIdsKey];
     self.sentFriendIds = [NSMutableSet setWithArray:(sentIds ?: @[])];
-    [self buildSearchPool];
     [super viewDidLoad];
+    // 勿再次调用 setupUI / updateLocalizedStrings：QMBaseViewController.viewDidLoad 已调用，重复会导致头部与列表叠两层
     self.view.backgroundColor = kAddFriendPageBg;
     self.shouldShowNavigationBar = NO;
-    [self setupUI];
-    [self updateLocalizedStrings];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -174,6 +215,16 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     if (!self.isSearching) {
         [self.tableView reloadData];
     }
+    __weak typeof(self) weakSelf = self;
+    [SocialRequest.shared getFriendRequestsPendingCountSuccess:^(HTTPResponse * _Nullable responseObject) {
+        NSInteger count = [responseObject.dataObject respondsToSelector:@selector(integerValue)] ? [responseObject.dataObject integerValue] : 0;
+        weakSelf.pendingRequestCount = MAX(0, count);
+        [[NSUserDefaults standardUserDefaults] setInteger:weakSelf.pendingRequestCount forKey:kCommunityPendingCountKey];
+        if (!weakSelf.isSearching) {
+            [weakSelf.tableView reloadData];
+        }
+    } failure:^(NSError * _Nonnull error) {
+    }];
 }
 
 - (void)setupUI {
@@ -182,7 +233,11 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     [self.view addSubview:self.headerView];
 
     UIButton *backBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    if (@available(iOS 13.0, *)) [backBtn setImage:[UIImage systemImageNamed:@"arrow.left"] forState:UIControlStateNormal];
+    UIImage *backIcon = [UIImage imageNamed:@"ad_left"];
+    if (!backIcon && @available(iOS 13.0, *)) {
+        backIcon = [UIImage systemImageNamed:@"arrow.left"];
+    }
+    [backBtn setImage:backIcon forState:UIControlStateNormal];
     backBtn.tintColor = [UIColor whiteColor];
     [backBtn addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
     [self.headerView addSubview:backBtn];
@@ -203,10 +258,16 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 
     self.searchField = [UITextField new];
     self.searchField.font = [UIFont systemFontOfSize:14];
+    self.searchField.textColor = [UIColor blackColor];
+    self.searchField.tintColor = [UIColor blackColor];
+    self.searchField.typingAttributes = @{
+        NSFontAttributeName: [UIFont systemFontOfSize:14],
+        NSForegroundColorAttributeName: [UIColor blackColor]
+    };
     self.searchField.delegate = self;
     self.searchField.returnKeyType = UIReturnKeySearch;
-    self.searchField.placeholder = NSLocalizedString(@"community_search_placeholder", nil);
     [searchBg addSubview:self.searchField];
+    [self updateSearchFieldPlaceholder];
 
     self.searchBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     self.searchBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
@@ -220,6 +281,9 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
     self.tableView.backgroundColor = [UIColor clearColor];
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    if (@available(iOS 15.0, *)) {
+        self.tableView.sectionHeaderTopPadding = 0;
+    }
     self.tableView.dataSource = self;
     self.tableView.delegate = self;
     [self.tableView registerClass:[MenuItemCell class] forCellReuseIdentifier:@"MenuItemCell"];
@@ -233,31 +297,54 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     [searchIcon mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(searchBg).offset(12); make.centerY.equalTo(searchBg); make.size.mas_equalTo(CGSizeMake(18, 18)); }];
     [self.searchBtn mas_makeConstraints:^(MASConstraintMaker *make) { make.trailing.equalTo(searchBg).offset(-4); make.centerY.equalTo(searchBg); make.size.mas_equalTo(CGSizeMake(77, 40)); }];
     [self.searchField mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(searchIcon.mas_trailing).offset(8); make.trailing.equalTo(self.searchBtn.mas_leading).offset(-6); make.centerY.equalTo(searchBg); }];
-    [self.tableView mas_makeConstraints:^(MASConstraintMaker *make) { make.top.equalTo(self.headerView.mas_bottom).offset(8); make.leading.trailing.bottom.equalTo(self.view); }];
+    [self.tableView mas_makeConstraints:^(MASConstraintMaker *make) { make.top.equalTo(self.headerView.mas_bottom).offset(0); make.leading.trailing.bottom.equalTo(self.view); }];
 }
 
 - (void)onBack { [self.navigationController popViewControllerAnimated:YES]; }
+
+/// 解析 `/api/v1/users/search` 返回的 data：单用户字典、用户数组，或 `{ list: [...] }`
+- (NSArray<PNUser *> *)pnUsersFromSearchResponseData:(id)data {
+    if (!data || data == (id)kCFNull) {
+        return @[];
+    }
+    if ([data isKindOfClass:[NSArray class]]) {
+        return [NSArray yy_modelArrayWithClass:PNUser.class json:data] ?: @[];
+    }
+    if ([data isKindOfClass:[NSDictionary class]]) {
+        id list = data[@"list"];
+        if ([list isKindOfClass:[NSArray class]]) {
+            return [NSArray yy_modelArrayWithClass:PNUser.class json:list] ?: @[];
+        }
+        PNUser *u = [PNUser yy_modelWithJSON:data];
+        if (u && (u.userId.length > 0 || u.nickname.length > 0)) {
+            return @[u];
+        }
+    }
+    return @[];
+}
 
 - (void)onSearch {
     NSString *text = [self.searchField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (text.length == 0) {
         self.isSearching = NO;
         self.searchResults = @[];
-    } else {
-        self.isSearching = YES;
-        NSMutableArray *arr = [NSMutableArray arrayWithCapacity:self.searchPool.count];
-        NSString *lower = text.lowercaseString;
-        for (PNUser *r in self.searchPool) {
-            BOOL matchId = [r.userId containsString:text];
-            BOOL matchName = [r.nickname.lowercaseString containsString:lower];
-            if (matchId || matchName) {
-                [arr addObject:r];
-            }
-        }
-        self.searchResults = arr;
+        [self.searchField resignFirstResponder];
+        [self.tableView reloadData];
+        return;
     }
+    self.isSearching = YES;
     [self.searchField resignFirstResponder];
     [self.tableView reloadData];
+
+    __weak typeof(self) weakSelf = self;
+    [UserRequest.shared searchUser:text success:^(HTTPResponse * _Nullable responseObject) {
+        weakSelf.searchResults = [weakSelf pnUsersFromSearchResponseData:responseObject.data];
+        [weakSelf.tableView reloadData];
+    } failure:^(NSError * _Nonnull error) {
+        weakSelf.searchResults = @[];
+        [weakSelf.tableView reloadData];
+        [weakSelf showError:(error.localizedDescription.length > 0 ? error.localizedDescription : @"搜索失败")];
+    }];
 }
 
 - (BOOL)textFieldShouldReturn:(UITextField *)textField {
@@ -270,7 +357,7 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    return self.isSearching ? 74 : 77;
+    return self.isSearching ? 74 : 82;
 }
 
 - (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
@@ -280,14 +367,19 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     UILabel *label = [UILabel new];
     label.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
     label.textColor = [UIColor blackColor];
-    label.text = [NSString stringWithFormat:@"搜索结果（%ld）", (long)self.searchResults.count];
+    label.text = [NSString stringWithFormat:NSLocalizedString(@"community_search_result_format", nil), (long)self.searchResults.count];
     [header addSubview:label];
-    [label mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(header).offset(18); make.centerY.equalTo(header); }];
+    [label mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(header).offset(18);
+        make.top.equalTo(header).offset(8);
+        make.bottom.equalTo(header).offset(-16);
+    }];
     return header;
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-    return self.isSearching ? 44 : 0;
+    // 8 顶边距 + 单行标题约 22 + 与首个 cell 间距 16
+    return self.isSearching ? 46 : 0;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -308,16 +400,30 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     }
     MenuItemCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MenuItemCell" forIndexPath:indexPath];
     if (indexPath.row == 0) {
-        if (@available(iOS 13.0, *)) cell.iconView.image = [UIImage systemImageNamed:@"person.2"];
+        UIImage *icon = [UIImage imageNamed:@"new_friends"];
+        BOOL assetIcon = (icon != nil);
+        if (!icon && @available(iOS 13.0, *)) {
+            icon = [UIImage systemImageNamed:@"person.2"];
+        }
+        cell.iconView.image = icon;
+        cell.iconView.tintColor = assetIcon ? nil : [UIColor blackColor];
         cell.titleLabel.text = NSLocalizedString(@"community_new_friends", nil);
         cell.subtitleLabel.text = NSLocalizedString(@"community_new_friends_subtitle", nil);
-        cell.badgeView.hidden = NO;
-        cell.badgeLabel.text = [NSString stringWithFormat:@"%ld", (long)self.pendingRequestCount];
+        BOOL showBadge = self.pendingRequestCount > 0;
+        cell.badgeView.hidden = !showBadge;
+        cell.badgeLabel.text = showBadge ? (self.pendingRequestCount > 99 ? @"99+" : [NSString stringWithFormat:@"%ld", (long)self.pendingRequestCount]) : @"";
     } else {
-        if (@available(iOS 13.0, *)) cell.iconView.image = [UIImage systemImageNamed:@"qrcode.viewfinder"];
+        UIImage *icon = [UIImage imageNamed:@"scan_qr_icon"];
+        BOOL assetIcon = (icon != nil);
+        if (!icon && @available(iOS 13.0, *)) {
+            icon = [UIImage systemImageNamed:@"qrcode.viewfinder"];
+        }
+        cell.iconView.image = icon;
+        cell.iconView.tintColor = assetIcon ? nil : [UIColor blackColor];
         cell.titleLabel.text = NSLocalizedString(@"community_scan_add_friend", nil);
         cell.subtitleLabel.text = NSLocalizedString(@"community_scan_add_friend_subtitle", nil);
         cell.badgeView.hidden = YES;
+        cell.badgeLabel.text = @"";
     }
     return cell;
 }
@@ -332,19 +438,9 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 - (void)updateLocalizedStrings {
     [super updateLocalizedStrings];
     self.titleLabel.text = NSLocalizedString(@"community_add_friend", nil);
-    self.searchField.placeholder = NSLocalizedString(@"community_search_placeholder", nil);
+    [self updateSearchFieldPlaceholder];
     [self.searchBtn setTitle:NSLocalizedString(@"community_search", nil) forState:UIControlStateNormal];
     [self.tableView reloadData];
-}
-
-- (void)buildSearchPool {
-    PNUser *a = [PNUser yy_modelWithJSON:@{@"nickname": NSLocalizedString(@"team_name_arsenal", nil), @"userId": @"12653795", @"lastOnlineTime": @"1"}];
-    PNUser *b = [PNUser yy_modelWithJSON:@{@"nickname": NSLocalizedString(@"team_name_mancity", nil), @"userId": @"521467395", @"lastOnlineTime": @""}];
-    PNUser *c = [PNUser yy_modelWithJSON:@{@"nickname": NSLocalizedString(@"team_name_liverpool", nil), @"userId": @"912653795", @"lastOnlineTime": @"1"}];
-    PNUser *d = [PNUser yy_modelWithJSON:@{@"nickname": NSLocalizedString(@"team_name_chelsea", nil), @"userId": @"770034821", @"lastOnlineTime": @""}];
-    PNUser *e = [PNUser yy_modelWithJSON:@{@"nickname": NSLocalizedString(@"team_name_spurs", nil), @"userId": @"300198426", @"lastOnlineTime": @"1"}];
-    PNUser *f = [PNUser yy_modelWithJSON:@{@"nickname": NSLocalizedString(@"team_name_manutd", nil), @"userId": @"450762190", @"lastOnlineTime": @""}];
-    self.searchPool = @[a, b, c, d, e, f];
 }
 
 - (void)onAddSearchFriendTapped:(UIButton *)sender {
