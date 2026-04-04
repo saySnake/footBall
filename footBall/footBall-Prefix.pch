@@ -102,6 +102,7 @@
 #import "PagFilePreloader.h"
 #import "RefreshPagHeader.h"
 #import "DashView.h"
+#import "StampDashView.h"
 #pragma mark - 项目核心类 - Debug (仅在Debug模式下)
 #ifdef DEBUG
 #import "BVAPPDebugTool.h"

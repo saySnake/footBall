@@ -28,6 +28,7 @@ static UIColor *PassportGreen(void) {
 @property (nonatomic, strong) UIView *moneyView;
 @property (nonatomic, strong) UIView *scoresView;
 @property (nonatomic, strong) UIView *nothingView;
+@property (nonatomic, strong) PassportHeader2View *passportHeader2View;
 
 @property (nonatomic, strong) UILabel *idLabel;
 @property (nonatomic, strong) UILabel *nameLabel;
@@ -85,8 +86,11 @@ static UIColor *PassportGreen(void) {
         DashView *dashLine = [[DashView alloc] init];
         [self.contentView addSubview:dashLine];
 
-        PassportHeader2View *header2View = [[PassportHeader2View alloc] initWithFrame:CGRectZero];
-        [self.contentView addSubview:header2View];
+        self.passportHeader2View = [[PassportHeader2View alloc] initWithFrame:CGRectZero];
+        self.passportHeader2View.userInteractionEnabled = YES;
+        UITapGestureRecognizer *header2Tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handlePassportHeader2Tap)];
+        [self.passportHeader2View addGestureRecognizer:header2Tap];
+        [self.contentView addSubview:self.passportHeader2View];
 
         UIImageView *footer2 = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"passport_header_sep"]];
         [self.contentView addSubview:footer2];
@@ -141,14 +145,14 @@ static UIColor *PassportGreen(void) {
             make.top.equalTo(footer.mas_bottom).offset(2);
             make.height.equalTo(@1);
         }];
-        [header2View mas_makeConstraints:^(MASConstraintMaker *make) {
+        [self.passportHeader2View mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.right.equalTo(self.topView);
             make.top.equalTo(dashLine.mas_bottom).offset(10);
             make.height.mas_equalTo(_circleLblWH * 5);
         }];
         [footer2 mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.left.right.equalTo(header2View);
-            make.top.equalTo(header2View.mas_bottom).offset(2);
+            make.left.right.equalTo(self.passportHeader2View);
+            make.top.equalTo(self.passportHeader2View.mas_bottom).offset(2);
             make.bottom.equalTo(self.contentView).offset(-16);
         }];
     }
@@ -440,6 +444,13 @@ static UIColor *PassportGreen(void) {
 }
 
 - (void)configureWithModel:(PassportViewModel *)model {
+    [self.passportHeader2View configureWithModel:model];
+}
+
+- (void)handlePassportHeader2Tap {
+    if (self.onPassportHeader2Tap) {
+        self.onPassportHeader2Tap();
+    }
 }
 
 @end
