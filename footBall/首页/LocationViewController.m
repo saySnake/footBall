@@ -404,7 +404,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
     [self.headerView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.leading.trailing.equalTo(self.view);
-        self.headerHeightConstraint = make.height.mas_equalTo(166);
+        self.headerHeightConstraint = make.height.mas_equalTo(146);
     }];
     [self.titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self.headerView);
@@ -448,7 +448,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     }
     [self.rankFilterContainer mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.trailing.equalTo(self.headerView);
-        make.top.equalTo(self.switchBgView.mas_bottom).offset(12);
+        make.top.equalTo(self.switchBgView.mas_bottom).offset(20);
         make.height.mas_equalTo(38);
     }];
     [self.weekBtn mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -544,7 +544,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
 - (void)refreshTableHeaderForCurrentMode {
     if (self.isFriendsTab) {
-        self.headerHeightConstraint.offset = 166;
+        self.headerHeightConstraint.offset = 146;
         self.sectionLabel.hidden = NO;
         self.addFriendBtn.hidden = NO;
         self.qrCodeBtn.hidden = NO;
@@ -555,7 +555,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         }];
         return;
     }
-    self.headerHeightConstraint.offset = 206;
+    self.headerHeightConstraint.offset = 202;
     self.sectionLabel.hidden = YES;
     self.addFriendBtn.hidden = YES;
     self.qrCodeBtn.hidden = YES;
