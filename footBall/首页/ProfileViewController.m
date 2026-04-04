@@ -8,6 +8,7 @@
 #import "PersonalInfoViewController.h"
 #import "SettingsViewController.h"
 #import "MyTeamsViewController.h"
+#import "StampAlbumViewController.h"
 #import "ProfileTeamsStore.h"
 #import <Masonry/Masonry.h>
 
@@ -538,6 +539,10 @@ static NSArray<NSString *> * _menuKeys(void) {
         [self.navigationController pushViewController:vc animated:YES];
     } else if ([key isEqualToString:@"profile_my_info"]) {
         PersonalInfoViewController *vc = [PersonalInfoViewController new];
+        vc.hidesBottomBarWhenPushed = YES;
+        [self.navigationController pushViewController:vc animated:YES];
+    } else if ([key isEqualToString:@"profile_my_stamps"]) {
+        StampAlbumViewController *vc = [[StampAlbumViewController alloc] init];
         vc.hidesBottomBarWhenPushed = YES;
         [self.navigationController pushViewController:vc animated:YES];
     }

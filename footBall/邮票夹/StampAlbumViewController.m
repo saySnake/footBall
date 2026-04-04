@@ -1,0 +1,587 @@
+//
+//  StampAlbumViewController.m
+//  footBall
+//
+
+#import "StampAlbumViewController.h"
+#import "StampAlbumModels.h"
+#import "StampAlbumStampCell.h"
+#import "StampAlbumCategoryViewController.h"
+#import <Masonry/Masonry.h>
+
+static UIColor *StampAlbumNavBg(void) {
+    return [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0];
+}
+
+static const CGFloat kStampFilterRowHeight = 40;
+
+#pragma mark - Grid table cell
+
+@interface StampAlbumGridTableCell : UITableViewCell <UICollectionViewDataSource, UICollectionViewDelegateFlowLayout>
+@property (nonatomic, copy) NSArray<StampAlbumItem *> *items;
+@property (nonatomic, strong) UICollectionView *collectionView;
+@property (nonatomic, assign) CGFloat itemSide;
+@end
+
+@implementation StampAlbumGridTableCell
+
+- (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
+    if (self = [super initWithStyle:style reuseIdentifier:reuseIdentifier]) {
+        self.selectionStyle = UITableViewCellSelectionStyleNone;
+        self.backgroundColor = [UIColor clearColor];
+        self.contentView.backgroundColor = [UIColor clearColor];
+        UICollectionViewFlowLayout *flow = [[UICollectionViewFlowLayout alloc] init];
+        flow.minimumInteritemSpacing = 0;
+        flow.minimumLineSpacing = 0;
+        flow.sectionInset = UIEdgeInsetsZero;
+        _collectionView = [[UICollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:flow];
+        _collectionView.backgroundColor = [UIColor whiteColor];
+        _collectionView.dataSource = self;
+        _collectionView.delegate = self;
+        _collectionView.scrollEnabled = NO;
+        [_collectionView registerClass:[StampAlbumStampCell class] forCellWithReuseIdentifier:@"StampAlbumStampCell"];
+        [self.contentView addSubview:_collectionView];
+        [_collectionView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(self.contentView).offset(16);
+            make.trailing.equalTo(self.contentView).offset(-16);
+            make.top.equalTo(self.contentView).offset(8);
+            make.height.mas_equalTo(0);
+            make.bottom.equalTo(self.contentView).offset(-8);
+        }];
+    }
+    return self;
+}
+
+- (void)configureWithItems:(NSArray<StampAlbumItem *> *)items tableWidth:(CGFloat)tableWidth {
+    self.items = items ?: @[];
+    CGFloat inner = MAX(0, tableWidth - 32);
+    self.itemSide = inner > 0 ? floor(inner / 5.0) : 0;
+    NSInteger n = self.items.count;
+    NSInteger rows = n > 0 ? (n + 4) / 5 : 0;
+    CGFloat h = rows * self.itemSide + MAX(0, rows - 1) * 0.5;
+    [_collectionView mas_updateConstraints:^(MASConstraintMaker *make) {
+        make.height.mas_equalTo(h);
+    }];
+    [_collectionView reloadData];
+    [self.collectionView.collectionViewLayout invalidateLayout];
+}
+
+- (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
+    return self.items.count;
+}
+
+- (__kindof UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
+    StampAlbumStampCell *c = [collectionView dequeueReusableCellWithReuseIdentifier:@"StampAlbumStampCell" forIndexPath:indexPath];
+    [c configureWithItem:self.items[indexPath.item] indexPath:indexPath totalCount:self.items.count columnCount:5];
+    return c;
+}
+
+- (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
+    return CGSizeMake(self.itemSide, self.itemSide);
+}
+
+@end
+
+#pragma mark - StampAlbumViewController
+
+@interface StampAlbumViewController () <UITableViewDelegate, UITableViewDataSource, UIGestureRecognizerDelegate>
+@property (nonatomic, strong) UIView *topBar;
+@property (nonatomic, strong) UIButton *backButton;
+@property (nonatomic, strong) UILabel *titleLabel;
+@property (nonatomic, strong) UIButton *filterButton;
+@property (nonatomic, strong) UITableView *tableView;
+@property (nonatomic, copy) NSArray<StampAlbumSectionModel *> *allSections;
+@property (nonatomic, copy) NSArray<StampAlbumSectionModel *> *sections;
+@property (nonatomic, assign) CGFloat tableLayoutWidth;
+
+// Filter dropdown
+@property (nonatomic, copy) NSArray<NSString *> *filterOptions; // e.g. 球场分类/分类二/分类三
+@property (nonatomic, strong) NSArray<NSArray<StampAlbumSectionModel *> *> *filterOptionSections;
+@property (nonatomic, assign) BOOL filterApplied;
+@property (nonatomic, assign) NSInteger selectedFilterIndex;
+@property (nonatomic, copy) NSString *filterBaseTitle;
+@property (nonatomic, strong) UIView *filterOverlayView;
+@property (nonatomic, strong) UIView *filterDropdownView;
+@property (nonatomic, strong) UITableView *filterTableView;
+@property (nonatomic, strong) UITapGestureRecognizer *filterOverlayTapGesture;
+@end
+
+@implementation StampAlbumViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.hidesBottomBarWhenPushed = YES;
+    self.shouldShowNavigationBar = NO;
+    self.view.backgroundColor = [UIColor colorWithWhite:0.96 alpha:1.0];
+    self.tableLayoutWidth = CGRectGetWidth(self.view.bounds);
+    [self buildMockSections];
+    [self buildTopBar];
+    [self buildTable];
+    [self buildFilterDropdownUI];
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    CGFloat w = CGRectGetWidth(self.tableView.bounds);
+    if (w > 0 && fabs(w - self.tableLayoutWidth) > 0.5) {
+        self.tableLayoutWidth = w;
+        [self.tableView reloadData];
+    }
+}
+
+- (void)buildMockSections {
+    NSArray<UIColor *> *palette = @[
+        [UIColor colorWithRed:0.85 green:0.65 blue:0.68 alpha:1.0],
+        [UIColor colorWithRed:0.78 green:0.45 blue:0.38 alpha:1.0],
+        [UIColor colorWithRed:0.45 green:0.55 blue:0.62 alpha:1.0],
+        [UIColor colorWithRed:0.55 green:0.62 blue:0.45 alpha:1.0],
+        [UIColor colorWithRed:0.55 green:0.42 blue:0.35 alpha:1.0],
+        [UIColor colorWithRed:0.35 green:0.48 blue:0.72 alpha:1.0],
+        [UIColor colorWithRed:0.42 green:0.58 blue:0.48 alpha:1.0],
+    ];
+    NSMutableArray<StampAlbumSectionModel *> *sec = [NSMutableArray array];
+    // 球场分类：10 枚已解锁
+    StampAlbumSectionModel *s1 = [[StampAlbumSectionModel alloc] init];
+    s1.title = NSLocalizedString(@"stamp_album_section_stadium", nil) ?: @"球场分类";
+    NSMutableArray *i1 = [NSMutableArray array];
+    for (NSInteger k = 0; k < 10; k++) {
+        StampAlbumItem *it = [[StampAlbumItem alloc] init];
+        it.unlocked = YES;
+        it.circleColor = palette[k % palette.count];
+        [i1 addObject:it];
+    }
+    s1.items = [i1 copy];
+    [sec addObject:s1];
+    // 分类二：上排 5 蓝，下排 5 空
+    StampAlbumSectionModel *s2 = [[StampAlbumSectionModel alloc] init];
+    s2.title = NSLocalizedString(@"stamp_album_section_other", nil) ?: @"分类二";
+    NSMutableArray *i2 = [NSMutableArray array];
+    for (NSInteger k = 0; k < 5; k++) {
+        StampAlbumItem *it = [[StampAlbumItem alloc] init];
+        it.unlocked = YES;
+        it.circleColor = [UIColor colorWithRed:0.35 green:0.48 blue:0.72 alpha:1.0];
+        [i2 addObject:it];
+    }
+    for (NSInteger k = 0; k < 5; k++) {
+        StampAlbumItem *it = [[StampAlbumItem alloc] init];
+        it.unlocked = NO;
+        [i2 addObject:it];
+    }
+    s2.items = [i2 copy];
+    [sec addObject:s2];
+    // 再一组分类二
+    StampAlbumSectionModel *s3 = [[StampAlbumSectionModel alloc] init];
+    s3.title = NSLocalizedString(@"stamp_album_section_three", nil) ?: @"分类三";
+    NSMutableArray *i3 = [NSMutableArray array];
+    for (NSInteger k = 0; k < 10; k++) {
+        StampAlbumItem *it = [[StampAlbumItem alloc] init];
+        it.unlocked = YES;
+        it.circleColor = (k < 5) ? [UIColor colorWithRed:0.42 green:0.58 blue:0.48 alpha:1.0] : [UIColor colorWithRed:0.35 green:0.48 blue:0.72 alpha:1.0];
+        [i3 addObject:it];
+    }
+    s3.items = [i3 copy];
+    [sec addObject:s3];
+
+    self.allSections = [sec copy];
+    self.sections = self.allSections;
+    [self setupFilterOptions];
+}
+
+- (void)setupFilterOptions {
+    // 分类名：按 allSections 出现顺序去重（不含「全部」）
+    NSMutableArray<NSString *> *categoryTitles = [NSMutableArray array];
+    for (StampAlbumSectionModel *m in self.allSections) {
+        if (!m.title.length) continue;
+        BOOL exists = NO;
+        for (NSString *t in categoryTitles) {
+            if ([t isEqualToString:m.title]) { exists = YES; break; }
+        }
+        if (!exists) [categoryTitles addObject:m.title];
+    }
+
+    NSMutableArray *optSections = [NSMutableArray array];
+    for (NSString *t in categoryTitles) {
+        NSMutableArray *arr = [NSMutableArray array];
+        for (StampAlbumSectionModel *m in self.allSections) {
+            if ([m.title isEqualToString:t]) {
+                [arr addObject:m];
+            }
+        }
+        [optSections addObject:[arr copy]];
+    }
+    self.filterOptionSections = [optSections copy];
+
+    NSMutableArray *uiTitles = [NSMutableArray array];
+    [uiTitles addObject:NSLocalizedString(@"stamp_album_filter_all", nil) ?: @"全部"];
+    [uiTitles addObjectsFromArray:categoryTitles];
+    self.filterOptions = [uiTitles copy];
+
+    self.filterApplied = NO;
+    self.selectedFilterIndex = -1;
+}
+
+- (void)buildTopBar {
+    _topBar = [[UIView alloc] init];
+    _topBar.backgroundColor = StampAlbumNavBg();
+    [self.view addSubview:_topBar];
+    _backButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    if (@available(iOS 13.0, *)) {
+        UIImage *img = [UIImage systemImageNamed:@"chevron.left"];
+        [_backButton setImage:[img imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+    } else {
+        [_backButton setTitle:NSLocalizedString(@"back", nil) ?: @"返回" forState:UIControlStateNormal];
+    }
+    _backButton.tintColor = [UIColor whiteColor];
+    [_backButton addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
+    _titleLabel = [[UILabel alloc] init];
+    _titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+    _titleLabel.textColor = [UIColor whiteColor];
+    _titleLabel.text = NSLocalizedString(@"discover_stamp_album", nil) ?: @"邮票夹";
+    _filterButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    _filterButton.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    [_filterButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    self.filterBaseTitle = NSLocalizedString(@"stamp_album_filter", nil) ?: @"筛选";
+    [_filterButton setTitle:[NSString stringWithFormat:@"%@ ▼", self.filterBaseTitle] forState:UIControlStateNormal];
+    _filterButton.layer.cornerRadius = 6;
+    _filterButton.layer.borderWidth = 0.6;
+    _filterButton.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.55].CGColor;
+    _filterButton.contentEdgeInsets = UIEdgeInsetsMake(6, 12, 6, 12);
+    [_filterButton addTarget:self action:@selector(onFilterTapped) forControlEvents:UIControlEventTouchUpInside];
+    [_topBar addSubview:_backButton];
+    [_topBar addSubview:_titleLabel];
+    [_topBar addSubview:_filterButton];
+    [_topBar mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.leading.trailing.equalTo(self.view);
+        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideTop).offset(44);
+    }];
+    [_backButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(_topBar).offset(8);
+        make.bottom.equalTo(_topBar).offset(-8);
+        make.width.height.mas_equalTo(36);
+    }];
+    [_titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(_topBar);
+        make.centerY.equalTo(_backButton);
+    }];
+    [_filterButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.equalTo(_topBar).offset(-12);
+        make.centerY.equalTo(_backButton);
+    }];
+}
+
+- (void)buildTable {
+    _tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
+    _tableView.delegate = self;
+    _tableView.dataSource = self;
+    _tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    _tableView.backgroundColor = [UIColor colorWithWhite:0.96 alpha:1.0];
+    _tableView.estimatedRowHeight = 200;
+    _tableView.rowHeight = UITableViewAutomaticDimension;
+    [_tableView registerClass:[StampAlbumGridTableCell class] forCellReuseIdentifier:@"StampAlbumGridTableCell"];
+    [self.view addSubview:_tableView];
+    [_tableView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(_topBar.mas_bottom);
+        make.leading.trailing.bottom.equalTo(self.view);
+    }];
+}
+
+- (void)onBack {
+    [self.navigationController popViewControllerAnimated:YES];
+}
+
+- (void)buildFilterDropdownUI {
+    _filterOverlayView = [[UIView alloc] initWithFrame:self.view.bounds];
+    _filterOverlayView.backgroundColor = [UIColor colorWithWhite:0 alpha:0.0];
+    _filterOverlayView.hidden = YES;
+    [self.view addSubview:_filterOverlayView];
+
+    _filterOverlayTapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onOverlayTapped)];
+    _filterOverlayTapGesture.delegate = self;
+    _filterOverlayTapGesture.cancelsTouchesInView = NO;
+    [_filterOverlayView addGestureRecognizer:_filterOverlayTapGesture];
+
+    _filterDropdownView = [[UIView alloc] initWithFrame:CGRectZero];
+    _filterDropdownView.backgroundColor = [UIColor whiteColor];
+    _filterDropdownView.layer.cornerRadius = 12;
+    _filterDropdownView.layer.masksToBounds = YES;
+    _filterDropdownView.layer.shadowColor = [UIColor blackColor].CGColor;
+    _filterDropdownView.layer.shadowOpacity = 0.15;
+    _filterDropdownView.layer.shadowRadius = 10;
+    _filterDropdownView.layer.shadowOffset = CGSizeMake(0, 4);
+    [_filterOverlayView addSubview:_filterDropdownView];
+
+    _filterTableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
+    _filterTableView.dataSource = self;
+    _filterTableView.delegate = self;
+    _filterTableView.backgroundColor = [UIColor clearColor];
+    _filterTableView.scrollEnabled = NO;
+    _filterTableView.allowsSelection = YES;
+    _filterTableView.separatorInset = UIEdgeInsetsMake(0, 16, 0, 16);
+    _filterTableView.separatorColor = [UIColor colorWithWhite:0.85 alpha:1.0];
+    _filterTableView.rowHeight = kStampFilterRowHeight;
+    _filterTableView.estimatedRowHeight = 0;
+    if (@available(iOS 15.0, *)) {
+        // 默认非 0 会在首行前多出一块空白，固定高度容器里会把最后一行挤出可视区域
+        _filterTableView.sectionHeaderTopPadding = 0;
+    }
+    if (@available(iOS 11.0, *)) {
+        _filterTableView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+    }
+    [_filterDropdownView addSubview:_filterTableView];
+    [_filterTableView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(_filterDropdownView);
+    }];
+
+    [_filterTableView registerClass:[UITableViewCell class] forCellReuseIdentifier:@"StampFilterCell"];
+}
+
+- (void)onOverlayTapped {
+    [self hideFilterDropdown];
+}
+
+- (void)onFilterTapped {
+    if (self.filterOverlayView.hidden) {
+        [self showFilterDropdown];
+    } else {
+        [self hideFilterDropdown];
+    }
+}
+
+#pragma mark - Filter dropdown
+
+/// 宽度：按文案略留边即可，避免 minW 过大撑满；上限防止超屏。
+- (CGFloat)stampAlbumPreferredFilterDropdownWidth {
+    UIFont *font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
+    CGFloat maxText = 0;
+    for (NSString *t in self.filterOptions) {
+        if (![t isKindOfClass:[NSString class]] || !t.length) {
+            continue;
+        }
+        CGRect r = [t boundingRectWithSize:CGSizeMake(CGFLOAT_MAX, kStampFilterRowHeight)
+                                   options:(NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading)
+                                attributes:@{ NSFontAttributeName: font }
+                                   context:nil];
+        maxText = MAX(maxText, ceil(CGRectGetWidth(r)));
+    }
+    static const CGFloat hPad = 24; // 左右各约 12
+    static const CGFloat minW = 112;
+    CGFloat w = MAX(maxText + hPad, minW);
+    CGFloat screenW = CGRectGetWidth(self.view.bounds);
+    CGFloat cap = MAX(100, screenW - 24);
+    return MIN(w, cap);
+}
+
+- (void)showFilterDropdown {
+    if (self.filterOptions.count == 0) return;
+
+    self.filterOverlayView.hidden = NO;
+    self.filterOverlayView.frame = self.view.bounds;
+    [self.view bringSubviewToFront:self.filterOverlayView];
+
+    // 与筛选按钮右对齐展开（按钮在导航栏右侧），宽度按文案计算
+    CGRect btnFrame = [self.filterButton.superview convertRect:self.filterButton.frame toView:self.view];
+    CGFloat dropdownW = [self stampAlbumPreferredFilterDropdownWidth];
+    CGFloat dropdownH = kStampFilterRowHeight * (CGFloat)self.filterOptions.count;
+
+    CGFloat screenW = CGRectGetWidth(self.view.bounds);
+    CGFloat x = CGRectGetMaxX(btnFrame) - dropdownW;
+    CGFloat y = CGRectGetMaxY(btnFrame) + 6;
+    if (y + dropdownH > CGRectGetHeight(self.view.bounds) - 12) {
+        y = CGRectGetHeight(self.view.bounds) - 12 - dropdownH;
+    }
+    if (x + dropdownW > screenW - 12) {
+        x = screenW - 12 - dropdownW;
+    }
+    if (x < 12) {
+        x = 12;
+    }
+
+    self.filterDropdownView.frame = CGRectMake(x, y, dropdownW, dropdownH);
+    [self.filterTableView reloadData];
+    [self.filterTableView layoutIfNeeded];
+    self.filterDropdownView.transform = CGAffineTransformMakeScale(0.98, 0.98);
+    self.filterDropdownView.alpha = 0.0;
+
+    [UIView animateWithDuration:0.18 animations:^{
+        self.filterDropdownView.transform = CGAffineTransformIdentity;
+        self.filterDropdownView.alpha = 1.0;
+    }];
+}
+
+#pragma mark - UIGestureRecognizerDelegate
+
+/// 点击下拉列表区域时，不要让全屏 overlay 的手势抢触摸，否则 table 收不到点击、筛选逻辑不触发。
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
+    if (gestureRecognizer != self.filterOverlayTapGesture) {
+        return YES;
+    }
+    CGPoint p = [touch locationInView:self.filterOverlayView];
+    return !CGRectContainsPoint(self.filterDropdownView.frame, p);
+}
+
+- (void)hideFilterDropdown {
+    if (self.filterOverlayView.hidden) return;
+    [UIView animateWithDuration:0.15 animations:^{
+        self.filterDropdownView.alpha = 0.0;
+        self.filterDropdownView.transform = CGAffineTransformMakeScale(0.98, 0.98);
+    } completion:^(BOOL finished) {
+        self.filterOverlayView.hidden = YES;
+        self.filterDropdownView.transform = CGAffineTransformIdentity;
+        self.filterDropdownView.alpha = 1.0;
+    }];
+}
+
+#pragma mark - UITableView
+
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
+    if (tableView == self.filterTableView) return 1;
+    return self.sections.count;
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    if (tableView == self.filterTableView) return self.filterOptions.count;
+    return 1;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (tableView == self.filterTableView) {
+        return kStampFilterRowHeight;
+    }
+    return UITableViewAutomaticDimension;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (tableView == self.filterTableView) {
+        UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"StampFilterCell" forIndexPath:indexPath];
+        NSString *opt = (indexPath.row < self.filterOptions.count) ? self.filterOptions[indexPath.row] : @"";
+        cell.textLabel.text = opt;
+        cell.textLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
+        cell.textLabel.textColor = [UIColor colorWithWhite:0 alpha:1.0];
+        cell.textLabel.textAlignment = NSTextAlignmentCenter;
+        cell.textLabel.numberOfLines = 1;
+        cell.textLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+        // 下拉列表设计稿：纯文字点击即可，不额外展示勾选图标
+        cell.accessoryType = UITableViewCellAccessoryNone;
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        return cell;
+    }
+
+    StampAlbumGridTableCell *c = [tableView dequeueReusableCellWithIdentifier:@"StampAlbumGridTableCell" forIndexPath:indexPath];
+    StampAlbumSectionModel *sec = self.sections[indexPath.section];
+    CGFloat w = CGRectGetWidth(tableView.bounds);
+    if (w < 1) {
+        w = CGRectGetWidth(self.view.bounds);
+    }
+    [c configureWithItems:sec.items tableWidth:w];
+    return c;
+}
+
+- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
+    if (tableView == self.filterTableView) return nil;
+    StampAlbumSectionModel *m = self.sections[section];
+    UIView *wrap = [[UIView alloc] init];
+    wrap.backgroundColor = [UIColor clearColor];
+    UILabel *title = [[UILabel alloc] init];
+    title.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    title.textColor = [UIColor colorWithWhite:0.12 alpha:1.0];
+    title.text = m.title;
+    UIButton *more = [UIButton buttonWithType:UIButtonTypeSystem];
+    [more setTitle:NSLocalizedString(@"stamp_album_view_more", nil) ?: @"查看更多" forState:UIControlStateNormal];
+    more.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightRegular];
+    [more setTitleColor:[UIColor colorWithWhite:0.55 alpha:1.0] forState:UIControlStateNormal];
+    [more addTarget:self action:@selector(onViewMore:) forControlEvents:UIControlEventTouchUpInside];
+    more.tag = section;
+    [wrap addSubview:title];
+    [wrap addSubview:more];
+    [title mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(wrap).offset(16);
+        make.centerY.equalTo(wrap);
+    }];
+    [more mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.equalTo(wrap).offset(-16);
+        make.centerY.equalTo(wrap);
+    }];
+    return wrap;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
+    if (tableView == self.filterTableView) return 0;
+    return 44;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForFooterInSection:(NSInteger)section {
+    if (tableView == self.filterTableView) return 0;
+    return 12;
+}
+
+- (UIView *)tableView:(UITableView *)tableView viewForFooterInSection:(NSInteger)section {
+    if (tableView == self.filterTableView) return nil;
+    return [[UIView alloc] init];
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (tableView != self.filterTableView) return;
+    NSInteger idx = indexPath.row;
+    if (idx < 0 || idx >= self.filterOptions.count) return;
+
+    NSString *base = self.filterBaseTitle ?: @"筛选";
+
+    // 第 0 行：全部 → 清除筛选
+    if (idx == 0) {
+        self.filterApplied = NO;
+        self.selectedFilterIndex = -1;
+        self.sections = self.allSections ?: @[];
+        [self.filterButton setTitle:[NSString stringWithFormat:@"%@ ▼", base] forState:UIControlStateNormal];
+    } else if (self.filterApplied && idx == self.selectedFilterIndex) {
+        // 再次点当前分类：取消筛选（与「全部」同效）
+        self.filterApplied = NO;
+        self.selectedFilterIndex = -1;
+        self.sections = self.allSections ?: @[];
+        [self.filterButton setTitle:[NSString stringWithFormat:@"%@ ▼", base] forState:UIControlStateNormal];
+    } else {
+        self.filterApplied = YES;
+        self.selectedFilterIndex = idx;
+        NSInteger catIdx = idx - 1;
+        NSArray<StampAlbumSectionModel *> *sub = (catIdx >= 0 && catIdx < (NSInteger)self.filterOptionSections.count) ? self.filterOptionSections[catIdx] : @[];
+        self.sections = sub;
+        NSString *opt = self.filterOptions[idx] ?: @"";
+        [self.filterButton setTitle:[NSString stringWithFormat:@"%@ ▼", opt] forState:UIControlStateNormal];
+    }
+
+    [self.tableView reloadData];
+    [self.filterTableView reloadData];
+    [self hideFilterDropdown];
+}
+
+- (void)onViewMore:(UIButton *)sender {
+    NSInteger section = sender.tag;
+    if (section < 0 || section >= (NSInteger)self.sections.count) {
+        return;
+    }
+    StampAlbumSectionModel *sec = self.sections[section];
+    StampAlbumCategoryViewController *vc = [[StampAlbumCategoryViewController alloc] initWithItems:sec.items];
+    vc.hidesBottomBarWhenPushed = YES;
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (void)updateLocalizedStrings {
+    [super updateLocalizedStrings];
+    _titleLabel.text = NSLocalizedString(@"discover_stamp_album", nil) ?: @"邮票夹";
+    NSString *base = NSLocalizedString(@"stamp_album_filter", nil) ?: @"筛选";
+    self.filterBaseTitle = base;
+    if (self.filterOptions.count > 0) {
+        NSMutableArray *opts = [self.filterOptions mutableCopy];
+        opts[0] = NSLocalizedString(@"stamp_album_filter_all", nil) ?: @"全部";
+        self.filterOptions = [opts copy];
+    }
+    if (self.filterApplied && self.selectedFilterIndex >= 1 && self.selectedFilterIndex < (NSInteger)self.filterOptions.count) {
+        NSString *opt = self.filterOptions[self.selectedFilterIndex] ?: @"";
+        [_filterButton setTitle:[NSString stringWithFormat:@"%@ ▼", opt] forState:UIControlStateNormal];
+    } else {
+        [_filterButton setTitle:[NSString stringWithFormat:@"%@ ▼", base] forState:UIControlStateNormal];
+    }
+    [self.tableView reloadData];
+    [self.filterTableView reloadData];
+}
+
+@end

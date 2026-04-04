@@ -9,6 +9,7 @@
 #import "PNMatchVerifyViewController.h"
 #import "ConsumptionRecordViewController.h"
 #import "PassportViewController.h"
+#import "StampAlbumViewController.h"
 #import "PNMatchDetailViewController.h"
 #import "PNMatchInfoInputViewController.h"
 
@@ -646,6 +647,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     [white addSubview:_addConsumeBtn];
     [white addSubview:_stampBtn];
     [_addConsumeBtn addTarget:self action:@selector(onAddConsumeTapped) forControlEvents:UIControlEventTouchUpInside];
+    [_stampBtn addTarget:self action:@selector(onStampAlbumTapped) forControlEvents:UIControlEventTouchUpInside];
 
     UIView *tabBar = [[UIView alloc] init];
     tabBar.backgroundColor = [UIColor whiteColor];
@@ -860,6 +862,12 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
     vc.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
     [self presentViewController:vc animated:YES completion:nil];
+}
+
+- (void)onStampAlbumTapped {
+    StampAlbumViewController *vc = [[StampAlbumViewController alloc] init];
+    vc.hidesBottomBarWhenPushed = YES;
+    [self.navigationController pushViewController:vc animated:YES];
 }
 
 - (void)onConsumeRecordTapped {

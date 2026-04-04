@@ -106,6 +106,12 @@
 "discover_qualified" = "出线";
 "discover_add_consume" = "添加消费";
 "discover_stamp_album" = "邮票夹";
+"stamp_album_filter" = "筛选";
+"stamp_album_filter_all" = "全部";
+"stamp_album_view_more" = "查看更多";
+"stamp_album_section_stadium" = "球场分类";
+"stamp_album_section_other" = "分类二";
+"stamp_album_section_three" = "分类三";
 "discover_tab_upcoming_format" = "未来观赛(%ld)";
 "discover_tab_finished_format" = "已经观赛(%ld)";
 "discover_verified_ticket" = "认证球票";
