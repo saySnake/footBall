@@ -45,7 +45,16 @@
 
     [[APIManager sharedManager] GET:APIPathValueUser parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            UserProfile *user = [UserProfile yy_modelWithJSON:responseObject.data];
+            id raw = responseObject.data;
+            /// 常见嵌套：data 为 { user: {...} } / { profile: {...} }
+            if ([raw isKindOfClass:[NSDictionary class]]) {
+                NSDictionary *d = raw;
+                id inner = d[@"user"] ?: d[@"profile"] ?: d[@"userInfo"] ?: d[@"userProfile"];
+                if ([inner isKindOfClass:[NSDictionary class]]) {
+                    raw = inner;
+                }
+            }
+            UserProfile *user = [UserProfile yy_modelWithJSON:raw];
             responseObject.dataObject = user;
             AuthManager.sharedManager.user.profile = user;
             [AuthManager.sharedManager saveUser];
@@ -80,6 +89,7 @@
     NSMutableDictionary *dict = NSMutableDictionary.dictionary;
     dict[@"nickname"] = user.nickname;
     dict[@"avatar"] = user.avatar;
+    if (user.phone.length > 0) dict[@"phone"] = user.phone;
     dict[@"gender"] = @(user.gender);
     dict[@"birthDate"] = user.birthDate;
     dict[@"bio"] = user.bio;

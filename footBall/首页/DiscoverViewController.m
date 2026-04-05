@@ -379,7 +379,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 
     UIButton *arrow1 = [UIButton buttonWithType:UIButtonTypeSystem];
     UIButton *arrow2 = [UIButton buttonWithType:UIButtonTypeSystem];
-    UIImage *arr = [UIImage imageNamed:@"arrow_right"];
+    UIImage *arr = [[UIImage imageNamed:@"setting_right"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
     [arrow1 setImage:arr forState:UIControlStateNormal];
     [arrow2 setImage:arr forState:UIControlStateNormal];
     arrow1.tintColor = arrow2.tintColor = [UIColor colorWithWhite:1 alpha:0.8];

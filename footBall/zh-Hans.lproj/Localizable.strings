@@ -327,7 +327,7 @@
 "auth_realname_back" = "身份证反面";
 "auth_submit" = "开始认证";
 "auth_realname_completed" = "已完成实名认证";
-"auth_id_front_display" = "正面图片";
+"auth_id_front_display" = "正面照片";
 "auth_id_back_display" = "徽章面照片";
 "auth_please_upload_both" = "请上传身份证正面和背面照片";
 "auth_realname_success" = "实名认证提交成功";

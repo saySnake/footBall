@@ -82,6 +82,7 @@
 #import "ExpenseRequest.h"
 #import "ProfileRequest.h"
 #import "SocialRequest.h"
+#import "VerificationRequest.h"
 
 #pragma mark - 项目核心类 - models
 #import "Team.h"

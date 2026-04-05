@@ -6,6 +6,7 @@
 //
 
 #import "TeamsRequest.h"
+#import "Team.h"
 
 @implementation TeamsRequest
 +(instancetype)shared {
@@ -18,16 +19,26 @@
 }
 
 -(void)searchTeams:(NSString *)searckKey leagueId:(NSString *)leagueId page:(NSInteger)page pageSize:(NSInteger)pageSize success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
-    NSMutableDictionary *dict = NSMutableDictionary.dictionary;
-    dict[@"keyword"] = searckKey;
-    dict[@"leagueId"] = leagueId;
+    NSMutableDictionary *dict = [NSMutableDictionary dictionary];
+    dict[@"keyword"] = (searckKey.length > 0) ? searckKey : @"";
+    if (leagueId.length > 0) dict[@"leagueId"] = leagueId;
     dict[@"pageNum"] = @(page);
     dict[@"pageSize"] = @(pageSize);
 
     [[APIManager sharedManager] GET:APIPathValueTeamsSearch parameters:dict headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            NSArray *teams = [NSArray yy_modelArrayWithClass:Team.class json:responseObject.data[@"list"]];
-            responseObject.dataObject = teams;
+            id raw = responseObject.data;
+            id jsonList = nil;
+            if ([raw isKindOfClass:NSArray.class]) {
+                jsonList = raw;
+            } else if ([raw isKindOfClass:NSDictionary.class]) {
+                NSDictionary *d = (NSDictionary *)raw;
+                jsonList = d[@"list"] ?: d[@"teams"] ?: d[@"data"];
+            }
+            NSArray *teams = [jsonList isKindOfClass:NSArray.class]
+                ? [NSArray yy_modelArrayWithClass:Team.class json:jsonList]
+                : nil;
+            responseObject.dataObject = teams ?: @[];
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);
@@ -154,8 +165,16 @@
 
     [[APIManager sharedManager] GET:APIPathValueTeamsMyFollow parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            NSArray *teams = [NSArray yy_modelArrayWithClass:Team.class json:responseObject.data];
-            responseObject.dataObject = teams;
+            id raw = responseObject.data;
+            id jsonArr = raw;
+            if ([raw isKindOfClass:NSDictionary.class]) {
+                NSDictionary *d = (NSDictionary *)raw;
+                jsonArr = d[@"list"] ?: d[@"teams"] ?: d[@"data"];
+            }
+            NSArray *teams = [jsonArr isKindOfClass:NSArray.class]
+                ? [NSArray yy_modelArrayWithClass:Team.class json:jsonArr]
+                : nil;
+            responseObject.dataObject = teams ?: @[];
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);

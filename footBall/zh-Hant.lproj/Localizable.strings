@@ -232,7 +232,7 @@
 "auth_id_back_label" = "上傳身份證徽章面照片";
 "auth_submit_now" = "立即認證";
 "auth_realname_completed" = "已完成實名認證";
-"auth_id_front_display" = "正面圖片";
+"auth_id_front_display" = "正面照片";
 "auth_id_back_display" = "徽章面照片";
 "auth_please_upload_both" = "請上傳身份證正面和背面照片";
 "auth_realname_success" = "實名認證提交成功";

@@ -15,6 +15,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSString *accessToken;
 @property (nonatomic, strong) NSString *refreshToken;
 @property (nonatomic, strong) NSString *nickname;
+/// 登录等接口可能在根节点返回手机号（与 profile.phone 二选一或并存）
+@property (nonatomic, strong, nullable) NSString *phone;
 @property (nonatomic, strong) NSString *avatar;
 @property (nonatomic, assign) NSInteger expiresIn;
 @property (nonatomic, assign) BOOL isNewUser;
@@ -35,6 +37,8 @@ typedef NS_ENUM(NSUInteger, UserGender) {
 @property (nonatomic, strong) NSString *userId;
 /// 昵称
 @property (nonatomic, strong) NSString *nickname;
+/// 手机号（接口返回，部分环境字段名为 mobile）
+@property (nonatomic, strong, nullable) NSString *phone;
 /// 头像URL
 @property (nonatomic, strong) NSString *avatar;
 /// 性别: 0-未知, 1-男, 2-女

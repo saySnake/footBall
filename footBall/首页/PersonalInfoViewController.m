@@ -6,10 +6,39 @@
 #import "PersonalInfoViewController.h"
 #import "PNPickerSheetViewController.h"
 #import <Masonry/Masonry.h>
+#import <QuartzCore/QuartzCore.h>
+#import <math.h>
+#import <MBProgressHUD/MBProgressHUD.h>
+#import <SDWebImage/SDWebImage.h>
+#import "AuthManager.h"
+#import "User.h"
+#import "UserRequest.h"
+#import "FileRequest.h"
+#import "ColorManager.h"
+#import "LoadingManager.h"
 
-#define kPIBg      [UIColor colorWithWhite:0.95 alpha:1.0]
+/// Figma「个人资料」1:5552 背景 #f7f7f7
+#define kPIBg      [UIColor colorWithRed:247/255.0 green:247/255.0 blue:247/255.0 alpha:1.0]
 #define kPICardBg  [UIColor whiteColor]
-#define kPIGreen   [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0]
+#define kPIGreen   [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0]
+#define kPILabel   [UIColor colorWithRed:79/255.0 green:79/255.0 blue:79/255.0 alpha:1.0]
+
+static CGFloat const kPITopGradientH = 208.f;
+static CGFloat const kPIScreenInset = 16.f;
+static CGFloat const kPICardCorner = 6.f;
+
+/// 与 preferenceTags 对齐的稳定 key（与接口约定；若后端不同可再映射）
+static NSArray<NSString *> *kProfileChipTagKeys(void) {
+    static NSArray *keys;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        keys = @[
+            @"ultras", @"fan", @"chant_leader", @"supporters", @"curve_stand",
+            @"ball_kid", @"venue_staff", @"media", @"art", @"official", @"athlete"
+        ];
+    });
+    return keys;
+}
 
 @interface PICheckOption : UIControl
 @property (nonatomic, strong) UIView *circle;
@@ -70,6 +99,8 @@
 @end
 
 @interface PersonalInfoViewController () <UITextFieldDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate>
+@property (nonatomic, strong) UIView *gradientHostView;
+@property (nonatomic, strong) CAGradientLayer *topGradientLayer;
 @property (nonatomic, strong) UIView *navBar;
 @property (nonatomic, strong) UILabel *navTitle;
 @property (nonatomic, strong) UIScrollView *scrollView;
@@ -78,7 +109,7 @@
 @property (nonatomic, strong) UIView *avatarCard;
 @property (nonatomic, strong) UILabel *avatarLeftLabel;
 @property (nonatomic, strong) UIImageView *avatarView;
-@property (nonatomic, strong) UIView *cameraBadge;
+@property (nonatomic, strong) UIImageView *cameraBadge;
 
 // Cards
 @property (nonatomic, strong) UIView *nickCard;
@@ -118,6 +149,7 @@
 @property (nonatomic, strong) NSDate *birthDate;
 @property (nonatomic, strong) NSDate *firstMatchDate;
 @property (nonatomic, strong) NSDateFormatter *dateFormatter;
+@property (nonatomic, assign) BOOL avatarNeedsUpload;
 @end
 
 @implementation PersonalInfoViewController
@@ -127,50 +159,101 @@
     [super viewDidLoad];
     self.shouldShowNavigationBar = NO;
     self.view.backgroundColor = kPIBg;
-
-    // Fake data
-    self.birthDate = [NSDate dateWithTimeIntervalSince1970: (NSTimeInterval) 628214400]; // 1990-12-03 (UTC-ish)
-    self.firstMatchDate = self.birthDate;
-
+    self.birthDate = [NSDate date];
+    self.firstMatchDate = [NSDate date];
+    self.avatarNeedsUpload = NO;
     [self loadLocalAvatar];
 }
 
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self reloadProfileFromServer];
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    if (self.topGradientLayer && self.gradientHostView) {
+        self.topGradientLayer.frame = self.gradientHostView.bounds;
+    }
+    [self layoutChips];
+}
+
 - (void)setupUI {
-    // Nav
+    self.gradientHostView = [UIView new];
+    self.gradientHostView.userInteractionEnabled = NO;
+    [self.view insertSubview:self.gradientHostView atIndex:0];
+    [self.gradientHostView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.leading.trailing.equalTo(self.view);
+        make.height.mas_equalTo(kPITopGradientH);
+    }];
+    self.topGradientLayer = [CAGradientLayer layer];
+    self.topGradientLayer.colors = @[(id)[UIColor whiteColor].CGColor, (id)kPIBg.CGColor];
+    self.topGradientLayer.startPoint = CGPointMake(0.5, 0);
+    self.topGradientLayer.endPoint = CGPointMake(0.5, 1);
+    [self.gradientHostView.layer addSublayer:self.topGradientLayer];
+
     self.navBar = [UIView new];
-    self.navBar.backgroundColor = [UIColor whiteColor];
+    self.navBar.backgroundColor = [UIColor clearColor];
     [self.view addSubview:self.navBar];
     [self.navBar mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.leading.trailing.equalTo(self.view);
-        make.height.mas_equalTo(88);
+        make.top.equalTo(self.view.mas_safeAreaLayoutGuideTop);
+        make.leading.trailing.equalTo(self.view);
+        make.height.mas_equalTo(44);
     }];
 
-    UIButton *back = [UIButton buttonWithType:UIButtonTypeSystem];
-    if (@available(iOS 13.0, *)) {
-        [back setImage:[UIImage systemImageNamed:@"arrow.left"] forState:UIControlStateNormal];
+    UIButton *back = [UIButton buttonWithType:UIButtonTypeCustom];
+    UIImage *adLeft = [UIImage imageNamed:@"ad_left"];
+    UIImage *backImg = adLeft ?: [UIImage imageNamed:@"nav_back"];
+    if (!backImg && @available(iOS 13.0, *)) {
+        backImg = [UIImage systemImageNamed:@"arrow.left"];
     }
-    back.tintColor = [UIColor blackColor];
+    if (backImg) {
+        if (adLeft) {
+            [back setImage:adLeft forState:UIControlStateNormal];
+            back.tintColor = nil;
+        } else {
+            [back setImage:[backImg imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+            back.tintColor = [UIColor blackColor];
+        }
+    }
     [back addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
     [self.navBar addSubview:back];
     [back mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.navBar).offset(12);
-        make.bottom.equalTo(self.navBar).offset(-10);
-        make.size.mas_equalTo(CGSizeMake(36, 36));
+        make.leading.equalTo(self.navBar).offset(16);
+        make.centerY.equalTo(self.navBar);
+        make.size.mas_equalTo(CGSizeMake(44, 44));
     }];
 
     self.navTitle = [UILabel new];
-    self.navTitle.font = [UIFont boldSystemFontOfSize:17];
+    self.navTitle.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
     self.navTitle.textColor = [UIColor blackColor];
     [self.navBar addSubview:self.navTitle];
     [self.navTitle mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self.navBar);
-        make.centerY.equalTo(back);
+        make.center.equalTo(self.navBar);
     }];
 
-    // Scroll
+    self.saveBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.saveBtn.backgroundColor = kPIGreen;
+    self.saveBtn.layer.cornerRadius = 26;
+    self.saveBtn.layer.shadowColor = [UIColor blackColor].CGColor;
+    self.saveBtn.layer.shadowOpacity = 0.19f;
+    self.saveBtn.layer.shadowOffset = CGSizeMake(0, 2);
+    self.saveBtn.layer.shadowRadius = 4;
+    self.saveBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    [self.saveBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    [self.saveBtn addTarget:self action:@selector(onSave) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.saveBtn];
+    [self.saveBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        CGFloat side = 6.4f / 100.f * [UIScreen mainScreen].bounds.size.width;
+        make.leading.equalTo(self.view).offset(MAX(16, side));
+        make.trailing.equalTo(self.view).offset(-MAX(16, side));
+        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-12);
+        make.height.mas_equalTo(52);
+    }];
+
     self.scrollView = [UIScrollView new];
     self.scrollView.showsVerticalScrollIndicator = NO;
-    self.scrollView.backgroundColor = kPIBg;
+    self.scrollView.backgroundColor = [UIColor clearColor];
     if (@available(iOS 11.0, *)) {
         self.scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
     }
@@ -178,34 +261,14 @@
     [self.scrollView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.navBar.mas_bottom);
         make.leading.trailing.equalTo(self.view);
-        make.bottom.equalTo(self.view);
+        make.bottom.equalTo(self.saveBtn.mas_top).offset(-12);
     }];
 
     self.content = [UIView new];
     [self.scrollView addSubview:self.content];
     [self.content mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.edges.equalTo(self.scrollView);
+        make.top.leading.trailing.equalTo(self.scrollView);
         make.width.equalTo(self.scrollView);
-    }];
-
-    // Save button (fixed bottom)
-    self.saveBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.saveBtn.backgroundColor = kPIGreen;
-    self.saveBtn.layer.cornerRadius = 22;
-    self.saveBtn.titleLabel.font = [UIFont boldSystemFontOfSize:16];
-    [self.saveBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    [self.saveBtn addTarget:self action:@selector(onSave) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:self.saveBtn];
-    [self.saveBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.view).offset(20);
-        make.trailing.equalTo(self.view).offset(-20);
-        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-10);
-        make.height.mas_equalTo(44);
-    }];
-
-    // Make content bottom above saveBtn
-    [self.content mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.bottom.equalTo(self.scrollView).offset(-80);
     }];
 
     // Avatar card
@@ -213,14 +276,14 @@
     [self.content addSubview:self.avatarCard];
     [self.avatarCard mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.content).offset(12);
-        make.leading.equalTo(self.content).offset(12);
-        make.trailing.equalTo(self.content).offset(-12);
-        make.height.mas_equalTo(70);
+        make.leading.equalTo(self.content).offset(kPIScreenInset);
+        make.trailing.equalTo(self.content).offset(-kPIScreenInset);
+        make.height.mas_equalTo(110);
     }];
 
     self.avatarLeftLabel = [UILabel new];
-    self.avatarLeftLabel.font = [UIFont systemFontOfSize:14];
-    self.avatarLeftLabel.textColor = [UIColor darkGrayColor];
+    self.avatarLeftLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
+    self.avatarLeftLabel.textColor = kPILabel;
     self.avatarLeftLabel.textAlignment = NSTextAlignmentLeft;
     [self.avatarCard addSubview:self.avatarLeftLabel];
     [self.avatarLeftLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -229,7 +292,7 @@
     }];
 
     self.avatarView = [UIImageView new];
-    self.avatarView.layer.cornerRadius = 26;
+    self.avatarView.layer.cornerRadius = 40;
     self.avatarView.clipsToBounds = YES;
     self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
     if (@available(iOS 13.0, *)) {
@@ -240,30 +303,22 @@
     [self.avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.trailing.equalTo(self.avatarCard).offset(-16);
         make.centerY.equalTo(self.avatarCard);
-        make.size.mas_equalTo(CGSizeMake(52, 52));
+        make.size.mas_equalTo(CGSizeMake(80, 80));
     }];
 
-    self.cameraBadge = [UIView new];
-    self.cameraBadge.backgroundColor = [UIColor blackColor];
-    self.cameraBadge.layer.cornerRadius = 10;
-    self.cameraBadge.clipsToBounds = YES;
+    self.cameraBadge = [UIImageView new];
+    self.cameraBadge.contentMode = UIViewContentModeScaleAspectFit;
+    self.cameraBadge.image = [UIImage imageNamed:@"setting_photo"];
     [self.avatarCard addSubview:self.cameraBadge];
-    [self.cameraBadge mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(self.avatarView).offset(2);
-        make.bottom.equalTo(self.avatarView).offset(2);
-        make.size.mas_equalTo(CGSizeMake(20, 20));
-    }];
-    UIImageView *cam = [UIImageView new];
-    if (@available(iOS 13.0, *)) {
-        cam.image = [UIImage systemImageNamed:@"camera.fill"];
-        cam.tintColor = [UIColor whiteColor];
+    {
+        CGFloat r = 40.f;
+        CGFloat d = (CGFloat)(r / sqrt(2.0));
+        [self.cameraBadge mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.centerX.equalTo(self.avatarView.mas_centerX).offset(d);
+            make.centerY.equalTo(self.avatarView.mas_centerY).offset(d);
+            make.size.mas_equalTo(CGSizeMake(24, 24));
+        }];
     }
-    cam.contentMode = UIViewContentModeScaleAspectFit;
-    [self.cameraBadge addSubview:cam];
-    [cam mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.center.equalTo(self.cameraBadge);
-        make.size.mas_equalTo(CGSizeMake(12, 12));
-    }];
 
     UITapGestureRecognizer *avatarTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onAvatarTapped)];
     self.avatarCard.userInteractionEnabled = YES;
@@ -281,27 +336,26 @@
     self.nickCard = [self makeCard];
     [self.content addSubview:self.nickCard];
     [self.nickCard mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(prev.mas_bottom).offset(10);
+        make.top.equalTo(prev.mas_bottom).offset(12);
         make.leading.trailing.equalTo(self.avatarCard);
-        make.height.mas_equalTo(52);
+        make.height.mas_equalTo(50);
     }];
     self.nickLeft = [self addLeftLabelToCard:self.nickCard];
     self.nickField = [self addRightTextFieldToCard:self.nickCard];
-    self.nickField.text = @"Arisha Ireen";
     prev = self.nickCard;
 
     // 手机号卡片（可编辑 TextField）
     self.phoneCard = [self makeCard];
     [self.content addSubview:self.phoneCard];
     [self.phoneCard mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(prev.mas_bottom).offset(10);
+        make.top.equalTo(prev.mas_bottom).offset(12);
         make.leading.trailing.equalTo(self.avatarCard);
-        make.height.mas_equalTo(52);
+        make.height.mas_equalTo(50);
     }];
     self.phoneLeft = [self addLeftLabelToCard:self.phoneCard];
     self.phoneField = [self addRightTextFieldToCard:self.phoneCard];
-    self.phoneField.text = @"135 6090 8897";
     self.phoneField.keyboardType = UIKeyboardTypePhonePad;
+    self.phoneField.enabled = NO;
     prev = self.phoneCard;
 
     // 出生日期卡片（点击调用已有 PNPickerSheetViewController）
@@ -309,9 +363,9 @@
     [self.birthCard addTarget:self action:@selector(onPickBirth) forControlEvents:UIControlEventTouchUpInside];
     [self.content addSubview:self.birthCard];
     [self.birthCard mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(prev.mas_bottom).offset(10);
+        make.top.equalTo(prev.mas_bottom).offset(12);
         make.leading.trailing.equalTo(self.avatarCard);
-        make.height.mas_equalTo(52);
+        make.height.mas_equalTo(50);
     }];
     self.birthLeft = [self addLeftLabelToCard:self.birthCard];
     self.birthValue = [self addRightValueLabelToCard:self.birthCard];
@@ -322,9 +376,9 @@
     self.genderCard = [self makeCard];
     [self.content addSubview:self.genderCard];
     [self.genderCard mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(prev.mas_bottom).offset(10);
+        make.top.equalTo(prev.mas_bottom).offset(12);
         make.leading.trailing.equalTo(self.avatarCard);
-        make.height.mas_equalTo(52);
+        make.height.mas_equalTo(50);
     }];
     self.genderLeft = [self addLeftLabelToCard:self.genderCard];
     self.maleOption = [[PICheckOption alloc] initWithTitle:@""];
@@ -354,9 +408,9 @@
     [self.firstCard addTarget:self action:@selector(onPickFirst) forControlEvents:UIControlEventTouchUpInside];
     [self.content addSubview:self.firstCard];
     [self.firstCard mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(prev.mas_bottom).offset(10);
+        make.top.equalTo(prev.mas_bottom).offset(12);
         make.leading.trailing.equalTo(self.avatarCard);
-        make.height.mas_equalTo(52);
+        make.height.mas_equalTo(50);
     }];
     self.firstYearLeft = [self addLeftLabelToCard:self.firstCard];
     self.firstYearValue = [self addRightValueLabelToCard:self.firstCard];
@@ -367,12 +421,12 @@
     self.identityCard = [self makeCard];
     [self.content addSubview:self.identityCard];
     [self.identityCard mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(prev.mas_bottom).offset(10);
+        make.top.equalTo(prev.mas_bottom).offset(12);
         make.leading.trailing.equalTo(self.avatarCard);
     }];
     self.identityLeft = [UILabel new];
-    self.identityLeft.font = [UIFont systemFontOfSize:14];
-    self.identityLeft.textColor = [UIColor darkGrayColor];
+    self.identityLeft.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    self.identityLeft.textColor = kPILabel;
     [self.identityCard addSubview:self.identityLeft];
     [self.identityLeft mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(self.identityCard).offset(16);
@@ -426,28 +480,16 @@
         [btns addObject:b];
     }
     self.chipButtons = btns;
-    // 选中“媒体记者”
-    if (self.chipButtons.count > 7) {
-        [self setChipSelected:self.chipButtons[7] selected:YES];
-    }
-
     // Localized chip titles set in updateLocalizedStrings
     (void)chipKeys;
 
-    // Identity card height由 chipsContainer 决定
     [self.identityCard mas_makeConstraints:^(MASConstraintMaker *make) {
         make.bottom.equalTo(self.chipsContainer.mas_bottom).offset(12);
     }];
 
-    // content bottom
-    [self.identityCard mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.bottom.lessThanOrEqualTo(self.content).offset(-20);
+    [self.content mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.bottom.equalTo(self.identityCard.mas_bottom).offset(24);
     }];
-}
-
-- (void)viewDidLayoutSubviews {
-    [super viewDidLayoutSubviews];
-    [self layoutChips];
 }
 
 - (void)layoutChips {
@@ -479,7 +521,7 @@
 - (UIView *)makeCard {
     UIView *v = [UIView new];
     v.backgroundColor = kPICardBg;
-    v.layer.cornerRadius = 12;
+    v.layer.cornerRadius = kPICardCorner;
     v.clipsToBounds = YES;
     return v;
 }
@@ -488,15 +530,15 @@
 - (UIControl *)makeTapCard {
     UIControl *c = [UIControl new];
     c.backgroundColor = kPICardBg;
-    c.layer.cornerRadius = 12;
+    c.layer.cornerRadius = kPICardCorner;
     c.clipsToBounds = YES;
     return c;
 }
 
 - (UILabel *)addLeftLabelToCard:(UIView *)card {
     UILabel *l = [UILabel new];
-    l.font = [UIFont systemFontOfSize:14];
-    l.textColor = [UIColor darkGrayColor];
+    l.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    l.textColor = kPILabel;
     [card addSubview:l];
     [l mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(card).offset(16);
@@ -537,10 +579,8 @@
 
 - (UIImageView *)addDownArrowToCard:(UIView *)card {
     UIImageView *img = [UIImageView new];
-    if (@available(iOS 13.0, *)) {
-        img.image = [UIImage systemImageNamed:@"chevron.down"];
-        img.tintColor = [UIColor colorWithWhite:0.65 alpha:1.0];
-    }
+    img.contentMode = UIViewContentModeScaleAspectFit;
+    img.image = [UIImage imageNamed:@"setting_down"];
     [card addSubview:img];
     [img mas_makeConstraints:^(MASConstraintMaker *make) {
         make.trailing.equalTo(card).offset(-14);
@@ -552,10 +592,8 @@
 
 - (UIImageView *)addRightArrowToCard:(UIView *)card {
     UIImageView *img = [UIImageView new];
-    if (@available(iOS 13.0, *)) {
-        img.image = [UIImage systemImageNamed:@"chevron.right"];
-        img.tintColor = [UIColor colorWithWhite:0.65 alpha:1.0];
-    }
+    img.contentMode = UIViewContentModeScaleAspectFit;
+    img.image = [UIImage imageNamed:@"setting_right"];
     [card addSubview:img];
     [img mas_makeConstraints:^(MASConstraintMaker *make) {
         make.trailing.equalTo(card).offset(-14);
@@ -587,6 +625,133 @@
 - (void)onFemale { self.maleOption.checked = NO; self.femaleOption.checked = YES; }
 
 - (void)endEditing { [self.view endEditing:YES]; }
+
+- (void)reloadProfileFromServer {
+    if (!AuthManager.sharedManager.isLoggedIn) return;
+    __weak typeof(self) weakSelf = self;
+    [[UserRequest shared] getLoginUserInfoSuccess:^(HTTPResponse * _Nullable responseObject) {
+        UserProfile *p = [responseObject.dataObject isKindOfClass:[UserProfile class]] ? responseObject.dataObject : AuthManager.sharedManager.user.profile;
+        [weakSelf applyUserProfile:p];
+    } failure:^(NSError * _Nonnull error) {
+        UserProfile *p = AuthManager.sharedManager.user.profile;
+        if (p) [weakSelf applyUserProfile:p];
+    }];
+}
+
+- (nullable NSDate *)dateFromAPIBirthString:(NSString *)s {
+    if (s.length == 0) return nil;
+    NSDateFormatter *f = [[NSDateFormatter alloc] init];
+    f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    NSArray<NSString *> *fmts = @[ @"yyyy-MM-dd", @"yyyy-MM-dd'T'HH:mm:ss.SSSZ", @"yyyy/MM/dd" ];
+    for (NSString *fmt in fmts) {
+        f.dateFormat = fmt;
+        NSDate *d = [f dateFromString:s];
+        if (d) return d;
+    }
+    return nil;
+}
+
+- (void)applyUserProfile:(UserProfile *)p {
+    if (!p) return;
+    self.nickField.text = p.nickname ?: @"";
+    NSString *ph = p.phone;
+    if (ph.length == 0) ph = AuthManager.sharedManager.user.phone;
+    self.phoneField.text = ph ?: @"";
+
+    NSDate *bd = [self dateFromAPIBirthString:p.birthDate];
+    if (bd) self.birthDate = bd;
+    self.birthValue.text = [self formatDate:self.birthDate ?: [NSDate date]];
+
+    if (p.gender == UserGenderMale) {
+        self.maleOption.checked = YES;
+        self.femaleOption.checked = NO;
+    } else if (p.gender == UserGenderFemale) {
+        self.maleOption.checked = NO;
+        self.femaleOption.checked = YES;
+    }
+
+    if (p.firstWatchYear.length) {
+        NSDate *fd = [self dateFromAPIBirthString:p.firstWatchYear];
+        if (!fd && p.firstWatchYear.length >= 4) {
+            NSInteger y = [[p.firstWatchYear substringToIndex:4] integerValue];
+            if (y > 1900) {
+                NSDateComponents *c = [[NSDateComponents alloc] init];
+                c.calendar = [NSCalendar currentCalendar];
+                c.year = (NSInteger)y;
+                c.month = 1;
+                c.day = 1;
+                fd = c.date;
+            }
+        }
+        if (fd) self.firstMatchDate = fd;
+    }
+    self.firstYearValue.text = [self formatDate:self.firstMatchDate ?: [NSDate date]];
+
+    NSArray *tags = [p.preferenceTags isKindOfClass:[NSArray class]] ? p.preferenceTags : @[];
+    NSArray<NSString *> *keys = kProfileChipTagKeys();
+    for (NSInteger i = 0; i < (NSInteger)self.chipButtons.count && i < (NSInteger)keys.count; i++) {
+        NSString *key = keys[i];
+        BOOL on = NO;
+        for (id o in tags) {
+            if ([o isKindOfClass:[NSString class]] && [key caseInsensitiveCompare:(NSString *)o] == NSOrderedSame) {
+                on = YES;
+                break;
+            }
+        }
+        [self setChipSelected:self.chipButtons[i] selected:on];
+    }
+    if (tags.count == 0 && self.chipButtons.count > 7) {
+        [self setChipSelected:self.chipButtons[1] selected:YES];
+        [self setChipSelected:self.chipButtons[7] selected:YES];
+    }
+    [self layoutChips];
+
+    if (p.avatar.length > 0) {
+        NSURL *url = [NSURL URLWithString:p.avatar];
+        __weak typeof(self) weakSelf = self;
+        [self.avatarView sd_setImageWithURL:url placeholderImage:self.avatarView.image completed:^(UIImage * _Nullable image, NSError * _Nullable error, SDImageCacheType cacheType, NSURL * _Nullable imageURL) {
+            if (image) weakSelf.avatarNeedsUpload = NO;
+        }];
+    } else {
+        [self loadLocalAvatar];
+    }
+}
+
+- (UserProfile *)buildProfileForSave {
+    UserProfile *cur = AuthManager.sharedManager.user.profile;
+    UserProfile *p = nil;
+    if (cur) {
+        NSDictionary *json = [cur yy_modelToJSONObject];
+        if ([json isKindOfClass:[NSDictionary class]]) {
+            p = [UserProfile yy_modelWithJSON:json];
+        }
+    }
+    if (!p) p = [[UserProfile alloc] init];
+
+    p.nickname = [self.nickField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    p.phone = self.phoneField.text;
+
+    p.gender = self.maleOption.checked ? UserGenderMale : UserGenderFemale;
+
+    NSDateFormatter *apiFmt = [[NSDateFormatter alloc] init];
+    apiFmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    apiFmt.dateFormat = @"yyyy-MM-dd";
+    p.birthDate = [apiFmt stringFromDate:self.birthDate ?: [NSDate date]];
+
+    NSInteger y = [[NSCalendar currentCalendar] component:NSCalendarUnitYear fromDate:self.firstMatchDate ?: [NSDate date]];
+    p.firstWatchYear = [NSString stringWithFormat:@"%ld", (long)y];
+
+    NSMutableArray<NSString *> *tags = [NSMutableArray array];
+    NSArray<NSString *> *keys = kProfileChipTagKeys();
+    for (NSInteger i = 0; i < (NSInteger)self.chipButtons.count && i < (NSInteger)keys.count; i++) {
+        UIButton *b = self.chipButtons[i];
+        BOOL sel = CGColorEqualToColor(b.layer.borderColor, kPIGreen.CGColor);
+        if (sel) [tags addObject:keys[i]];
+    }
+    p.preferenceTags = [tags copy];
+
+    return p;
+}
 
 - (NSString *)formatDate:(NSDate *)date {
     if (!self.dateFormatter) self.dateFormatter = [[NSDateFormatter alloc] init];
@@ -666,6 +831,7 @@
     if (!image) return;
 
     self.avatarView.image = image;
+    self.avatarNeedsUpload = YES;
     [self saveAvatarToLocal:image];
 }
 
@@ -707,33 +873,54 @@
 
 - (void)onBack { [self.navigationController popViewControllerAnimated:YES]; }
 
-- (void)onSave { [self showToast:NSLocalizedString(@"profile_save_success", nil)]; }
+- (void)onSave {
+    if (!AuthManager.sharedManager.isLoggedIn) {
+        [self showToast:@"请先登录"];
+        return;
+    }
+    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+    UserProfile *p = [self buildProfileForSave];
+    __weak typeof(self) weakSelf = self;
+
+    void (^putProfile)(void) = ^{
+        void (^afterSaveOK)(void) = ^{
+            [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+            weakSelf.avatarNeedsUpload = NO;
+            [weakSelf.navigationController popViewControllerAnimated:YES];
+            [[LoadingManager sharedManager] showSuccess:NSLocalizedString(@"profile_save_success", nil)];
+        };
+        [[UserRequest shared] updateUserInfo:p success:^(HTTPResponse * _Nullable responseObject) {
+            [[UserRequest shared] getLoginUserInfoSuccess:^(HTTPResponse * _Nullable r2) {
+                afterSaveOK();
+            } failure:^(NSError * _Nonnull error) {
+                afterSaveOK();
+            }];
+        } failure:^(NSError * _Nonnull error) {
+            [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+            NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"profile_save_fail", @"保存失败");
+            [[LoadingManager sharedManager] showError:msg inView:weakSelf.view];
+        }];
+    };
+
+    if (self.avatarNeedsUpload) {
+        NSData *jpeg = [NSData dataWithContentsOfFile:[self avatarLocalPath]];
+        if (jpeg.length > 0) {
+            [[FileRequest shared] uploadImage:jpeg type:ImageObjectTypeProfile success:^(HTTPResponse * _Nullable responseObject) {
+                NSString *url = [responseObject.dataObject isKindOfClass:[NSString class]] ? responseObject.dataObject : nil;
+                if (url.length > 0) p.avatar = url;
+                putProfile();
+            } failure:^(NSError * _Nonnull error) {
+                putProfile();
+            }];
+            return;
+        }
+    }
+    putProfile();
+}
 
 - (void)showToast:(NSString *)message {
-    UILabel *toast = [UILabel new];
-    toast.text = message;
-    toast.font = [UIFont systemFontOfSize:14];
-    toast.textColor = [UIColor whiteColor];
-    toast.backgroundColor = [UIColor colorWithWhite:0 alpha:0.7];
-    toast.textAlignment = NSTextAlignmentCenter;
-    toast.layer.cornerRadius = 16;
-    toast.clipsToBounds = YES;
-    [self.view addSubview:toast];
-    [toast mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self.view);
-        make.bottom.equalTo(self.saveBtn.mas_top).offset(-14);
-        make.height.mas_equalTo(36);
-        make.leading.greaterThanOrEqualTo(self.view).offset(40);
-        make.trailing.lessThanOrEqualTo(self.view).offset(-40);
-    }];
-    toast.alpha = 0;
-    [UIView animateWithDuration:0.25 animations:^{ toast.alpha = 1; } completion:^(BOOL finished) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [UIView animateWithDuration:0.25 animations:^{ toast.alpha = 0; } completion:^(BOOL done) {
-                [toast removeFromSuperview];
-            }];
-        });
-    }];
+    if (message.length == 0) return;
+    [[LoadingManager sharedManager] showText:message];
 }
 
 - (void)updateLocalizedStrings {

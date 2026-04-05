@@ -12,6 +12,10 @@
 #import <Masonry/Masonry.h>
 #import "ColorManager.h"
 
+static UIColor * SettingsPageBackgroundColor(void) {
+    return [UIColor colorWithRed:0.969 green:0.969 blue:0.969 alpha:1.0];
+}
+
 @interface SettingsViewController ()
 @property (nonatomic, strong) UILabel *navTitle;
 @property (nonatomic, strong) UIView *listCard;
@@ -26,7 +30,7 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.shouldShowNavigationBar = NO;
-    self.view.backgroundColor = [UIColor whiteColor];
+    self.view.backgroundColor = SettingsPageBackgroundColor();
 }
 
 - (void)setupUI {
@@ -40,8 +44,20 @@
     }];
 
     UIButton *back = [UIButton buttonWithType:UIButtonTypeSystem];
-    if (@available(iOS 13.0, *)) [back setImage:[UIImage systemImageNamed:@"arrow.left"] forState:UIControlStateNormal];
-    back.tintColor = [UIColor blackColor];
+    UIImage *adLeft = [UIImage imageNamed:@"ad_left"];
+    UIImage *fallback = adLeft ?: [UIImage imageNamed:@"nav_back"];
+    if (!fallback && @available(iOS 13.0, *)) {
+        fallback = [UIImage systemImageNamed:@"arrow.left"];
+    }
+    if (fallback) {
+        if (adLeft) {
+            [back setImage:adLeft forState:UIControlStateNormal];
+            back.tintColor = nil;
+        } else {
+            [back setImage:[fallback imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+            back.tintColor = [UIColor blackColor];
+        }
+    }
     [back addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
     [nav addSubview:back];
     [back mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -183,10 +199,8 @@
 
     if (showChevron) {
         UIImageView *arr = [UIImageView new];
-        if (@available(iOS 13.0, *)) {
-            arr.image = [UIImage systemImageNamed:@"chevron.right"];
-            arr.tintColor = [UIColor colorWithWhite:0.65 alpha:1.0];
-        }
+        arr.contentMode = UIViewContentModeScaleAspectFit;
+        arr.image = [UIImage imageNamed:@"setting_right"];
         [row addSubview:arr];
         [arr mas_makeConstraints:^(MASConstraintMaker *make) {
             make.trailing.equalTo(row).offset(-16);

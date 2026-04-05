@@ -4,104 +4,140 @@
 //
 
 #import "AddTeamsViewController.h"
-#import "ProfileTeamsStore.h"
+#import "TeamsRequest.h"
+#import "Team.h"
 #import <Masonry/Masonry.h>
+#import <math.h>
 #import "ColorManager.h"
+#import <SDWebImage/SDWebImage.h>
 
-#define kAddBg   [UIColor whiteColor]
+/// Figma「添加球队 / 选球队」1:9176
+static CGFloat const kAddTeamsPadding = 16.f;
+static CGFloat const kAddTeamsSearchH = 36.f;
+static CGFloat const kAddTeamsSearchSideInset = 24.f;
+static CGFloat const kAddTeamsNavRowH = 44.f;
+static CGFloat const kAddTeamsBottomBtnH = 54.f;
+/// 外圈白底圆直径、队标、右上角选中角标（与稿一致）
+static CGFloat const kAddTeamOuterD = 90.f;
+static CGFloat const kAddTeamLogoD = 50.f;
+static CGFloat const kAddTeamCheckBadgeD = 24.f;
+
 #define kGreen   [ColorManager sharedManager].primaryColor
 
 @interface AddTeamCell : UICollectionViewCell
-@property (nonatomic, strong) UIView *circleBg;
+@property (nonatomic, strong) UIView *outerCircle;
 @property (nonatomic, strong) UIImageView *iconView;
 @property (nonatomic, strong) UILabel *nameLabel;
-@property (nonatomic, strong) UIView *selectedRing;
-@property (nonatomic, strong) UIView *checkBadge;
-@property (nonatomic, strong) UIImageView *checkIcon;
-- (void)configureWithTeam:(ProfileTeamItem *)team selected:(BOOL)selected;
+@property (nonatomic, strong) UIImageView *checkBadge;
+- (void)configureWithAPITeam:(Team *)team selected:(BOOL)selected;
 @end
 
 @implementation AddTeamCell
 - (instancetype)initWithFrame:(CGRect)frame {
     if (self = [super initWithFrame:frame]) {
         self.contentView.backgroundColor = [UIColor clearColor];
-        _selectedRing = [UIView new];
-        _selectedRing.layer.cornerRadius = 38;
-        _selectedRing.layer.borderWidth = 2;
-        _selectedRing.layer.borderColor = kGreen.CGColor;
-        _selectedRing.hidden = YES;
 
-        _circleBg = [UIView new];
-        _circleBg.backgroundColor = [UIColor colorWithWhite:0.92 alpha:1.0];
-        _circleBg.layer.cornerRadius = 36;
-        _circleBg.clipsToBounds = YES;
+        _outerCircle = [UIView new];
+        _outerCircle.backgroundColor = [UIColor whiteColor];
+        _outerCircle.layer.cornerRadius = kAddTeamOuterD / 2.f;
+        _outerCircle.clipsToBounds = NO;
+        _outerCircle.layer.borderWidth = 0;
+        _outerCircle.layer.borderColor = kGreen.CGColor;
+        _outerCircle.layer.shadowColor = [UIColor blackColor].CGColor;
+        _outerCircle.layer.shadowOpacity = 0.06f;
+        _outerCircle.layer.shadowOffset = CGSizeMake(0, 9);
+        _outerCircle.layer.shadowRadius = 16;
 
         _iconView = [UIImageView new];
         _iconView.contentMode = UIViewContentModeScaleAspectFit;
+        _iconView.layer.cornerRadius = kAddTeamLogoD / 2.f;
+        _iconView.clipsToBounds = YES;
+        _iconView.backgroundColor = [UIColor clearColor];
 
         _nameLabel = [UILabel new];
-        _nameLabel.font = [UIFont systemFontOfSize:12];
-        _nameLabel.textColor = [UIColor darkGrayColor];
+        _nameLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
+        _nameLabel.textColor = [UIColor colorWithRed:0.208 green:0.200 blue:0.208 alpha:1.0];
         _nameLabel.textAlignment = NSTextAlignmentCenter;
         _nameLabel.numberOfLines = 2;
 
-        _checkBadge = [UIView new];
-        _checkBadge.backgroundColor = kGreen;
-        _checkBadge.layer.cornerRadius = 10;
-        _checkBadge.hidden = YES;
-        _checkBadge.clipsToBounds = YES;
-
-        _checkIcon = [UIImageView new];
-        if (@available(iOS 13.0, *)) {
-            _checkIcon.image = [UIImage systemImageNamed:@"checkmark"];
-            _checkIcon.tintColor = [UIColor whiteColor];
+        _checkBadge = [UIImageView new];
+        _checkBadge.contentMode = UIViewContentModeScaleAspectFit;
+        UIImage *yesImg = [UIImage imageNamed:@"set_yes"];
+        if (yesImg) {
+            _checkBadge.image = yesImg;
+        } else if (@available(iOS 13.0, *)) {
+            UIImage *sf = [UIImage systemImageNamed:@"checkmark.circle.fill"];
+            _checkBadge.image = [sf imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+            _checkBadge.tintColor = kGreen;
         }
-        _checkIcon.contentMode = UIViewContentModeScaleAspectFit;
-        [_checkBadge addSubview:_checkIcon];
-        [_checkIcon mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.center.equalTo(_checkBadge);
-            make.size.mas_equalTo(CGSizeMake(12, 12));
-        }];
+        _checkBadge.hidden = YES;
 
-        [self.contentView addSubview:_selectedRing];
-        [self.contentView addSubview:_circleBg];
-        [_circleBg addSubview:_iconView];
+        [self.contentView addSubview:_outerCircle];
+        [_outerCircle addSubview:_iconView];
+        [_outerCircle addSubview:_checkBadge];
         [self.contentView addSubview:_nameLabel];
-        [self.contentView addSubview:_checkBadge];
 
-        [_selectedRing mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(self.contentView).offset(2);
+        [_outerCircle mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.equalTo(self.contentView);
             make.centerX.equalTo(self.contentView);
-            make.size.mas_equalTo(CGSizeMake(76, 76));
-        }];
-        [_circleBg mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.center.equalTo(_selectedRing);
-            make.size.mas_equalTo(CGSizeMake(72, 72));
+            make.size.mas_equalTo(CGSizeMake(kAddTeamOuterD, kAddTeamOuterD));
         }];
         [_iconView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.center.equalTo(_circleBg);
-            make.size.mas_equalTo(CGSizeMake(44, 44));
+            make.center.equalTo(_outerCircle);
+            make.size.mas_equalTo(CGSizeMake(kAddTeamLogoD, kAddTeamLogoD));
         }];
-        [_checkBadge mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(_selectedRing).offset(-4);
-            make.trailing.equalTo(_selectedRing).offset(4);
-            make.size.mas_equalTo(CGSizeMake(20, 20));
-        }];
+        /// 选中角标中心落在外圈圆周（右上 45°），一半在圆内一半在圆外
+        {
+            CGFloat r = kAddTeamOuterD / 2.f;
+            CGFloat d = (CGFloat)(r / sqrt(2.0));
+            [_checkBadge mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.centerX.equalTo(_outerCircle.mas_centerX).offset(d);
+                make.centerY.equalTo(_outerCircle.mas_centerY).offset(-d);
+                make.size.mas_equalTo(CGSizeMake(kAddTeamCheckBadgeD, kAddTeamCheckBadgeD));
+            }];
+        }
         [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(_selectedRing.mas_bottom).offset(8);
+            make.top.equalTo(_outerCircle.mas_bottom).offset(8);
             make.leading.trailing.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 2, 0, 2));
         }];
     }
     return self;
 }
 
-- (void)configureWithTeam:(ProfileTeamItem *)team selected:(BOOL)selected {
-    self.nameLabel.text = NSLocalizedString(team.nameKey, nil);
-    if (@available(iOS 13.0, *)) {
-        self.iconView.image = [UIImage systemImageNamed:(team.iconName ?: @"circle.fill")];
-        self.iconView.tintColor = team.tintColor ?: [UIColor grayColor];
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    if (self.outerCircle.bounds.size.width > 0) {
+        UIBezierPath *p = [UIBezierPath bezierPathWithRoundedRect:self.outerCircle.bounds cornerRadius:kAddTeamOuterD / 2.f];
+        self.outerCircle.layer.shadowPath = p.CGPath;
     }
-    self.selectedRing.hidden = !selected;
+}
+
+- (void)configureWithAPITeam:(Team *)team selected:(BOOL)selected {
+    NSString *title = @"";
+    if (team.name.length > 0) title = team.name;
+    else if (team.nameEn.length > 0) title = team.nameEn;
+    else title = @"-";
+    self.nameLabel.text = title;
+
+    self.iconView.tintColor = nil;
+    NSURL *url = team.logo.length > 0 ? [NSURL URLWithString:team.logo] : nil;
+    UIImage *placeholder = nil;
+    if (@available(iOS 13.0, *)) {
+        placeholder = [UIImage systemImageNamed:@"sportscourt.fill"];
+    }
+    __weak typeof(self) weakSelf = self;
+    [self.iconView sd_setImageWithURL:url placeholderImage:placeholder completed:^(UIImage * _Nullable image, NSError * _Nullable error, SDImageCacheType cacheType, NSURL * _Nullable imageURL) {
+        weakSelf.iconView.contentMode = UIViewContentModeScaleAspectFit;
+        if (!image || error) {
+            if (@available(iOS 13.0, *)) {
+                weakSelf.iconView.tintColor = [UIColor grayColor];
+            }
+        } else {
+            weakSelf.iconView.tintColor = nil;
+        }
+    }];
+
+    self.outerCircle.layer.borderWidth = selected ? 2.0 : 0.0;
     self.checkBadge.hidden = !selected;
 }
 @end
@@ -113,128 +149,171 @@
 @property (nonatomic, strong) UIButton *cancelBtn;
 @property (nonatomic, strong) UIButton *confirmBtn;
 
-@property (nonatomic, strong) NSArray<ProfileTeamItem *> *allTeams;
-@property (nonatomic, strong) NSArray<ProfileTeamItem *> *filteredTeams;
+@property (nonatomic, strong) NSArray<Team *> *allTeams;
 @property (nonatomic, strong) NSMutableSet<NSString *> *selectedIds;
-@property (nonatomic, assign) BOOL isSearching;
+@property (nonatomic, assign) NSInteger searchDebounceToken;
 @end
 
 @implementation AddTeamsViewController
 
 - (void)viewDidLoad {
     self.hidesBottomBarWhenPushed = YES;
-    self.allTeams = [ProfileTeamsStore allTeams];
-    self.filteredTeams = self.allTeams;
     self.selectedIds = [NSMutableSet setWithArray:(self.preselectedTeamIds ?: @[])];
+    self.allTeams = @[];
     [super viewDidLoad];
     self.shouldShowNavigationBar = NO;
-    self.view.backgroundColor = kAddBg;
+    self.view.backgroundColor = [UIColor whiteColor];
+    [self fetchTeamsForKeyword:@""];
+}
+
+/// GET /api/v1/teams/search
+- (void)fetchTeamsForKeyword:(NSString *)keyword {
+    __weak typeof(self) weakSelf = self;
+    NSString *kw = keyword ?: @"";
+    [[TeamsRequest shared] searchTeams:kw leagueId:nil page:1 pageSize:100 success:^(HTTPResponse * _Nullable responseObject) {
+        NSArray *teams = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+        weakSelf.allTeams = teams ?: @[];
+        [weakSelf.collectionView reloadData];
+    } failure:^(NSError * _Nonnull error) {
+        weakSelf.allTeams = @[];
+        [weakSelf.collectionView reloadData];
+    }];
 }
 
 - (void)setupUI {
-    // Nav
+    ColorManager *cm = [ColorManager sharedManager];
+
     UIView *nav = [UIView new];
-    nav.backgroundColor = [UIColor whiteColor];
+    nav.backgroundColor = [UIColor clearColor];
     [self.view addSubview:nav];
+
+    UIView *navRow = [UIView new];
+    navRow.backgroundColor = [UIColor clearColor];
+    [nav addSubview:navRow];
+    [navRow mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.trailing.bottom.equalTo(nav);
+        make.top.equalTo(nav.mas_safeAreaLayoutGuideTop);
+        make.height.mas_equalTo(kAddTeamsNavRowH);
+    }];
     [nav mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.leading.trailing.equalTo(self.view);
-        make.height.mas_equalTo(88);
+        make.bottom.equalTo(navRow);
     }];
 
-    UIButton *back = [UIButton buttonWithType:UIButtonTypeSystem];
-    if (@available(iOS 13.0, *)) [back setImage:[UIImage systemImageNamed:@"arrow.left"] forState:UIControlStateNormal];
-    back.tintColor = [UIColor blackColor];
+    UIButton *back = [UIButton buttonWithType:UIButtonTypeCustom];
+    UIImage *adLeft = [UIImage imageNamed:@"ad_left"];
+    UIImage *backImg = adLeft ?: [UIImage imageNamed:@"nav_back"];
+    if (!backImg && @available(iOS 13.0, *)) {
+        backImg = [UIImage systemImageNamed:@"arrow.left"];
+    }
+    if (backImg) {
+        if (adLeft) {
+            [back setImage:adLeft forState:UIControlStateNormal];
+            back.tintColor = nil;
+        } else {
+            [back setImage:[backImg imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+            back.tintColor = cm.textColor;
+        }
+    }
     [back addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
-    [nav addSubview:back];
+    [navRow addSubview:back];
     [back mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(nav).offset(12);
-        make.bottom.equalTo(nav).offset(-10);
-        make.size.mas_equalTo(CGSizeMake(36, 36));
+        make.leading.equalTo(navRow).offset(16);
+        make.centerY.equalTo(navRow);
+        make.size.mas_equalTo(CGSizeMake(44, 44));
     }];
 
     self.navTitle = [UILabel new];
-    self.navTitle.font = [UIFont boldSystemFontOfSize:17];
-    self.navTitle.textColor = [UIColor blackColor];
-    [nav addSubview:self.navTitle];
+    self.navTitle.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
+    self.navTitle.textColor = cm.textColor;
+    [navRow addSubview:self.navTitle];
     [self.navTitle mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(nav);
-        make.centerY.equalTo(back);
+        make.centerX.equalTo(navRow);
+        make.centerY.equalTo(navRow);
     }];
 
-    // Search pill
     UIView *searchPill = [UIView new];
-    searchPill.backgroundColor = [UIColor colorWithWhite:0.92 alpha:1.0];
-    searchPill.layer.cornerRadius = 18;
+    searchPill.backgroundColor = [UIColor colorWithRed:247/255.0 green:246/255.0 blue:246/255.0 alpha:1.0];
+    searchPill.layer.cornerRadius = kAddTeamsSearchH / 2.f;
+    searchPill.clipsToBounds = YES;
     [self.view addSubview:searchPill];
     [searchPill mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(nav.mas_bottom).offset(10);
-        make.leading.equalTo(self.view).offset(12);
-        make.trailing.equalTo(self.view).offset(-12);
-        make.height.mas_equalTo(36);
+        make.leading.equalTo(self.view).offset(kAddTeamsSearchSideInset);
+        make.trailing.equalTo(self.view).offset(-kAddTeamsSearchSideInset);
+        make.height.mas_equalTo(kAddTeamsSearchH);
     }];
 
     UIImageView *icon = [UIImageView new];
-    if (@available(iOS 13.0, *)) { icon.image = [UIImage systemImageNamed:@"magnifyingglass"]; icon.tintColor = [UIColor grayColor]; }
+    if (@available(iOS 13.0, *)) {
+        icon.image = [UIImage systemImageNamed:@"magnifyingglass"];
+        icon.tintColor = [UIColor colorWithRed:89/255.0 green:89/255.0 blue:89/255.0 alpha:1.0];
+    }
+    icon.contentMode = UIViewContentModeScaleAspectFit;
     [searchPill addSubview:icon];
     [icon mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(searchPill).offset(12);
+        make.leading.equalTo(searchPill).offset(8);
         make.centerY.equalTo(searchPill);
-        make.size.mas_equalTo(CGSizeMake(16, 16));
+        make.size.mas_equalTo(CGSizeMake(24, 24));
     }];
 
     self.searchField = [UITextField new];
-    self.searchField.font = [UIFont systemFontOfSize:13];
+    self.searchField.font = [UIFont systemFontOfSize:12];
     self.searchField.delegate = self;
     self.searchField.returnKeyType = UIReturnKeySearch;
+    self.searchField.textColor = cm.textColor;
     [self.searchField addTarget:self action:@selector(onSearchChanged) forControlEvents:UIControlEventEditingChanged];
     [searchPill addSubview:self.searchField];
     [self.searchField mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(icon.mas_trailing).offset(8);
+        make.leading.equalTo(icon.mas_trailing).offset(6);
         make.trailing.equalTo(searchPill).offset(-12);
         make.centerY.equalTo(searchPill);
-        make.height.mas_equalTo(30);
+        make.height.mas_equalTo(32);
     }];
+    [self applySearchFieldPlaceholderStyle];
 
-    // Bottom buttons
+    CGFloat bottomCorner = kAddTeamsBottomBtnH / 2.f;
     UIView *bottom = [UIView new];
     bottom.backgroundColor = [UIColor clearColor];
     [self.view addSubview:bottom];
     [bottom mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.trailing.equalTo(self.view);
-        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-10);
-        make.height.mas_equalTo(54);
+        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-16);
+        make.height.mas_equalTo(kAddTeamsBottomBtnH);
     }];
 
-    self.cancelBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.cancelBtn.backgroundColor = [UIColor colorWithWhite:0.9 alpha:1.0];
-    self.cancelBtn.layer.cornerRadius = 22;
-    self.cancelBtn.titleLabel.font = [UIFont boldSystemFontOfSize:16];
-    [self.cancelBtn setTitleColor:[UIColor darkGrayColor] forState:UIControlStateNormal];
+    self.cancelBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.cancelBtn.backgroundColor = [UIColor colorWithRed:226/255.0 green:226/255.0 blue:226/255.0 alpha:1.0];
+    self.cancelBtn.layer.cornerRadius = bottomCorner;
+    self.cancelBtn.clipsToBounds = YES;
+    self.cancelBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    [self.cancelBtn setTitleColor:[UIColor colorWithRed:39/255.0 green:39/255.0 blue:39/255.0 alpha:1.0] forState:UIControlStateNormal];
     [self.cancelBtn addTarget:self action:@selector(onCancelTapped) forControlEvents:UIControlEventTouchUpInside];
     [bottom addSubview:self.cancelBtn];
 
-    self.confirmBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.confirmBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     self.confirmBtn.backgroundColor = kGreen;
-    self.confirmBtn.layer.cornerRadius = 22;
-    self.confirmBtn.titleLabel.font = [UIFont boldSystemFontOfSize:16];
+    self.confirmBtn.layer.cornerRadius = bottomCorner;
+    self.confirmBtn.clipsToBounds = YES;
+    self.confirmBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [self.confirmBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     [self.confirmBtn addTarget:self action:@selector(onConfirmTapped) forControlEvents:UIControlEventTouchUpInside];
     [bottom addSubview:self.confirmBtn];
 
     [self.cancelBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(bottom).offset(16);
+        make.leading.equalTo(bottom).offset(kAddTeamsPadding);
         make.top.bottom.equalTo(bottom);
-        make.trailing.equalTo(bottom.mas_centerX).offset(-8);
+        make.height.mas_equalTo(kAddTeamsBottomBtnH);
+        make.width.equalTo(self.confirmBtn);
     }];
     [self.confirmBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(bottom).offset(-16);
+        make.trailing.equalTo(bottom).offset(-kAddTeamsPadding);
         make.top.bottom.equalTo(bottom);
-        make.leading.equalTo(bottom.mas_centerX).offset(8);
+        make.leading.equalTo(self.cancelBtn.mas_trailing).offset(12);
     }];
 
-    // Collection
     UICollectionViewFlowLayout *fl = [UICollectionViewFlowLayout new];
-    fl.sectionInset = UIEdgeInsetsMake(10, 12, 10, 12);
+    fl.sectionInset = UIEdgeInsetsMake(12, kAddTeamsPadding, 24, kAddTeamsPadding);
     fl.minimumInteritemSpacing = 0;
     fl.minimumLineSpacing = 16;
 
@@ -243,19 +322,38 @@
     self.collectionView.dataSource = self;
     self.collectionView.delegate = self;
     self.collectionView.showsVerticalScrollIndicator = NO;
+    if (@available(iOS 11.0, *)) {
+        self.collectionView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+    }
     [self.collectionView registerClass:[AddTeamCell class] forCellWithReuseIdentifier:@"AddTeamCell"];
     [self.view addSubview:self.collectionView];
     [self.collectionView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(searchPill.mas_bottom).offset(6);
+        make.top.equalTo(searchPill.mas_bottom).offset(8);
         make.leading.trailing.equalTo(self.view);
-        make.bottom.equalTo(bottom.mas_top).offset(-6);
+        make.bottom.equalTo(bottom.mas_top).offset(-8);
     }];
+}
+
+- (void)applySearchFieldPlaceholderStyle {
+    if (!self.searchField) return;
+    ColorManager *cm = [ColorManager sharedManager];
+    NSString *ph = NSLocalizedString(@"profile_team_search_placeholder", nil);
+    UIFont *font = self.searchField.font ?: [UIFont systemFontOfSize:12];
+    UIColor *phColor = [UIColor colorWithRed:89/255.0 green:89/255.0 blue:89/255.0 alpha:1.0];
+    self.searchField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:ph attributes:@{
+        NSForegroundColorAttributeName: phColor,
+        NSFontAttributeName: font
+    }];
+    self.searchField.typingAttributes = @{
+        NSFontAttributeName: font,
+        NSForegroundColorAttributeName: cm.textColor
+    };
 }
 
 - (void)updateLocalizedStrings {
     [super updateLocalizedStrings];
     self.navTitle.text = NSLocalizedString(@"profile_add_team_title", nil);
-    self.searchField.placeholder = NSLocalizedString(@"profile_team_search_placeholder", nil);
+    [self applySearchFieldPlaceholderStyle];
     [self.cancelBtn setTitle:NSLocalizedString(@"cancel", nil) forState:UIControlStateNormal];
     [self.confirmBtn setTitle:NSLocalizedString(@"confirm", nil) forState:UIControlStateNormal];
 }
@@ -270,11 +368,18 @@
 }
 
 - (NSArray<NSString *> *)selectedIdsInStableOrder {
-    // 保持输出顺序与 allTeams 一致，避免 set 的无序导致上层 UI 抖动
     NSMutableArray<NSString *> *arr = [NSMutableArray array];
-    for (ProfileTeamItem *t in self.allTeams) {
+    NSMutableSet<NSString *> *seen = [NSMutableSet set];
+    for (Team *t in self.allTeams) {
         if (t.teamId.length > 0 && [self.selectedIds containsObject:t.teamId]) {
             [arr addObject:t.teamId];
+            [seen addObject:t.teamId];
+        }
+    }
+    for (NSString *sid in self.selectedIds) {
+        if (sid.length > 0 && ![seen containsObject:sid]) {
+            [arr addObject:sid];
+            [seen addObject:sid];
         }
     }
     return arr;
@@ -282,57 +387,54 @@
 
 - (void)onSearchChanged {
     NSString *kw = [self.searchField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if (kw.length == 0) {
-        self.isSearching = NO;
-        self.filteredTeams = self.allTeams;
-    } else {
-        self.isSearching = YES;
-        NSString *lower = kw.lowercaseString;
-        NSMutableArray *arr = [NSMutableArray array];
-        for (ProfileTeamItem *t in self.allTeams) {
-            NSString *name = NSLocalizedString(t.nameKey, nil) ?: @"";
-            if ([name.lowercaseString containsString:lower] || [t.teamId containsString:lower]) {
-                [arr addObject:t];
-            }
-        }
-        self.filteredTeams = arr;
-    }
-    [self.collectionView reloadData];
+    self.searchDebounceToken += 1;
+    NSInteger token = self.searchDebounceToken;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (token != self.searchDebounceToken) return;
+        [self fetchTeamsForKeyword:kw];
+    });
+}
+
+- (BOOL)textFieldShouldReturn:(UITextField *)textField {
+    [textField resignFirstResponder];
+    NSString *kw = [textField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    self.searchDebounceToken += 1;
+    [self fetchTeamsForKeyword:kw];
+    return YES;
 }
 
 #pragma mark - UICollectionView
 
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
-    return self.filteredTeams.count;
+    return self.allTeams.count;
 }
 
 - (__kindof UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
     AddTeamCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"AddTeamCell" forIndexPath:indexPath];
-    ProfileTeamItem *t = self.filteredTeams[indexPath.item];
+    Team *t = self.allTeams[indexPath.item];
     BOOL sel = [self.selectedIds containsObject:t.teamId];
-    [cell configureWithTeam:t selected:sel];
+    [cell configureWithAPITeam:t selected:sel];
     return cell;
 }
 
 - (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)layout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
-    // 原型：3 列大图标
     CGFloat w = collectionView.bounds.size.width;
-    CGFloat inset = 12;
-    CGFloat spacing = 0;
-    CGFloat available = w - inset * 2 - spacing * 2;
+    CGFloat inset = kAddTeamsPadding;
+    CGFloat available = w - inset * 2;
     CGFloat itemW = floor(available / 3.0);
-    return CGSizeMake(itemW, 120);
+    return CGSizeMake(itemW, 140);
 }
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-    ProfileTeamItem *t = self.filteredTeams[indexPath.item];
-    if ([self.selectedIds containsObject:t.teamId]) {
-        [self.selectedIds removeObject:t.teamId];
+    Team *t = self.allTeams[indexPath.item];
+    NSString *tid = t.teamId ?: @"";
+    if (tid.length == 0) return;
+    if ([self.selectedIds containsObject:tid]) {
+        [self.selectedIds removeObject:tid];
     } else {
-        [self.selectedIds addObject:t.teamId];
+        [self.selectedIds addObject:tid];
     }
     [collectionView reloadItemsAtIndexPaths:@[indexPath]];
 }
 
 @end
-

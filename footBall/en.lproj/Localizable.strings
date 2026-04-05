@@ -318,7 +318,7 @@
 "auth_id_back_label" = "Upload ID card back photo";
 "auth_submit_now" = "Verify Now";
 "auth_realname_completed" = "Real-name verification completed";
-"auth_id_front_display" = "Front image";
+"auth_id_front_display" = "Front photo";
 "auth_id_back_display" = "Back image";
 "auth_please_upload_both" = "Please upload both front and back ID photos";
 "auth_realname_success" = "Real-name verification submitted";

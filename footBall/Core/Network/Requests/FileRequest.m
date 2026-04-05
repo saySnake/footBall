@@ -6,6 +6,8 @@
 //
 
 #import "FileRequest.h"
+#import "HTTPResponse.h"
+#import "AuthManager.h"
 #define OSS_ENDPOINT                    @"http://oss-cn-region.aliyuncs.com"      // 访问的阿里云endpoint
 
 @implementation FileRequest
@@ -108,10 +110,23 @@
         failure(error);
         return;
     }
-    
+    if (!self.stsToken || !self.defaultClient) {
+        __weak typeof(self) weakSelf = self;
+        [self getOSSTokenSuccess:^(HTTPResponse * _Nullable responseObject) {
+            [weakSelf setupSTSToken];
+            [weakSelf uploadImage:data type:type success:success failure:failure];
+        } failure:failure];
+        return;
+    }
+
+    NSString *objectKey = [NSString stringWithFormat:@"%@/%@/%.0f.jpg",
+                           AuthManager.sharedManager.user.userId ?: @"user",
+                           [self objectType:type],
+                           [NSDate date].timeIntervalSince1970 * 1000.0];
+
     OSSPutObjectRequest *_normalUploadRequest = [OSSPutObjectRequest new];
     _normalUploadRequest.bucketName = self.stsToken.bucket;
-    _normalUploadRequest.objectKey = [NSString stringWithFormat:@"%@/%@/%.f.jpg",AuthManager.sharedManager.user.userId,[self objectType:type],NSDate.date.timeIntervalSince1970*1000];
+    _normalUploadRequest.objectKey = objectKey;
     _normalUploadRequest.uploadingData = data;
     _normalUploadRequest.isAuthenticationRequired = YES;
     _normalUploadRequest.uploadProgress = ^(int64_t bytesSent, int64_t totalByteSent, int64_t totalBytesExpectedToSend) {
@@ -126,10 +141,16 @@
                     failure(task.error);
                 } else {
                     NSLog(@"[OSS] upload result: %@",task.result);
-                    success(nil);
+                    NSString *bucket = self.stsToken.bucket ?: @"";
+                    NSString *region = self.stsToken.region.length ? self.stsToken.region : @"cn-hangzhou";
+                    NSString *urlStr = [NSString stringWithFormat:@"https://%@.oss-%@.aliyuncs.com/%@", bucket, region, objectKey];
+                    HTTPResponse *resp = [[HTTPResponse alloc] init];
+                    resp.success = YES;
+                    resp.dataObject = urlStr;
+                    if (success) success(resp);
                 }
             });
-            
+
             return nil;
         }];
     });
