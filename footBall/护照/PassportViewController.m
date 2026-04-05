@@ -14,7 +14,7 @@
 #import <Masonry/Masonry.h>
 
 static UIColor *PassportPageBg(void) {
-    return [UIColor colorWithRed:0.05 green:0.05 blue:0.06 alpha:1.0];
+    return [UIColor colorWithHexString:@"#E6E6E6"];
 }
 
 @interface PassportViewController () <UITableViewDelegate, UITableViewDataSource>
@@ -75,7 +75,7 @@ static UIColor *PassportPageBg(void) {
 
 - (void)buildTopBar {
     _topBar = [[UIView alloc] init];
-    _topBar.backgroundColor = PassportPageBg();
+    _topBar.backgroundColor = [UIColor colorWithHexString:@"#0D2122"];
     [self.view addSubview:_topBar];
 
     _backButton = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -126,11 +126,19 @@ static UIColor *PassportPageBg(void) {
 }
 
 - (void)buildTable {
+    UIView *topBg = UIView.alloc.init;
+    topBg.backgroundColor = [UIColor colorWithHexString:@"#0D2122"];
+    [self.view addSubview:topBg];
+    [topBg mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(_topBar.mas_bottom);
+        make.leading.trailing.equalTo(self.view);
+        make.height.equalTo(@30);
+    }];
     _tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
     _tableView.delegate = self;
     _tableView.dataSource = self;
     _tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
-    _tableView.backgroundColor = PassportPageBg();
+    _tableView.backgroundColor = UIColor.clearColor;
     _tableView.showsVerticalScrollIndicator = YES;
     _tableView.estimatedRowHeight = 200;
     _tableView.rowHeight = UITableViewAutomaticDimension;
@@ -156,7 +164,7 @@ static UIColor *PassportPageBg(void) {
 
 - (void)buildTableHeader {
     _headerWrap = [[UIView alloc] init];
-    _headerWrap.backgroundColor = PassportPageBg();
+    _headerWrap.backgroundColor = UIColor.clearColor;
 
     _passportHeader = [[PassportHeaderView alloc] init];
     _yearStrip = [[PassportYearTabStrip alloc] init];
@@ -180,7 +188,7 @@ static UIColor *PassportPageBg(void) {
     [_headerWrap addSubview:_yearStrip];
 
     [_passportHeader mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(@0);
+        make.top.equalTo(@15);
         make.leading.equalTo(@0);
         make.trailing.equalTo(@0);
     }];

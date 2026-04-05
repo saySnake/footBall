@@ -22,6 +22,41 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) NSInteger headerStatRight;
 @property (nonatomic, copy) NSString *promoButtonTitle;
 
+#pragma mark - 护照头部 PassportHeaderView
+/// 用户区第一行：护照代号展示（如 NO.0088）
+@property (nonatomic, copy) NSString *headerPassportCodeLine;
+/// 周折线图：周一至周日 7 个值，范围 0～100（由 weeklyFrequency 归一化）
+@property (nonatomic, copy) NSArray<NSNumber *> *headerWeekLineValues;
+/// 纪律：红 / 黄 / 干净场（绿）
+@property (nonatomic, assign) NSInteger headerRedCards;
+@property (nonatomic, assign) NSInteger headerYellowCards;
+@property (nonatomic, assign) NSInteger headerCleanMatches;
+/// 地图填充：ISO 3166-1 alpha-2 大写（经常去 / 已去过）
+@property (nonatomic, copy) NSArray<NSString *> *headerMapOftenISOs;
+@property (nonatomic, copy) NSArray<NSString *> *headerMapGoneISOs;
+/// 年度消费金额展示（RMB 数字文案，可含千分位）
+@property (nonatomic, copy) NSString *headerSpendingAmountText;
+/// 底部 8 个圆：胜、平、负、胜率、淘汰、出线、年度场次、年度进球
+@property (nonatomic, copy) NSArray<NSString *> *headerBottomStatTexts;
+
+#pragma mark - 护照头部下区 PassportHeader2View
+/// 当前选中年份（与年份 Tab / 接口 year 一致）
+@property (nonatomic, assign) NSInteger displayYear;
+/// 所在城市（护照 city，空则 UI 用默认文案）
+@property (nonatomic, copy, nullable) NSString *userCity;
+/// 本年度观赛场次（大数字，「场」旁白另显示）
+@property (nonatomic, assign) NSInteger header2YearMatchCount;
+/// 世代标签主数字（如 05后 → "05"）
+@property (nonatomic, copy) NSString *header2GenerationMainText;
+/// 世代标签是否带「…后」后缀（由 generationTag 是否以「后」结尾推断）
+@property (nonatomic, assign) BOOL header2GenerationHasHouSuffix;
+@property (nonatomic, assign) NSInteger header2YearWatchMinutes;
+@property (nonatomic, assign) NSInteger header2YearGoals;
+@property (nonatomic, assign) NSInteger header2CityCount;
+@property (nonatomic, assign) NSInteger header2CountryCount;
+/// 关注球队队徽 URL，最多取 5 个填满底部前 5 圆
+@property (nonatomic, copy) NSArray<NSString *> *header2FollowedTeamLogoURLs;
+
 @property (nonatomic, copy) NSString *regularSeasonTitle;
 @property (nonatomic, copy) NSString *avgDurationTitle;
 @property (nonatomic, copy) NSString *avgDurationValue;

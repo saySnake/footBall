@@ -7,7 +7,6 @@
 #import <Masonry/Masonry.h>
 
 @interface PassportYearTabStrip ()
-@property (nonatomic, strong) UIScrollView *scroll;
 @property (nonatomic, strong) UIStackView *stack;
 @property (nonatomic, strong) NSArray<NSNumber *> *years;
 @property (nonatomic, strong) NSMutableArray<UIButton *> *buttons;
@@ -19,20 +18,14 @@
     if (self = [super initWithFrame:frame]) {
         self.backgroundColor = [UIColor clearColor];
         _buttons = [NSMutableArray array];
-        _scroll = [[UIScrollView alloc] init];
-        _scroll.showsHorizontalScrollIndicator = NO;
-        [self addSubview:_scroll];
         _stack = [[UIStackView alloc] init];
         _stack.axis = UILayoutConstraintAxisHorizontal;
-        _stack.spacing = 20;
-        _stack.alignment = UIStackViewAlignmentCenter;
-        [_scroll addSubview:_stack];
-        [_scroll mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self);
-        }];
+        _stack.spacing = 8;
+        _stack.distribution = UIStackViewDistributionFillEqually;
+        _stack.alignment = UIStackViewAlignmentFill;
+        [self addSubview:_stack];
         [_stack mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(_scroll).insets(UIEdgeInsetsMake(8, 16, 8, 16));
-            make.height.equalTo(_scroll);
+            make.edges.equalTo(self).insets(UIEdgeInsetsMake(8, 16, 8, 16));
         }];
     }
     return self;
@@ -53,6 +46,12 @@
         [b setTitle:[NSString stringWithFormat:fmt, (long)yv] forState:UIControlStateNormal];
         b.tag = yv;
         b.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+        b.titleLabel.adjustsFontSizeToFitWidth = YES;
+        b.titleLabel.minimumScaleFactor = 0.7;
+        b.titleLabel.textAlignment = NSTextAlignmentCenter;
+        b.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
+        [b setContentHuggingPriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
+        [b setContentCompressionResistancePriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
         [b addTarget:self action:@selector(onTap:) forControlEvents:UIControlEventTouchUpInside];
         [_stack addArrangedSubview:b];
         [_buttons addObject:b];
@@ -69,8 +68,8 @@
 - (void)updateSelection {
     for (UIButton *b in _buttons) {
         BOOL on = b.tag == self.selectedYear;
-        [b setTitleColor:on ? [UIColor whiteColor] : [UIColor colorWithWhite:1 alpha:0.45] forState:UIControlStateNormal];
-        b.titleLabel.font = [UIFont systemFontOfSize:14 weight:on ? UIFontWeightSemibold : UIFontWeightMedium];
+        [b setTitleColor:on ? [UIColor colorWithHexString:@"#333333"] : [UIColor colorWithHexString:@"#999999"] forState:UIControlStateNormal];
+        b.titleLabel.font = on ? FontManager.sharedManager.font18Regular : FontManager.sharedManager.font14Regular;
     }
 }
 

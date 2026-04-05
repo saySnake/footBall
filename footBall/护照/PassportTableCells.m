@@ -82,12 +82,12 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
         self.contentView.layoutMargins = UIEdgeInsetsZero;
         self.contentView.preservesSuperviewLayoutMargins = NO;
         _headerCard = [[UIView alloc] init];
-        _headerCard.backgroundColor = PCDarkCard();
-        _headerCard.layer.cornerRadius = 16;
+        _headerCard.backgroundColor = [UIColor colorWithHexString:@"#18181C"];
+        _headerCard.layer.cornerRadius = 24;
         _headerCard.clipsToBounds = YES;
         [self.contentView addSubview:_headerCard];
         _title = [[UILabel alloc] init];
-        _title.font = [UIFont systemFontOfSize:24 weight:UIFontWeightBold];
+        _title.font = [UIFont systemFontOfSize:18 weight:UIFontWeightBold];
         _title.textColor = [UIColor whiteColor];
         [_headerCard addSubview:_title];
 
@@ -98,15 +98,15 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
 
         // 纯色（不透明），按设计稿从上到下逐渐变亮一点
         NSArray<UIColor *> *rowColors = @[
-            PCHex(@"2A2B30"),
-            PCHex(@"303138"),
-            PCHex(@"353742"),
-            PCHex(@"3A3D4A"),
+            PCHex(@"27272D"),
+            PCHex(@"34343B"),
+            PCHex(@"43434B"),
+            PCHex(@"53535A"),
         ];
         for (NSInteger i = 0; i < rowColors.count; i++) {
             UIView *rowCard = [[UIView alloc] init];
             rowCard.backgroundColor = rowColors[i];
-            rowCard.layer.cornerRadius = 18;
+            rowCard.layer.cornerRadius = 24;
             rowCard.clipsToBounds = YES;
             [self.contentView addSubview:rowCard];
 
@@ -130,7 +130,11 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
 
             [left mas_makeConstraints:^(MASConstraintMaker *make) {
                 make.left.equalTo(rowCard).offset(18);
-                make.centerY.equalTo(rowCard);
+                if (rowColors.count - 1 == i) {
+                    make.centerY.equalTo(rowCard);
+                } else {
+                    make.centerY.equalTo(rowCard).offset(-28);
+                }
                 make.right.lessThanOrEqualTo(val.mas_left).offset(-12);
             }];
             [unit mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -139,7 +143,11 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
             }];
             [val mas_makeConstraints:^(MASConstraintMaker *make) {
                 make.right.equalTo(unit.mas_left).offset(-10);
-                make.centerY.equalTo(rowCard);
+                if (rowColors.count - 1 == i) {
+                    make.centerY.equalTo(rowCard);
+                } else {
+                    make.centerY.equalTo(rowCard).offset(-28);
+                }
             }];
 
             [rows addObject:rowCard];
@@ -152,16 +160,17 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
         _rowValueLabels = [vs copy];
         _rowUnitLabels = [us copy];
 
-        CGFloat cardH = 89.0;
-        CGFloat overlap = 21.0;
+        CGFloat cardH = 138.0;
+        CGFloat overlap = 58.0;
 
         [_headerCard mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.right.equalTo(self.contentView);
             make.top.equalTo(self.contentView).offset(6);
-            make.height.mas_equalTo(cardH);
+            make.height.mas_equalTo(cardH+6);
         }];
         [_title mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.leading.equalTo(_headerCard).offset(16);
+            make.top.equalTo(@30);
+            make.leading.equalTo(_headerCard).offset(16);
             make.trailing.equalTo(_headerCard).offset(-16);
         }];
 
@@ -170,11 +179,15 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
             UIView *row = _rows[i];
             [row mas_makeConstraints:^(MASConstraintMaker *make) {
                 make.left.right.equalTo(self.contentView);
-                make.height.mas_equalTo(cardH);
+                if (i == _rows.count-1) {
+                    make.height.mas_equalTo(89);
+                } else {
+                    make.height.mas_equalTo(cardH);
+                }
                 // 从第二个开始向上叠压 21（等价于 top = prev.bottom - 21）
                 make.top.equalTo(prev.mas_bottom).offset(-overlap);
                 if (i == _rows.count - 1) {
-                    make.bottom.equalTo(self.contentView).offset(-6);
+                    make.bottom.equalTo(self.contentView);
                 }
             }];
             prev = row;
@@ -241,7 +254,7 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
         self.backgroundColor = [UIColor clearColor];
         self.contentView.backgroundColor = [UIColor clearColor];
         _card = [[UIView alloc] init];
-        _card.backgroundColor = PCGreen();
+        _card.backgroundColor = [UIColor colorWithHexString:@"#285D4B"];
         _card.layer.cornerRadius = 24;
         _card.clipsToBounds = YES;
         [self.contentView addSubview:_card];
@@ -271,10 +284,10 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
         [_card addSubview:_bottomLine];
 
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 0, 6, 0));
+            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 0, 0, 0));
         }];
         [_topLine mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(_card).offset(16);
+            make.top.equalTo(_card).offset(40);
             make.left.equalTo(_card).offset(16);
             make.right.equalTo(_card).offset(-16);
         }];
@@ -285,7 +298,7 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
         [_suffix mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.equalTo(_percent.mas_right).offset(14);
             // baseline 约束在部分字体/系统版本上可能触发异常，改为更稳定的 centerY 对齐
-            make.centerY.equalTo(_percent).offset(-6);
+            make.bottom.equalTo(_percent).offset(-16);
             make.right.lessThanOrEqualTo(_card).offset(-16);
         }];
         [_bottomLine mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -337,7 +350,7 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
         [_card addSubview:_title];
         [_card addSubview:_chart];
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 0, 6, 0));
+            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 0, 0, 0));
         }];
         [_title mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.leading.equalTo(_card).offset(16);
@@ -412,16 +425,16 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
         [_card addSubview:_desc2];
         [_card addSubview:_donut];
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 0, 6, 0));
+            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 0, 0, 0));
         }];
         [_title mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(_card).offset(16);
+            make.top.equalTo(_card).offset(26);
             make.left.equalTo(_card).offset(16);
             make.right.equalTo(_card).offset(-16);
         }];
         [_donut mas_makeConstraints:^(MASConstraintMaker *make) {
             make.trailing.equalTo(_card).offset(-16);
-            make.centerY.equalTo(_card);
+            make.centerY.equalTo(_card).offset(20);
             make.width.height.mas_equalTo(154);
         }];
         [_num1 mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -430,7 +443,7 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
         }];
         [_desc1 mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.equalTo(_num1.mas_right).offset(10);
-            make.centerY.equalTo(_num1);
+            make.bottom.equalTo(_num1).offset(-16);
             make.right.lessThanOrEqualTo(_donut.mas_left).offset(-12);
         }];
         [_sepLine mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -446,7 +459,7 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
         }];
         [_desc2 mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.equalTo(_num2.mas_right).offset(10);
-            make.centerY.equalTo(_num2);
+            make.bottom.equalTo(_num2).offset(-16);
             make.right.lessThanOrEqualTo(_donut.mas_left).offset(-12);
         }];
     }
@@ -469,7 +482,7 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
     _donut.ringTrackExtraWidth = 0;
     _donut.segmentGapPoints = 0;
     _donut.segmentRatios = @[ @(p), @(1 - p) ];
-    _donut.segmentColors = @[ [UIColor colorWithRed:0.2 green:0.62 blue:0.55 alpha:1.0], [UIColor colorWithWhite:0.18 alpha:1.0] ];
+    _donut.segmentColors = @[ [UIColor colorWithHexString:@"#5CB793"] , [UIColor colorWithHexString:@"#0D2122"]];
     _donut.centerText = [NSString stringWithFormat:@"%.0f%%", p * 100];
 }
 

@@ -12,8 +12,12 @@
 #import "WorldMapView.h"
 #import "DashView.h"
 
-static UIColor *PassportGreen(void) {
-    return [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0];
+static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i, NSString *fallback) {
+    if (![arr isKindOfClass:[NSArray class]] || i >= arr.count) {
+        return fallback ?: @"";
+    }
+    NSString *s = arr[i];
+    return [s isKindOfClass:[NSString class]] ? s : (fallback ?: @"");
 }
 
 @interface PassportHeaderView (){
@@ -29,6 +33,8 @@ static UIColor *PassportGreen(void) {
 @property (nonatomic, strong) UIView *scoresView;
 @property (nonatomic, strong) UIView *nothingView;
 @property (nonatomic, strong) PassportHeader2View *passportHeader2View;
+@property (nonatomic, strong) WorldMapView *worldMapView;
+@property (nonatomic, strong) UILabel *moneyAmountLabel;
 
 @property (nonatomic, strong) UILabel *idLabel;
 @property (nonatomic, strong) UILabel *nameLabel;
@@ -252,10 +258,7 @@ static UIColor *PassportGreen(void) {
     [map mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.mas_equalTo(UIEdgeInsetsMake(5, 10, 5, 10));
     }];
-    map.oftenCountries = @[ @"CN", @"JP" ];
-    map.goneCountries = @[ @"US", @"GB" ];
-    map.ungoCountries = @[ @"FR", @"DE" ];
-    [map reload];
+    self.worldMapView = map;
 
     return view;
 }
@@ -275,14 +278,15 @@ static UIColor *PassportGreen(void) {
     amountLbl.textColor = [UIColor colorWithHexString:@"#060606"];
     amountLbl.text = @"999,999.99";
     [view addSubview:amountLbl];
+    self.moneyAmountLabel = amountLbl;
 
     [unitLbl mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.bottom.equalTo(view).offset(-15);
+        make.bottom.equalTo(view).offset(-12);
         make.right.equalTo(view).offset(-25);
     }];
     [amountLbl mas_makeConstraints:^(MASConstraintMaker *make) {
         make.right.equalTo(unitLbl.mas_left).offset(-2);
-        make.bottom.equalTo(unitLbl).offset(6);
+        make.bottom.equalTo(unitLbl).offset(7);
     }];
     return view;
 }
@@ -314,6 +318,7 @@ static UIColor *PassportGreen(void) {
     UIView *view = UIView.new;
     for (int i=0; i<3; i++) {
         UILabel *lbl = [self _cicrleLabel];
+        lbl.tag = 0x300 + i;
         [view addSubview:lbl];
         [lbl mas_makeConstraints:^(MASConstraintMaker *make) {
             make.centerY.equalTo(view);
@@ -445,6 +450,43 @@ static UIColor *PassportGreen(void) {
 
 - (void)configureWithModel:(PassportViewModel *)model {
     [self.passportHeader2View configureWithModel:model];
+    if (!model) {
+        return;
+    }
+
+    self.idLabel.text = model.headerPassportCodeLine.length ? model.headerPassportCodeLine : @"NO.0088";
+    self.nameLabel.text = model.nickname.length ? model.nickname : @"";
+
+    if ([self.lineChartView isKindOfClass:[PassportWeekLineChartView class]]) {
+        PassportWeekLineChartView *chart = (PassportWeekLineChartView *)self.lineChartView;
+        if (model.headerWeekLineValues.count == 7) {
+            chart.weekValues = model.headerWeekLineValues;
+        }
+    }
+
+    self.redCardLabel.text = [NSString stringWithFormat:@"%ld", (long)model.headerRedCards];
+    self.yellowCardLabel.text = [NSString stringWithFormat:@"%ld", (long)model.headerYellowCards];
+    self.greenCardLabel.text = [NSString stringWithFormat:@"%ld", (long)model.headerCleanMatches];
+
+    if (self.moneyAmountLabel) {
+        self.moneyAmountLabel.text = model.headerSpendingAmountText.length ? model.headerSpendingAmountText : @"0.00";
+    }
+
+    if (self.worldMapView) {
+        self.worldMapView.oftenCountries = model.headerMapOftenISOs ?: @[];
+        self.worldMapView.goneCountries = model.headerMapGoneISOs ?: @[];
+        self.worldMapView.ungoCountries = @[];
+        [self.worldMapView reload];
+    }
+
+
+    //TODO:总得分
+    for (int i = 0; i < 8; i++) {
+        UILabel *lbl = [self.scoresView viewWithTag:0xFF + i];
+        if ([lbl isKindOfClass:[UILabel class]]) {
+            lbl.text = PassportHeaderSafeStatAt(model.headerBottomStatTexts, (NSUInteger)i, @"—");
+        }
+    }
 }
 
 - (void)handlePassportHeader2Tap {

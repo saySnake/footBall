@@ -6,6 +6,7 @@
 #import "PassportHeader2View.h"
 #import "PassportViewModel.h"
 #import <Masonry/Masonry.h>
+#import <SDWebImage/SDWebImage.h>
 
 static UIColor *PassportCircleStrokeColor(void) {
     return [UIColor colorWithHexString:@"#000000"];
@@ -18,7 +19,9 @@ static UIColor *PassportCircleStrokeColor(void) {
 @property (nonatomic, strong) UIImageView *avatarView;
 @property (nonatomic, strong) UILabel *cityLabel;
 @property (nonatomic, strong) UILabel *matchesLabel;
+@property (nonatomic, strong) UILabel *matchesUnitLabel;
 @property (nonatomic, strong) UILabel *afterLabel;
+@property (nonatomic, strong) UILabel *afterUnitLabel;
 
 @property (nonatomic, strong) UILabel *minutesValueLabel;
 @property (nonatomic, strong) UILabel *minutesUnitLabel;
@@ -68,8 +71,106 @@ static UIColor *PassportCircleStrokeColor(void) {
 // MARK: - Public
 
 - (void)configureWithModel:(PassportViewModel *)model {
-    // 目前先按设计稿占位；后续按 model 字段再补全映射
-    self.cityLabel.text = model.nickname.length ? model.nickname : @"上海";
+    if (!model) {
+        return;
+    }
+
+    NSURL *avURL = model.avatarURL.length ? [NSURL URLWithString:model.avatarURL] : nil;
+    UIImage *avPh = nil;
+    if (@available(iOS 13.0, *)) {
+        avPh = [[UIImage systemImageNamed:@"person.crop.circle.fill"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    }
+    self.avatarView.tintColor = [UIColor colorWithHexString:@"#9E9E9E"];
+    self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
+    __weak typeof(self) weakSelf = self;
+    [self.avatarView sd_setImageWithURL:avURL placeholderImage:avPh completed:^(UIImage * _Nullable image, NSError * _Nullable error, SDImageCacheType cacheType, NSURL * _Nullable imageURL) {
+        if (!image || error) {
+            return;
+        }
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) {
+            return;
+        }
+        strongSelf.avatarView.tintColor = [UIColor clearColor];
+        strongSelf.avatarView.contentMode = UIViewContentModeScaleAspectFill;
+    }];
+
+    NSString *cityPh = NSLocalizedString(@"passport_header2_city_placeholder", nil);
+    if (!cityPh.length || [cityPh isEqualToString:@"passport_header2_city_placeholder"]) {
+        cityPh = @"上海";
+    }
+    self.cityLabel.text = model.userCity.length ? model.userCity : cityPh;
+
+    self.matchesLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, model.header2YearMatchCount)];
+    NSString *matchUnit = NSLocalizedString(@"passport_unit_matches", nil);
+    if (!matchUnit.length || [matchUnit isEqualToString:@"passport_unit_matches"]) {
+        matchUnit = @"场";
+    }
+    self.matchesUnitLabel.text = matchUnit;
+
+    BOOL hasGen = model.header2GenerationMainText.length > 0;
+    self.afterLabel.text = hasGen ? model.header2GenerationMainText : @"—";
+    NSString *genSuffix = NSLocalizedString(@"passport_unit_generation_suffix", nil);
+    if (!genSuffix.length || [genSuffix isEqualToString:@"passport_unit_generation_suffix"]) {
+        genSuffix = @"后";
+    }
+    self.afterUnitLabel.text = genSuffix;
+    self.afterUnitLabel.hidden = !(hasGen && model.header2GenerationHasHouSuffix);
+
+    self.minutesValueLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, model.header2YearWatchMinutes)];
+    NSString *minUnit = NSLocalizedString(@"passport_unit_minutes_short", nil);
+    if (!minUnit.length || [minUnit isEqualToString:@"passport_unit_minutes_short"]) {
+        minUnit = @"分钟";
+    }
+    self.minutesUnitLabel.text = minUnit;
+
+    self.goalsValueLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, model.header2YearGoals)];
+    NSString *goalUnit = NSLocalizedString(@"passport_unit_goals", nil);
+    if (!goalUnit.length || [goalUnit isEqualToString:@"passport_unit_goals"]) {
+        goalUnit = @"球";
+    }
+    self.goalsUnitLabel.text = goalUnit;
+
+    self.citiesValueLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, model.header2CityCount)];
+    NSString *cityUnit = NSLocalizedString(@"passport_unit_cities", nil);
+    if (!cityUnit.length || [cityUnit isEqualToString:@"passport_unit_cities"]) {
+        cityUnit = @"城市";
+    }
+    self.citiesUnitLabel.text = cityUnit;
+
+    self.countriesValueLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, model.header2CountryCount)];
+    NSString *countryUnit = NSLocalizedString(@"passport_unit_countries", nil);
+    if (!countryUnit.length || [countryUnit isEqualToString:@"passport_unit_countries"]) {
+        countryUnit = @"国家";
+    }
+    self.countriesUnitLabel.text = countryUnit;
+
+    NSString *yearStr = [NSString stringWithFormat:@"%ld", (long)model.displayYear];
+    self.yearPinkLabel.text = yearStr;
+    self.yearBlackLabel.text = yearStr;
+
+    NSArray<NSString *> *urls = model.header2FollowedTeamLogoURLs;
+    NSArray<NSString *> *iconNames = @[ @"passport_icon_1", @"passport_icon_2", @"passport_icon_3", @"passport_icon_4", @"passport_icon_5" ];
+    for (NSInteger i = 0; i < MIN(5, (NSInteger)self.iconCircles.count); i++) {
+        UIView *circle = self.iconCircles[i];
+        UIImageView *iv = nil;
+        for (UIView *sub in circle.subviews) {
+            if ([sub isKindOfClass:[UIImageView class]]) {
+                iv = (UIImageView *)sub;
+                break;
+            }
+        }
+        if (!iv) {
+            continue;
+        }
+        NSString *u = (urls && i < (NSInteger)urls.count) ? urls[(NSUInteger)i] : nil;
+        if (u.length) {
+            [iv sd_setImageWithURL:[NSURL URLWithString:u] placeholderImage:[UIImage imageNamed:iconNames[i]]];
+        } else {
+            [iv sd_cancelCurrentImageLoad];
+            iv.image = [UIImage imageNamed:iconNames[i]];
+        }
+    }
 }
 
 // MARK: - UI
@@ -164,9 +265,10 @@ static UIColor *PassportCircleStrokeColor(void) {
     matchesUnitLabel.font = [UIFont systemFontOfSize:10];
     matchesUnitLabel.textColor = [UIColor colorWithHexString:@"#131313"];
     [matchesCircle addSubview:matchesUnitLabel];
+    self.matchesUnitLabel = matchesUnitLabel;
     [matchesUnitLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.equalTo(_matchesLabel.mas_right);
-        make.bottom.equalTo(_matchesLabel).offset(-5);
+        make.bottom.equalTo(_matchesLabel).offset(-6);
     }];
 
     // “05 后”（第二行第二个圆）
@@ -188,6 +290,7 @@ static UIColor *PassportCircleStrokeColor(void) {
     afterUnitLabel.font = [UIFont systemFontOfSize:10];
     afterUnitLabel.textColor = [UIColor colorWithHexString:@"#131313"];
     [afterCircle addSubview:afterUnitLabel];
+    self.afterUnitLabel = afterUnitLabel;
     [afterUnitLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.equalTo(_afterLabel.mas_right);
         make.bottom.equalTo(_afterLabel).offset(-5);
