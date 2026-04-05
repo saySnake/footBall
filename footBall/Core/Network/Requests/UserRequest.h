@@ -28,8 +28,8 @@ NS_ASSUME_NONNULL_BEGIN
             success:(nullable APISuccessBlock)success
             failure:(nullable APIFailureBlock)failure;
 
-/// 搜索用户
-- (void)searchUser:(NSString *)userId
+/// 搜索用户（GET `/api/v1/users/search`，参数含 `keyword` 与 `userId`，均为trim后的关键词/用户号）
+- (void)searchUser:(NSString *)keyword
             success:(nullable APISuccessBlock)success
             failure:(nullable APIFailureBlock)failure;
 

@@ -9,6 +9,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSString *userId;
 @property (nonatomic, copy) NSString *avatar;
 @property (nonatomic, copy) NSString *nickname;
+/// 接口可能在条目上直接给球队名，优先于 followedTeams.firstObject
+@property (nonatomic, copy, nullable) NSString *teamName;
 @property (nonatomic, strong) NSArray<TeamIcon *> *followedTeams;
 @property (nonatomic, assign) NSInteger matchCount;
 @end

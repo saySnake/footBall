@@ -157,18 +157,33 @@
 
 }
 
-- (void)searchUser:(nonnull NSString *)userId success:(nullable APISuccessBlock)success failure:(nullable APIFailureBlock)failure {
-    if (!userId || userId.length == 0) {
+- (void)searchUser:(nonnull NSString *)keyword success:(nullable APISuccessBlock)success failure:(nullable APIFailureBlock)failure {
+    NSString *trimmed = [keyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmed.length == 0) {
         if (failure) {
             NSError *error = [NSError errorWithDomain:@"AuthManagerErrorDomain"
                                                   code:-1
-                                              userInfo:@{NSLocalizedDescriptionKey: @"用户ID为空"}];
+                                              userInfo:@{NSLocalizedDescriptionKey: @"搜索内容不能为空"}];
+            failure(error);
+        }
+        return;
+    }
+    if (!AuthManager.sharedManager.isLoggedIn) {
+        if (failure) {
+            NSError *error = [NSError errorWithDomain:@"AuthManagerErrorDomain"
+                                                  code:-1
+                                              userInfo:@{NSLocalizedDescriptionKey: @"用户未登录"}];
             failure(error);
         }
         return;
     }
 
-    [[APIManager sharedManager] GET:APIPathValueSearchUser parameters:@{@"userId":userId} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+    /// GET `/api/v1/users/search`：同时传 keyword（昵称/关键词）与 userId（与 keyword 相同，兼容仅识别 userId 的旧后端）
+    NSDictionary *params = @{
+        @"keyword": trimmed,
+        @"userId": trimmed,
+    };
+    [[APIManager sharedManager] GET:APIPathValueSearchUser parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
             success(responseObject);
         } else {

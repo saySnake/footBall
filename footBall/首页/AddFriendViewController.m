@@ -302,25 +302,48 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 
 - (void)onBack { [self.navigationController popViewControllerAnimated:YES]; }
 
-/// 解析 `/api/v1/users/search` 返回的 data：单用户字典、用户数组，或 `{ list: [...] }`
+/// 解析 `/api/v1/users/search` 的 data：数组、`{ list }`、`PNUserPage`、`{ users|records|items }`、单用户字典，或元素内嵌 `user`/`profile`
 - (NSArray<PNUser *> *)pnUsersFromSearchResponseData:(id)data {
     if (!data || data == (id)kCFNull) {
         return @[];
     }
     if ([data isKindOfClass:[NSArray class]]) {
-        return [NSArray yy_modelArrayWithClass:PNUser.class json:data] ?: @[];
+        return [self pnUsersFromSearchJSONArray:(NSArray *)data];
     }
     if ([data isKindOfClass:[NSDictionary class]]) {
-        id list = data[@"list"];
-        if ([list isKindOfClass:[NSArray class]]) {
-            return [NSArray yy_modelArrayWithClass:PNUser.class json:list] ?: @[];
+        NSDictionary *d = (NSDictionary *)data;
+        PNUserPage *page = [PNUserPage yy_modelWithJSON:d];
+        if (page.list.count > 0) {
+            return [self pnUsersFromSearchJSONArray:page.list];
         }
-        PNUser *u = [PNUser yy_modelWithJSON:data];
+        for (NSString *key in @[@"list", @"users", @"records", @"items", @"rows", @"content"]) {
+            id list = d[key];
+            if ([list isKindOfClass:[NSArray class]]) {
+                return [self pnUsersFromSearchJSONArray:list];
+            }
+        }
+        PNUser *u = [PNUser yy_modelWithJSON:d];
         if (u && (u.userId.length > 0 || u.nickname.length > 0)) {
             return @[u];
         }
     }
     return @[];
+}
+
+- (NSArray<PNUser *> *)pnUsersFromSearchJSONArray:(NSArray *)raw {
+    NSMutableArray<PNUser *> *out = [NSMutableArray array];
+    for (id item in raw) {
+        if (![item isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSDictionary *dict = (NSDictionary *)item;
+        id payload = dict[@"user"] ?: dict[@"profile"] ?: dict[@"member"] ?: item;
+        PNUser *u = [PNUser yy_modelWithJSON:payload];
+        if (u && (u.userId.length > 0 || u.nickname.length > 0)) {
+            [out addObject:u];
+        }
+    }
+    return out;
 }
 
 - (void)onSearch {
@@ -335,15 +358,23 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     self.isSearching = YES;
     [self.searchField resignFirstResponder];
     [self.tableView reloadData];
+    [self showLoading];
 
     __weak typeof(self) weakSelf = self;
     [UserRequest.shared searchUser:text success:^(HTTPResponse * _Nullable responseObject) {
-        weakSelf.searchResults = [weakSelf pnUsersFromSearchResponseData:responseObject.data];
-        [weakSelf.tableView reloadData];
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [self hideLoading];
+        self.searchResults = [self pnUsersFromSearchResponseData:responseObject.data];
+        [self.tableView reloadData];
     } failure:^(NSError * _Nonnull error) {
-        weakSelf.searchResults = @[];
-        [weakSelf.tableView reloadData];
-        [weakSelf showError:(error.localizedDescription.length > 0 ? error.localizedDescription : @"搜索失败")];
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [self hideLoading];
+        self.searchResults = @[];
+        [self.tableView reloadData];
+        NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"community_search_failed", nil);
+        [self showError:msg];
     }];
 }
 

@@ -140,6 +140,9 @@
 "community_add_friend" = "添加好友";
 "community_my_qrcode" = "我的二維碼";
 "community_section_friends" = "好友";
+"community_section_may_know" = "你可能認識的";
+"community_empty_no_data" = "暫無數據";
+"community_rank_games_format" = "%ld 場";
 "community_view_stamps" = "查看郵票";
 "community_view_data" = "查看數據";
 "community_id_format" = "ID:%@";
@@ -152,6 +155,8 @@
 "community_scan_add_friend" = "掃碼添加好友";
 "community_scan_add_friend_subtitle" = "掃描二維碼名片";
 "community_search_result_format" = "搜索結果（%ld）";
+"community_search_no_result" = "未找到相關用戶";
+"community_search_failed" = "搜索失敗";
 "community_recent_3days" = "三天內";
 "community_week_ago" = "一週前";
 "community_request_message" = "看你的護照很精彩，想添加您為好友";

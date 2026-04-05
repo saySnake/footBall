@@ -12,7 +12,7 @@
 
 #define kCommunityGreen    [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0] // #285D4B
 #define kCommunityHeaderBg [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0] // #0D2122
-#define kCommunityPageBg   [UIColor colorWithRed:0.969 green:0.969 blue:0.969 alpha:1.0] // #F7F7F7
+#define kCommunityPageBg   [UIColor colorWithRed:0.976 green:0.980 blue:0.976 alpha:1.0] // #F9FAF9 设计稿内容区背景
 static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 static NSString * const kCommunityPendingCountDidChangeNotification = @"community_pending_count_did_change";
 static NSString * const kCommunityAddedFriendsKey = @"community_added_friends";
@@ -195,14 +195,15 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
             make.centerY.equalTo(self.contentView);
             make.width.mas_greaterThanOrEqualTo(12);
         }];
+        // Figma 1:5798：名次在 24pt，头像左缘 50pt
         [_avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_rankLabel.mas_trailing).offset(10);
+            make.leading.equalTo(self.contentView).offset(50);
             make.centerY.equalTo(self.contentView);
             make.size.mas_equalTo(CGSizeMake(60, 60));
         }];
         [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_avatarView.mas_trailing).offset(10);
-            make.top.equalTo(_avatarView).offset(14);
+            make.top.equalTo(_avatarView).offset(10);
             make.trailing.lessThanOrEqualTo(_gamesLabel.mas_leading).offset(-10);
         }];
         [_teamLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -220,11 +221,13 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 }
 
 - (void)configureWithItem:(PNLeaderboardEntry *)item rank:(NSInteger)rank {
-    self.rankLabel.text = [NSString stringWithFormat:@"%ld", (long)rank];
-    self.nameLabel.text = item.nickname;
+    NSInteger displayRank = item.rank > 0 ? item.rank : rank;
+    self.rankLabel.text = [NSString stringWithFormat:@"%ld", (long)displayRank];
+    self.nameLabel.text = item.nickname.length > 0 ? item.nickname : @"-";
     TeamIcon *team = item.followedTeams.firstObject;
-    self.teamLabel.text = team.name.length > 0 ? team.name : @"-";
-    self.gamesLabel.text = [NSString stringWithFormat:@"%ld Games", (long)MAX(item.matchCount, 0)];
+    NSString *teamText = item.teamName.length > 0 ? item.teamName : (team.name.length > 0 ? team.name : @"-");
+    self.teamLabel.text = teamText;
+    self.gamesLabel.text = [NSString stringWithFormat:NSLocalizedString(@"community_rank_games_format", nil), (long)MAX(item.matchCount, 0)];
     NSURL *url = item.avatar.length > 0 ? [NSURL URLWithString:item.avatar] : nil;
     UIImage *placeholder = (@available(iOS 13.0, *)) ? [UIImage systemImageNamed:@"person.crop.circle.fill"] : nil;
     [self.avatarView sd_setImageWithURL:url placeholderImage:placeholder];
@@ -265,11 +268,17 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 @property (nonatomic, strong) UIView *seasonLine;
 @property (nonatomic, strong) UIView *rankFilterContainer;
 @property (nonatomic, strong) MASConstraint *headerHeightConstraint;
+@property (nonatomic, strong) UIView *friendsEmptyBackgroundView;
+@property (nonatomic, strong) UILabel *friendsEmptyTitleLabel;
 @end
 
 @implementation LocationViewController
 
 - (void)viewDidLoad {
+    self.friends = @[];
+    self.weekRanks = @[];
+    self.monthRanks = @[];
+    self.seasonRanks = @[];
     self.isFriendsTab = YES;
     self.currentRankType = CommunityRankTypeWeek;
     self.pendingCount = [[NSUserDefaults standardUserDefaults] integerForKey:kCommunityPendingCountKey];
@@ -295,6 +304,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     self.pendingCount = [[NSUserDefaults standardUserDefaults] integerForKey:kCommunityPendingCountKey];
     [self loadRemoteFriends];
     [self.tableView reloadData];
+    [self updateCommunityEmptyState];
     [self updatePendingBadge];
 }
 
@@ -308,9 +318,11 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         PNFriendPage *page = [responseObject.dataObject isKindOfClass:PNFriendPage.class] ? responseObject.dataObject : nil;
         weakSelf.friends = page.list ?: @[];
         [weakSelf.tableView reloadData];
+        [weakSelf updateCommunityEmptyState];
     } failure:^(NSError * _Nonnull error) {
         weakSelf.friends = @[];
         [weakSelf.tableView reloadData];
+        [weakSelf updateCommunityEmptyState];
     }];
 
     [SocialRequest.shared getFriendRequestsPendingCountSuccess:^(HTTPResponse * _Nullable responseObject) {
@@ -339,7 +351,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     [self.view addSubview:self.headerView];
 
     self.titleLabel = [[UILabel alloc] init];
-    self.titleLabel.font = [UIFont boldSystemFontOfSize:17];
+    self.titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
     self.titleLabel.textColor = [UIColor whiteColor];
     [self.headerView addSubview:self.titleLabel];
 
@@ -404,15 +416,15 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
     [self.headerView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.leading.trailing.equalTo(self.view);
-        self.headerHeightConstraint = make.height.mas_equalTo(146);
+        self.headerHeightConstraint = make.height.mas_equalTo(166);
     }];
     [self.titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self.headerView);
         make.top.equalTo(self.headerView.mas_safeAreaLayoutGuideTop).offset(10);
     }];
     [self.switchBgView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.headerView).offset(12);
-        make.trailing.equalTo(self.headerView).offset(-12);
+        make.leading.equalTo(self.headerView).offset(16);
+        make.trailing.equalTo(self.headerView).offset(-16);
         make.top.equalTo(self.titleLabel.mas_bottom).offset(12);
         make.height.mas_equalTo(47);
     }];
@@ -468,35 +480,35 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     [self.weekLine mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.weekBtn.mas_bottom).offset(2);
         make.centerX.equalTo(self.weekBtn);
-        make.width.mas_equalTo(26);
+        make.width.mas_equalTo(18);
         make.height.mas_equalTo(3);
     }];
     [self.monthLine mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.monthBtn.mas_bottom).offset(2);
         make.centerX.equalTo(self.monthBtn);
-        make.width.mas_equalTo(26);
+        make.width.mas_equalTo(18);
         make.height.mas_equalTo(3);
     }];
     [self.seasonLine mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.seasonBtn.mas_bottom).offset(2);
         make.centerX.equalTo(self.seasonBtn);
-        make.width.mas_equalTo(26);
+        make.width.mas_equalTo(18);
         make.height.mas_equalTo(3);
     }];
     [self.addFriendBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.headerView.mas_bottom).offset(17);
-        make.leading.equalTo(self.view).offset(18);
+        make.leading.equalTo(self.view).offset(16);
         make.trailing.equalTo(self.view.mas_centerX).offset(-5);
         make.height.mas_equalTo(50);
     }];
     [self.qrCodeBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.height.equalTo(self.addFriendBtn);
         make.leading.equalTo(self.view.mas_centerX).offset(5);
-        make.trailing.equalTo(self.view).offset(-18);
+        make.trailing.equalTo(self.view).offset(-16);
     }];
     [self.sectionLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.addFriendBtn.mas_bottom).offset(16);
-        make.leading.equalTo(self.view).offset(18);
+        make.leading.equalTo(self.view).offset(16);
     }];
     [self.tableView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.sectionLabel.mas_bottom).offset(6);
@@ -506,6 +518,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     [self updateTabs];
     [self updatePendingBadge];
     [self refreshTableHeaderForCurrentMode];
+    [self updateCommunityEmptyState];
 }
 
 - (void)updateTabs {
@@ -522,6 +535,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     }
     [self refreshTableHeaderForCurrentMode];
     [self.tableView reloadData];
+    [self updateCommunityEmptyState];
 }
 
 - (void)onFriendsTab {
@@ -540,11 +554,13 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     else self.currentRankType = CommunityRankTypeSeason;
     [self refreshRankButtonsUI];
     [self.tableView reloadData];
+    [self updateCommunityEmptyState];
 }
 
 - (void)refreshTableHeaderForCurrentMode {
     if (self.isFriendsTab) {
-        self.headerHeightConstraint.offset = 146;
+        self.headerHeightConstraint.offset = 166;
+        self.tableView.backgroundColor = [UIColor clearColor];
         self.sectionLabel.hidden = NO;
         self.addFriendBtn.hidden = NO;
         self.qrCodeBtn.hidden = NO;
@@ -553,9 +569,12 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
             make.top.equalTo(self.sectionLabel.mas_bottom).offset(6);
             make.leading.trailing.bottom.equalTo(self.view);
         }];
+        [self updateCommunityEmptyState];
         return;
     }
-    self.headerHeightConstraint.offset = 202;
+    // 设计稿顶栏深色区约 206pt；刘海/Dynamic Island 机型需略增高以免裁切周/月/赛季
+    self.headerHeightConstraint.offset = 214;
+    self.tableView.backgroundColor = [UIColor whiteColor];
     self.sectionLabel.hidden = YES;
     self.addFriendBtn.hidden = YES;
     self.qrCodeBtn.hidden = YES;
@@ -569,6 +588,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     }];
     self.tableView.tableHeaderView = nil;
     [self refreshRankButtonsUI];
+    [self updateCommunityEmptyState];
 }
 
 - (void)refreshRankButtonsUI {
@@ -579,7 +599,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         BOOL selected = (i == self.currentRankType);
         [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
         btn.alpha = selected ? 1.0 : 0.78;
-        btn.titleLabel.font = [UIFont systemFontOfSize:17 weight:(selected ? UIFontWeightBold : UIFontWeightSemibold)];
+        btn.titleLabel.font = [UIFont systemFontOfSize:14 weight:(selected ? UIFontWeightSemibold : UIFontWeightMedium)];
         lines[i].hidden = !selected;
     }
 }
@@ -604,6 +624,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 - (void)onFriendsChanged {
     [self loadRemoteFriends];
     [self.tableView reloadData];
+    [self updateCommunityEmptyState];
 }
 
 - (void)updatePendingBadge {
@@ -613,6 +634,54 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         return;
     }
     self.pendingBadgeLabel.text = self.pendingCount > 99 ? @"99+" : [NSString stringWithFormat:@"%ld", (long)self.pendingCount];
+}
+
+- (void)ensureFriendsEmptyBackgroundView {
+    if (self.friendsEmptyBackgroundView) {
+        return;
+    }
+    UIView *bg = [[UIView alloc] init];
+    bg.backgroundColor = kCommunityPageBg; // 实际颜色在 updateCommunityEmptyState 中按 Tab 覆盖
+    UIImageView *iv = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"friend_nodata"]];
+    iv.contentMode = UIViewContentModeScaleAspectFit;
+    [bg addSubview:iv];
+    UILabel *lb = [[UILabel alloc] init];
+    lb.font = [UIFont systemFontOfSize:14];
+    lb.textColor = [UIColor colorWithRed:0.6 green:0.62 blue:0.65 alpha:1.0];
+    lb.text = NSLocalizedString(@"community_empty_no_data", nil);
+    lb.textAlignment = NSTextAlignmentCenter;
+    [bg addSubview:lb];
+    self.friendsEmptyTitleLabel = lb;
+    [iv mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(bg);
+        make.centerY.equalTo(bg).offset(-28);
+        make.width.height.mas_equalTo(120);
+    }];
+    [lb mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(iv.mas_bottom).offset(16);
+        make.centerX.equalTo(bg);
+    }];
+    self.friendsEmptyBackgroundView = bg;
+}
+
+/// 好友或排行榜无数据时展示占位（friend_nodata + 暂无数据）
+- (void)updateCommunityEmptyState {
+    BOOL friendsEmpty = self.isFriendsTab && self.friends.count == 0;
+    NSInteger rankCount = 0;
+    if (!self.isFriendsTab) {
+        if (self.currentRankType == CommunityRankTypeWeek) rankCount = self.weekRanks.count;
+        else if (self.currentRankType == CommunityRankTypeMonth) rankCount = self.monthRanks.count;
+        else rankCount = self.seasonRanks.count;
+    }
+    BOOL rankEmpty = !self.isFriendsTab && rankCount == 0;
+    if (!friendsEmpty && !rankEmpty) {
+        self.tableView.backgroundView = nil;
+        return;
+    }
+    [self ensureFriendsEmptyBackgroundView];
+    self.friendsEmptyBackgroundView.backgroundColor = self.isFriendsTab ? kCommunityPageBg : [UIColor whiteColor];
+    self.friendsEmptyTitleLabel.text = NSLocalizedString(@"community_empty_no_data", nil);
+    self.tableView.backgroundView = self.friendsEmptyBackgroundView;
 }
 
 #pragma mark - UITableView
@@ -647,23 +716,27 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     [self.rankTab setTitle:NSLocalizedString(@"community_tab_rank", nil) forState:UIControlStateNormal];
     [self.addFriendBtn setTitle:[NSString stringWithFormat:@"  %@  ", NSLocalizedString(@"community_add_friend", nil)] forState:UIControlStateNormal];
     [self.qrCodeBtn setTitle:[NSString stringWithFormat:@"  %@  ", NSLocalizedString(@"community_my_qrcode", nil)] forState:UIControlStateNormal];
-    self.sectionLabel.text = NSLocalizedString(@"community_section_friends", nil);
+    self.sectionLabel.text = NSLocalizedString(@"community_section_may_know", nil);
     [self loadRemoteRanks];
     [self.tableView reloadData];
+    [self updateCommunityEmptyState];
 }
 
 - (void)loadRemoteRanks {
     [self loadLeaderboardForPeriod:@"week" completion:^(NSArray<PNLeaderboardEntry *> *items) {
         self.weekRanks = items;
         [self.tableView reloadData];
+        [self updateCommunityEmptyState];
     }];
     [self loadLeaderboardForPeriod:@"month" completion:^(NSArray<PNLeaderboardEntry *> *items) {
         self.monthRanks = items;
         [self.tableView reloadData];
+        [self updateCommunityEmptyState];
     }];
     [self loadLeaderboardForPeriod:@"season" completion:^(NSArray<PNLeaderboardEntry *> *items) {
         self.seasonRanks = items;
         [self.tableView reloadData];
+        [self updateCommunityEmptyState];
     }];
 }
 

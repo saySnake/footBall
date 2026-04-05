@@ -43,27 +43,25 @@ static UIColor * SettingsPageBackgroundColor(void) {
         make.height.mas_equalTo(88);
     }];
 
-    UIButton *back = [UIButton buttonWithType:UIButtonTypeSystem];
-    UIImage *adLeft = [UIImage imageNamed:@"ad_left"];
-    UIImage *fallback = adLeft ?: [UIImage imageNamed:@"nav_back"];
-    if (!fallback && @available(iOS 13.0, *)) {
-        fallback = [UIImage systemImageNamed:@"arrow.left"];
+    /// Figma 1:5503：返回 24×24、x=16；图标优先 nav_back
+    UIButton *back = [UIButton buttonWithType:UIButtonTypeCustom];
+    UIImage *backImg = [UIImage imageNamed:@"nav_back"];
+    if (!backImg) backImg = [UIImage imageNamed:@"ad_left"];
+    if (!backImg && @available(iOS 13.0, *)) {
+        backImg = [UIImage systemImageNamed:@"arrow.left"];
     }
-    if (fallback) {
-        if (adLeft) {
-            [back setImage:adLeft forState:UIControlStateNormal];
-            back.tintColor = nil;
-        } else {
-            [back setImage:[fallback imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
-            back.tintColor = [UIColor blackColor];
-        }
+    if (backImg) {
+        [back setImage:[backImg imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+        back.tintColor = [UIColor blackColor];
     }
+    back.imageView.contentMode = UIViewContentModeScaleAspectFit;
+    back.adjustsImageWhenHighlighted = NO;
     [back addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
     [nav addSubview:back];
     [back mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(nav).offset(12);
+        make.leading.equalTo(nav).offset(16);
         make.bottom.equalTo(nav).offset(-10);
-        make.size.mas_equalTo(CGSizeMake(36, 36));
+        make.size.mas_equalTo(CGSizeMake(24, 24));
     }];
 
     self.navTitle = [UILabel new];
@@ -82,12 +80,12 @@ static UIColor * SettingsPageBackgroundColor(void) {
     self.listCard.clipsToBounds = YES;
     [self.view addSubview:self.listCard];
     [self.listCard mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(nav.mas_bottom).offset(10);
-        make.leading.equalTo(self.view).offset(12);
-        make.trailing.equalTo(self.view).offset(-12);
+        make.top.equalTo(nav.mas_bottom).offset(12);
+        make.leading.equalTo(self.view).offset(16);
+        make.trailing.equalTo(self.view).offset(-16);
     }];
 
-    UIView *row1 = [self addRowToCard:self.listCard top:nil icon:@"bell" titleKey:@"settings_notice" showChevron:NO];
+    UIView *row1 = [self addRowToCard:self.listCard top:nil icon:@"setting_noti" titleKey:@"settings_notice" showChevron:NO];
     self.noticeSwitch = [UISwitch new];
     self.noticeSwitch.onTintColor = [ColorManager sharedManager].primaryLightColor;
     self.noticeSwitch.on = YES;
@@ -97,11 +95,11 @@ static UIColor * SettingsPageBackgroundColor(void) {
         make.centerY.equalTo(row1);
     }];
 
-    UIView *row2 = [self addRowToCard:self.listCard top:row1 icon:@"shield" titleKey:@"settings_privacy" showChevron:YES];
+    UIView *row2 = [self addRowToCard:self.listCard top:row1 icon:@"setting_privacy" titleKey:@"settings_privacy" showChevron:YES];
     UIControl *privacyTap = (UIControl *)row2;
     [privacyTap addTarget:self action:@selector(onPrivacy) forControlEvents:UIControlEventTouchUpInside];
 
-    UIControl *row3 = (UIControl *)[self addRowToCard:self.listCard top:row2 icon:@"checkmark.seal" titleKey:@"settings_test_version" showChevron:NO];
+    UIControl *row3 = (UIControl *)[self addRowToCard:self.listCard top:row2 icon:@"setting_version" titleKey:@"settings_test_version" showChevron:NO];
     self.versionValueLabel = [UILabel new];
     self.versionValueLabel.font = [UIFont systemFontOfSize:13];
     self.versionValueLabel.textColor = [UIColor grayColor];
@@ -112,7 +110,7 @@ static UIColor * SettingsPageBackgroundColor(void) {
         make.centerY.equalTo(row3);
     }];
 
-    UIControl *row4 = (UIControl *)[self addRowToCard:self.listCard top:row3 icon:@"trash" titleKey:@"settings_clear_data" showChevron:NO];
+    UIControl *row4 = (UIControl *)[self addRowToCard:self.listCard top:row3 icon:@"setting_clean" titleKey:@"settings_clear_data" showChevron:NO];
     [row4 addTarget:self action:@selector(onClearData) forControlEvents:UIControlEventTouchUpInside];
     self.cacheValueLabel = [UILabel new];
     self.cacheValueLabel.font = [UIFont systemFontOfSize:13];
@@ -131,7 +129,7 @@ static UIColor * SettingsPageBackgroundColor(void) {
     // Logout button
     self.logoutBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     self.logoutBtn.backgroundColor = [ColorManager sharedManager].primaryColor;
-    self.logoutBtn.layer.cornerRadius = 24;
+    self.logoutBtn.layer.cornerRadius = 26;
     self.logoutBtn.titleLabel.font = [UIFont boldSystemFontOfSize:16];
     [self.logoutBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     [self.logoutBtn addTarget:self action:@selector(onLogout) forControlEvents:UIControlEventTouchUpInside];
@@ -140,7 +138,7 @@ static UIColor * SettingsPageBackgroundColor(void) {
         make.leading.equalTo(self.view).offset(24);
         make.trailing.equalTo(self.view).offset(-24);
         make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-24);
-        make.height.mas_equalTo(48);
+        make.height.mas_equalTo(52);
     }];
 }
 
@@ -158,7 +156,7 @@ static UIColor * SettingsPageBackgroundColor(void) {
     [card addSubview:row];
     [row mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.trailing.equalTo(card);
-        make.height.mas_equalTo(52);
+        make.height.mas_equalTo(50);
         if (top) make.top.equalTo(top.mas_bottom);
         else make.top.equalTo(card);
     }];
@@ -175,16 +173,19 @@ static UIColor * SettingsPageBackgroundColor(void) {
     }
 
     UIImageView *ic = [UIImageView new];
-    if (@available(iOS 13.0, *)) {
+    ic.contentMode = UIViewContentModeScaleAspectFit;
+    UIImage *asset = [UIImage imageNamed:icon];
+    if (asset) {
+        ic.image = asset;
+    } else if (@available(iOS 13.0, *)) {
         ic.image = [UIImage systemImageNamed:icon];
         ic.tintColor = [UIColor blackColor];
     }
-    ic.contentMode = UIViewContentModeScaleAspectFit;
     [row addSubview:ic];
     [ic mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(row).offset(16);
         make.centerY.equalTo(row);
-        make.size.mas_equalTo(CGSizeMake(18, 18));
+        make.size.mas_equalTo(CGSizeMake(24, 24));
     }];
 
     UILabel *lbl = [UILabel new];

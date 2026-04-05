@@ -16,7 +16,9 @@
 
 @implementation PNUser
 + (NSDictionary<NSString *,id> *)modelCustomPropertyMapper {
-    return @{@"userId": @[@"userId", @"id"]};
+    return @{@"userId": @[@"userId", @"id", @"uid"],
+             @"nickname": @[@"nickname", @"nickName", @"name"],
+             @"avatar": @[@"avatar", @"headImg", @"headUrl", @"avatarUrl", @"headImage"]};
 }
 @end
 

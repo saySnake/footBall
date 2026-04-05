@@ -226,6 +226,9 @@
 "community_add_friend" = "Add Friend";
 "community_my_qrcode" = "My QR Code";
 "community_section_friends" = "Friends";
+"community_section_may_know" = "People you may know";
+"community_empty_no_data" = "No data";
+"community_rank_games_format" = "%ld Games";
 "community_view_stamps" = "View Stamps";
 "community_view_data" = "View Data";
 "community_id_format" = "ID:%@";
@@ -238,6 +241,8 @@
 "community_scan_add_friend" = "Scan to Add Friend";
 "community_scan_add_friend_subtitle" = "Scan QR name card";
 "community_search_result_format" = "Results (%ld)";
+"community_search_no_result" = "No users found";
+"community_search_failed" = "Search failed";
 "community_recent_3days" = "Within 3 Days";
 "community_week_ago" = "A Week Ago";
 "community_request_message" = "Your passport looks great, I'd like to add you as a friend.";
