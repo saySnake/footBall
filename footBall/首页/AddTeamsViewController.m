@@ -201,20 +201,19 @@ static CGFloat const kAddTeamCheckBadgeD = 24.f;
     }];
 
     UIButton *back = [UIButton buttonWithType:UIButtonTypeCustom];
-    UIImage *adLeft = [UIImage imageNamed:@"ad_left"];
-    UIImage *backImg = adLeft ?: [UIImage imageNamed:@"nav_back"];
+    UIImage *backImg = [UIImage imageNamed:@"nav_back"];
+    if (!backImg) {
+        backImg = [UIImage imageNamed:@"ad_left"];
+    }
     if (!backImg && @available(iOS 13.0, *)) {
         backImg = [UIImage systemImageNamed:@"arrow.left"];
     }
     if (backImg) {
-        if (adLeft) {
-            [back setImage:adLeft forState:UIControlStateNormal];
-            back.tintColor = nil;
-        } else {
-            [back setImage:[backImg imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
-            back.tintColor = cm.textColor;
-        }
+        [back setImage:[backImg imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+        back.tintColor = cm.textColor;
     }
+    back.imageView.contentMode = UIViewContentModeScaleAspectFit;
+    back.adjustsImageWhenHighlighted = NO;
     [back addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
     [navRow addSubview:back];
     [back mas_makeConstraints:^(MASConstraintMaker *make) {
