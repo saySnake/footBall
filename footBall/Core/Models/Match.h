@@ -36,6 +36,12 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) NSInteger homeScore;
 // 客队比分
 @property (nonatomic, assign) NSInteger awayScore;
+/// 是否已提交观赛信息（字段名按后端可多种）
+@property (nonatomic, assign) BOOL infoCompleted;
+/// 是否已完成球票/比赛认证
+@property (nonatomic, assign) BOOL verifyCompleted;
+/// 已认证时长（分钟），用于「已认证xx分钟」
+@property (nonatomic, assign) NSInteger certifiedMinutes;
 
 @end
 

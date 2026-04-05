@@ -96,8 +96,8 @@
 "discover_stat_venues" = "Venues";
 "discover_stat_league" = "Leagues";
 "discover_stat_country" = "Countries";
-"discover_consume_record" = "  Consumption  ";
-"discover_my_passport_btn" = "  My Passport  ";
+"discover_consume_record" = "Consumption";
+"discover_my_passport_btn" = "My Football Passport";
 "discover_league_info" = "League Info";
 "discover_win" = "Win";
 "discover_draw" = "Draw";

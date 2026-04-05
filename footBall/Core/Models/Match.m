@@ -13,7 +13,10 @@
              @"homeTeamId": @"homeTeamId",
              @"awayTeamId": @"awayTeamId",
              @"homeTeamLogo": @"homeTeamLogo",
-             @"awayTeamLogo": @"awayTeamLogo"};
+             @"awayTeamLogo": @"awayTeamLogo",
+             @"infoCompleted": @[@"infoCompleted", @"info_completed", @"inputCompleted", @"input_completed"],
+             @"verifyCompleted": @[@"verifyCompleted", @"verify_completed", @"ticketVerified", @"ticket_verified"],
+             @"certifiedMinutes": @[@"certifiedMinutes", @"certified_minutes", @"verifiedMinutes", @"verified_minutes"]};
 }
 @end
 

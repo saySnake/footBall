@@ -89,15 +89,15 @@
 
 /* Discover */
 "discover_passport_title" = "我的足球護照";
-"discover_passport_subtitle" = "護照·通行證";
+"discover_passport_subtitle" = "護照•通行證";
 "discover_input_info" = "輸入資訊";
 "discover_stat_matches" = "總場次";
 "discover_stat_duration" = "總觀看時長";
 "discover_stat_venues" = "總球場數";
 "discover_stat_league" = "聯賽";
 "discover_stat_country" = "國家";
-"discover_consume_record" = "  消費記錄  ";
-"discover_my_passport_btn" = "  我的足球護照  ";
+"discover_consume_record" = "消費記錄";
+"discover_my_passport_btn" = "我的足球護照";
 "discover_league_info" = "聯賽資訊";
 "discover_win" = "勝利";
 "discover_draw" = "和局";

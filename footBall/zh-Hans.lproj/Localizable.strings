@@ -89,15 +89,15 @@
 
 /* Discover */
 "discover_passport_title" = "我的足球护照";
-"discover_passport_subtitle" = "护照·通行证";
+"discover_passport_subtitle" = "护照•通行证";
 "discover_input_info" = "输入信息";
 "discover_stat_matches" = "总场次";
 "discover_stat_duration" = "总观看时长";
 "discover_stat_venues" = "总球场数";
 "discover_stat_league" = "联赛";
 "discover_stat_country" = "国家";
-"discover_consume_record" = "  消费记录  ";
-"discover_my_passport_btn" = "  我的足球护照  ";
+"discover_consume_record" = "消费记录";
+"discover_my_passport_btn" = "我的足球护照";
 "discover_league_info" = "联赛信息";
 "discover_win" = "胜利";
 "discover_draw" = "平局";

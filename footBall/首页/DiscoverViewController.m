@@ -5,6 +5,7 @@
 
 #import "DiscoverViewController.h"
 #import <Masonry/Masonry.h>
+#import <SDWebImage/SDWebImage.h>
 #import "PNAddConsumeViewController.h"
 #import "PNMatchVerifyViewController.h"
 #import "ConsumptionRecordViewController.h"
@@ -17,7 +18,8 @@
 #define kDiscoverGreen        [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0]   // #285D4B
 #define kDiscoverPillGreen    kDiscoverGreen
 #define kDiscoverCardBg       [UIColor colorWithRed:0.976 green:0.976 blue:0.976 alpha:1.0]   // #F9F9F9
-#define kDiscoverCellBg       [UIColor colorWithRed:0.961 green:0.961 blue:0.961 alpha:1.0]   // #F5F5F5
+#define kDiscoverCellBg       [UIColor colorWithRed:0.961 green:0.961 blue:0.961 alpha:1.0]   // #F5F5F5 未来观赛卡片
+#define kDiscoverFinishedCardBg [UIColor colorWithRed:0.957 green:0.957 blue:0.957 alpha:1.0]   // #F4F4F4 已经观赛卡片（Figma 1:7162）
 
 typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     DiscoverMatchTypeUpcoming,
@@ -38,12 +40,15 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 /// 是否已经完成“认证比赛”
 @property (nonatomic, assign) BOOL hasVerified;
 @property (nonatomic, assign) DiscoverMatchType type;
+@property (nonatomic, copy) NSString *homeLogoURL;
+@property (nonatomic, copy) NSString *awayLogoURL;
 @end
 
 @implementation DiscoverMatch
 @end
 
 @interface DiscoverMatchCell : UITableViewCell
+@property (nonatomic, strong) UIView *cardView;
 @property (nonatomic, strong) UIImageView *homeLogo;
 @property (nonatomic, strong) UIImageView *awayLogo;
 @property (nonatomic, strong) UIImageView *middleBadge;
@@ -66,6 +71,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         card.backgroundColor = kDiscoverCellBg;
         card.layer.cornerRadius = 8;
         [self.contentView addSubview:card];
+        self.cardView = card;
         [card mas_makeConstraints:^(MASConstraintMaker *make) {
             make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(5, 16, 5, 16));
         }];
@@ -188,10 +194,25 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
             make.trailing.equalTo(card).offset(-16);
             make.bottom.equalTo(card).offset(-12);
             make.height.mas_equalTo(26);
-            make.width.mas_equalTo(86);
+            make.width.mas_greaterThanOrEqualTo(86);
         }];
     }
     return self;
+}
+
+- (void)prepareForReuse {
+    [super prepareForReuse];
+    self.cardView.backgroundColor = kDiscoverCellBg;
+    self.scoreLabel.layer.borderWidth = 0.5;
+    self.scoreLabel.layer.borderColor = kDiscoverGreen.CGColor;
+    self.scoreLabel.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.18];
+    self.scoreLabel.textColor = kDiscoverGreen;
+    self.scoreLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    self.verifiedPill.backgroundColor = kDiscoverPillGreen;
+    [self.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    self.verifiedPill.layer.borderWidth = 0;
+    [self.homeLogo sd_cancelCurrentImageLoad];
+    [self.awayLogo sd_cancelCurrentImageLoad];
 }
 
 @end
@@ -237,6 +258,47 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 
 @implementation DiscoverViewController
 
+/// Figma 1:9284「消费记录 / 我的足球护照」：并排 160×40、12 Regular、白 80%、底 15% 白、边 20% 白
+- (UIButton *)discover_headerListRowButtonWithTitle:(NSString *)title imageName:(NSString *)imageName action:(SEL)action {
+    UIButton *b = [UIButton buttonWithType:UIButtonTypeCustom];
+    UIImage *img = [[UIImage imageNamed:imageName] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    [b setImage:img forState:UIControlStateNormal];
+    b.tintColor = [UIColor colorWithWhite:1 alpha:0.8];
+    [b setTitle:title forState:UIControlStateNormal];
+    [b setTitleColor:[UIColor colorWithWhite:1 alpha:0.8] forState:UIControlStateNormal];
+    b.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
+    b.titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    b.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
+    // 稿：图标距左 9、与文案间隔 6；右侧预留给 chevron
+    b.contentEdgeInsets = UIEdgeInsetsMake(0, 9, 0, 28);
+    CGFloat gap = 6;
+    b.imageEdgeInsets = UIEdgeInsetsMake(0, 0, 0, gap);
+    b.titleEdgeInsets = UIEdgeInsetsMake(0, gap, 0, -gap);
+    b.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.15];
+    b.layer.cornerRadius = 8;
+    b.layer.borderWidth = 1;
+    b.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.2].CGColor;
+    b.clipsToBounds = YES;
+    b.adjustsImageWhenHighlighted = NO;
+    [b addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+    return b;
+}
+
+- (void)discover_attachWhiteChevronToListRow:(UIButton *)row {
+    UIButton *arrow = [UIButton buttonWithType:UIButtonTypeCustom];
+    UIImage *arr = [[UIImage imageNamed:@"setting_right"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    [arrow setImage:arr forState:UIControlStateNormal];
+    arrow.tintColor = [UIColor colorWithWhite:1 alpha:0.8];
+    arrow.userInteractionEnabled = NO;
+    arrow.adjustsImageWhenHighlighted = NO;
+    [row addSubview:arrow];
+    [arrow mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.equalTo(row).offset(-12);
+        make.centerY.equalTo(row);
+        make.width.height.mas_equalTo(14);
+    }];
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = [UIColor whiteColor];
@@ -245,7 +307,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     [self buildHeader];
     [self buildBody];
     [self loadRemoteData];
-    [self switchToType:DiscoverMatchTypeFinished];
+    [self switchToType:DiscoverMatchTypeUpcoming];
 }
 
 - (void)viewDidLayoutSubviews {
@@ -353,52 +415,24 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     [row2 addSubview:_statEValue];
     [row2 addSubview:statEDesc];
 
-    _consumeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    _consumeBtn.layer.cornerRadius = 8;
-    _consumeBtn.layer.borderWidth = 1;
-    _consumeBtn.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.20].CGColor;
-    _consumeBtn.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.15];
-    [_consumeBtn setTitle:(NSLocalizedString(@"discover_consume_record", nil) ?: @"  消费记录") forState:UIControlStateNormal];
-    [_consumeBtn setTitleColor:[UIColor colorWithWhite:1 alpha:0.8] forState:UIControlStateNormal];
-    _consumeBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
-    [_consumeBtn setImage:[UIImage imageNamed:@"payment_record"] forState:UIControlStateNormal];
-    _consumeBtn.tintColor = [UIColor colorWithWhite:1 alpha:0.8];
-    [_consumeBtn addTarget:self action:@selector(onConsumeRecordTapped) forControlEvents:UIControlEventTouchUpInside];
-
-    _myPassportBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    _myPassportBtn.layer.cornerRadius = 8;
-    _myPassportBtn.layer.borderWidth = 1;
-    _myPassportBtn.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.20].CGColor;
-    _myPassportBtn.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.15];
-    [_myPassportBtn setTitle:(NSLocalizedString(@"discover_my_passport_btn", nil) ?: @"  我的足球护照") forState:UIControlStateNormal];
-    [_myPassportBtn setTitleColor:[UIColor colorWithWhite:1 alpha:0.8] forState:UIControlStateNormal];
-    _myPassportBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
-    [_myPassportBtn setImage:[UIImage imageNamed:@"football_passport"] forState:UIControlStateNormal];
-    _myPassportBtn.tintColor = [UIColor colorWithWhite:1 alpha:0.8];
-    [_myPassportBtn addTarget:self action:@selector(onMyPassportTapped) forControlEvents:UIControlEventTouchUpInside];
-
-    UIButton *arrow1 = [UIButton buttonWithType:UIButtonTypeSystem];
-    UIButton *arrow2 = [UIButton buttonWithType:UIButtonTypeSystem];
-    UIImage *arr = [[UIImage imageNamed:@"setting_right"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-    [arrow1 setImage:arr forState:UIControlStateNormal];
-    [arrow2 setImage:arr forState:UIControlStateNormal];
-    arrow1.tintColor = arrow2.tintColor = [UIColor colorWithWhite:1 alpha:0.8];
-    arrow1.userInteractionEnabled = arrow2.userInteractionEnabled = NO;
+    NSString *consumeTitle = NSLocalizedString(@"discover_consume_record", nil) ?: @"消费记录";
+    NSString *passportBtnTitle = NSLocalizedString(@"discover_my_passport_btn", nil) ?: @"我的足球护照";
+    _consumeBtn = [self discover_headerListRowButtonWithTitle:consumeTitle imageName:@"payment_record" action:@selector(onConsumeRecordTapped)];
+    _myPassportBtn = [self discover_headerListRowButtonWithTitle:passportBtnTitle imageName:@"football_passport" action:@selector(onMyPassportTapped)];
 
     [header addSubview:_consumeBtn];
     [header addSubview:_myPassportBtn];
-    [_consumeBtn addSubview:arrow1];
-    [_myPassportBtn addSubview:arrow2];
+    [self discover_attachWhiteChevronToListRow:_consumeBtn];
+    [self discover_attachWhiteChevronToListRow:_myPassportBtn];
 
     [header mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.leading.trailing.equalTo(_contentView);
-        // 让 header 高度随底部两个按钮自适应，避免下方白色容器遮挡按钮
-        make.bottom.equalTo(_consumeBtn.mas_bottom).offset(36);
+        make.bottom.equalTo(_myPassportBtn.mas_bottom).offset(36);
         make.height.mas_greaterThanOrEqualTo(330);
     }];
     [_avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(header.mas_safeAreaLayoutGuideTop).offset(12);
-        make.leading.equalTo(header).offset(20);
+        make.leading.equalTo(header).offset(16);
         make.width.height.mas_equalTo(40);
     }];
     [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -410,7 +444,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         make.top.equalTo(_nameLabel.mas_bottom).offset(2);
     }];
     [_passportTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(header).offset(20);
+        make.leading.equalTo(header).offset(16);
         make.top.equalTo(_avatarView.mas_bottom).offset(22);
     }];
     [_passportSubIcon mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -422,7 +456,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         make.centerY.equalTo(_passportSubIcon.mas_centerY);
     }];
     [_statAValue mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(header).offset(20);
+        make.leading.equalTo(header).offset(16);
         make.top.equalTo(_passportSubLabel.mas_bottom).offset(18);
     }];
     [statADesc mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -439,8 +473,8 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     }];
 
     [row2 mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(header).offset(20);
-        make.trailing.equalTo(header).offset(-20);
+        make.leading.equalTo(header).offset(16);
+        make.trailing.equalTo(header).offset(-16);
         make.top.equalTo(statADesc.mas_bottom).offset(16);
         make.height.mas_equalTo(52);
     }];
@@ -488,26 +522,16 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     }];
 
     [_consumeBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(header).offset(20);
+        make.leading.equalTo(header).offset(16);
         make.top.equalTo(row2.mas_bottom).offset(16);
         make.height.mas_equalTo(40);
         make.width.equalTo(_myPassportBtn);
     }];
     [_myPassportBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(header).offset(-20);
+        make.leading.equalTo(_consumeBtn.mas_trailing).offset(23);
+        make.trailing.equalTo(header).offset(-16);
         make.centerY.equalTo(_consumeBtn);
         make.height.equalTo(_consumeBtn);
-        make.leading.equalTo(_consumeBtn.mas_trailing).offset(12);
-    }];
-    [arrow1 mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(_consumeBtn).offset(-12);
-        make.centerY.equalTo(_consumeBtn);
-        make.width.height.mas_equalTo(14);
-    }];
-    [arrow2 mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(_myPassportBtn).offset(-12);
-        make.centerY.equalTo(_myPassportBtn);
-        make.width.height.mas_equalTo(14);
     }];
 }
 
@@ -688,7 +712,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     }];
     [leagueTitle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(white).offset(18);
-        make.leading.equalTo(white).offset(20);
+        make.leading.equalTo(white).offset(16);
     }];
     [leagueCard mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(leagueTitle.mas_bottom).offset(10);
@@ -736,19 +760,23 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 
 - (void)loadRemoteData {
     __weak typeof(self) weakSelf = self;
-    [[MatchRequest shared] getMyTeamMatchesWithPage:1 pageSize:20 success:^(HTTPResponse * _Nullable responseObject) {
+    /// 接口：`/api/v1/matches/my-team` 返回关注球队相关比赛；客户端按 `matchStatus` / 开赛时间拆成「未来观赛」「已经观赛」
+    [[MatchRequest shared] getMyTeamMatchesWithPage:1 pageSize:50 success:^(HTTPResponse * _Nullable responseObject) {
         NSArray *matches = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
-        weakSelf.upcomingMatches = [weakSelf discoverMatchesFrom:matches type:DiscoverMatchTypeUpcoming];
+        NSMutableArray<Match *> *upList = [NSMutableArray array];
+        NSMutableArray<Match *> *finList = [NSMutableArray array];
+        for (Match *m in matches) {
+            if ([weakSelf isMatchFinished:m]) {
+                [finList addObject:m];
+            } else {
+                [upList addObject:m];
+            }
+        }
+        weakSelf.upcomingMatches = [weakSelf discoverMatchesFrom:upList type:DiscoverMatchTypeUpcoming];
+        weakSelf.finishedMatches = [weakSelf discoverMatchesFrom:finList type:DiscoverMatchTypeFinished];
         [weakSelf refreshTabs];
     } failure:^(NSError * _Nonnull error) {
         weakSelf.upcomingMatches = @[];
-        [weakSelf refreshTabs];
-    }];
-    [[MatchRequest shared] getFavoriteMatchesWithPage:1 pageSize:20 success:^(HTTPResponse * _Nullable responseObject) {
-        NSArray *matches = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
-        weakSelf.finishedMatches = [weakSelf discoverMatchesFrom:matches type:DiscoverMatchTypeFinished];
-        [weakSelf refreshTabs];
-    } failure:^(NSError * _Nonnull error) {
         weakSelf.finishedMatches = @[];
         [weakSelf refreshTabs];
     }];
@@ -768,26 +796,46 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     }];
 }
 
+/// 已结束：优先读 `matchStatus`（FINISHED 等），否则用开赛时间与当前时间比较
+- (BOOL)isMatchFinished:(Match *)match {
+    NSString *st = match.matchStatus.uppercaseString;
+    if (st.length > 0) {
+        if ([st containsString:@"FINISH"] || [st containsString:@"COMPLETE"] || [st isEqualToString:@"FT"] || [st containsString:@"ENDED"]) {
+            return YES;
+        }
+        if ([st containsString:@"SCHEDULE"] || [st containsString:@"UPCOM"] || [st isEqualToString:@"NS"] || [st containsString:@"LIVE"]) {
+            return NO;
+        }
+    }
+    NSDate *kickoff = [self dateFromRaw:match.matchDate];
+    if (!kickoff) {
+        return NO;
+    }
+    return [kickoff compare:[NSDate date]] == NSOrderedAscending;
+}
+
 - (NSArray<DiscoverMatch *> *)discoverMatchesFrom:(NSArray<Match *> *)matches type:(DiscoverMatchType)type {
     NSMutableArray *result = [NSMutableArray arrayWithCapacity:matches.count];
-    NSString *verifiedTicket = (NSLocalizedString(@"discover_verified_ticket", nil) ?: @"认证球票");
+    NSString *fmtVerified = (NSLocalizedString(@"discover_verified_minutes_format", nil) ?: @"已认证%ld分钟");
     for (Match *match in matches) {
         DiscoverMatch *m = [DiscoverMatch new];
         m.matchId = match.matchId ?: @"";
         m.homeName = match.homeTeamName ?: @"-";
         m.awayName = match.awayTeamName ?: @"-";
+        m.homeLogoURL = match.homeTeamLogo ?: @"";
+        m.awayLogoURL = match.awayTeamLogo ?: @"";
         m.timeText = [self shortTimeText:match.matchDate];
         m.dateText = [self shortDateText:match.matchDate];
         if (type == DiscoverMatchTypeUpcoming) {
-            m.scoreText = [self shortTimeText:match.matchDate];
-            m.verifiedText = verifiedTicket;
+            m.scoreText = m.timeText;
+            m.hasInputInfo = match.infoCompleted;
+            m.hasVerified = match.verifyCompleted;
         } else {
             m.scoreText = [NSString stringWithFormat:@"%ld : %ld", (long)match.homeScore, (long)match.awayScore];
-            NSInteger minutes = [match.viewCount integerValue];
-            NSString *fmt = (NSLocalizedString(@"discover_verified_minutes_format", nil) ?: @"已认证%ld分钟");
-            m.verifiedText = [NSString stringWithFormat:fmt, (long)MAX(minutes, 0)];
-            m.hasInputInfo = NO;
-            m.hasVerified = NO;
+            m.hasInputInfo = match.infoCompleted;
+            m.hasVerified = match.verifyCompleted;
+            NSInteger minutes = match.certifiedMinutes > 0 ? match.certifiedMinutes : (NSInteger)[match.viewCount integerValue];
+            m.verifiedText = [NSString stringWithFormat:fmtVerified, (long)MAX(minutes, 0)];
         }
         m.type = type;
         [result addObject:m];
@@ -845,6 +893,8 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     self.finishedPill.backgroundColor = upcomingSel ? [UIColor clearColor] : kDiscoverGreen;
     [self.upcomingPill setTitleColor:upcomingSel ? [UIColor whiteColor] : kDiscoverGreen forState:UIControlStateNormal];
     [self.finishedPill setTitleColor:upcomingSel ? kDiscoverGreen : [UIColor whiteColor] forState:UIControlStateNormal];
+    self.upcomingPill.titleLabel.font = [UIFont systemFontOfSize:14 weight:(upcomingSel ? UIFontWeightSemibold : UIFontWeightMedium)];
+    self.finishedPill.titleLabel.font = [UIFont systemFontOfSize:14 weight:(upcomingSel ? UIFontWeightMedium : UIFontWeightSemibold)];
     [self.tableView reloadData];
     [self updateTableHeight];
 }
@@ -883,7 +933,8 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 
 - (void)updateTableHeight {
     NSInteger rows = [self currentDataSource].count;
-    self.tableHeightConstraint.offset = rows * 87.f;
+    CGFloat rowH = (self.currentType == DiscoverMatchTypeFinished) ? 101.f : 97.f;
+    self.tableHeightConstraint.offset = rows * rowH;
     [self.view layoutIfNeeded];
 }
 
@@ -894,7 +945,8 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    return 87;
+    DiscoverMatch *m = [self currentDataSource][indexPath.row];
+    return (m.type == DiscoverMatchTypeFinished) ? 101.f : 97.f;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -903,70 +955,79 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 
     cell.homeLabel.text = m.homeName;
     cell.awayLabel.text = m.awayName;
-    // Figma：中间展示的是“比赛时间”胶囊（统一来自 matchDate）
-    cell.scoreLabel.text = m.timeText.length > 0 ? m.timeText : @"--:--";
     cell.dateLabel.text = m.dateText;
+    cell.cardView.backgroundColor = (m.type == DiscoverMatchTypeFinished) ? kDiscoverFinishedCardBg : kDiscoverCellBg;
+
+    NSURL *homeURL = m.homeLogoURL.length ? [NSURL URLWithString:m.homeLogoURL] : nil;
+    NSURL *awayURL = m.awayLogoURL.length ? [NSURL URLWithString:m.awayLogoURL] : nil;
+    UIImage *ph = nil;
+    if (@available(iOS 13.0, *)) {
+        ph = [UIImage systemImageNamed:@"photo"];
+    }
+    [cell.homeLogo sd_setImageWithURL:homeURL placeholderImage:ph options:SDWebImageRetryFailed];
+    [cell.awayLogo sd_setImageWithURL:awayURL placeholderImage:ph options:SDWebImageRetryFailed];
+    cell.homeLogo.contentMode = UIViewContentModeScaleAspectFit;
+    cell.awayLogo.contentMode = UIViewContentModeScaleAspectFit;
 
     if (m.type == DiscoverMatchTypeUpcoming) {
-        // 未来观赛：不显示输入信息、认证比赛按钮
-        cell.inputButton.hidden = YES;
-        cell.verifiedPill.hidden = YES;
-        cell.scoreLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-    } else {
-        // 已经观赛：底部仍然是左侧“输入信息”、右侧 pill，
-        // 但当 hasInputInfo=YES 时，隐藏“输入信息”，并将中间时间挪到左侧展示
+        cell.inputButton.hidden = NO;
         cell.verifiedPill.hidden = NO;
-        // 右侧始终文案为“认证比赛”，只有在输入信息+认证都完成后，才显示“已认证xx分钟”
-        NSString *pillTitle = (m.hasInputInfo && m.hasVerified) ? m.verifiedText : (NSLocalizedString(@"discover_verify_match", nil) ?: @"认证比赛");
-        [cell.verifiedPill setTitle:pillTitle forState:UIControlStateNormal];
-        cell.verifiedPill.backgroundColor = kDiscoverPillGreen;
-        cell.verifiedPill.layer.borderWidth = 0;
-        [cell.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-        if (@available(iOS 13.0, *)) {
-            // 未完成时统一使用“认证”图标，完成后使用已认证图标
-            NSString *iconName = (m.hasInputInfo && m.hasVerified) ? @"checkmark.circle" : @"checkmark.seal";
-            UIImage *img = [UIImage systemImageNamed:iconName];
-            [cell.verifiedPill setImage:img forState:UIControlStateNormal];
-            cell.verifiedPill.tintColor = [UIColor whiteColor];
-        }
+        cell.scoreLabel.text = m.timeText.length ? m.timeText : @"--:--";
+        cell.scoreLabel.layer.borderWidth = 0.5;
+        cell.scoreLabel.layer.borderColor = kDiscoverGreen.CGColor;
+        cell.scoreLabel.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.18];
+        cell.scoreLabel.textColor = kDiscoverGreen;
         cell.scoreLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-
-        if (m.hasInputInfo) {
-            // 已完成：隐藏“输入信息”按钮
-            cell.inputButton.hidden = YES;
-            // 日期标签保持左对齐到“时间胶囊”
-            cell.dateLabel.textAlignment = NSTextAlignmentLeft;
-            [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
-                make.leading.equalTo(cell.scoreLabel);                // 与时间胶囊对齐
-                make.top.equalTo(cell.scoreLabel.mas_bottom).offset(10);
-            }];
-        } else {
-            // 未完成：保留原始布局（中间时间 + 左侧输入信息按钮）
-            cell.inputButton.hidden = NO;
-            cell.dateLabel.textAlignment = NSTextAlignmentLeft;
-            [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
-                make.leading.equalTo(cell.scoreLabel);
-                make.top.equalTo(cell.scoreLabel.mas_bottom).offset(10);
-            }];
-        }
-
-        // 点击右侧操作 pill：根据当前状态在“输入信息 / 认证比赛 / 比赛详情”之间切换
+        [cell.verifiedPill setTitle:(NSLocalizedString(@"discover_verify_match", nil) ?: @"认证比赛") forState:UIControlStateNormal];
+        cell.verifiedPill.backgroundColor = kDiscoverPillGreen;
+        [cell.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        [cell.verifiedPill setImage:[UIImage imageNamed:@"verified_icon"] forState:UIControlStateNormal];
+        cell.verifiedPill.tintColor = [UIColor whiteColor];
+        cell.dateLabel.textAlignment = NSTextAlignmentLeft;
+        [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(cell.scoreLabel);
+            make.top.equalTo(cell.scoreLabel.mas_bottom).offset(10);
+        }];
+        [cell.inputButton removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+        [cell.inputButton addTarget:self action:@selector(onInputInfoButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
         [cell.verifiedPill removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
         [cell.verifiedPill addTarget:self action:@selector(onVerifyMatchButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
-
-        // “输入信息”按钮：仅在未完成时可见，进入输入信息弹层
+    } else {
+        cell.inputButton.hidden = m.hasInputInfo;
+        cell.verifiedPill.hidden = NO;
+        cell.scoreLabel.text = m.scoreText.length ? m.scoreText : @"0 : 0";
+        cell.scoreLabel.layer.borderWidth = 0;
+        cell.scoreLabel.backgroundColor = [UIColor clearColor];
+        cell.scoreLabel.textColor = [UIColor blackColor];
+        cell.scoreLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightBold];
+        if (m.hasVerified) {
+            [cell.verifiedPill setTitle:m.verifiedText forState:UIControlStateNormal];
+            cell.verifiedPill.backgroundColor = [UIColor colorWithRed:6/255.0 green:15/255.0 blue:15/255.0 alpha:1.0];
+            [cell.verifiedPill setTitleColor:[UIColor colorWithRed:0.298 green:0.851 blue:0.392 alpha:1.0] forState:UIControlStateNormal];
+            if (@available(iOS 13.0, *)) {
+                [cell.verifiedPill setImage:[UIImage systemImageNamed:@"checkmark.circle.fill"] forState:UIControlStateNormal];
+                cell.verifiedPill.tintColor = [UIColor colorWithRed:0.298 green:0.851 blue:0.392 alpha:1.0];
+            } else {
+                [cell.verifiedPill setImage:nil forState:UIControlStateNormal];
+            }
+        } else {
+            [cell.verifiedPill setTitle:(NSLocalizedString(@"discover_verify_match", nil) ?: @"认证比赛") forState:UIControlStateNormal];
+            cell.verifiedPill.backgroundColor = kDiscoverPillGreen;
+            [cell.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+            [cell.verifiedPill setImage:[UIImage imageNamed:@"verified_icon"] forState:UIControlStateNormal];
+            cell.verifiedPill.tintColor = [UIColor whiteColor];
+        }
+        cell.dateLabel.textAlignment = NSTextAlignmentLeft;
+        [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(cell.cardView).offset(16);
+            make.top.equalTo(cell.scoreLabel.mas_bottom).offset(8);
+        }];
+        [cell.verifiedPill removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+        [cell.verifiedPill addTarget:self action:@selector(onVerifyMatchButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
         [cell.inputButton removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
         [cell.inputButton addTarget:self action:@selector(onInputInfoButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
     }
 
-    if (@available(iOS 13.0, *)) {
-        cell.homeLogo.image = [UIImage systemImageNamed:@"shield.fill"];
-        cell.homeLogo.tintColor = [UIColor colorWithRed:0.85 green:0.20 blue:0.25 alpha:1.0];
-        cell.homeLogo.contentMode = UIViewContentModeCenter;
-        cell.awayLogo.image = [UIImage systemImageNamed:@"shield.fill"];
-        cell.awayLogo.tintColor = [UIColor colorWithRed:0.10 green:0.45 blue:0.85 alpha:1.0];
-        cell.awayLogo.contentMode = UIViewContentModeCenter;
-    }
     return cell;
 }
 
@@ -992,10 +1053,10 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     NSIndexPath *indexPath = [self.tableView indexPathForRowAtPoint:pointInTable];
     if (!indexPath) return;
     DiscoverMatch *m = [self currentDataSource][indexPath.row];
-    if (m.type != DiscoverMatchTypeFinished) return;
-    
-    // 右侧 pill：始终表示“认证比赛”
-    // 未认证时 -> 进入认证弹窗；已认证并且输入信息完成 -> 进入比赛详情
+    if (m.type == DiscoverMatchTypeUpcoming) {
+        [self presentMatchVerifyForMatch:m];
+        return;
+    }
     if (!m.hasVerified) {
         [self presentMatchVerifyForMatch:m];
     } else if (m.hasInputInfo) {
@@ -1008,7 +1069,6 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     NSIndexPath *indexPath = [self.tableView indexPathForRowAtPoint:pointInTable];
     if (!indexPath) return;
     DiscoverMatch *m = [self currentDataSource][indexPath.row];
-    if (m.type != DiscoverMatchTypeFinished) return;
     [self presentMatchInfoForMatch:m];
 }
 
