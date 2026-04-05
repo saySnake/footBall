@@ -39,3 +39,21 @@
     return @{@"list": PNUser.class};
 }
 @end
+
+@implementation PNFriendStats
+@end
+
+@implementation PNFollowStats
+@end
+
+@implementation PNYearlyStat
+@end
+
+@implementation PNUserPublic
++ (NSDictionary<NSString *,id> *)modelContainerPropertyGenericClass {
+    return @{ @"yearlyStats": PNYearlyStat.class };
+}
++ (NSDictionary<NSString *,id> *)modelCustomPropertyMapper {
+    return @{ @"userId": @[ @"userId", @"id" ] };
+}
+@end

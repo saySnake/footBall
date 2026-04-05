@@ -24,6 +24,12 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)submitProfessionalWithImageUrls:(NSArray<NSString *> *)urls
                                 success:(nullable APISuccessBlock)success failure:(nullable APIFailureBlock)failure;
 
+/// GET /api/v1/verification/realname/info
+- (void)fetchRealnameInfoSuccess:(nullable APISuccessBlock)success failure:(nullable APIFailureBlock)failure;
+
+/// GET /api/v1/verification/history
+- (void)fetchHistorySuccess:(nullable APISuccessBlock)success failure:(nullable APIFailureBlock)failure;
+
 /// 将 status 接口返回的 data 解析后同步到 AuthStateStore（字段名因后端而异，见 .m 内解析逻辑）
 + (void)applyVerificationStatusData:(nullable id)data;
 

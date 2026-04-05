@@ -1,3 +1,10 @@
+//
+//  ExpenseRequest.m
+//  footBall
+//
+//  写操作成功时尝试将 data 转为 PNExpense，失败则回退为原始 data。
+//
+
 #import "ExpenseRequest.h"
 
 @implementation ExpenseRequest
@@ -51,4 +58,62 @@
         failure(error);
     }];
 }
+
+- (void)createExpenseWithBody:(NSDictionary *)body success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    if (![body isKindOfClass:NSDictionary.class] || body.count == 0) {
+        if (failure) failure([NSError errorWithDomain:@"ExpenseRequestErrorDomain" code:-1 userInfo:@{ NSLocalizedDescriptionKey: @"请求体不能为空" }]);
+        return;
+    }
+    [[APIManager sharedManager] POST:APIPathValueExpenses parameters:body headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            PNExpense *exp = [PNExpense yy_modelWithJSON:responseObject.data];
+            responseObject.dataObject = exp ?: responseObject.data;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
+
+- (void)updateExpense:(NSString *)expenseId body:(NSDictionary *)body success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    if (expenseId.length == 0) {
+        if (failure) failure([NSError errorWithDomain:@"ExpenseRequestErrorDomain" code:-1 userInfo:@{ NSLocalizedDescriptionKey: @"消费记录ID不能为空" }]);
+        return;
+    }
+    if (![body isKindOfClass:NSDictionary.class]) {
+        if (failure) failure([NSError errorWithDomain:@"ExpenseRequestErrorDomain" code:-1 userInfo:@{ NSLocalizedDescriptionKey: @"请求体无效" }]);
+        return;
+    }
+    [[APIManager sharedManager] PUT:APIPathValueExpensesDetail(expenseId) parameters:body headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            PNExpense *exp = [PNExpense yy_modelWithJSON:responseObject.data];
+            responseObject.dataObject = exp ?: responseObject.data;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
+
+- (void)deleteExpense:(NSString *)expenseId success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    if (expenseId.length == 0) {
+        if (failure) failure([NSError errorWithDomain:@"ExpenseRequestErrorDomain" code:-1 userInfo:@{ NSLocalizedDescriptionKey: @"消费记录ID不能为空" }]);
+        return;
+    }
+    [[APIManager sharedManager] DELETE:APIPathValueExpensesDetail(expenseId) parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            responseObject.dataObject = responseObject.data;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
+
 @end

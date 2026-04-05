@@ -1,3 +1,10 @@
+//
+//  SocialRequest.m
+//  footBall
+//
+//  好友/关注接口；写操作与扫码 payload 字段名需与后端 Swagger 对齐。
+//
+
 #import "SocialRequest.h"
 
 @implementation SocialRequest
@@ -100,4 +107,120 @@
         failure(error);
     }];
 }
+
+#pragma mark - 关注
+
+- (void)followUser:(NSString *)userId success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    if (userId.length == 0) {
+        if (failure) failure([NSError errorWithDomain:@"SocialRequestErrorDomain" code:-1 userInfo:@{ NSLocalizedDescriptionKey: @"userId不能为空" }]);
+        return;
+    }
+    [[APIManager sharedManager] POST:APIPathValueFollowsUser(userId) parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            responseObject.dataObject = responseObject.data;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
+
+- (void)unfollowUser:(NSString *)userId success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    if (userId.length == 0) {
+        if (failure) failure([NSError errorWithDomain:@"SocialRequestErrorDomain" code:-1 userInfo:@{ NSLocalizedDescriptionKey: @"userId不能为空" }]);
+        return;
+    }
+    [[APIManager sharedManager] DELETE:APIPathValueFollowsUser(userId) parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            responseObject.dataObject = responseObject.data;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
+
+- (void)getFollowStatsSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    [[APIManager sharedManager] GET:APIPathValueFollowsStats parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            responseObject.dataObject = responseObject.data;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
+
+#pragma mark - 好友写操作 / 统计
+
+- (void)sendFriendRequestWithBody:(NSDictionary *)body success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    if (![body isKindOfClass:NSDictionary.class] || body.count == 0) {
+        if (failure) failure([NSError errorWithDomain:@"SocialRequestErrorDomain" code:-1 userInfo:@{ NSLocalizedDescriptionKey: @"请求体不能为空" }]);
+        return;
+    }
+    [[APIManager sharedManager] POST:APIPathValueFriendsRequests parameters:body headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            responseObject.dataObject = responseObject.data;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
+
+- (void)deleteFriend:(NSString *)friendId success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    if (friendId.length == 0) {
+        if (failure) failure([NSError errorWithDomain:@"SocialRequestErrorDomain" code:-1 userInfo:@{ NSLocalizedDescriptionKey: @"friendId不能为空" }]);
+        return;
+    }
+    [[APIManager sharedManager] DELETE:APIPathValueFriendsDelete(friendId) parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            responseObject.dataObject = responseObject.data;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
+
+- (void)scanAddFriendWithPayload:(NSDictionary *)payload success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    if (![payload isKindOfClass:NSDictionary.class]) {
+        if (failure) failure([NSError errorWithDomain:@"SocialRequestErrorDomain" code:-1 userInfo:@{ NSLocalizedDescriptionKey: @"请求体无效" }]);
+        return;
+    }
+    [[APIManager sharedManager] POST:APIPathValueFriendsScan parameters:payload headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            responseObject.dataObject = responseObject.data;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
+
+- (void)getFriendStatsSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    [[APIManager sharedManager] GET:APIPathValueFriendsStats parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            responseObject.dataObject = responseObject.data;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
+
 @end

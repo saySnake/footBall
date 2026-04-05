@@ -8,7 +8,7 @@
 #import "Team.h"
 @implementation TeamIcon
 + (NSDictionary<NSString *,id> *)modelCustomPropertyMapper {
-    return @{@"teamId":@"id"};
+    return @{ @"teamId": @[ @"id", @"teamId" ] };
 }
 @end
 @implementation Team

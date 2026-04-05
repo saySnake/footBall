@@ -2,7 +2,8 @@
 //  MatchRequest.h
 //  footBall
 //
-//  Created by LWJ on 2026/3/22.
+//  比赛、首页日程、Nami、观赛记录、比赛互动、打卡认证等网络请求。
+//  路径常量见 APIPathValues.h。
 //
 
 #import <Foundation/Foundation.h>
@@ -10,11 +11,19 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @interface MatchRequest : NSObject
-+(instancetype)shared;
-/// 获取精选比赛卡片
+
++ (instancetype)shared;
+
+#pragma mark - 首页 / 日程
+
+/// GET `/api/v1/home/featured-matches` — 精选比赛卡片；成功时 `dataObject` 为 `Match` 数组
 - (void)getFeaturesMatchsSuccess:(nullable APISuccessBlock)success
                          failure:(nullable APIFailureBlock)failure;
-/// 获取比赛日程列表
+
+/// GET `/api/v1/home/schedule` — 比赛日程
+/// @param date 可选，如 `yyyy-MM-dd`
+/// @param myTeamOnly 是否仅关注球队
+/// @param page / pageSize 分页，内部会转为 `pageNum` / `pageSize`
 - (void)getMatchScheduleWithDate:(nullable NSString *)date
                        myTeamOnly:(BOOL)myTeamOnly
                              page:(NSInteger)page
@@ -22,40 +31,149 @@ NS_ASSUME_NONNULL_BEGIN
                           success:(nullable APISuccessBlock)success
                           failure:(nullable APIFailureBlock)failure;
 
-/// 获取指定月份有比赛的日期列表
-/// 按日期查询 Nami 比赛列表
-/// 查询正在进行的 Nami 比赛
-/// 获取 Nami 比赛详情（比赛 + 实时比分 + 统计 + 事件）
-/// 获取 Nami 比赛实时数据（实时比分 + 统计 + 事件 + 文字直播）
-/// 获取 Nami 比赛趋势数据
-/// 获取 Nami 比赛阵容
-/// 获取 Nami 比赛球员统计
-/// 获取 Nami 比赛直播地址
-/// 获取 Nami 比赛集锦录像
-/// 搜索比赛
-/// 获取比赛详情
+/// GET `/api/v1/home/schedule/dates` — 有比赛的日期列表
+/// @param month 可选，如 `yyyy-MM`，传 `nil` 时由后端默认规则处理
+- (void)getMatchScheduleDatesWithMonth:(nullable NSString *)month
+                               success:(nullable APISuccessBlock)success
+                               failure:(nullable APIFailureBlock)failure;
+
+#pragma mark - 比赛检索 / 详情 / 收藏
+
+/// GET `/api/v1/matches/search` — 搜索比赛
+/// @param keyword 关键词，可传空串占位
+/// @param leagueId 可选联赛筛选
+- (void)searchMatchesWithKeyword:(nullable NSString *)keyword
+                        leagueId:(nullable NSString *)leagueId
+                            page:(NSInteger)page
+                        pageSize:(NSInteger)pageSize
+                         success:(nullable APISuccessBlock)success
+                         failure:(nullable APIFailureBlock)failure;
+
+/// GET `/api/v1/matches/calendar` — 日历上有比赛的标记
+/// @param year 年；@param month 1～12
+- (void)getMatchCalendarWithYear:(NSInteger)year
+                             month:(NSInteger)month
+                           success:(nullable APISuccessBlock)success
+                           failure:(nullable APIFailureBlock)failure;
+
+/// GET `/api/v1/matches/{matchId}` — 比赛详情；`dataObject` 为 `MatchDetail`
 - (void)getMatchDetail:(NSString *)matchId
                success:(nullable APISuccessBlock)success
                failure:(nullable APIFailureBlock)failure;
-/// 获取指定月份有比赛的日期列表
-/// 获取关注球队的比赛列表
+
+/// GET `/api/v1/matches/my-team` — 关注球队的比赛列表
 - (void)getMyTeamMatchesWithPage:(NSInteger)page
                         pageSize:(NSInteger)pageSize
                          success:(nullable APISuccessBlock)success
                          failure:(nullable APIFailureBlock)failure;
-/// 收藏比赛
-/// 取消收藏比赛
-/// 获取收藏的比赛列表
+
+/// POST `/api/v1/matches/{matchId}/favorite` — 收藏比赛
+- (void)favoriteMatch:(NSString *)matchId
+              success:(nullable APISuccessBlock)success
+              failure:(nullable APIFailureBlock)failure;
+
+/// DELETE `/api/v1/matches/{matchId}/favorite` — 取消收藏
+- (void)unfavoriteMatch:(NSString *)matchId
+                success:(nullable APISuccessBlock)success
+                failure:(nullable APIFailureBlock)failure;
+
+/// GET `/api/v1/matches/favorites` — 收藏列表分页
 - (void)getFavoriteMatchesWithPage:(NSInteger)page
                           pageSize:(NSInteger)pageSize
                            success:(nullable APISuccessBlock)success
                            failure:(nullable APIFailureBlock)failure;
-/// 创建观赛记录
-/// 更新观赛记录
-/// 获取观赛记录详情
-/// 点赞比赛
-/// 取消点赞比赛
-/// 记录比赛浏览量
+
+#pragma mark - Nami 实时数据
+
+/// GET `/api/v1/matches/nami/schedule` — 按日期的 Nami 赛程
+- (void)getNamiScheduleWithDate:(nullable NSString *)date
+                           page:(NSInteger)page
+                       pageSize:(NSInteger)pageSize
+                        success:(nullable APISuccessBlock)success
+                        failure:(nullable APIFailureBlock)failure;
+
+/// GET `/api/v1/matches/nami/live` — 进行中的 Nami 比赛
+- (void)getNamiLiveMatchesSuccess:(nullable APISuccessBlock)success
+                          failure:(nullable APIFailureBlock)failure;
+
+/// GET `/api/v1/matches/nami/{matchId}/detail` — Nami 比赛详情（含实时比分等）
+- (void)getNamiMatchDetail:(NSString *)matchId
+                   success:(nullable APISuccessBlock)success
+                   failure:(nullable APIFailureBlock)failure;
+
+/// GET `/api/v1/matches/nami/{matchId}/live` — Nami 实时数据（比分、统计、事件等）
+- (void)getNamiMatchLiveData:(NSString *)matchId
+                     success:(nullable APISuccessBlock)success
+                     failure:(nullable APIFailureBlock)failure;
+
+/// GET `/api/v1/matches/nami/{matchId}/trend` — 趋势
+- (void)getNamiMatchTrend:(NSString *)matchId
+                  success:(nullable APISuccessBlock)success
+                  failure:(nullable APIFailureBlock)failure;
+
+/// GET `/api/v1/matches/nami/{matchId}/lineup` — 阵容
+- (void)getNamiMatchLineup:(NSString *)matchId
+                   success:(nullable APISuccessBlock)success
+                   failure:(nullable APIFailureBlock)failure;
+
+/// GET `/api/v1/matches/nami/{matchId}/player-stats` — 球员统计
+- (void)getNamiMatchPlayerStats:(NSString *)matchId
+                        success:(nullable APISuccessBlock)success
+                        failure:(nullable APIFailureBlock)failure;
+
+/// GET `/api/v1/matches/nami/{matchId}/stream` — 直播地址（后端可能尚未提供，仍按约定路径请求）
+- (void)getNamiMatchStreamWithMatchId:(NSString *)matchId
+                              success:(nullable APISuccessBlock)success
+                              failure:(nullable APIFailureBlock)failure;
+
+/// GET `/api/v1/matches/nami/{matchId}/videos` — 集锦录像（后端可能尚未提供）
+- (void)getNamiMatchVideosWithMatchId:(NSString *)matchId
+                              success:(nullable APISuccessBlock)success
+                              failure:(nullable APIFailureBlock)failure;
+
+#pragma mark - 观赛记录（match-records）
+
+/// POST `/api/v1/match-records` — 创建观赛记录，body 字段与后端 DTO 对齐
+- (void)createMatchRecordWithBody:(NSDictionary *)body
+                          success:(nullable APISuccessBlock)success
+                          failure:(nullable APIFailureBlock)failure;
+
+/// PUT `/api/v1/match-records/{recordId}` — 更新观赛记录
+- (void)updateMatchRecord:(NSString *)recordId
+                     body:(NSDictionary *)body
+                  success:(nullable APISuccessBlock)success
+                  failure:(nullable APIFailureBlock)failure;
+
+/// GET `/api/v1/match-records/{recordId}` — 观赛记录详情
+- (void)getMatchRecordDetail:(NSString *)recordId
+                     success:(nullable APISuccessBlock)success
+                     failure:(nullable APIFailureBlock)failure;
+
+#pragma mark - 比赛互动（match-interactions）
+
+/// POST `/api/v1/match-interactions/{matchId}/like` — 点赞比赛
+- (void)likeMatch:(NSString *)matchId
+          success:(nullable APISuccessBlock)success
+          failure:(nullable APIFailureBlock)failure;
+
+/// DELETE `/api/v1/match-interactions/{matchId}/like` — 取消点赞
+- (void)unlikeMatch:(NSString *)matchId
+            success:(nullable APISuccessBlock)success
+            failure:(nullable APIFailureBlock)failure;
+
+/// POST `/api/v1/match-interactions/{matchId}/view` — 记录浏览量
+- (void)recordMatchView:(NSString *)matchId
+                success:(nullable APISuccessBlock)success
+                failure:(nullable APIFailureBlock)failure;
+
+#pragma mark - 比赛认证（打卡）
+
+/// POST `/api/v1/match-records/{recordId}/verify` — 提交现场认证/打卡；body 可为 nil 或按后端要求传参
+- (void)verifyMatchRecord:(NSString *)recordId
+                     body:(nullable NSDictionary *)body
+                  success:(nullable APISuccessBlock)success
+                  failure:(nullable APIFailureBlock)failure;
+
 @end
 
 NS_ASSUME_NONNULL_END

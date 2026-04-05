@@ -83,6 +83,10 @@
 #import "ProfileRequest.h"
 #import "SocialRequest.h"
 #import "VerificationRequest.h"
+#import "StampRequest.h"
+#import "CommunityRequest.h"
+#import "PrivacyRequest.h"
+#import "MembershipRequest.h"
 
 #pragma mark - 项目核心类 - models
 #import "Team.h"
@@ -92,6 +96,13 @@
 #import "LeaderboardModels.h"
 #import "StatisticsModels.h"
 #import "Passport.h"
+#import "StampModels.h"
+#import "MatchRecordModels.h"
+#import "VerificationModels.h"
+#import "PrivacyModels.h"
+#import "MembershipModels.h"
+#import "NamiModels.h"
+#import "ApiCommonModels.h"
 
 #pragma mark - 项目核心类 - Image
 #import "SDImageManager.h"

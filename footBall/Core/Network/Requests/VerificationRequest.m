@@ -2,6 +2,9 @@
 //  VerificationRequest.m
 //  footBall
 //
+//  实名/职业认证提交与状态查询；status 成功后会调用 applyVerificationStatusData: 写 AuthStateStore。
+//  realname、professional 的 POST 参数字段若后端改为 snake_case，需在对应方法内调整。
+//
 
 #import "VerificationRequest.h"
 #import "APIManager.h"
@@ -95,6 +98,48 @@
     [[APIManager sharedManager] POST:APIPathValueVerificationProfessional parameters:params headers:nil
                              success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
+
+- (void)fetchRealnameInfoSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    if (!AuthManager.sharedManager.isLoggedIn) {
+        if (failure) {
+            failure([NSError errorWithDomain:@"AuthManagerErrorDomain" code:-1
+                                    userInfo:@{NSLocalizedDescriptionKey: @"用户未登录"}]);
+        }
+        return;
+    }
+    [[APIManager sharedManager] GET:APIPathValueVerificationRealnameInfo parameters:nil headers:nil
+                            success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            responseObject.dataObject = responseObject.data;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
+
+- (void)fetchHistorySuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    if (!AuthManager.sharedManager.isLoggedIn) {
+        if (failure) {
+            failure([NSError errorWithDomain:@"AuthManagerErrorDomain" code:-1
+                                    userInfo:@{NSLocalizedDescriptionKey: @"用户未登录"}]);
+        }
+        return;
+    }
+    [[APIManager sharedManager] GET:APIPathValueVerificationHistory parameters:nil headers:nil
+                            success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            responseObject.dataObject = responseObject.data;
             if (success) success(responseObject);
         } else {
             if (failure) failure([APIError errorWithResponse:responseObject]);
