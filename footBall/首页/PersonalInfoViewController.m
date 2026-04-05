@@ -24,8 +24,9 @@
 #define kPILabel   [UIColor colorWithRed:79/255.0 green:79/255.0 blue:79/255.0 alpha:1.0]
 
 static CGFloat const kPITopGradientH = 208.f;
-static CGFloat const kPIScreenInset = 16.f;
 static CGFloat const kPICardCorner = 6.f;
+/// Figma 1:5552：卡片与底部按钮均为距屏幕左右 16pt（375 宽下为 w=343）；勿用 6.4%（会与稿 16 不一致）
+static CGFloat const kPIFigmaHorizontalInset = 16.f;
 
 /// 与 preferenceTags 对齐的稳定 key（与接口约定；若后端不同可再映射）
 static NSArray<NSString *> *kProfileChipTagKeys(void) {
@@ -202,26 +203,26 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
     }];
 
     UIButton *back = [UIButton buttonWithType:UIButtonTypeCustom];
-    UIImage *adLeft = [UIImage imageNamed:@"ad_left"];
-    UIImage *backImg = adLeft ?: [UIImage imageNamed:@"nav_back"];
+    UIImage *backImg = [UIImage imageNamed:@"nav_back"];
+    if (!backImg) {
+        backImg = [UIImage imageNamed:@"ad_left"];
+    }
     if (!backImg && @available(iOS 13.0, *)) {
         backImg = [UIImage systemImageNamed:@"arrow.left"];
     }
     if (backImg) {
-        if (adLeft) {
-            [back setImage:adLeft forState:UIControlStateNormal];
-            back.tintColor = nil;
-        } else {
-            [back setImage:[backImg imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
-            back.tintColor = [UIColor blackColor];
-        }
+        [back setImage:[backImg imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+        back.tintColor = [UIColor blackColor];
     }
+    back.imageView.contentMode = UIViewContentModeScaleAspectFit;
+    back.adjustsImageWhenHighlighted = NO;
     [back addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
     [self.navBar addSubview:back];
+    /// Figma：Arrow 容器 left=16、24×24（非 44 热区，避免箭头视觉比卡片更靠右）
     [back mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.navBar).offset(16);
+        make.leading.equalTo(self.navBar).offset(kPIFigmaHorizontalInset);
         make.centerY.equalTo(self.navBar);
-        make.size.mas_equalTo(CGSizeMake(44, 44));
+        make.size.mas_equalTo(CGSizeMake(24, 24));
     }];
 
     self.navTitle = [UILabel new];
@@ -229,7 +230,8 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
     self.navTitle.textColor = [UIColor blackColor];
     [self.navBar addSubview:self.navTitle];
     [self.navTitle mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.center.equalTo(self.navBar);
+        make.centerX.equalTo(self.navBar);
+        make.centerY.equalTo(self.navBar);
     }];
 
     self.saveBtn = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -244,9 +246,8 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
     [self.saveBtn addTarget:self action:@selector(onSave) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.saveBtn];
     [self.saveBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        CGFloat side = 6.4f / 100.f * [UIScreen mainScreen].bounds.size.width;
-        make.leading.equalTo(self.view).offset(MAX(16, side));
-        make.trailing.equalTo(self.view).offset(-MAX(16, side));
+        make.leading.equalTo(self.view).offset(kPIFigmaHorizontalInset);
+        make.trailing.equalTo(self.view).offset(-kPIFigmaHorizontalInset);
         make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-12);
         make.height.mas_equalTo(52);
     }];
@@ -276,8 +277,8 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
     [self.content addSubview:self.avatarCard];
     [self.avatarCard mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.content).offset(12);
-        make.leading.equalTo(self.content).offset(kPIScreenInset);
-        make.trailing.equalTo(self.content).offset(-kPIScreenInset);
+        make.leading.equalTo(self.content).offset(kPIFigmaHorizontalInset);
+        make.trailing.equalTo(self.content).offset(-kPIFigmaHorizontalInset);
         make.height.mas_equalTo(110);
     }];
 
