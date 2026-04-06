@@ -175,6 +175,27 @@
 
 @implementation PassportDonutChartView
 
+/// 用“径向分割线”模拟扇区间隙：线宽就是 gapPt，因此从内到外宽度一致（不会出现外宽内窄的楔形间隙）。
+static void PassportDonutStrokeRadialGap(CGContextRef _Nonnull ctx,
+                                         CGPoint c,
+                                         CGFloat rInner,
+                                         CGFloat rOuter,
+                                         CGFloat angle,
+                                         CGFloat gapPt,
+                                         CGColorRef _Nonnull color) {
+    if (gapPt <= 0 || rOuter <= rInner) return;
+    CGPoint p0 = CGPointMake(c.x + cos(angle) * rInner, c.y + sin(angle) * rInner);
+    CGPoint p1 = CGPointMake(c.x + cos(angle) * rOuter, c.y + sin(angle) * rOuter);
+    CGContextSaveGState(ctx);
+    CGContextSetStrokeColorWithColor(ctx, color);
+    CGContextSetLineWidth(ctx, gapPt);
+    CGContextSetLineCap(ctx, kCGLineCapButt);
+    CGContextMoveToPoint(ctx, p0.x, p0.y);
+    CGContextAddLineToPoint(ctx, p1.x, p1.y);
+    CGContextStrokePath(ctx);
+    CGContextRestoreGState(ctx);
+}
+
 - (instancetype)initWithFrame:(CGRect)frame {
     if (self = [super initWithFrame:frame]) {
         self.backgroundColor = [UIColor clearColor];
@@ -243,21 +264,30 @@
     CGPoint c = CGPointMake(CGRectGetMidX(rect), CGRectGetMidY(rect));
     CGFloat half = MIN(rect.size.width, rect.size.height) * 0.5f;
     CGFloat lw = self.lineWidth;
-    CGFloat outsideReserve = self.showsOutsidePercentLabels ? 36.0f : 0.0f;
+    // 如果需要画“环外百分比+引导线”，必须给外侧留出空间，否则文字容易被 view 裁切或与折线重叠。
+    CGFloat outsideReserve = self.showsOutsidePercentLabels ? 56.0f : 0.0f;
     CGFloat trackStroke = lw;
     if (self.ringTrackColor && self.ringTrackExtraWidth > 0) {
+        // 轨道底色可以比彩色环更粗（视觉上像托底），所以半径计算要按更粗的 trackStroke 预留。
         trackStroke = lw + self.ringTrackExtraWidth;
     }
     CGFloat r;
     if (self.ringInnerRadius > 0) {
+        // ringInnerRadius 表示“内孔半径”；圆弧是 stroke 画的，中心线半径 = inner + lw/2
         r = self.ringInnerRadius + lw * 0.5f;
     } else {
+        // 自动适配：用内切圆半径 half，减去 stroke 外扩的 1/2，再减去环外 label 的预留。
         r = half - trackStroke * 0.5f - outsideReserve;
         if (r < 8.0f) r = 8.0f;
     }
+    // 彩色环的内/外边界半径（用于间隙填充的“带状区域”）
+    CGFloat rInnerStroke = r - lw * 0.5f;
+    CGFloat rOuterStroke = r + lw * 0.5f;
+    // 从 12 点方向开始绘制，更符合常见环图习惯（iOS 0 在 3 点方向）
     CGFloat start = -M_PI_2;
     if (self.segmentRatios.count > 0 && self.segmentColors.count == self.segmentRatios.count) {
         if (self.ringTrackColor) {
+            // 先画整圈底色轨道（track），再在其上画彩色分段和间隙
             UIBezierPath *baseTrack = [UIBezierPath bezierPathWithArcCenter:c radius:r startAngle:0 endAngle:(CGFloat)(2 * M_PI) clockwise:YES];
             [self.ringTrackColor setStroke];
             baseTrack.lineWidth = trackStroke;
@@ -266,27 +296,44 @@
         }
         NSUInteger n = self.segmentRatios.count;
         CGFloat gapPt = MAX(0, self.segmentGapPoints);
-        CGFloat gapAngle = (r > 1.0f && gapPt > 0) ? (gapPt / r) : 0;
-        CGFloat totalGapAngle = gapAngle * (CGFloat)n;
-        CGFloat availableAngle = (CGFloat)(2 * M_PI) - totalGapAngle;
-        if (availableAngle < 0.01f) {
-            availableAngle = (CGFloat)(2 * M_PI);
-            gapAngle = 0;
-        }
+
+        // 1) 先把 ratios 归一到整圈（保证所有段拼成 360°，便于“分割线”稳定落在每个边界）
+        double sum = 0.0;
+        for (NSNumber *v in self.segmentRatios) { sum += MAX(0.0, v.doubleValue); }
+        if (sum <= 0.0) sum = 1.0;
+
+        // 2) 画彩色圆弧，并记录每段结束角（用于画分割线）
+        // 注意：分割线要画在“段与段的边界”上；对于 n 段，一共有 n 条边界线：
+        // - 起始角 start0（最后一段与第一段的分界）
+        // - 以及前 n-1 段的结束角（第 i 段与第 i+1 段的分界）
+        // 最后一段结束角理论上等于 start0 + 2π，与起始角重合，不再重复画。
+        CGFloat start0 = start;
+        NSMutableArray<NSNumber *> *endAngles = [NSMutableArray arrayWithCapacity:n];
         for (NSUInteger i = 0; i < n; i++) {
-            CGFloat t = self.segmentRatios[i].doubleValue;
-            CGFloat sweep = t * availableAngle;
+            CGFloat t = MAX(0.0, self.segmentRatios[i].doubleValue);
+            CGFloat sweep = (CGFloat)((t / sum) * (2.0 * M_PI));
             UIBezierPath *p = [UIBezierPath bezierPathWithArcCenter:c radius:r startAngle:start endAngle:start + sweep clockwise:YES];
             [self.segmentColors[i] setStroke];
             p.lineWidth = lw;
             p.lineCapStyle = kCGLineCapButt;
             [p stroke];
             start += sweep;
-            if (gapAngle > 0) {
-                start += gapAngle;
+            [endAngles addObject:@(start)];
+        }
+
+        // 3) 在每个边界角画一条“径向分割线”作为间隙（线宽=gapPt，内外视觉宽度一致）
+        if (gapPt > 0 && rInnerStroke > 1.0f && rOuterStroke > rInnerStroke + 0.5f) {
+            UIColor *gapColor = self.ringTrackColor ?: [UIColor colorWithWhite:0.9 alpha:1];
+            // 先画起始边界（最后一段与第一段的分界）
+            PassportDonutStrokeRadialGap(ctx, c, rInnerStroke, rOuterStroke, start0, gapPt, gapColor.CGColor);
+            // 再画前 n-1 段的结束边界
+            for (NSUInteger i = 0; i + 1 < endAngles.count; i++) {
+                CGFloat a = endAngles[i].doubleValue;
+                PassportDonutStrokeRadialGap(ctx, c, rInnerStroke, rOuterStroke, a, gapPt, gapColor.CGColor);
             }
         }
     } else {
+        // 数据不足时的兜底：画一圈浅灰（或 track）
         UIBezierPath *track = [UIBezierPath bezierPathWithArcCenter:c radius:r startAngle:0 endAngle:(CGFloat)(2 * M_PI) clockwise:YES];
         [[UIColor colorWithWhite:0.9 alpha:1] setStroke];
         track.lineWidth = self.ringTrackColor ? trackStroke : lw;
@@ -318,34 +365,27 @@
                                                  context:nil].size;
             textSize.width = ceil(textSize.width);
             textSize.height = ceil(textSize.height);
-            // Web 扇形图常见 labelLine：圆环外缘 → 径向第一段 → 水平第二段接到文字边缘（无竖线）
-            CGFloat L1 = 20.0f;
+            // 常见 labelLine：圆环外缘 tip → 径向第一段到 p1 → 水平第二段接到文字边缘（不画竖线）。
+            // 注意：文字框 tr 最终会被屏幕边界夹紧，所以“线连哪一边”不能只用 cos(mid) 判断，
+            // 必须在 tr 最终确定后，按 tr 相对 p1 的实际位置决定连接到文字左缘/右缘。
+            CGFloat L1 = 26.0f;
             CGPoint tip = CGPointMake(c.x + cos(mid) * rOuter, c.y + sin(mid) * rOuter);
             CGPoint p1 = CGPointMake(c.x + cos(mid) * (rOuter + L1), c.y + sin(mid) * (rOuter + L1));
             CGFloat hy = p1.y;
-            BOOL rightSide = cos(mid) >= 0.0;
-            CGFloat edgePad = 4.0f;
-            CGFloat horizGap = 10.0f;
+            BOOL preferRight = cos(mid) >= 0.0;
+            CGFloat edgePad = 12.0f;
+            CGFloat horizGap = 16.0f;
             CGFloat minX = 2.0f;
             CGFloat maxX = CGRectGetWidth(rect) - 2.0f;
             CGRect tr;
-            CGFloat pEndX = p1.x;
-            if (rightSide) {
-                CGFloat tx = MAX(p1.x + horizGap, c.x + rOuter + L1 + 6.0f);
+            if (preferRight) {
+                CGFloat tx = MAX(p1.x + horizGap, c.x + rOuter + L1 + 14.0f);
                 tx = MIN(tx, maxX - textSize.width);
                 tr = CGRectMake(tx, hy - textSize.height * 0.5f, textSize.width, textSize.height);
-                pEndX = CGRectGetMinX(tr) - edgePad;
-                if (pEndX <= p1.x) {
-                    pEndX = p1.x + 2.0f;
-                }
             } else {
                 CGFloat tx = p1.x - horizGap - textSize.width;
                 tx = MAX(tx, minX);
                 tr = CGRectMake(tx, hy - textSize.height * 0.5f, textSize.width, textSize.height);
-                pEndX = CGRectGetMaxX(tr) + edgePad;
-                if (pEndX >= p1.x) {
-                    pEndX = p1.x - 2.0f;
-                }
             }
             CGFloat inset = 2.0f;
             if (CGRectGetMinY(tr) < inset) {
@@ -353,6 +393,39 @@
             }
             if (CGRectGetMaxY(tr) > CGRectGetHeight(rect) - inset) {
                 tr.origin.y = CGRectGetHeight(rect) - inset - textSize.height;
+            }
+            // 计算水平折线段终点 pEndX：
+            // 需求：左侧文字应连接到文字 rect 的 maxX；右侧文字应连接到文字 rect 的 minX。
+            // 这里“左/右侧”按文字框 tr 相对拐点 p1 的实际位置判断（tr 会被屏幕边界夹紧，所以不能只看 cos(mid)）。
+            CGFloat tl = CGRectGetMinX(tr);
+            CGFloat tright = CGRectGetMaxX(tr);
+            CGFloat pEndX;
+            const CGFloat lineJoinSlop = 2.0f;
+            if (tl >= p1.x - 0.5f) {
+                // 文字在拐点右侧：连接到文字左边缘（rect minX）
+                pEndX = tl;
+                if (pEndX <= p1.x + lineJoinSlop) {
+                    pEndX = p1.x + lineJoinSlop;
+                }
+            } else if (tright <= p1.x + 0.5f) {
+                // 文字在拐点左侧：连接到文字右边缘（rect maxX）
+                pEndX = tright;
+                if (pEndX >= p1.x - lineJoinSlop) {
+                    pEndX = p1.x - lineJoinSlop;
+                }
+            } else {
+                // 文字跨过拐点：连接到离 p1 更近的那条边（仍遵循 minX/maxX 规则）
+                if (fabs(tl - p1.x) < fabs(tright - p1.x)) {
+                    pEndX = tl;
+                    if (pEndX <= p1.x + lineJoinSlop) {
+                        pEndX = p1.x + lineJoinSlop;
+                    }
+                } else {
+                    pEndX = tright;
+                    if (pEndX >= p1.x - lineJoinSlop) {
+                        pEndX = p1.x - lineJoinSlop;
+                    }
+                }
             }
             CGContextSaveGState(ctx);
             CGContextSetStrokeColorWithColor(ctx, [[UIColor colorWithHexString:@"#CCFFDC"] CGColor]);
@@ -370,6 +443,7 @@
         }
     }
     if (self.centerText.length) {
+        // 圆心数字（如“85%”等）直接居中绘制；宽度按 view 裁剪留一点边距
         NSMutableParagraphStyle *ps = [[NSMutableParagraphStyle alloc] init];
         ps.alignment = NSTextAlignmentCenter;
         NSDictionary *attr = @{

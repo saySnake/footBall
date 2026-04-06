@@ -905,11 +905,12 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
         [_donut mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(_subtitle.mas_bottom).offset(12);
             make.centerX.equalTo(_card);
-            make.width.height.mas_equalTo(260);
+            make.height.mas_equalTo(260);
+            make.width.mas_equalTo(_card);
         }];
         [_legendRow mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(_donut.mas_bottom).offset(12);
-            make.leading.trailing.equalTo(_card).insets(UIEdgeInsetsMake(0, 16, 0, 16));
+            make.leading.trailing.equalTo(_card).insets(UIEdgeInsetsMake(0, 30, 0, 30));
 //            make.bottom.equalTo(_card).offset(-16);
         }];
     }
@@ -930,9 +931,9 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
     _subtitle.attributedText = PCTacticalIdentitySubtitle(model.tacticalIdentityCount);
     NSMutableArray *ratios = [NSMutableArray array];
     NSArray<UIColor *> *cols = @[
-        [UIColor colorWithRed:0.12 green:0.42 blue:0.38 alpha:1.0],
-        [UIColor colorWithRed:0.50 green:0.82 blue:0.65 alpha:1.0],
-        [UIColor colorWithRed:0.25 green:0.58 blue:0.48 alpha:1.0],
+        [UIColor colorWithHexString:@"#CCFFDC"],
+        [UIColor colorWithHexString:@"#62D486"],
+        [UIColor colorWithHexString:@"#5CB793"]
     ];
     NSMutableArray *colors = [NSMutableArray array];
     NSUInteger i = 0;
@@ -959,19 +960,19 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
         UIView *cell = [[UIView alloc] init];
         UIView *dot = [[UIView alloc] init];
         dot.backgroundColor = cols[MIN(i, cols.count - 1)];
-        dot.layer.cornerRadius = 4;
+        dot.layer.cornerRadius = 8;
         dot.clipsToBounds = YES;
         UILabel *l = [[UILabel alloc] init];
         l.text = [NSString stringWithFormat:@"%@", seg[@"title"] ?: @""];
         l.font = legFont;
-        l.textColor = [UIColor colorWithWhite:0.88 alpha:1.0];
+        l.textColor = [UIColor colorWithWhite:1 alpha:0.75];
         l.textAlignment = NSTextAlignmentLeft;
         l.numberOfLines = 0;
         [cell addSubview:dot];
         [cell addSubview:l];
         [dot mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.leading.equalTo(cell);
-            make.width.height.mas_equalTo(8);
+            make.width.height.mas_equalTo(16);
         }];
         [l mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(dot.mas_bottom).offset(6);
@@ -1082,19 +1083,19 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
         _bigNumber.textColor = [UIColor colorWithWhite:0.12 alpha:1.0];
         _bigNumber.numberOfLines = 1;
         _asideLine1 = [[UILabel alloc] init];
-        _asideLine1.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
-        _asideLine1.textColor = [UIColor colorWithWhite:0.12 alpha:1.0];
+        _asideLine1.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+        _asideLine1.textColor = [UIColor colorWithWhite:0 alpha:1.0];
         _asideLine1.numberOfLines = 1;
         _asideLine2 = [[UILabel alloc] init];
-        _asideLine2.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
-        _asideLine2.textColor = [UIColor colorWithWhite:0.12 alpha:1.0];
+        _asideLine2.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+        _asideLine2.textColor = [UIColor colorWithWhite:0 alpha:1.0];
         _asideLine2.numberOfLines = 1;
         UIStackView *asideStack = [[UIStackView alloc] initWithArrangedSubviews:@[ _asideLine1, _asideLine2 ]];
         asideStack.axis = UILayoutConstraintAxisVertical;
         asideStack.spacing = 2;
         _prompt = [[UILabel alloc] init];
         _prompt.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
-        _prompt.textColor = [UIColor colorWithWhite:0.12 alpha:1.0];
+        _prompt.textColor = [UIColor colorWithWhite:0 alpha:1.0];
         _prompt.numberOfLines = 1;
         _stack = [[UIStackView alloc] init];
         _stack.axis = UILayoutConstraintAxisVertical;
@@ -1117,11 +1118,11 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
         }];
         [asideStack mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_bigNumber.mas_trailing).offset(12);
-            make.centerY.equalTo(_bigNumber);
+            make.bottom.equalTo(_bigNumber).offset(-20);
             make.trailing.lessThanOrEqualTo(_headerRow);
         }];
         [_prompt mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(_headerRow.mas_bottom).offset(12);
+            make.top.equalTo(_headerRow.mas_bottom).offset(10);
             make.leading.equalTo(_card).offset(16);
             make.trailing.equalTo(_card).offset(-16);
         }];
@@ -1236,7 +1237,7 @@ static UIView *PCOutcomeLegendItemView(NSString *title, NSString *numStr, UIColo
         [self.contentView addSubview:_card];
         _title = [[UILabel alloc] init];
         _title.font = [UIFont systemFontOfSize:18 weight:UIFontWeightBold];
-        _title.textColor = [UIColor colorWithWhite:0.12 alpha:1.0];
+        _title.textColor = [UIColor colorWithWhite:0 alpha:1.0];
         _donut = [[PassportDonutChartView alloc] init];
         _donut.lineWidth = 40;
         _legend = [[UIStackView alloc] init];
@@ -1246,21 +1247,22 @@ static UIView *PCOutcomeLegendItemView(NSString *title, NSString *numStr, UIColo
         [_card addSubview:_donut];
         [_card addSubview:_legend];
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 0, 6, 0));
+            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 0, 0, 0));
         }];
         [_title mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.leading.equalTo(_card).offset(16);
+            make.top.equalTo(_card).offset(30);
+            make.leading.equalTo(_card).offset(16);
             make.trailing.equalTo(_card).offset(-16);
         }];
         [_donut mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(_title.mas_bottom).offset(12);
+            make.top.equalTo(_title.mas_bottom).offset(30);
             make.centerX.equalTo(_card);
             make.width.height.mas_equalTo(199);
         }];
         [_legend mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(_donut.mas_bottom).offset(12);
-            make.leading.trailing.equalTo(_card).insets(UIEdgeInsetsMake(0, 16, 0, 16));
-            make.bottom.equalTo(_card).offset(-16);
+            make.leading.trailing.equalTo(_card).insets(UIEdgeInsetsMake(0, 26, 0, 26));
+//            make.bottom.equalTo(_card).offset(-16);
         }];
     }
     return self;

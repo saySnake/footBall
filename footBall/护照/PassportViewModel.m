@@ -282,10 +282,10 @@
     m.outcomeTitle = NSLocalizedString(@"passport_outcome_vs_last", nil) ?: @"比上场胜势情况";
     m.outcomeCenterPercent = 0.45;
     m.outcomeLegend = @[
-        @{@"t": NSLocalizedString(@"passport_legend_win", nil) ?: @"胜", @"n": @"21", @"h": @"285D4B"},
-        @{@"t": NSLocalizedString(@"passport_legend_draw", nil) ?: @"平", @"n": @"3", @"h": @"4A8F7A"},
-        @{@"t": NSLocalizedString(@"passport_legend_loss", nil) ?: @"负", @"n": @"22", @"h": @"6BA68A"},
-        @{@"t": NSLocalizedString(@"passport_legend_other", nil) ?: @"其它", @"n": @"3", @"h": @"A8D5BA"},
+        @{@"t": NSLocalizedString(@"passport_legend_win", nil) ?: @"胜", @"n": @"21", @"h": @"62D486"},
+        @{@"t": NSLocalizedString(@"passport_legend_draw", nil) ?: @"平", @"n": @"3", @"h": @"5CB793"},
+        @{@"t": NSLocalizedString(@"passport_legend_loss", nil) ?: @"负", @"n": @"22", @"h": @"285D4B"},
+        @{@"t": NSLocalizedString(@"passport_legend_other", nil) ?: @"其它", @"n": @"3", @"h": @"0D2122"},
     ];
 
     [self applyHeaderFromPassport:passport toModel:m codeDigits:[box copy]];
