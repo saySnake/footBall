@@ -119,8 +119,7 @@
         return;
     }
 
-    NSString *objectKey = [NSString stringWithFormat:@"%@/%@/%.0f.jpg",
-                           AuthManager.sharedManager.user.userId ?: @"user",
+    NSString *objectKey = [NSString stringWithFormat:@"c/%@/%.0f.jpg",
                            [self objectType:type],
                            [NSDate date].timeIntervalSince1970 * 1000.0];
 

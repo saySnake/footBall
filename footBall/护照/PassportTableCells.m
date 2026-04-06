@@ -10,9 +10,9 @@
 #import <Masonry/Masonry.h>
 #import <QuartzCore/QuartzCore.h>
 
-static UIColor *PCDarkCard(void) { return [UIColor colorWithRed:0.11 green:0.11 blue:0.12 alpha:1.0]; }
-static UIColor *PCLightCard(void) { return [UIColor colorWithRed:0.96 green:0.96 blue:0.97 alpha:1.0]; }
-static UIColor *PCGreen(void) { return [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0]; }
+static UIColor *PCDarkCard(void) { return [UIColor colorWithHexString:@"#0D2122"]; }
+static UIColor *PCLightCard(void) { return [UIColor colorWithHexString:@"#FEFEFE"]; }
+static UIColor *PCGreen(void) { return [UIColor colorWithHexString:@"#285D4B"]; }
 static UIColor *PCHex(NSString *hex) {
     unsigned r = 0, g = 0, b = 0;
     NSScanner *sc = [NSScanner scannerWithString:hex];
@@ -25,7 +25,7 @@ static UIColor *PCHex(NSString *hex) {
 
 static const CGFloat kPassportAbilityValueColumnWidth = 24;
 static const CGFloat kPassportAbilityBarHeight = 12;
-static const CGFloat kPassportAbilityRowHeight = 29;
+static const CGFloat kPassportAbilityRowHeight = 25;
 
 /// 能力块左侧列宽：取当前数据里所有行标题在指定字体下排版宽度的最大值（与左侧 UILabel 一致）
 static CGFloat PCAbilityMaxLabelWidthForTitles(NSArray<NSString *> *titles, UIFont *font) {
@@ -339,7 +339,7 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
         self.contentView.backgroundColor = [UIColor clearColor];
         _card = [[UIView alloc] init];
         _card.backgroundColor = PCLightCard();
-        _card.layer.cornerRadius = 16;
+        _card.layer.cornerRadius = 24;
         [self.contentView addSubview:_card];
         _title = [[UILabel alloc] init];
         _title.font = FontManager.sharedManager.font18Regular;
@@ -393,7 +393,7 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
         self.contentView.backgroundColor = [UIColor clearColor];
         _card = [[UIView alloc] init];
         _card.backgroundColor = PCLightCard();
-        _card.layer.cornerRadius = 16;
+        _card.layer.cornerRadius = 24;
         [self.contentView addSubview:_card];
         _title = [[UILabel alloc] init];
         _title.font = FontManager.sharedManager.font18Regular;
@@ -519,7 +519,7 @@ static void PCPositionSetCorners(UIView *v, UIRectCorner corners, CGFloat r) {
     }
 }
 
-static UIView *PCPositionRow(UILabel **outL, UILabel **outV) {
+static UIView *PCPositionRow(UILabel **outL, UILabel **outV, bool last) {
     UIView *row = [[UIView alloc] init];
     row.clipsToBounds = YES;
     UILabel *l = [[UILabel alloc] init];
@@ -533,12 +533,12 @@ static UIView *PCPositionRow(UILabel **outL, UILabel **outV) {
     [row addSubview:v];
     [l mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.equalTo(row).offset(16);
-        make.centerY.equalTo(row);
+        make.centerY.equalTo(row).offset(last?0:-13);
         make.right.lessThanOrEqualTo(v.mas_left).offset(-12);
     }];
     [v mas_makeConstraints:^(MASConstraintMaker *make) {
         make.right.equalTo(row).offset(-16);
-        make.centerY.equalTo(row);
+        make.centerY.equalTo(row).offset(last?0:-13);
     }];
     *outL = l;
     *outV = v;
@@ -554,8 +554,8 @@ static UIView *PCPositionRow(UILabel **outL, UILabel **outV) {
         _card.backgroundColor = [UIColor clearColor];
         [self.contentView addSubview:_card];
         _headerStrip = [[UIView alloc] init];
-        _headerStrip.backgroundColor = PCDarkCard();
-        PCPositionSetCorners(_headerStrip, UIRectCornerTopLeft | UIRectCornerTopRight, 20);
+        _headerStrip.backgroundColor = [UIColor colorWithHexString:@"#0D2122"];
+        PCPositionSetCorners(_headerStrip, UIRectCornerTopLeft | UIRectCornerTopRight, 24);
         [_card addSubview:_headerStrip];
         _title = [[UILabel alloc] init];
         _title.font = [UIFont systemFontOfSize:18 weight:UIFontWeightBold];
@@ -564,50 +564,49 @@ static UIView *PCPositionRow(UILabel **outL, UILabel **outV) {
         [_headerStrip addSubview:_title];
 
         UILabel *l1, *v1, *l2, *v2, *l3, *v3;
-        _row1 = PCPositionRow(&l1, &v1);
+        _row1 = PCPositionRow(&l1, &v1,NO);
         _l1 = l1;
         _v1 = v1;
-        _row2 = PCPositionRow(&l2, &v2);
+        _row2 = PCPositionRow(&l2, &v2,NO);
         _l2 = l2;
         _v2 = v2;
-        _row3 = PCPositionRow(&l3, &v3);
+        _row3 = PCPositionRow(&l3, &v3,YES);
         _l3 = l3;
         _v3 = v3;
-        PCPositionSetCorners(_row1, UIRectCornerTopLeft | UIRectCornerTopRight, 20);
-        PCPositionSetCorners(_row2, UIRectCornerTopLeft | UIRectCornerTopRight, 20);
+        PCPositionSetCorners(_row1, UIRectCornerTopLeft | UIRectCornerTopRight, 24);
+        PCPositionSetCorners(_row2, UIRectCornerTopLeft | UIRectCornerTopRight, 24);
         // 最后一行：仅上沿圆角，底边与容器齐平为直角
-        PCPositionSetCorners(_row3, UIRectCornerTopLeft | UIRectCornerTopRight, 20);
+        PCPositionSetCorners(_row3, UIRectCornerTopLeft | UIRectCornerTopRight, 24);
         [_card addSubview:_row1];
         [_card addSubview:_row2];
         [_card addSubview:_row3];
 
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 0, 6, 0));
+            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 0, 0, 0));
         }];
         [_headerStrip mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.left.right.equalTo(_card);
-            make.height.mas_equalTo(89);
+            make.height.mas_equalTo(116);
         }];
         [_title mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(_headerStrip).offset(16);
+            make.top.equalTo(_headerStrip).offset(36);
             make.left.equalTo(_headerStrip).offset(16);
             make.right.equalTo(_headerStrip).offset(-16);
         }];
         [_row1 mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.right.equalTo(_card);
-            make.top.equalTo(_headerStrip.mas_bottom).offset(-21);
-            make.height.mas_equalTo(123);
+            make.top.equalTo(_headerStrip.mas_bottom).offset(-26);
+            make.height.mas_equalTo(132);
         }];
         [_row2 mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.right.equalTo(_card);
-            make.top.equalTo(_row1.mas_bottom).offset(-21);
-            make.height.mas_equalTo(123);
+            make.top.equalTo(_row1.mas_bottom).offset(-26);
+            make.height.mas_equalTo(132);
         }];
         [_row3 mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.right.equalTo(_card);
-            make.top.equalTo(_row2.mas_bottom).offset(-21);
+            make.top.equalTo(_row2.mas_bottom).offset(-26);
             make.height.mas_equalTo(106);
-            make.bottom.equalTo(_card);
         }];
     }
     return self;
@@ -622,12 +621,12 @@ static UIView *PCPositionRow(UILabel **outL, UILabel **outV) {
     _l3.text = model.positionDefenderLabel;
     _v3.text = [NSString stringWithFormat:@"%ld", (long)model.positionDefender];
 
-    _row1.backgroundColor = PCHex(@"1F3D2E");
-    _v1.textColor = PCHex(@"A8E6CF");
-    _row2.backgroundColor = PCHex(@"4A6B5C");
-    _v2.textColor = PCHex(@"1A2420");
-    _row3.backgroundColor = PCHex(@"5CB793");
-    _v3.textColor = PCHex(@"1A2420");
+    _row1.backgroundColor = PCHex(@"285D4B");
+    _v1.textColor = PCHex(@"62D486");
+    _row2.backgroundColor = PCHex(@"5CB793");
+    _v2.textColor = PCHex(@"215040");
+    _row3.backgroundColor = PCHex(@"62D486");
+    _v3.textColor = PCHex(@"285D4B");
 }
 
 @end
@@ -675,7 +674,7 @@ static NSAttributedString *PCAbilitySummaryAttributed(CGFloat level) {
         self.contentView.backgroundColor = [UIColor clearColor];
         _card = [[UIView alloc] init];
         _card.backgroundColor = PCLightCard();
-        _card.layer.cornerRadius = 16;
+        _card.layer.cornerRadius = 24;
         _card.clipsToBounds = YES;
         [self.contentView addSubview:_card];
         _title = [[UILabel alloc] init];
@@ -757,20 +756,21 @@ static NSAttributedString *PCAbilitySummaryAttributed(CGFloat level) {
         [_card addSubview:_subtitle];
         [_card addSubview:_rowStack];
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 0, 6, 0));
+            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 0, 0, 0));
         }];
         [_title mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.leading.equalTo(_card).offset(16);
+            make.top.equalTo(_card).offset(30);
+            make.left.equalTo(_card).offset(16);
             make.trailing.equalTo(_card).offset(-16);
         }];
         [_subtitle mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(_title.mas_bottom).offset(8);
+            make.top.equalTo(_title.mas_bottom).offset(2);
             make.leading.trailing.equalTo(_title);
         }];
         [_rowStack mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(_subtitle.mas_bottom).offset(12);
+            make.top.equalTo(_subtitle.mas_bottom).offset(25);
             make.leading.trailing.equalTo(_card).insets(UIEdgeInsetsMake(0, 16, 0, 16));
-            make.bottom.equalTo(_card).offset(-16);
+//            make.bottom.equalTo(_card).offset(-16);
         }];
     }
     return self;
@@ -867,7 +867,7 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
         self.contentView.backgroundColor = [UIColor clearColor];
         _card = [[UIView alloc] init];
         _card.backgroundColor = PCHex(@"0D2122");
-        _card.layer.cornerRadius = 16;
+        _card.layer.cornerRadius = 24;
         _card.clipsToBounds = YES;
         [self.contentView addSubview:_card];
         _title = [[UILabel alloc] init];
@@ -891,14 +891,15 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
         [_card addSubview:_donut];
         [_card addSubview:_legendRow];
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 0, 6, 0));
+            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 0, 0, 0));
         }];
         [_title mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.leading.equalTo(_card).offset(16);
+            make.top.equalTo(_card).offset(30);
+            make.leading.equalTo(_card).offset(16);
             make.trailing.equalTo(_card).offset(-16);
         }];
         [_subtitle mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(_title.mas_bottom).offset(8);
+            make.top.equalTo(_title.mas_bottom).offset(10);
             make.leading.trailing.equalTo(_title);
         }];
         [_donut mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -909,7 +910,7 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
         [_legendRow mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(_donut.mas_bottom).offset(12);
             make.leading.trailing.equalTo(_card).insets(UIEdgeInsetsMake(0, 16, 0, 16));
-            make.bottom.equalTo(_card).offset(-16);
+//            make.bottom.equalTo(_card).offset(-16);
         }];
     }
     return self;
@@ -1072,7 +1073,7 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
         self.contentView.backgroundColor = [UIColor clearColor];
         _card = [[UIView alloc] init];
         _card.backgroundColor = PCLightCard();
-        _card.layer.cornerRadius = 16;
+        _card.layer.cornerRadius = 24;
         _card.clipsToBounds = YES;
         [self.contentView addSubview:_card];
         _headerRow = [[UIView alloc] init];
@@ -1231,7 +1232,7 @@ static UIView *PCOutcomeLegendItemView(NSString *title, NSString *numStr, UIColo
         self.contentView.backgroundColor = [UIColor clearColor];
         _card = [[UIView alloc] init];
         _card.backgroundColor = PCLightCard();
-        _card.layer.cornerRadius = 16;
+        _card.layer.cornerRadius = 24;
         [self.contentView addSubview:_card];
         _title = [[UILabel alloc] init];
         _title.font = [UIFont systemFontOfSize:18 weight:UIFontWeightBold];

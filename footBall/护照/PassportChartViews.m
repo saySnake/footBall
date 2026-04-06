@@ -355,8 +355,8 @@
                 tr.origin.y = CGRectGetHeight(rect) - inset - textSize.height;
             }
             CGContextSaveGState(ctx);
-            CGContextSetStrokeColorWithColor(ctx, [[UIColor colorWithWhite:1 alpha:0.4] CGColor]);
-            CGContextSetLineWidth(ctx, 1);
+            CGContextSetStrokeColorWithColor(ctx, [[UIColor colorWithHexString:@"#CCFFDC"] CGColor]);
+            CGContextSetLineWidth(ctx, 2);
             CGContextMoveToPoint(ctx, tip.x, tip.y);
             CGContextAddLineToPoint(ctx, p1.x, p1.y);
             CGContextAddLineToPoint(ctx, pEndX, hy);
