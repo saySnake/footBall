@@ -21,7 +21,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)getStampCategoriesSuccess:(nullable APISuccessBlock)success
                            failure:(nullable APIFailureBlock)failure;
 
-/// GET `/api/v1/stamps/categories/{categoryId}/all` — 某分类下全部邮票（网格）
+/// GET `/api/v1/stamps/categories/{categoryId}/all`
+/// - 预期：某分类下全部邮票（网格，数组）
+/// - 兼容：后端若暂返回分类列表（id/name/icon/sortOrder），会解析为 `NSArray<PNStampCategory *>`
 - (void)getAllStampsInCategory:(NSString *)categoryId
                        success:(nullable APISuccessBlock)success
                        failure:(nullable APIFailureBlock)failure;

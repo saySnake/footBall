@@ -17,6 +17,12 @@ NS_ASSUME_NONNULL_BEGIN
              totalCount:(NSInteger)total
             columnCount:(NSInteger)columns;
 
+/// 邮票格（接口模型）：用于「某分类下全部邮票」网格页
+- (void)configureWithStamp:(nullable PNStampGridItem *)stamp
+                 indexPath:(NSIndexPath *)indexPath
+                totalCount:(NSInteger)total
+               columnCount:(NSInteger)columns;
+
 @end
 
 NS_ASSUME_NONNULL_END

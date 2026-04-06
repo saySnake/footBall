@@ -13,6 +13,7 @@ typedef NS_ENUM(NSUInteger, ImageObjectType) {
     ImageObjectTypeProfessional, /// 职业认证
     ImageObjectTypeMatch, /// 球赛认证
     ImageObjectTypeMatchRecord, /// 比赛记录
+    ImageObjectTypeConsumption, /// 消费记录
     ImageObjectTypeOther
 };
 

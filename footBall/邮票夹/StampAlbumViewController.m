@@ -7,6 +7,9 @@
 #import "StampAlbumModels.h"
 #import "StampAlbumStampCell.h"
 #import "StampAlbumCategoryViewController.h"
+#import "StampRequest.h"
+#import "StampModels.h"
+#import "HTTPResponse.h"
 #import <Masonry/Masonry.h>
 
 static UIColor *StampAlbumNavBg(void) {
@@ -92,6 +95,7 @@ static const CGFloat kStampFilterRowHeight = 40;
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, copy) NSArray<StampAlbumSectionModel *> *allSections;
 @property (nonatomic, copy) NSArray<StampAlbumSectionModel *> *sections;
+@property (nonatomic, copy) NSArray<PNStampCategorySection *> *apiCategories;
 @property (nonatomic, assign) CGFloat tableLayoutWidth;
 
 // Filter dropdown
@@ -118,6 +122,7 @@ static const CGFloat kStampFilterRowHeight = 40;
     [self buildTopBar];
     [self buildTable];
     [self buildFilterDropdownUI];
+    [self loadStampCollection];
 }
 
 - (void)viewDidLayoutSubviews {
@@ -185,6 +190,48 @@ static const CGFloat kStampFilterRowHeight = 40;
     self.allSections = [sec copy];
     self.sections = self.allSections;
     [self setupFilterOptions];
+}
+
+static UIColor *StampAlbumRarityColor(NSString *rarity) {
+    NSString *r = [rarity isKindOfClass:NSString.class] ? [(NSString *)rarity uppercaseString] : @"";
+    if ([r isEqualToString:@"LEGENDARY"]) return [UIColor colorWithHexString:@"#D9B44A"];
+    if ([r isEqualToString:@"EPIC"]) return [UIColor colorWithHexString:@"#8E62D9"];
+    if ([r isEqualToString:@"RARE"]) return [UIColor colorWithHexString:@"#3C6FD9"];
+    return [UIColor colorWithHexString:@"#7C9A8B"];
+}
+
+- (void)loadStampCollection {
+    __weak typeof(self) weakSelf = self;
+    [[StampRequest shared] getStampCollectionSuccess:^(HTTPResponse * _Nullable responseObject) {
+        PNStampCollection *c = (PNStampCollection *)responseObject.dataObject;
+        weakSelf.apiCategories = c.categories ?: @[];
+
+        NSMutableArray<StampAlbumSectionModel *> *sec = [NSMutableArray array];
+        for (PNStampCategorySection *cat in weakSelf.apiCategories) {
+            StampAlbumSectionModel *s = [[StampAlbumSectionModel alloc] init];
+            s.title = cat.name ?: @"";
+            NSMutableArray<StampAlbumItem *> *items = [NSMutableArray array];
+            for (PNStampAlbumItem *st in (cat.stamps ?: @[])) {
+                StampAlbumItem *it = [[StampAlbumItem alloc] init];
+                it.unlocked = st.unlocked;
+                it.isNew = st.isNew;
+                it.imageURL = st.image;
+                it.rarity = st.rarity;
+                it.circleColor = StampAlbumRarityColor(st.rarity);
+                [items addObject:it];
+            }
+            s.items = [items copy];
+            [sec addObject:s];
+        }
+
+        weakSelf.allSections = [sec copy];
+        weakSelf.sections = weakSelf.allSections;
+        [weakSelf setupFilterOptions];
+        [weakSelf.tableView reloadData];
+        [weakSelf.filterTableView reloadData];
+    } failure:^(NSError * _Nonnull error) {
+        [QMUITips showError:error.localizedDescription];
+    }];
 }
 
 - (void)setupFilterOptions {
@@ -559,7 +606,21 @@ static const CGFloat kStampFilterRowHeight = 40;
         return;
     }
     StampAlbumSectionModel *sec = self.sections[section];
-    StampAlbumCategoryViewController *vc = [[StampAlbumCategoryViewController alloc] initWithItems:sec.items];
+    // 尝试从接口 categories 找到对应分类并传 categoryId（若当前是筛选后的 sections，同名可能重复，以 first match 为准）
+    NSString *catId = nil;
+    NSString *catName = sec.title;
+    for (PNStampCategorySection *c in self.apiCategories) {
+        if (catName.length && [c.name isEqualToString:catName] && c.categoryId.length) {
+            catId = c.categoryId;
+            break;
+        }
+    }
+    StampAlbumCategoryViewController *vc = nil;
+    if (catId.length) {
+        vc = [[StampAlbumCategoryViewController alloc] initWithCategoryId:catId categoryName:catName];
+    } else {
+        vc = [[StampAlbumCategoryViewController alloc] initWithItems:sec.items];
+    }
     vc.hidesBottomBarWhenPushed = YES;
     [self.navigationController pushViewController:vc animated:YES];
 }

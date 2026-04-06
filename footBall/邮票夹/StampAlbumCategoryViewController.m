@@ -6,6 +6,9 @@
 #import "StampAlbumCategoryViewController.h"
 #import "StampAlbumModels.h"
 #import "StampAlbumStampCell.h"
+#import "StampRequest.h"
+#import "StampModels.h"
+#import "HTTPResponse.h"
 #import <Masonry/Masonry.h>
 
 static UIColor *StampCategoryNavBg(void) {
@@ -22,6 +25,10 @@ static inline UIEdgeInsets StampCategorySectionInset(void) {
 @property (nonatomic, copy) NSArray<StampAlbumItem *> *items;
 /// 含补位占位邮票：仅补满最后一行（总数为列数的整数倍）
 @property (nonatomic, copy) NSArray<StampAlbumItem *> *displayItems;
+@property (nonatomic, copy, nullable) NSString *categoryId;
+@property (nonatomic, copy, nullable) NSString *categoryName;
+@property (nonatomic, copy) NSArray<PNStampGridItem *> *apiItems;
+@property (nonatomic, copy) NSArray<PNStampGridItem *> *apiDisplayItems;
 @property (nonatomic, strong) UIView *topBar;
 @property (nonatomic, strong) UIButton *backButton;
 @property (nonatomic, strong) UILabel *titleLabel;
@@ -38,6 +45,16 @@ static inline UIEdgeInsets StampCategorySectionInset(void) {
     return self;
 }
 
+- (instancetype)initWithCategoryId:(NSString *)categoryId categoryName:(NSString *)categoryName {
+    if (self = [super initWithNibName:nil bundle:nil]) {
+        _categoryId = [categoryId copy];
+        _categoryName = [categoryName copy];
+        _apiItems = @[];
+        _apiDisplayItems = @[];
+    }
+    return self;
+}
+
 /// 与 `sizeForItemAtIndexPath:` 一致：outline 宽度 = 屏宽 − 左右各 16
 - (CGFloat)stampCategoryGridOutlineWidth {
     CGFloat vw = CGRectGetWidth(self.view.bounds);
@@ -45,7 +62,7 @@ static inline UIEdgeInsets StampCategorySectionInset(void) {
 }
 
 - (CGFloat)stampCategoryGridContentHeight {
-    NSInteger count = self.displayItems.count;
+    NSInteger count = (self.categoryId.length ? self.apiDisplayItems.count : self.displayItems.count);
     if (count == 0) {
         return 0;
     }
@@ -69,7 +86,7 @@ static inline UIEdgeInsets StampCategorySectionInset(void) {
 - (void)updateGridOutlineHeight {
     CGFloat contentH = [self stampCategoryGridContentHeight];
     CGFloat maxH = [self stampCategoryMaxGridHeight];
-    if (self.displayItems.count == 0) {
+    if ((self.categoryId.length ? self.apiDisplayItems.count : self.displayItems.count) == 0) {
         self.gridOutlineView.hidden = YES;
         [self.gridOutlineView mas_updateConstraints:^(MASConstraintMaker *make) {
             make.height.mas_equalTo(0);
@@ -104,6 +121,26 @@ static inline UIEdgeInsets StampCategorySectionInset(void) {
     self.displayItems = [m copy];
 }
 
+- (void)rebuildAPIDisplayItems {
+    NSArray<PNStampGridItem *> *src = self.apiItems ?: @[];
+    if (src.count == 0) {
+        self.apiDisplayItems = @[];
+        return;
+    }
+    NSMutableArray<PNStampGridItem *> *m = [src mutableCopy];
+    NSInteger cols = kStampCategoryColumns;
+    NSInteger rem = (NSInteger)m.count % cols;
+    if (rem != 0) {
+        NSInteger pad = cols - rem;
+        for (NSInteger i = 0; i < pad; i++) {
+            PNStampGridItem *p = [[PNStampGridItem alloc] init];
+            p.unlocked = NO;
+            [m addObject:p];
+        }
+    }
+    self.apiDisplayItems = [m copy];
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.hidesBottomBarWhenPushed = YES;
@@ -128,12 +165,13 @@ static inline UIEdgeInsets StampCategorySectionInset(void) {
     _titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
     _titleLabel.textColor = [UIColor whiteColor];
     // 设计稿：与邮票夹主页相同顶栏标题
-    _titleLabel.text = NSLocalizedString(@"discover_stamp_album", nil) ?: @"邮票夹";
+    _titleLabel.text = self.categoryName.length ? self.categoryName : (NSLocalizedString(@"discover_stamp_album", nil) ?: @"邮票夹");
 
     [_topBar addSubview:_backButton];
     [_topBar addSubview:_titleLabel];
 
     [self rebuildDisplayItems];
+    [self rebuildAPIDisplayItems];
 
     _gridOutlineView = [[UIView alloc] init];
     _gridOutlineView.backgroundColor = [UIColor whiteColor];
@@ -183,6 +221,10 @@ static inline UIEdgeInsets StampCategorySectionInset(void) {
     [_collectionView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(_gridOutlineView);
     }];
+
+    if (self.categoryId.length > 0) {
+        [self loadAllStampsInCategory];
+    }
 }
 
 - (void)viewDidLayoutSubviews {
@@ -197,19 +239,24 @@ static inline UIEdgeInsets StampCategorySectionInset(void) {
 
 - (void)updateLocalizedStrings {
     [super updateLocalizedStrings];
-    _titleLabel.text = NSLocalizedString(@"discover_stamp_album", nil) ?: @"邮票夹";
+    _titleLabel.text = self.categoryName.length ? self.categoryName : (NSLocalizedString(@"discover_stamp_album", nil) ?: @"邮票夹");
 }
 
 #pragma mark - UICollectionView
 
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
-    return self.displayItems.count;
+    return self.categoryId.length ? self.apiDisplayItems.count : self.displayItems.count;
 }
 
 - (__kindof UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
     StampAlbumStampCell *c = [collectionView dequeueReusableCellWithReuseIdentifier:@"StampAlbumStampCell" forIndexPath:indexPath];
-    StampAlbumItem *item = self.displayItems[indexPath.item];
-    [c configureWithItem:item indexPath:indexPath totalCount:self.displayItems.count columnCount:kStampCategoryColumns];
+    if (self.categoryId.length) {
+        PNStampGridItem *item = self.apiDisplayItems[indexPath.item];
+        [c configureWithStamp:item indexPath:indexPath totalCount:self.apiDisplayItems.count columnCount:kStampCategoryColumns];
+    } else {
+        StampAlbumItem *item = self.displayItems[indexPath.item];
+        [c configureWithItem:item indexPath:indexPath totalCount:self.displayItems.count columnCount:kStampCategoryColumns];
+    }
     return c;
 }
 
@@ -223,6 +270,52 @@ static inline UIEdgeInsets StampCategorySectionInset(void) {
         side = 1;
     }
     return CGSizeMake(side, side);
+}
+
+#pragma mark - API
+
+- (void)loadAllStampsInCategory {
+    if (self.categoryId.length == 0) {
+        return;
+    }
+    __weak typeof(self) weakSelf = self;
+    [self showLoading];
+    [[StampRequest shared] getAllStampsInCategory:self.categoryId success:^(HTTPResponse * _Nullable responseObject) {
+        [weakSelf hideLoading];
+        // 兼容后端暂时返回分类列表的情况（见 StampRequest 解析）。
+        id obj = responseObject.dataObject;
+        if ([obj isKindOfClass:NSArray.class] && [(NSArray *)obj count] > 0) {
+            id first = [(NSArray *)obj firstObject];
+            if ([first isKindOfClass:PNStampGridItem.class]) {
+                weakSelf.apiItems = (NSArray<PNStampGridItem *> *)obj;
+                [weakSelf rebuildAPIDisplayItems];
+                [weakSelf.collectionView reloadData];
+                [weakSelf updateGridOutlineHeight];
+                return;
+            }
+            if ([first isKindOfClass:PNStampCategory.class]) {
+                [weakSelf showError:@"接口返回了分类列表（id/name/icon/sortOrder），缺少邮票字段，无法渲染网格。请确认后端返回 StampVO 列表。"];
+                weakSelf.apiItems = @[];
+                [weakSelf rebuildAPIDisplayItems];
+                [weakSelf.collectionView reloadData];
+                [weakSelf updateGridOutlineHeight];
+                return;
+            }
+        }
+
+        // 兜底：尝试按 StampVO 列表解析
+        NSArray<PNStampGridItem *> *list = nil;
+        if ([responseObject.data isKindOfClass:NSArray.class]) {
+            list = [NSArray yy_modelArrayWithClass:PNStampGridItem.class json:responseObject.data];
+        }
+        weakSelf.apiItems = list ?: @[];
+        [weakSelf rebuildAPIDisplayItems];
+        [weakSelf.collectionView reloadData];
+        [weakSelf updateGridOutlineHeight];
+    } failure:^(NSError * _Nonnull error) {
+        [weakSelf hideLoading];
+        [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
+    }];
 }
 
 @end

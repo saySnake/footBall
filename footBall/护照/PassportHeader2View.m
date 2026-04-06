@@ -262,12 +262,12 @@ static UIColor *PassportCircleStrokeColor(void) {
     }];
     UILabel *matchesUnitLabel = UILabel.new;
     matchesUnitLabel.text = @"场";
-    matchesUnitLabel.font = [UIFont systemFontOfSize:10];
-    matchesUnitLabel.textColor = [UIColor colorWithHexString:@"#131313"];
+    matchesUnitLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
+    matchesUnitLabel.textColor = [UIColor colorWithHexString:@"#090909"];
     [matchesCircle addSubview:matchesUnitLabel];
     self.matchesUnitLabel = matchesUnitLabel;
     [matchesUnitLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(_matchesLabel.mas_right);
+        make.left.equalTo(_matchesLabel.mas_right).offset(2);
         make.bottom.equalTo(_matchesLabel).offset(-6);
     }];
 
@@ -287,8 +287,8 @@ static UIColor *PassportCircleStrokeColor(void) {
     }];
     UILabel *afterUnitLabel = UILabel.new;
     afterUnitLabel.text = @"后";
-    afterUnitLabel.font = [UIFont systemFontOfSize:10];
-    afterUnitLabel.textColor = [UIColor colorWithHexString:@"#131313"];
+    afterUnitLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
+    afterUnitLabel.textColor = [UIColor colorWithHexString:@"#090909"];
     [afterCircle addSubview:afterUnitLabel];
     self.afterUnitLabel = afterUnitLabel;
     [afterUnitLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -330,8 +330,8 @@ static UIColor *PassportCircleStrokeColor(void) {
     _minutesValueLabel.text = @"9500";
     [minutesPill addSubview:_minutesValueLabel];
     _minutesUnitLabel = [[UILabel alloc] init];
-    _minutesUnitLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightMedium];
-    _minutesUnitLabel.textColor = [UIColor blackColor];
+    _minutesUnitLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
+    _minutesUnitLabel.textColor = [UIColor colorWithHexString:@"#090909"];
     _minutesUnitLabel.text = @"分钟";
     [minutesPill addSubview:_minutesUnitLabel];
     [_minutesValueLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -363,8 +363,8 @@ static UIColor *PassportCircleStrokeColor(void) {
     _goalsValueLabel.text = @"30";
     [goalsPill addSubview:_goalsValueLabel];
     _goalsUnitLabel = [[UILabel alloc] init];
-    _goalsUnitLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightMedium];
-    _goalsUnitLabel.textColor = [UIColor blackColor];
+    _goalsUnitLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
+    _goalsUnitLabel.textColor = [UIColor colorWithHexString:@"#090909"];
     _goalsUnitLabel.text = @"球";
     [goalsPill addSubview:_goalsUnitLabel];
     [_goalsValueLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -390,8 +390,8 @@ static UIColor *PassportCircleStrokeColor(void) {
     _citiesValueLabel.numberOfLines = 1;
     [citiesCircle addSubview:_citiesValueLabel];
     _citiesUnitLabel = [[UILabel alloc] init];
-    _citiesUnitLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightMedium];
-    _citiesUnitLabel.textColor = [UIColor blackColor];
+    _citiesUnitLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
+    _citiesUnitLabel.textColor = [UIColor colorWithHexString:@"#090909"];
     _citiesUnitLabel.text = @"城市";
     [citiesCircle addSubview:_citiesUnitLabel];
     [_citiesValueLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -416,8 +416,8 @@ static UIColor *PassportCircleStrokeColor(void) {
     _countriesValueLabel.numberOfLines = 1;
     [countriesCircle addSubview:_countriesValueLabel];
     _countriesUnitLabel = [[UILabel alloc] init];
-    _countriesUnitLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightMedium];
-    _countriesUnitLabel.textColor = [UIColor blackColor];
+    _countriesUnitLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
+    _countriesUnitLabel.textColor = [UIColor colorWithHexString:@"#090909"];
     _countriesUnitLabel.text = @"国家";
     [countriesCircle addSubview:_countriesUnitLabel];
     [_countriesValueLabel mas_makeConstraints:^(MASConstraintMaker *make) {

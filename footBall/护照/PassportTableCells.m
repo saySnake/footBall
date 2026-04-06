@@ -1106,7 +1106,7 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
         [_card addSubview:_prompt];
         [_card addSubview:_stack];
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 0, 6, 0));
+            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 0, 0, 0));
         }];
         [_headerRow mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(_card).offset(16);

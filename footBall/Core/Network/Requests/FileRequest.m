@@ -53,8 +53,8 @@
     cfg.timeoutIntervalForRequest = 15;
     cfg.isHttpdnsEnable = NO;
     cfg.crc64Verifiable = YES;
-    
-    OSSClient *defaultClient = [[OSSClient alloc] initWithEndpoint:OSS_ENDPOINT credentialProvider:credentialProvider clientConfiguration:cfg];
+    NSString *endpoint = [NSString stringWithFormat:@"https://%@.aliyuncs.com",self.stsToken.region];
+    OSSClient *defaultClient = [[OSSClient alloc] initWithEndpoint:endpoint credentialProvider:credentialProvider clientConfiguration:cfg];
     self.defaultClient = defaultClient;
 
 }
@@ -99,6 +99,9 @@
         case ImageObjectTypeMatchRecord:
             return @"matchrecord";
             break;
+        case ImageObjectTypeConsumption:
+            return @"consumption";
+            break;
         default:
             return @"other";
             break;
@@ -119,8 +122,8 @@
         return;
     }
 
-    NSString *objectKey = [NSString stringWithFormat:@"c/%@/%.0f.jpg",
-                           [self objectType:type],
+    NSString *objectKey = [NSString stringWithFormat:@"c/%@/%@/%.0f.jpg",
+                           [self objectType:type],AuthManager.sharedManager.user.userId,
                            [NSDate date].timeIntervalSince1970 * 1000.0];
 
     OSSPutObjectRequest *_normalUploadRequest = [OSSPutObjectRequest new];
@@ -141,8 +144,8 @@
                 } else {
                     NSLog(@"[OSS] upload result: %@",task.result);
                     NSString *bucket = self.stsToken.bucket ?: @"";
-                    NSString *region = self.stsToken.region.length ? self.stsToken.region : @"cn-hangzhou";
-                    NSString *urlStr = [NSString stringWithFormat:@"https://%@.oss-%@.aliyuncs.com/%@", bucket, region, objectKey];
+                    NSString *region = self.stsToken.region.length ? self.stsToken.region : @"oss-cn-hangzhou";
+                    NSString *urlStr = [NSString stringWithFormat:@"https://%@.%@.aliyuncs.com/%@", bucket, region, objectKey];
                     HTTPResponse *resp = [[HTTPResponse alloc] init];
                     resp.success = YES;
                     resp.dataObject = urlStr;

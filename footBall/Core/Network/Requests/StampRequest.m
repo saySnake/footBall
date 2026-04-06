@@ -9,6 +9,7 @@
 #import "APIManager.h"
 #import "APIPathValues.h"
 #import "APIError.h"
+#import "StampModels.h"
 
 @implementation StampRequest
 
@@ -24,7 +25,12 @@
 - (void)getStampCollectionSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     [[APIManager sharedManager] GET:APIPathValueStampsCollection parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            responseObject.dataObject = responseObject.data;
+            // data: { categories: [ { categoryId, name, icon, totalCount, collectedCount, stamps: [...] } ] }
+            PNStampCollection *collection = nil;
+            if ([responseObject.data isKindOfClass:NSDictionary.class]) {
+                collection = [PNStampCollection yy_modelWithJSON:responseObject.data];
+            }
+            responseObject.dataObject = collection;
             if (success) success(responseObject);
         } else {
             if (failure) failure([APIError errorWithResponse:responseObject]);
@@ -54,7 +60,22 @@
     }
     [[APIManager sharedManager] GET:APIPathValueStampsCategoryAll(categoryId) parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            responseObject.dataObject = responseObject.data;
+            // data: array
+            // - stamps: [{ stampId/id, name, image, rarity, unlocked, ... }]
+            // - or categories (backend compatibility): [{ id, name, icon, sortOrder }]
+            id data = responseObject.data;
+            id out = data;
+            if ([data isKindOfClass:NSArray.class]) {
+                NSDictionary *first = ([(NSArray *)data count] > 0 && [[(NSArray *)data firstObject] isKindOfClass:NSDictionary.class]) ? (NSDictionary *)[(NSArray *)data firstObject] : nil;
+                BOOL looksLikeStamp = (first[@"image"] != nil || first[@"rarity"] != nil || first[@"unlocked"] != nil || first[@"unlockCondition"] != nil);
+                BOOL looksLikeCategory = (first[@"sortOrder"] != nil || first[@"icon"] != nil);
+                if (looksLikeStamp) {
+                    out = [NSArray yy_modelArrayWithClass:PNStampGridItem.class json:data] ?: @[];
+                } else if (looksLikeCategory) {
+                    out = [NSArray yy_modelArrayWithClass:PNStampCategory.class json:data] ?: @[];
+                }
+            }
+            responseObject.dataObject = out;
             if (success) success(responseObject);
         } else {
             if (failure) failure([APIError errorWithResponse:responseObject]);

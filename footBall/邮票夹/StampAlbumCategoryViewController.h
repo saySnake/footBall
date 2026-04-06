@@ -14,6 +14,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (instancetype)initWithItems:(NSArray<StampAlbumItem *> *)items;
 
+/// 某分类下全部邮票（接口：`/api/v1/stamps/categories/{categoryId}/all`）
+- (instancetype)initWithCategoryId:(NSString *)categoryId categoryName:(nullable NSString *)categoryName;
+
 @end
 
 NS_ASSUME_NONNULL_END

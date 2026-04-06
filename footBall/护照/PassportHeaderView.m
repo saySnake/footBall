@@ -87,9 +87,10 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
 
         [self addLines];
 
-        UIImageView *footer = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"passport_header_sep"]];
-        [self.contentView addSubview:footer];
+//        UIImageView *footer = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"passport_header_sep"]];
+//        [self.contentView addSubview:footer];
         DashView *dashLine = [[DashView alloc] init];
+        dashLine.lineColor = [UIColor colorWithHexString:@"#E0E0E0"];
         [self.contentView addSubview:dashLine];
 
         self.passportHeader2View = [[PassportHeader2View alloc] initWithFrame:CGRectZero];
@@ -98,8 +99,8 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
         [self.passportHeader2View addGestureRecognizer:header2Tap];
         [self.contentView addSubview:self.passportHeader2View];
 
-        UIImageView *footer2 = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"passport_header_sep"]];
-        [self.contentView addSubview:footer2];
+//        UIImageView *footer2 = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"passport_header_sep"]];
+//        [self.contentView addSubview:footer2];
 
         [self.userInfoView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.top.equalTo(self.topView);
@@ -142,44 +143,45 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
             make.height.equalTo(@(_circleLblWH));
         }];
 
-        [footer mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.left.right.equalTo(self.topView);
-            make.top.equalTo(self.topView.mas_bottom).offset(2);
-        }];
+//        [footer mas_makeConstraints:^(MASConstraintMaker *make) {
+//            make.left.right.equalTo(self.topView);
+//            make.top.equalTo(self.topView.mas_bottom).offset(2);
+//        }];
         [dashLine mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.right.equalTo(self.contentView);
-            make.top.equalTo(footer.mas_bottom).offset(2);
+            make.top.equalTo(self.topView.mas_bottom).offset(10);
             make.height.equalTo(@1);
         }];
         [self.passportHeader2View mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.right.equalTo(self.topView);
             make.top.equalTo(dashLine.mas_bottom).offset(10);
             make.height.mas_equalTo(_circleLblWH * 5);
-        }];
-        [footer2 mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.left.right.equalTo(self.passportHeader2View);
-            make.top.equalTo(self.passportHeader2View.mas_bottom).offset(2);
             make.bottom.equalTo(self.contentView).offset(-16);
         }];
+//        [footer2 mas_makeConstraints:^(MASConstraintMaker *make) {
+//            make.left.right.equalTo(self.passportHeader2View);
+//            make.top.equalTo(self.passportHeader2View.mas_bottom).offset(2);
+//            make.bottom.equalTo(self.contentView).offset(-16);
+//        }];
     }
     return self;
 }
 - (UIView *)_userInfoView {
     UIView *view = UIView.new;
-    view.layer.borderColor = [UIColor colorWithHexString:@"#000000"].CGColor;
-    view.layer.borderWidth = 0.5;
+//    view.layer.borderColor = [UIColor colorWithHexString:@"#000000"].CGColor;
+//    view.layer.borderWidth = 0.5;
     view.layer.cornerRadius = 20;
-    view.backgroundColor = [UIColor colorWithHexString:@"#E6E6E6"];
+    view.backgroundColor = [UIColor colorWithHexString:@"#0D2122"];
     
     UILabel *idlbl = UILabel.new;
     idlbl.font = FontManager.sharedManager.font16Regular;
-    idlbl.textColor = [UIColor colorWithHexString:@"#34343B"];
+    idlbl.textColor = [UIColor colorWithHexString:@"#FFFFFF"];
     [view addSubview:idlbl];
     self.idLabel = idlbl;
     
     UILabel *namelbl = UILabel.new;
-    namelbl.font = FontManager.sharedManager.font16Bold;
-    namelbl.textColor = [UIColor colorWithHexString:@"#285D4B"];
+    namelbl.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    namelbl.textColor = [UIColor colorWithHexString:@"#FFFFFF"];
     [view addSubview:namelbl];
     self.nameLabel = namelbl;
 
@@ -196,29 +198,30 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
 }
 - (UIView *)_lineChartView {
     PassportWeekLineChartView *view = [[PassportWeekLineChartView alloc] init];
+    view.lineColor = [UIColor colorWithHexString:@"#FAD908"];
     return view;
 }
 - (UIView *)_rygCardView {
     UIView *view = UIView.new;
     self.redCardLabel = UILabel.new;
-    self.redCardLabel.backgroundColor = [UIColor colorWithHexString:@"#CD5150"];
-    self.redCardLabel.font = FontManager.sharedManager.font26;
+    self.redCardLabel.backgroundColor = [UIColor colorWithHexString:@"#FE0201"];
+    self.redCardLabel.font = FontManager.sharedManager.font26Regular;
     self.redCardLabel.textColor = [UIColor colorWithHexString:@"#000000"];
     self.redCardLabel.textAlignment = NSTextAlignmentCenter;
     self.redCardLabel.layer.cornerRadius = _circleLblWH/2;
     self.redCardLabel.clipsToBounds = YES;
     [view addSubview:self.redCardLabel];
     self.yellowCardLabel = UILabel.new;
-    self.yellowCardLabel.backgroundColor = [UIColor colorWithHexString:@"#F7E05C"];
-    self.yellowCardLabel.font = FontManager.sharedManager.font26;
+    self.yellowCardLabel.backgroundColor = [UIColor colorWithHexString:@"#FDD803"];
+    self.yellowCardLabel.font = FontManager.sharedManager.font26Regular;
     self.yellowCardLabel.textColor = [UIColor colorWithHexString:@"#000000"];
     self.yellowCardLabel.textAlignment = NSTextAlignmentCenter;
     self.yellowCardLabel.layer.cornerRadius = _circleLblWH/2;
     self.yellowCardLabel.clipsToBounds = YES;
     [view addSubview:self.yellowCardLabel];
     self.greenCardLabel = UILabel.new;
-    self.greenCardLabel.backgroundColor = [UIColor colorWithHexString:@"#5CB793"];
-    self.greenCardLabel.font = FontManager.sharedManager.font26;
+    self.greenCardLabel.backgroundColor = [UIColor colorWithHexString:@"#03BA0A"];
+    self.greenCardLabel.font = FontManager.sharedManager.font26Regular;
     self.greenCardLabel.textColor = [UIColor colorWithHexString:@"#000000"];
     self.greenCardLabel.textAlignment = NSTextAlignmentCenter;
     self.greenCardLabel.layer.cornerRadius = _circleLblWH/2;
@@ -269,12 +272,12 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
     view.layer.cornerRadius = _circleLblWH/2;
     view.backgroundColor = [UIColor colorWithHexString:@"#FFFFFF"];
     UILabel *unitLbl = UILabel.new;
-    unitLbl.font = FontManager.sharedManager.font10;
-    unitLbl.textColor = [UIColor colorWithHexString:@"#787878"];
-    unitLbl.text = @"RMB";
+    unitLbl.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
+    unitLbl.textColor = [UIColor colorWithHexString:@"#000000"];
+    unitLbl.text = @"人民币";
     [view addSubview:unitLbl];
     UILabel *amountLbl = UILabel.new;
-    amountLbl.font = FontManager.sharedManager.font30Regular;
+    amountLbl.font = FontManager.sharedManager.font26Regular;
     amountLbl.textColor = [UIColor colorWithHexString:@"#060606"];
     amountLbl.text = @"999,999.99";
     [view addSubview:amountLbl];
@@ -286,7 +289,7 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
     }];
     [amountLbl mas_makeConstraints:^(MASConstraintMaker *make) {
         make.right.equalTo(unitLbl.mas_left).offset(-2);
-        make.bottom.equalTo(unitLbl).offset(7);
+        make.bottom.equalTo(unitLbl).offset(5);
     }];
     return view;
 }
@@ -340,7 +343,7 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
 }
 - (UILabel *)_cicrleLabel{
     UILabel *lbl = UILabel.new;
-    lbl.font = FontManager.sharedManager.font26;
+    lbl.font = FontManager.sharedManager.font26Regular;
     lbl.textColor = [UIColor colorWithHexString:@"#000000"];
     lbl.textAlignment = NSTextAlignmentCenter;
     lbl.layer.cornerRadius = _circleLblWH/2;
@@ -370,16 +373,16 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
     [leftLine mas_makeConstraints:^(MASConstraintMaker *make) {
         make.width.equalTo(@0.25);
         make.left.equalTo(self.topView);
-        make.top.equalTo(@1);
-        make.bottom.equalTo(@(-1));
+        make.top.equalTo(@0);
+        make.bottom.equalTo(@(0));
     }];
     UIView *rightLine = [self newLine];
     [self.topView addSubview:rightLine];
     [rightLine mas_makeConstraints:^(MASConstraintMaker *make) {
         make.width.equalTo(@0.25);
         make.right.equalTo(self.topView);
-        make.top.equalTo(@(-5));
-        make.bottom.equalTo(@(-10));
+        make.top.equalTo(@(0));
+        make.bottom.equalTo(@(0));
     }];
 
     UIView *topLine = [self newLine];
@@ -387,8 +390,8 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
     [topLine mas_makeConstraints:^(MASConstraintMaker *make) {
         make.height.equalTo(@0.25);
         make.top.equalTo(self.topView);
-        make.left.equalTo(@(3));
-        make.right.equalTo(@(-3));
+        make.left.equalTo(@(0));
+        make.right.equalTo(@(0));
     }];
 
     UIView *bottomLine = [self newLine];
@@ -396,8 +399,8 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
     [bottomLine mas_makeConstraints:^(MASConstraintMaker *make) {
         make.height.equalTo(@0.25);
         make.bottom.equalTo(self.topView);
-        make.left.equalTo(@(3));
-        make.right.equalTo(@(-3));
+        make.left.equalTo(@(0));
+        make.right.equalTo(@(0));
     }];
 
     // 内部view之间的水平线

@@ -310,6 +310,16 @@ static UIColor *kAddConsumePlaceholder(void) {
     self.photoPreview.image = img;
     self.photoBtn.hidden = (img != nil);
     [picker dismissViewControllerAnimated:YES completion:nil];
+    NSData *imgData = UIImageJPEGRepresentation(img, 0.5);
+    
+    [FileRequest.shared uploadImage:imgData type:ImageObjectTypeConsumption success:^(HTTPResponse * _Nullable responseObject) {
+        
+    } failure:^(NSError * _Nonnull error) {
+        [QMUITips showError:error.userInfo[@"Message"] inView:self.view];
+        self.photoPreview.image = nil;
+        self.selectedImage = nil;
+        self.photoBtn.hidden = NO;
+    }];
 }
 
 - (void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
