@@ -8,12 +8,27 @@
 #import <Masonry/Masonry.h>
 #import "ColorManager.h"
 
-// 统一使用 ColorManager 的主色，方便主题切换
+// 统一使用 ColorManager 的主色（与 Figma #285D4B 一致）
 #define kPNGreen [ColorManager sharedManager].primaryColor
 
-@interface PNAddConsumeViewController () <UIImagePickerControllerDelegate, UINavigationControllerDelegate, UITextFieldDelegate>
+/// Figma 1:12391 添加消费弹层 — 文本主色 #0D2122
+static UIColor *kAddConsumeTextDark(void) {
+    return [UIColor colorWithRed:0.051f green:0.129f blue:0.133f alpha:1.0f];
+}
+/// 输入区背景 #F6F6F6
+static UIColor *kAddConsumeInputBg(void) {
+    return [UIColor colorWithRed:0.965f green:0.965f blue:0.965f alpha:1.0f];
+}
+/// 占位符 #6F6F6F
+static UIColor *kAddConsumePlaceholder(void) {
+    return [UIColor colorWithRed:0.435f green:0.435f blue:0.435f alpha:1.0f];
+}
+
+@interface PNAddConsumeViewController () <UIImagePickerControllerDelegate, UINavigationControllerDelegate>
 @property (nonatomic, strong) UIView *dimmingView;
 @property (nonatomic, strong) UIView *cardView;
+@property (nonatomic, strong) UIButton *confirmButton;
+@property (nonatomic, assign) BOOL submitting;
 
 @property (nonatomic, strong) UIImageView *photoPreview;
 @property (nonatomic, strong) UIButton *photoBtn;
@@ -35,7 +50,7 @@
     self.selectedDate = [NSDate date];
 
     UIView *dim = [[UIView alloc] init];
-    dim.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.35];
+    dim.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.5];
     [self.view addSubview:dim];
     self.dimmingView = dim;
     [dim mas_makeConstraints:^(MASConstraintMaker *make) { make.edges.equalTo(self.view); }];
@@ -43,7 +58,7 @@
 
     UIView *card = [[UIView alloc] init];
     card.backgroundColor = [UIColor whiteColor];
-    card.layer.cornerRadius = 18;
+    card.layer.cornerRadius = 24;
     card.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
     card.layer.masksToBounds = YES;
     [self.view addSubview:card];
@@ -55,57 +70,56 @@
         make.bottom.equalTo(self.view);
     }];
 
-    // 顶部拖拽条
+    // 顶部拖拽条（Figma #D4D4D4，约 22% 屏宽）
     UIView *handle = [[UIView alloc] init];
-    handle.backgroundColor = [UIColor colorWithWhite:0.85 alpha:1.0];
+    handle.backgroundColor = [UIColor colorWithRed:0.831f green:0.831f blue:0.831f alpha:1.0f];
     handle.layer.cornerRadius = 2;
     [card addSubview:handle];
     [handle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(card).offset(8);
         make.centerX.equalTo(card);
-        make.width.mas_equalTo(40);
+        make.width.equalTo(card).multipliedBy(0.22);
         make.height.mas_equalTo(4);
     }];
 
     UILabel *title = [[UILabel alloc] init];
     title.text = NSLocalizedString(@"add_consume_title", nil) ?: @"添加消费";
-    title.font = [UIFont boldSystemFontOfSize:18];
+    title.font = [UIFont systemFontOfSize:18 weight:UIFontWeightBold];
+    title.textColor = kAddConsumeTextDark();
     title.textAlignment = NSTextAlignmentCenter;
     [card addSubview:title];
     [title mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(handle.mas_bottom).offset(10);
+        make.top.equalTo(card).offset(46);
         make.centerX.equalTo(card);
     }];
 
     UILabel *uploadLab = [[UILabel alloc] init];
-    uploadLab.text = NSLocalizedString(@"add_consume_upload_photo", nil) ?: @"上传照片";
-    uploadLab.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
-    uploadLab.textColor = [UIColor blackColor];
+    NSString *upMain = NSLocalizedString(@"add_consume_upload_photo_main", nil) ?: NSLocalizedString(@"add_consume_upload_photo", nil) ?: @"上传照片";
+    NSString *upCount = NSLocalizedString(@"add_consume_upload_photo_count", nil) ?: @"（1张）";
+    NSMutableAttributedString *uploadAttr = [[NSMutableAttributedString alloc] initWithString:upMain attributes:@{
+        NSFontAttributeName: [UIFont systemFontOfSize:16 weight:UIFontWeightMedium],
+        NSForegroundColorAttributeName: [UIColor blackColor],
+    }];
+    [uploadAttr appendAttributedString:[[NSAttributedString alloc] initWithString:upCount attributes:@{
+        NSFontAttributeName: [UIFont systemFontOfSize:12 weight:UIFontWeightMedium],
+        NSForegroundColorAttributeName: [UIColor blackColor],
+    }]];
+    uploadLab.attributedText = uploadAttr;
     [card addSubview:uploadLab];
     [uploadLab mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(title.mas_bottom).offset(18);
-        make.leading.equalTo(card).offset(18);
-    }];
-
-    UILabel *countLab = [[UILabel alloc] init];
-    countLab.text = @"(1张)";
-    countLab.font = [UIFont systemFontOfSize:12];
-    countLab.textColor = [UIColor lightGrayColor];
-    [card addSubview:countLab];
-    [countLab mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerY.equalTo(uploadLab);
-        make.leading.equalTo(uploadLab.mas_trailing).offset(4);
+        make.top.equalTo(title.mas_bottom).offset(19);
+        make.leading.equalTo(card).offset(16);
     }];
 
     UIView *photoBox = [[UIView alloc] init];
-    photoBox.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
-    photoBox.layer.cornerRadius = 10;
+    photoBox.backgroundColor = kAddConsumeInputBg();
+    photoBox.layer.cornerRadius = 8;
     photoBox.layer.masksToBounds = YES;
     [card addSubview:photoBox];
     [photoBox mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(uploadLab.mas_bottom).offset(10);
-        make.leading.equalTo(card).offset(18);
-        make.width.height.mas_equalTo(76);
+        make.top.equalTo(uploadLab.mas_bottom).offset(12);
+        make.leading.equalTo(card).offset(16);
+        make.width.height.mas_equalTo(107);
     }];
 
     UIImageView *preview = [[UIImageView alloc] init];
@@ -117,8 +131,10 @@
 
     UIButton *photoBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     if (@available(iOS 13.0, *)) {
-        [photoBtn setImage:[UIImage systemImageNamed:@"plus"] forState:UIControlStateNormal];
-        photoBtn.tintColor = [UIColor lightGrayColor];
+        UIImageSymbolConfiguration *symCfg = [UIImageSymbolConfiguration configurationWithPointSize:28 weight:UIImageSymbolWeightThin];
+        UIImage *plusImg = [UIImage systemImageNamed:@"plus" withConfiguration:symCfg];
+        [photoBtn setImage:plusImg forState:UIControlStateNormal];
+        photoBtn.tintColor = [UIColor colorWithRed:0.635f green:0.635f blue:0.635f alpha:1.0f];
     } else {
         [photoBtn setTitle:@"+" forState:UIControlStateNormal];
     }
@@ -127,57 +143,64 @@
     self.photoBtn = photoBtn;
     [photoBtn mas_makeConstraints:^(MASConstraintMaker *make) { make.center.equalTo(photoBox); }];
 
-    // 消费物品
+    // 消费物品（Figma 标签 14 Medium #0D2122）
     UILabel *itemLab = [[UILabel alloc] init];
     itemLab.text = NSLocalizedString(@"add_consume_item", nil) ?: @"消费物品";
-    itemLab.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    itemLab.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    itemLab.textColor = kAddConsumeTextDark();
     [card addSubview:itemLab];
     [itemLab mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(photoBox.mas_bottom).offset(16);
-        make.leading.equalTo(card).offset(18);
+        make.leading.equalTo(card).offset(16);
     }];
 
     UITextField *item = [[UITextField alloc] init];
-    item.placeholder = NSLocalizedString(@"add_consume_item_placeholder", nil) ?: @"请输入消费物品";
-    item.font = [UIFont systemFontOfSize:14];
-    // 初始与价格框一样（浅灰底无边框），获得焦点时再高亮为蓝边
+    item.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    item.textColor = kAddConsumeTextDark();
+    item.attributedPlaceholder = [[NSAttributedString alloc] initWithString:(NSLocalizedString(@"add_consume_item_placeholder", nil) ?: @"请输入消费物品") attributes:@{
+        NSForegroundColorAttributeName: kAddConsumePlaceholder(),
+        NSFontAttributeName: [UIFont systemFontOfSize:14 weight:UIFontWeightMedium],
+    }];
     item.layer.cornerRadius = 8;
     item.layer.borderWidth = 0;
     item.borderStyle = UITextBorderStyleNone;
-    item.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+    item.backgroundColor = kAddConsumeInputBg();
     item.clearButtonMode = UITextFieldViewModeWhileEditing;
-    item.leftView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 10, 1)];
+    item.leftView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 19, 1)];
     item.leftViewMode = UITextFieldViewModeAlways;
-    item.delegate = self;
     [card addSubview:item];
     self.itemField = item;
     [item mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(itemLab.mas_bottom).offset(8);
-        make.leading.equalTo(card).offset(18);
-        make.trailing.equalTo(card).offset(-18);
-        make.height.mas_equalTo(44);
+        make.leading.equalTo(card).offset(16);
+        make.trailing.equalTo(card).offset(-16);
+        make.height.mas_equalTo(50);
     }];
 
     // 消费价格
     UILabel *priceLab = [[UILabel alloc] init];
     priceLab.text = NSLocalizedString(@"add_consume_price", nil) ?: @"消费价格";
-    priceLab.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    priceLab.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    priceLab.textColor = kAddConsumeTextDark();
     [card addSubview:priceLab];
     [priceLab mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(item.mas_bottom).offset(14);
-        make.leading.equalTo(card).offset(18);
+        make.top.equalTo(item.mas_bottom).offset(16);
+        make.leading.equalTo(card).offset(16);
     }];
 
     UITextField *price = [[UITextField alloc] init];
-    price.placeholder = NSLocalizedString(@"add_consume_price_placeholder", nil) ?: @"请输入价格";
-    price.font = [UIFont systemFontOfSize:14];
+    price.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    price.textColor = kAddConsumeTextDark();
+    price.attributedPlaceholder = [[NSAttributedString alloc] initWithString:(NSLocalizedString(@"add_consume_price_placeholder", nil) ?: @"请输入价格") attributes:@{
+        NSForegroundColorAttributeName: kAddConsumePlaceholder(),
+        NSFontAttributeName: [UIFont systemFontOfSize:14 weight:UIFontWeightMedium],
+    }];
     price.layer.cornerRadius = 8;
-    price.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+    price.backgroundColor = kAddConsumeInputBg();
     price.borderStyle = UITextBorderStyleNone;
-    price.leftView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 10, 1)];
+    price.leftView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 19, 1)];
     price.leftViewMode = UITextFieldViewModeAlways;
     price.keyboardType = UIKeyboardTypeDecimalPad;
-    price.delegate = self;
     [card addSubview:price];
     self.priceField = price;
     [price mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -185,31 +208,36 @@
         make.leading.trailing.height.equalTo(item);
     }];
 
-    // 日期 & 时间
+    // 日期 & 时间（两列各 166pt、间距 11pt，375 设计稿）
     UILabel *dateLab = [[UILabel alloc] init];
     dateLab.text = NSLocalizedString(@"add_consume_date", nil) ?: @"消费日期";
-    dateLab.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    dateLab.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    dateLab.textColor = kAddConsumeTextDark();
     [card addSubview:dateLab];
     [dateLab mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(price.mas_bottom).offset(14);
-        make.leading.equalTo(card).offset(18);
+        make.top.equalTo(price.mas_bottom).offset(16);
+        make.leading.equalTo(card).offset(16);
     }];
 
     UILabel *timeLab = [[UILabel alloc] init];
     timeLab.text = NSLocalizedString(@"add_consume_time", nil) ?: @"时间";
-    timeLab.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    timeLab.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    timeLab.textColor = kAddConsumeTextDark();
     [card addSubview:timeLab];
     [timeLab mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerY.equalTo(dateLab);
-        make.leading.equalTo(card.mas_centerX).offset(10);
+        make.leading.equalTo(card.mas_centerX).offset(8.5);
     }];
 
     UIButton* (^fieldBtn)(void) = ^UIButton*{
-        UIButton *b = [UIButton buttonWithType:UIButtonTypeSystem];
-        b.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+        UIButton *b = [UIButton buttonWithType:UIButtonTypeCustom];
+        b.backgroundColor = kAddConsumeInputBg();
         b.layer.cornerRadius = 8;
-        [b setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
-        b.titleLabel.font = [UIFont systemFontOfSize:14];
+        b.clipsToBounds = YES;
+        b.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeading;
+        b.titleEdgeInsets = UIEdgeInsetsMake(0, 14, 0, 8);
+        [b setTitleColor:kAddConsumeTextDark() forState:UIControlStateNormal];
+        b.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
         return b;
     };
     _dateBtn = fieldBtn();
@@ -220,31 +248,34 @@
     [card addSubview:_timeBtn];
     [_dateBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(dateLab.mas_bottom).offset(8);
-        make.leading.equalTo(card).offset(18);
-        make.trailing.equalTo(card.mas_centerX).offset(-8);
-        make.height.mas_equalTo(44);
+        make.leading.equalTo(card).offset(16);
+        make.trailing.equalTo(card.mas_centerX).offset(-5.5);
+        make.height.mas_equalTo(50);
     }];
     [_timeBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(_dateBtn);
-        make.leading.equalTo(card.mas_centerX).offset(8);
-        make.trailing.equalTo(card).offset(-18);
+        make.leading.equalTo(card.mas_centerX).offset(5.5);
+        make.trailing.equalTo(card).offset(-16);
         make.height.equalTo(_dateBtn);
     }];
 
-    UIButton *confirm = [UIButton buttonWithType:UIButtonTypeSystem];
+    UIButton *confirm = [UIButton buttonWithType:UIButtonTypeCustom];
     [confirm setTitle:NSLocalizedString(@"add_consume_confirm", nil) ?: @"确认" forState:UIControlStateNormal];
     confirm.backgroundColor = kPNGreen;
-    [confirm setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    confirm.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
-    confirm.layer.cornerRadius = 22;
+    [confirm setTitleColor:[UIColor colorWithRed:0.937f green:0.941f blue:0.957f alpha:1.0f] forState:UIControlStateNormal];
+    [confirm setTitleColor:[[UIColor colorWithRed:0.937f green:0.941f blue:0.957f alpha:1.0f] colorWithAlphaComponent:0.35f] forState:UIControlStateDisabled];
+    confirm.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    confirm.layer.cornerRadius = 26;
+    confirm.clipsToBounds = YES;
     [confirm addTarget:self action:@selector(onConfirm) forControlEvents:UIControlEventTouchUpInside];
     [card addSubview:confirm];
+    self.confirmButton = confirm;
     [confirm mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_dateBtn.mas_bottom).offset(18);
-        make.leading.equalTo(card).offset(18);
-        make.trailing.equalTo(card).offset(-18);
-        make.height.mas_equalTo(46);
-        make.bottom.equalTo(card.mas_safeAreaLayoutGuideBottom).offset(-10);
+        make.top.equalTo(_dateBtn.mas_bottom).offset(24);
+        make.leading.equalTo(card).offset(16);
+        make.trailing.equalTo(card).offset(-16);
+        make.height.mas_equalTo(52);
+        make.bottom.equalTo(card.mas_safeAreaLayoutGuideBottom).offset(-16);
     }];
 
     [self refreshDateTimeButtons];
@@ -313,39 +344,139 @@
     [self presentViewController:sheet animated:NO completion:nil];
 }
 
+- (NSString *)expenseDateStringForAPI {
+    NSDate *d = self.selectedDate ?: [NSDate date];
+    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    fmt.timeZone = [NSTimeZone localTimeZone];
+    fmt.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+    return [fmt stringFromDate:d];
+}
+
+- (void)resetSubmittingState {
+    [MBProgressHUD hideHUDForView:self.view animated:YES];
+    self.submitting = NO;
+    self.confirmButton.enabled = YES;
+}
+
+- (void)postCreateExpenseWithBody:(NSDictionary *)body {
+    __weak typeof(self) weakSelf = self;
+    [[ExpenseRequest shared] createExpenseWithBody:body success:^(HTTPResponse * _Nullable responseObject) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) return;
+            [self resetSubmittingState];
+            NSString *ok = NSLocalizedString(@"add_consume_success", nil) ?: @"添加成功";
+            [[LoadingManager sharedManager] showText:ok];
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"PNExpenseDidCreate" object:nil];
+            [self dismissViewControllerAnimated:YES completion:nil];
+        });
+    } failure:^(NSError * _Nonnull error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) return;
+            [self resetSubmittingState];
+            NSString *msg = error.localizedDescription ?: @"";
+            if ([error isKindOfClass:[APIError class]]) {
+                APIError *ae = (APIError *)error;
+                if (ae.businessMessage.length) msg = ae.businessMessage;
+            }
+            if (msg.length == 0) msg = NSLocalizedString(@"add_consume_fail", nil) ?: @"添加失败";
+            [[LoadingManager sharedManager] showError:msg inView:self.view];
+        });
+    }];
+}
+
 - (void)onConfirm {
-    // 假提交：直接关闭
-    [self dismissViewControllerAnimated:YES completion:nil];
-}
+    [self.view endEditing:YES];
+    if (self.submitting) return;
 
-#pragma mark - UITextFieldDelegate
-
-- (void)textFieldDidBeginEditing:(UITextField *)textField {
-    if (textField == self.itemField) {
-        // 消费物品获得焦点时显示蓝色描边，贴合设计图
-        textField.layer.borderWidth = 2;
-        textField.layer.borderColor = [UIColor colorWithRed:0.16 green:0.55 blue:0.95 alpha:1.0].CGColor;
-        textField.backgroundColor = [UIColor whiteColor];
+    if (!AuthManager.sharedManager.isLoggedIn) {
+        NSString *msg = NSLocalizedString(@"add_consume_error_login", nil) ?: @"请先登录";
+        [[LoadingManager sharedManager] showError:msg inView:self.view];
+        return;
     }
-}
 
-- (void)textFieldDidEndEditing:(UITextField *)textField {
-    if (textField == self.itemField) {
-        // 失焦后恢复为浅灰底、无边框
-        textField.layer.borderWidth = 0;
-        textField.layer.borderColor = [UIColor clearColor].CGColor;
-        textField.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+    NSString *itemName = [self.itemField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (itemName.length == 0) {
+        NSString *msg = NSLocalizedString(@"add_consume_error_item", nil) ?: @"请输入消费物品";
+        [[LoadingManager sharedManager] showError:msg inView:self.view];
+        return;
     }
-}
 
-- (BOOL)textFieldShouldBeginEditing:(UITextField *)textField {
-    // 再保险：在将要编辑时也打一遍样式，避免某些机型 delegate 顺序差异
-    if (textField == self.itemField) {
-        textField.layer.borderWidth = 2;
-        textField.layer.borderColor = [UIColor colorWithRed:0.16 green:0.55 blue:0.95 alpha:1.0].CGColor;
-        textField.backgroundColor = [UIColor whiteColor];
+    NSString *priceStr = [self.priceField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (priceStr.length == 0) {
+        NSString *msg = NSLocalizedString(@"add_consume_error_price", nil) ?: @"请输入价格";
+        [[LoadingManager sharedManager] showError:msg inView:self.view];
+        return;
     }
-    return YES;
+
+    NSDecimalNumber *amount = [NSDecimalNumber decimalNumberWithString:priceStr];
+    if ([amount isEqualToNumber:[NSDecimalNumber notANumber]] || [amount compare:[NSDecimalNumber zero]] != NSOrderedDescending) {
+        NSString *msg = NSLocalizedString(@"add_consume_error_price_invalid", nil) ?: @"请输入有效金额";
+        [[LoadingManager sharedManager] showError:msg inView:self.view];
+        return;
+    }
+
+    self.submitting = YES;
+    self.confirmButton.enabled = NO;
+    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+
+    NSString *dateStr = [self expenseDateStringForAPI];
+    __weak typeof(self) weakSelf = self;
+
+    void (^sendBody)(NSArray<NSString *> *) = ^(NSArray<NSString *> *photoURLs) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        NSMutableDictionary *body = [NSMutableDictionary dictionary];
+        body[@"itemName"] = itemName;
+        body[@"amount"] = [amount stringValue];
+        body[@"expenseDate"] = dateStr;
+        if (photoURLs.count > 0) {
+            body[@"photos"] = photoURLs;
+        }
+        [self postCreateExpenseWithBody:body];
+    };
+
+    if (self.selectedImage) {
+        NSData *jpeg = UIImageJPEGRepresentation(self.selectedImage, 0.85);
+        if (!jpeg) jpeg = UIImagePNGRepresentation(self.selectedImage);
+        if (!jpeg) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                __strong typeof(weakSelf) self = weakSelf;
+                if (!self) return;
+                [self resetSubmittingState];
+                NSString *msg = NSLocalizedString(@"add_consume_image_fail", nil) ?: @"图片处理失败";
+                [[LoadingManager sharedManager] showError:msg inView:self.view];
+            });
+            return;
+        }
+        [[FileRequest shared] uploadImage:jpeg type:ImageObjectTypeOther success:^(HTTPResponse * _Nullable responseObject) {
+            NSString *url = [responseObject.dataObject isKindOfClass:[NSString class]] ? responseObject.dataObject : nil;
+            if (url.length == 0) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    __strong typeof(weakSelf) self = weakSelf;
+                    if (!self) return;
+                    [self resetSubmittingState];
+                    NSString *msg = NSLocalizedString(@"add_consume_upload_fail", nil) ?: @"图片上传失败";
+                    [[LoadingManager sharedManager] showError:msg inView:self.view];
+                });
+                return;
+            }
+            sendBody(@[url]);
+        } failure:^(NSError * _Nonnull error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                __strong typeof(weakSelf) self = weakSelf;
+                if (!self) return;
+                [self resetSubmittingState];
+                NSString *msg = error.localizedDescription.length ? error.localizedDescription : (NSLocalizedString(@"add_consume_upload_fail", nil) ?: @"图片上传失败");
+                [[LoadingManager sharedManager] showError:msg inView:self.view];
+            });
+        }];
+        return;
+    }
+
+    sendBody(@[]);
 }
 
 @end

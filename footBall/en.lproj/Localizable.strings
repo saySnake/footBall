@@ -207,6 +207,8 @@
 /* Add Consume */
 "add_consume_title" = "Add Expense";
 "add_consume_upload_photo" = "Upload Photo (1)";
+"add_consume_upload_photo_main" = "Upload Photo ";
+"add_consume_upload_photo_count" = "(1)";
 "add_consume_item" = "Item";
 "add_consume_item_placeholder" = "Please enter item";
 "add_consume_price" = "Price";
@@ -214,10 +216,19 @@
 "add_consume_date" = "Date";
 "add_consume_time" = "Time";
 "add_consume_confirm" = "Confirm";
+"add_consume_success" = "Added";
+"add_consume_fail" = "Could not add expense";
+"add_consume_error_login" = "Please sign in first";
+"add_consume_error_item" = "Please enter an item";
+"add_consume_error_price" = "Please enter a price";
+"add_consume_error_price_invalid" = "Please enter a valid amount";
+"add_consume_upload_fail" = "Photo upload failed";
+"add_consume_image_fail" = "Could not process the image";
 
 /* More Matches */
 "more_pick_time_title" = "Select Time";
 "consume_record_title" = "Consumption Record";
+"consume_record_empty" = "No records yet";
 
 /* Community */
 "community_title" = "Community";

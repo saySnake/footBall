@@ -16,9 +16,11 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSString *matchRecordId;
 /// 花费项目名称
 @property (nonatomic, copy) NSString *itemName;
-/// 金额（字符串，与接口一致）
-@property (nonatomic, copy) NSString *amount;
+/// 金额（接口可能返回字符串或数字）
+@property (nonatomic, strong) id amount;
 @property (nonatomic, strong) NSArray<NSString *> *photos;
+/// 列表展示用图标（球队/分类等），可选
+@property (nonatomic, copy) NSString *logoUrl;
 @property (nonatomic, copy) NSString *expenseDate;
 @property (nonatomic, copy) NSString *createTime;
 @end

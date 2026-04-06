@@ -6,10 +6,34 @@
 #import "ConsumptionRecordViewController.h"
 #import "MoreDatePickerController.h"
 #import <Masonry/Masonry.h>
+#import <SDWebImage/SDWebImage.h>
 #import "ColorManager.h"
 
 static UIColor *kConsumeGreen(void) {
     return [ColorManager sharedManager].primaryColor;
+}
+
+/// Figma Grayscale 60 — 周几
+static UIColor *kConsumeWeekdayMuted(void) {
+    return [UIColor colorWithRed:0.612f green:0.643f blue:0.671f alpha:1.0]; // #9CA4AB
+}
+
+/// Figma 未选中日期数字
+static UIColor *kConsumeDayNumberDefault(void) {
+    return [UIColor colorWithRed:0.345f green:0.255f blue:0.255f alpha:1.0]; // #584141
+}
+
+/// 优先使用 Assets 中 `Calendar` 图集，缺失时再用 SF Symbol `calendar`
+static UIImage *kConsumeCalendarBarIcon(void) {
+    UIImage *asset = [UIImage imageNamed:@"Calendar"];
+    if (asset) {
+        return [asset imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    }
+    if (@available(iOS 13.0, *)) {
+        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:24 weight:UIImageSymbolWeightRegular];
+        return [[UIImage systemImageNamed:@"calendar" withConfiguration:cfg] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    }
+    return nil;
 }
 
 @interface ConsumeRecordCell : UITableViewCell
@@ -29,8 +53,8 @@ static UIColor *kConsumeGreen(void) {
         self.contentView.backgroundColor = [UIColor clearColor];
 
         UIView *card = [[UIView alloc] init];
-        card.backgroundColor = [UIColor colorWithWhite:0.94 alpha:1.0];
-        card.layer.cornerRadius = 12;
+        card.backgroundColor = [UIColor colorWithRed:0.961f green:0.961f blue:0.961f alpha:1.0]; // #F5F5F5
+        card.layer.cornerRadius = 8;
         card.tag = 999;
         [self.contentView addSubview:card];
         [card mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -39,14 +63,8 @@ static UIColor *kConsumeGreen(void) {
 
         _iconWrap = [[UIView alloc] init];
         _iconWrap.backgroundColor = [UIColor whiteColor];
-        _iconWrap.layer.cornerRadius = 22;
+        _iconWrap.layer.cornerRadius = 25;
         _iconWrap.layer.masksToBounds = YES;
-        if (@available(iOS 13.0, *)) {
-            _iconWrap.layer.shadowColor = [UIColor blackColor].CGColor;
-            _iconWrap.layer.shadowOpacity = 0.08;
-            _iconWrap.layer.shadowOffset = CGSizeMake(0, 1);
-            _iconWrap.layer.shadowRadius = 3;
-        }
 
         _iconView = [[UIImageView alloc] init];
         _iconView.contentMode = UIViewContentModeScaleAspectFit;
@@ -55,7 +73,7 @@ static UIColor *kConsumeGreen(void) {
         _iconView.clipsToBounds = YES;
 
         _titleLabel = [[UILabel alloc] init];
-        _titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+        _titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
         _titleLabel.textColor = [UIColor colorWithWhite:0.15 alpha:1.0];
 
         _timeLabel = [[UILabel alloc] init];
@@ -63,7 +81,7 @@ static UIColor *kConsumeGreen(void) {
         _timeLabel.textColor = [UIColor colorWithWhite:0.5 alpha:1.0];
 
         _amountLabel = [[UILabel alloc] init];
-        _amountLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+        _amountLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
         _amountLabel.textColor = [UIColor colorWithWhite:0.15 alpha:1.0];
         _amountLabel.textAlignment = NSTextAlignmentRight;
 
@@ -74,9 +92,9 @@ static UIColor *kConsumeGreen(void) {
         [card addSubview:_amountLabel];
 
         [_iconWrap mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(card).offset(16);
+            make.leading.equalTo(card).offset(11);
             make.centerY.equalTo(card);
-            make.width.height.mas_equalTo(44);
+            make.width.height.mas_equalTo(50);
         }];
         [_iconView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.center.equalTo(_iconWrap);
@@ -85,7 +103,7 @@ static UIColor *kConsumeGreen(void) {
         [_titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_iconWrap.mas_trailing).offset(12);
             make.trailing.lessThanOrEqualTo(_amountLabel.mas_leading).offset(-8);
-            make.top.equalTo(card).offset(14);
+            make.top.equalTo(card).offset(15);
         }];
         [_timeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_titleLabel);
@@ -121,6 +139,98 @@ static UIColor *kConsumeGreen(void) {
 
 @implementation ConsumptionRecordViewController
 
+/// 解析单条消费的时间，用于排序与按日筛选
+- (NSDate *)parseAPIInstant:(NSString *)raw {
+    if (raw.length == 0) return nil;
+    NSDateFormatter *f = [[NSDateFormatter alloc] init];
+    f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    NSArray<NSString *> *fmts = @[
+        @"yyyy-MM-dd'T'HH:mm:ssZ",
+        @"yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+        @"yyyy-MM-dd HH:mm:ss",
+        @"yyyy-MM-dd"
+    ];
+    for (NSString *fmt in fmts) {
+        f.dateFormat = fmt;
+        NSDate *d = [f dateFromString:raw];
+        if (d) return d;
+    }
+    return nil;
+}
+
+- (NSDate *)eventDateForExpense:(PNExpense *)e {
+    NSString *raw = e.expenseDate.length ? e.expenseDate : e.createTime;
+    NSDate *d = [self parseAPIInstant:raw];
+    if (!d && e.createTime.length) d = [self parseAPIInstant:e.createTime];
+    return d;
+}
+
+- (BOOL)expense:(PNExpense *)e matchesCalendarDayString:(NSString *)dayStr {
+    if (dayStr.length < 10) return NO;
+    NSString *pre = [dayStr substringToIndex:10];
+    NSString *ed = e.expenseDate ?: @"";
+    NSString *ct = e.createTime ?: @"";
+    if (ed.length >= 10 && [[ed substringToIndex:10] isEqualToString:pre]) return YES;
+    if (ct.length >= 10 && [[ct substringToIndex:10] isEqualToString:pre]) return YES;
+    return NO;
+}
+
+- (NSArray<PNExpense *> *)filterAndSortExpenses:(NSArray<PNExpense *> *)all
+                                  forCalendarDay:(NSDate *)day
+                                       dayString:(NSString *)dayStr {
+    if (!day || all.count == 0) return all ?: @[];
+    NSMutableArray<PNExpense *> *m = [NSMutableArray array];
+    for (PNExpense *e in all) {
+        NSDate *d = [self eventDateForExpense:e];
+        if (d && [self isSameDay:d other:day]) {
+            [m addObject:e];
+        }
+    }
+    if (m.count == 0 && all.count > 0) {
+        for (PNExpense *e in all) {
+            if ([self expense:e matchesCalendarDayString:dayStr]) {
+                [m addObject:e];
+            }
+        }
+    }
+    [m sortUsingComparator:^NSComparisonResult(PNExpense *a, PNExpense *b) {
+        NSDate *da = [self eventDateForExpense:a];
+        NSDate *db = [self eventDateForExpense:b];
+        if (!da && !db) return NSOrderedSame;
+        if (!da) return NSOrderedAscending;
+        if (!db) return NSOrderedDescending;
+        return [db compare:da];
+    }];
+    return [m copy];
+}
+
+- (NSString *)displayAmountForExpense:(PNExpense *)e {
+    id v = e.amount;
+    if ([v isKindOfClass:[NSNumber class]]) {
+        return [NSString stringWithFormat:@"-%0.2f", [(NSNumber *)v doubleValue]];
+    }
+    if ([v isKindOfClass:[NSString class]]) {
+        NSString *s = [(NSString *)v stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (s.length == 0) return @"-0";
+        if ([s hasPrefix:@"-"]) return s;
+        return [NSString stringWithFormat:@"-%@", s];
+    }
+    return @"-0";
+}
+
+- (void)updateConsumeEmptyState {
+    if (self.records.count > 0) {
+        self.tableView.backgroundView = nil;
+        return;
+    }
+    UILabel *hint = [[UILabel alloc] init];
+    hint.text = NSLocalizedString(@"consume_record_empty", nil) ?: @"暂无消费记录";
+    hint.font = [UIFont systemFontOfSize:14];
+    hint.textColor = [UIColor colorWithWhite:0.55 alpha:1.0];
+    hint.textAlignment = NSTextAlignmentCenter;
+    self.tableView.backgroundView = hint;
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.hidesBottomBarWhenPushed = YES;
@@ -130,11 +240,24 @@ static UIColor *kConsumeGreen(void) {
     self.calendar.firstWeekday = 1;
     self.calendar.timeZone = [NSTimeZone localTimeZone];
     self.selectedDate = [NSDate date];
+    self.records = @[];
 
     [self buildTopBar];
     [self buildDateHeader];
     [self buildTable];
     [self updateWeekHeaderForSelectedDate];
+    [self updateConsumeEmptyState];
+    [self reloadRecordsForSelectedDate];
+
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onExpenseDidCreateNotification:) name:@"PNExpenseDidCreate" object:nil];
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:@"PNExpenseDidCreate" object:nil];
+}
+
+- (void)onExpenseDidCreateNotification:(NSNotification *)n {
+    (void)n;
     [self reloadRecordsForSelectedDate];
 }
 
@@ -154,11 +277,17 @@ static UIColor *kConsumeGreen(void) {
     [self.view addSubview:bar];
     self.topBar = bar;
 
-    UIButton *back = [UIButton buttonWithType:UIButtonTypeSystem];
-    if (@available(iOS 13.0, *)) {
-        [back setImage:[UIImage systemImageNamed:@"chevron.left"] forState:UIControlStateNormal];
+    UIButton *back = [UIButton buttonWithType:UIButtonTypeCustom];
+    UIImage *backImg = [UIImage imageNamed:@"nav_back"];
+    if (!backImg && @available(iOS 13.0, *)) {
+        backImg = [UIImage systemImageNamed:@"chevron.left"];
     }
-    back.tintColor = [UIColor blackColor];
+    if (backImg) {
+        [back setImage:[backImg imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+        back.tintColor = [UIColor blackColor];
+    }
+    back.imageView.contentMode = UIViewContentModeScaleAspectFit;
+    back.adjustsImageWhenHighlighted = NO;
     [back addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
 
     UILabel *title = [[UILabel alloc] init];
@@ -179,7 +308,7 @@ static UIColor *kConsumeGreen(void) {
     [back mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(bar).offset(16);
         make.centerY.equalTo(bar);
-        make.width.height.mas_equalTo(28);
+        make.width.height.mas_equalTo(24);
     }];
     [title mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(bar);
@@ -194,14 +323,15 @@ static UIColor *kConsumeGreen(void) {
     self.dateHeader = header;
 
     self.monthLabel = [[UILabel alloc] init];
-    self.monthLabel.font = [UIFont boldSystemFontOfSize:18];
-    self.monthLabel.textColor = [UIColor colorWithWhite:0.15 alpha:1.0];
-    self.monthLabel.textAlignment = NSTextAlignmentLeft;
+    self.monthLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
+    self.monthLabel.textColor = [UIColor blackColor];
+    self.monthLabel.textAlignment = NSTextAlignmentCenter;
     [header addSubview:self.monthLabel];
 
     UIButton *calendarBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    if (@available(iOS 13.0, *)) {
-        [calendarBtn setImage:[UIImage systemImageNamed:@"calendar"] forState:UIControlStateNormal];
+    UIImage *calImg = kConsumeCalendarBarIcon();
+    if (calImg) {
+        [calendarBtn setImage:calImg forState:UIControlStateNormal];
     }
     calendarBtn.tintColor = [UIColor blackColor];
     [calendarBtn addTarget:self action:@selector(onCalendarTapped) forControlEvents:UIControlEventTouchUpInside];
@@ -218,12 +348,12 @@ static UIColor *kConsumeGreen(void) {
     }];
     [self.monthLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(header).offset(12);
-        make.leading.equalTo(header).offset(16);
+        make.centerX.equalTo(header);
     }];
     [calendarBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.trailing.equalTo(header).offset(-16);
         make.centerY.equalTo(self.monthLabel);
-        make.width.height.mas_equalTo(28);
+        make.width.height.mas_equalTo(24);
     }];
     [weekRow mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.monthLabel.mas_bottom).offset(12);
@@ -241,16 +371,28 @@ static UIColor *kConsumeGreen(void) {
         [day addTarget:self action:@selector(onWeekDayTapped:) forControlEvents:UIControlEventTouchUpInside];
         [weekRow addSubview:day];
 
+        UIView *pill = [[UIView alloc] init];
+        pill.tag = 201;
+        pill.backgroundColor = kConsumeGreen();
+        pill.layer.cornerRadius = 6;
+        pill.hidden = YES;
+        [day insertSubview:pill atIndex:0];
+        [pill mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.centerX.centerY.equalTo(day);
+            make.width.mas_equalTo(38);
+            make.height.mas_equalTo(56);
+        }];
+
         UILabel *weekLab = [[UILabel alloc] init];
         weekLab.textAlignment = NSTextAlignmentCenter;
-        weekLab.font = [UIFont systemFontOfSize:11];
-        weekLab.textColor = [UIColor darkGrayColor];
+        weekLab.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
+        weekLab.textColor = kConsumeWeekdayMuted();
         weekLab.text = weekTitles[i];
 
         UILabel *dateLab = [[UILabel alloc] init];
         dateLab.textAlignment = NSTextAlignmentCenter;
-        dateLab.font = [UIFont boldSystemFontOfSize:14];
-        dateLab.textColor = [UIColor blackColor];
+        dateLab.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+        dateLab.textColor = kConsumeDayNumberDefault();
         dateLab.tag = 200;
 
         [day addSubview:weekLab];
@@ -266,7 +408,7 @@ static UIColor *kConsumeGreen(void) {
             make.leading.trailing.equalTo(day);
         }];
         [dateLab mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(weekLab.mas_bottom).offset(4);
+            make.top.equalTo(weekLab.mas_bottom).offset(2);
             make.leading.trailing.equalTo(day);
         }];
         [views addObject:day];
@@ -309,38 +451,29 @@ static UIColor *kConsumeGreen(void) {
         NSDate *date = [self.calendar dateByAddingUnit:NSCalendarUnitDay value:i toDate:self.weekStartDate options:0];
         NSString *dayString = [dayFmt stringFromDate:date];
 
+        UILabel *weekLab = nil;
         UILabel *dateLab = nil;
         for (UIView *sub in dayView.subviews) {
-            if (sub.tag == 200 && [sub isKindOfClass:[UILabel class]]) {
-                dateLab = (UILabel *)sub;
-                break;
-            }
+            if (![sub isKindOfClass:[UILabel class]]) continue;
+            UILabel *lab = (UILabel *)sub;
+            if (lab.tag == 200) dateLab = lab;
+            else weekLab = lab;
         }
-        dateLab.text = dayString;
+        if (dateLab) dateLab.text = dayString;
 
+        UIView *pill = [dayView viewWithTag:201];
         BOOL isSameDay = [self isSameDay:date other:self.selectedDate];
+        pill.hidden = !isSameDay;
+
+        if (!weekLab || !dateLab) continue;
         if (isSameDay) {
-            dayView.backgroundColor = kConsumeGreen();
-            dayView.layer.cornerRadius = 8;
-            dayView.layer.masksToBounds = YES;
-            for (UIView *sub in dayView.subviews) {
-                if ([sub isKindOfClass:[UILabel class]]) {
-                    ((UILabel *)sub).textColor = [UIColor whiteColor];
-                }
-            }
+            weekLab.textColor = [UIColor whiteColor];
+            dateLab.textColor = [UIColor whiteColor];
+            dateLab.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
         } else {
-            dayView.backgroundColor = [UIColor clearColor];
-            dayView.layer.cornerRadius = 0;
-            for (UIView *sub in dayView.subviews) {
-                if ([sub isKindOfClass:[UILabel class]]) {
-                    UILabel *lab = (UILabel *)sub;
-                    if (lab.tag == 200) {
-                        lab.textColor = [UIColor blackColor];
-                    } else {
-                        lab.textColor = [UIColor darkGrayColor];
-                    }
-                }
-            }
+            weekLab.textColor = kConsumeWeekdayMuted();
+            dateLab.textColor = kConsumeDayNumberDefault();
+            dateLab.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
         }
     }
 }
@@ -353,18 +486,31 @@ static UIColor *kConsumeGreen(void) {
 }
 
 - (void)reloadRecordsForSelectedDate {
-    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
-    formatter.dateFormat = @"yyyy-MM";
-    NSString *monthStr = [formatter stringFromDate:self.selectedDate ?: NSDate.date];
+    NSDate *day = self.selectedDate ?: [NSDate date];
+    NSDateFormatter *ym = [[NSDateFormatter alloc] init];
+    ym.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    ym.dateFormat = @"yyyy-MM";
+    NSString *monthStr = [ym stringFromDate:day];
+    NSDateFormatter *ymd = [[NSDateFormatter alloc] init];
+    ymd.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    ymd.dateFormat = @"yyyy-MM-dd";
+    NSString *dayStr = [ymd stringFromDate:day];
+
     __weak typeof(self) weakSelf = self;
-    [[ExpenseRequest shared] getExpensesWithMonth:monthStr page:1 pageSize:100 success:^(HTTPResponse * _Nullable responseObject) {
-        PNExpensePage *page = [responseObject.dataObject isKindOfClass:PNExpensePage.class] ? responseObject.dataObject : nil;
-        NSArray<PNExpense *> *list = page.list ?: @[];
-        weakSelf.records = list;
-        [weakSelf.tableView reloadData];
+    [[ExpenseRequest shared] getExpensesWithMonth:monthStr date:dayStr page:1 pageSize:100 success:^(HTTPResponse * _Nullable responseObject) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            PNExpensePage *page = [responseObject.dataObject isKindOfClass:PNExpensePage.class] ? responseObject.dataObject : nil;
+            NSArray<PNExpense *> *list = page.list ?: @[];
+            weakSelf.records = [weakSelf filterAndSortExpenses:list forCalendarDay:day dayString:dayStr];
+            [weakSelf.tableView reloadData];
+            [weakSelf updateConsumeEmptyState];
+        });
     } failure:^(NSError * _Nonnull error) {
-        weakSelf.records = @[];
-        [weakSelf.tableView reloadData];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            weakSelf.records = @[];
+            [weakSelf.tableView reloadData];
+            [weakSelf updateConsumeEmptyState];
+        });
     }];
 }
 
@@ -421,22 +567,28 @@ static UIColor *kConsumeGreen(void) {
 #pragma mark - UITableView
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    return self.records.count;
+    return (NSInteger)(self.records ?: @[]).count;
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    return 72;
+    return 82;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     ConsumeRecordCell *cell = [tableView dequeueReusableCellWithIdentifier:@"ConsumeRecordCell" forIndexPath:indexPath];
     PNExpense *item = self.records[indexPath.row];
     cell.titleLabel.text = item.itemName.length > 0 ? item.itemName : @"消费";
-    cell.timeLabel.text = [self shortTimeFromString:item.createTime.length > 0 ? item.createTime : item.expenseDate];
-    id amount = item.amount;
-    cell.amountLabel.text = [amount respondsToSelector:@selector(stringValue)] ? [NSString stringWithFormat:@"-%@", [amount stringValue]] : @"-0";
-    cell.iconView.image = nil;
-    cell.iconView.backgroundColor = [UIColor colorWithRed:0.85 green:0.2 blue:0.2 alpha:0.3];
+    NSString *timeRaw = item.createTime.length ? item.createTime : item.expenseDate;
+    cell.timeLabel.text = [self shortTimeFromString:timeRaw];
+    cell.amountLabel.text = [self displayAmountForExpense:item];
+    cell.iconView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+    NSURL *logoURL = [NSURL URLWithString:item.logoUrl ?: @""];
+    if (logoURL && logoURL.scheme.length) {
+        [cell.iconView sd_setImageWithURL:logoURL placeholderImage:nil options:SDWebImageRetryFailed];
+    } else {
+        [cell.iconView sd_cancelCurrentImageLoad];
+        cell.iconView.image = nil;
+    }
     return cell;
 }
 

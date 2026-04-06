@@ -13,12 +13,13 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (instancetype)shared;
 
-/// GET `/api/v1/expenses` — 消费列表分页；`month` 如 `yyyy-MM`；`dataObject` 为 `PNExpensePage`
+/// GET `/api/v1/expenses` — 消费列表分页；`month` 如 `yyyy-MM`；`date` 如 `yyyy-MM-dd`（可选，依后端是否支持）；`dataObject` 为 `PNExpensePage`
 - (void)getExpensesWithMonth:(nullable NSString *)month
-                        page:(NSInteger)page
-                    pageSize:(NSInteger)pageSize
-                     success:(nullable APISuccessBlock)success
-                     failure:(nullable APIFailureBlock)failure;
+                         date:(nullable NSString *)dateString
+                         page:(NSInteger)page
+                     pageSize:(NSInteger)pageSize
+                      success:(nullable APISuccessBlock)success
+                      failure:(nullable APIFailureBlock)failure;
 
 /// GET `/api/v1/expenses/summary` — 月度汇总；`dataObject` 为 `PNExpenseSummary`
 - (void)getExpenseSummaryWithMonth:(nullable NSString *)month

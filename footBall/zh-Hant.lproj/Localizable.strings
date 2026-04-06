@@ -121,6 +121,8 @@
 /* Add Consume */
 "add_consume_title" = "添加消費";
 "add_consume_upload_photo" = "上傳照片（1張）";
+"add_consume_upload_photo_main" = "上傳照片";
+"add_consume_upload_photo_count" = "（1張）";
 "add_consume_item" = "消費物品";
 "add_consume_item_placeholder" = "請輸入消費物品";
 "add_consume_price" = "消費價格";
@@ -128,10 +130,19 @@
 "add_consume_date" = "消費日期";
 "add_consume_time" = "時間";
 "add_consume_confirm" = "確認";
+"add_consume_success" = "添加成功";
+"add_consume_fail" = "添加失敗";
+"add_consume_error_login" = "請先登入";
+"add_consume_error_item" = "請輸入消費物品";
+"add_consume_error_price" = "請輸入價格";
+"add_consume_error_price_invalid" = "請輸入有效金額";
+"add_consume_upload_fail" = "圖片上傳失敗";
+"add_consume_image_fail" = "圖片處理失敗";
 
 /* More Matches */
 "more_pick_time_title" = "選擇時間";
 "consume_record_title" = "消費記錄";
+"consume_record_empty" = "暫無消費記錄";
 
 /* Community */
 "community_title" = "社區";

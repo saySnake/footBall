@@ -207,6 +207,8 @@
 /* Add Consume */
 "add_consume_title" = "添加消费";
 "add_consume_upload_photo" = "上传照片（1张）";
+"add_consume_upload_photo_main" = "上传照片";
+"add_consume_upload_photo_count" = "（1张）";
 "add_consume_item" = "消费物品";
 "add_consume_item_placeholder" = "请输入消费物品";
 "add_consume_price" = "消费价格";
@@ -214,10 +216,19 @@
 "add_consume_date" = "消费日期";
 "add_consume_time" = "时间";
 "add_consume_confirm" = "确认";
+"add_consume_success" = "添加成功";
+"add_consume_fail" = "添加失败";
+"add_consume_error_login" = "请先登录";
+"add_consume_error_item" = "请输入消费物品";
+"add_consume_error_price" = "请输入价格";
+"add_consume_error_price_invalid" = "请输入有效金额";
+"add_consume_upload_fail" = "图片上传失败";
+"add_consume_image_fail" = "图片处理失败";
 
 /* More Matches */
 "more_pick_time_title" = "选择时间";
 "consume_record_title" = "消费记录";
+"consume_record_empty" = "暂无消费记录";
 
 /* Community */
 "community_title" = "社区";
