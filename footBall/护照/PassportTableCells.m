@@ -230,9 +230,17 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
 
 - (void)configureWithModel:(PassportViewModel *)model {
     _title.text = model.regularSeasonTitle;
+    //个人2026年份 总看球时间，有年份因素限制 选中赛季认证几场的总时间 TIME 2026 SUM
+    // TODO: 当前 model.avgDurationTitle/avgDurationValue 仍是占位（PassportViewModel 内写死），需按后端实际字段映射为「所选赛季总观赛时长」或「平均时长」之一。
     [self setRowAtIndex:0 left:model.avgDurationTitle right:model.avgDurationValue];
+    //个人2026年份 总看球时间，有年份因素限制 选中赛季认证几场的总时间 TIME 2026 SUM time/24小时 转换成天保留三位小数. 2.312天
+    // TODO: 当前用的是 matchesYearTitle/matchesYearValue（场次），与注释“时长转天”不一致；待后端字段明确后再替换。
     [self setRowAtIndex:1 left:model.matchesYearTitle right:model.matchesYearValue];
+    //个人2026年份 总看球时间 工作日和周末的比例 周末和工作日看球时间需要分开记录～ 然后求比值 保留最小公约数
+    // TODO: 当前用 avgGoalsMatchTitle/avgGoalsMatchValue（进球相关占位），与注释“周末/工作日比”不一致；待接口补字段或 ViewModel 补计算。
     [self setRowAtIndex:2 left:model.avgGoalsMatchTitle right:model.avgGoalsMatchValue];
+    //个人2026年份 总看球时间 白天和晚上的比例 白天和晚上看球时间需要分开记录～ 然后求比值 保留最小公约数。早5点-晚5点开始的比赛 是白天看球晚5点-早5点 是晚上看球
+    // TODO: 当前用 totalGoalsTitle/totalGoalsValue（进球相关占位），与注释“白天/夜晚比”不一致；待接口补字段或 ViewModel 补计算。
     [self setRowAtIndex:3 left:model.totalGoalsTitle right:model.totalGoalsValue];
 }
 
@@ -311,9 +319,9 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
 }
 
 - (void)configureWithModel:(PassportViewModel *)model {
-    // growthHeadline 作为第一行；percent 与后缀先用 subtitle 里占位（后续可用 model 字段扩展）
     _topLine.text = model.growthHeadline.length ? model.growthHeadline : @"2025年睡醒时间里的";
-    // 如果 subtitle 里形如 "0%"，则填充 percent；否则保持默认
+    //个人2026年份 总看球总天数 除以 天（365-121睡眠天数）算出%
+    // TODO: growthSubtitle 目前被复用为 percent 或底部文案，占位逻辑较随意；等后端提供“睡醒时间占比%”与“说明文案”后拆成两个字段更清晰。
     NSString *t = [model.growthSubtitle stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if ([t hasSuffix:@"%"] && t.length <= 6) {
         _percent.text = t;
@@ -367,6 +375,15 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
 
 - (void)configureWithModel:(PassportViewModel *)model {
     _title.text = model.goalTrendTitle;
+    /**
+     X轴在表示地点
+     Y轴表示去过的频次
+     表格Y轴 最大值需要自适应，例如最高Y值是83 那么表格最高值是100
+     表格Y轴 最大值需要自适应，例如最高Y值是53 那么表格最高值是60
+     最高值做高亮
+     数据从信息填写得来
+     */
+    // TODO: 当前绑定 goalTrendTitle/goalTrendValues（PassportViewModel 占位为“近8场进球数”），与本 cell 注释“地点频次柱状图”不一致；待确认此 cell 的真实数据源再改字段。
     _chart.maxValue = 100;
     _chart.values = model.goalTrendValues;
 }
@@ -467,6 +484,12 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
 }
 
 - (void)configureWithModel:(PassportViewModel *)model {
+    /**
+     2026单个赛季
+     总共认证的场次里 包含主队的比赛里 主队胜利的场次
+
+     胜利与 打平+失败的比值计算胜率x100%
+     */
     _title.text = model.possessionCardTitle;
     NSString *n1, *r1, *n2, *r2;
     PCPossessionSplitLine(model.possessionLeftLine1, &n1, &r1);
@@ -484,6 +507,7 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
     _donut.segmentRatios = @[ @(p), @(1 - p) ];
     _donut.segmentColors = @[ [UIColor colorWithHexString:@"#5CB793"] , [UIColor colorWithHexString:@"#0D2122"]];
     _donut.centerText = [NSString stringWithFormat:@"%.0f%%", p * 100];
+    // TODO: possessionLeftLine1/2 与 possessionCenterPercent 目前由 ViewModel 占位生成；待对接后端统计口径（控球/射门/得分等）后再调整。
 }
 
 @end
@@ -614,12 +638,16 @@ static UIView *PCPositionRow(UILabel **outL, UILabel **outV, bool last) {
 
 - (void)configureWithModel:(PassportViewModel *)model {
     _title.text = model.positionSectionTitle;
+    //在2026年（所选时间）下  认证的场次 共覆盖几个球场就是多少球场 例如2026年小明去过 看过100场北京国安主场 但只看过北京国安主场 那么球场还是=1 因为就是北京工人体育场
     _l1.text = model.positionForwardLabel;
     _v1.text = [NSString stringWithFormat:@"%ld", (long)model.positionForward];
+    //在2026年（所选时间）下  认证的场次 共覆盖几个城市就是多少城市 例如2026年小明去过 看过100场北京国安主场 但只看过北京国安主场 那么城市还是=1 因为就是北京
     _l2.text = model.positionMidfieldLabel;
     _v2.text = [NSString stringWithFormat:@"%ld", (long)model.positionMidfield];
+    //在2026年（所选时间）下 认证的场次 共覆盖几个国家就是多少国家 例如2026年小明去过 看过100场中超 但只看过中超 那么国家还是=1 因为就是中国
     _l3.text = model.positionDefenderLabel;
     _v3.text = [NSString stringWithFormat:@"%ld", (long)model.positionDefender];
+    // TODO: positionForward/Midfield/Defender 当前是“位置强度”占位数据（PassportViewModel 写死），与注释“球场/城市/国家去重统计”不一致；待接口字段明确后替换为 yearStadiumCount/yearCityCount/yearCountryCount 等。
 
     _row1.backgroundColor = PCHex(@"285D4B");
     _v1.textColor = PCHex(@"62D486");
@@ -778,7 +806,23 @@ static NSAttributedString *PCAbilitySummaryAttributed(CGFloat level) {
 
 - (void)configureWithModel:(PassportViewModel *)model {
     _title.text = model.abilitySectionTitle;
+    /**
+     把看台类型 归类为层高 求该赛季总平均层数
+     规则：
+     内场=0层；1层=1层；2层=2层；3层=3层；4层=4层；
+     包厢=2.5层；VIP看台=1.5层
+     其余内容不计入统计
+     */
     _subtitle.attributedText = PCAbilitySummaryAttributed(model.abilityAverageLevel);
+    
+    
+    /**
+     在2026年（所选时间）下 认证的场次 共覆去过多少个线下观赛类型的比赛 他们坐在那里？ 数据从填报信息得来
+     X轴表示去过的频次
+     Y轴是看台类型
+     表格X轴 最大值需要自适应，例如最高Y值是83 那么表格最高值是100
+     表格X轴 最大值需要自适应，例如最高Y值是53 那么表格最高值是60
+     */
     NSArray<NSDictionary *> *items = model.abilityItems ?: @[];
     NSInteger maxV = 0;
     for (NSDictionary *item in items) {
@@ -928,7 +972,10 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
 - (void)configureWithModel:(PassportViewModel *)model {
     [self prepareForReuse];
     _title.text = model.tacticalTitle;
+    //2026赛季 具体用了几种身份看就写几 不能大于6
     _subtitle.attributedText = PCTacticalIdentitySubtitle(model.tacticalIdentityCount);
+    
+    //在2026赛季 以最多6种身份观看比赛 具体占比做出饼图 假如身份A和B都在一场比赛里使用 可以叠加
     NSMutableArray *ratios = [NSMutableArray array];
     NSArray<UIColor *> *cols = @[
         [UIColor colorWithHexString:@"#CCFFDC"],
@@ -953,6 +1000,7 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
     _donut.ringTrackExtraWidth = 10;
     _donut.segmentGapPoints = 5;
 
+    //观赛信息 和验证实名身份 最多允许6种身份认证
     UIFont *legFont = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
 
     i = 0;
@@ -1145,10 +1193,18 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
 
 - (void)configureWithModel:(PassportViewModel *)model {
     [self prepareForReuse];
+    //6种情绪 在填写比赛信息里写 然后一样是做统计图
     _bigNumber.text = [NSString stringWithFormat:@"%ld", (long)model.metricEmotionCount];
     _asideLine1.text = model.metricHeaderAsideLine1;
     _asideLine2.text = model.metricHeaderAsideLine2;
     _prompt.text = model.metricBarsPrompt;
+    
+    /**
+     X轴表示心情的频次
+     Y轴是心情类型
+     表格X轴 最大值需要自适应，例如最高Y值是83 那么表格最高值是100
+     表格X轴 最大值需要自适应，例如最高Y值是53 那么表格最高值是60
+     */
     NSArray<NSDictionary *> *items = model.recentMetricBars ?: @[];
     NSInteger maxV = 0;
     for (NSDictionary *item in items) {
@@ -1279,6 +1335,12 @@ static UIView *PCOutcomeLegendItemView(NSString *title, NSString *numStr, UIColo
 - (void)configureWithModel:(PassportViewModel *)model {
     [self prepareForReuse];
     _title.text = model.outcomeTitle;
+    /**
+     在2026赛季 以最多3种 线上看球的情况
+     打开又关掉 说明比赛没意思 主队没赢
+     关掉又打开 说明中间办事去了 活着犯贱接着看
+     or 完整看
+     */
     CGFloat p = MIN(1, MAX(0, model.outcomeCenterPercent));
     _donut.lineWidth = 40;
     _donut.showsOutsidePercentLabels = NO;

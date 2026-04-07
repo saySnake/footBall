@@ -16,21 +16,23 @@ static UIColor *PassportCircleStrokeColor(void) {
 @property (nonatomic, assign) CGFloat circleWH;
 @property (nonatomic, strong) CAShapeLayer *gridLayer;
 
-@property (nonatomic, strong) UIImageView *avatarView;
-@property (nonatomic, strong) UILabel *cityLabel;
-@property (nonatomic, strong) UILabel *matchesLabel;
+@property (nonatomic, strong) UIImageView *avatarView;//用户信息 头像昵称来自于 我的-个人信息页面
+@property (nonatomic, strong) UILabel *cityLabel;////用户信息 头像昵称来自于 我的-个人信息页面
+@property (nonatomic, strong) UILabel *matchesLabel;//个人2026年份总观看场次，有年份因素限制 选中赛季 认证几场的场次 game number 2026 SUM
 @property (nonatomic, strong) UILabel *matchesUnitLabel;
 @property (nonatomic, strong) UILabel *afterLabel;
 @property (nonatomic, strong) UILabel *afterUnitLabel;
 
-@property (nonatomic, strong) UILabel *minutesValueLabel;
+@property (nonatomic, strong) UILabel *minutesValueLabel;//个人2026年总时间，有年份因素限制 选中赛季几场的总时间 TIME 2026 SUM
 @property (nonatomic, strong) UILabel *minutesUnitLabel;
 
-@property (nonatomic, strong) UILabel *goalsValueLabel;
+@property (nonatomic, strong) UILabel *goalsValueLabel;//个人2026年份总进球见证，有年份因素限制 选中赛季 认证几场的总进球 GOAL 2026 SUM
 @property (nonatomic, strong) UILabel *goalsUnitLabel;
 
+//在2026年（所选时间）下  认证的场次 共覆盖几个城市就是多少城市 例如2026年小明去过 看过100场北京国安主场 但只看过北京国安主场 那么城市还是=1 因为就是北京
 @property (nonatomic, strong) UILabel *citiesValueLabel;
 @property (nonatomic, strong) UILabel *citiesUnitLabel;
+//在2026年（所选时间）下 认证的场次 共覆盖几个国家就是多少国家 例如2026年小明去过 看过100场中超 但只看过中超 那么国家还是=1 因为就是中国
 @property (nonatomic, strong) UILabel *countriesValueLabel;
 @property (nonatomic, strong) UILabel *countriesUnitLabel;
 

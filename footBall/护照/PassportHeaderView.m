@@ -25,14 +25,21 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
 }
 @property (nonatomic, strong) UIView *contentView;
 @property (nonatomic, strong) UIView *topView;
-@property (nonatomic, strong) UIView *userInfoView;
+@property (nonatomic, strong) UIView *userInfoView; // 用户信息 头像昵称来自于 我的-个人信息页面
 @property (nonatomic, strong) UIView *lineChartView;
-@property (nonatomic, strong) UIView *rygCardView;
+@property (nonatomic, strong) UIView *rygCardView;//在2026年（所选时间）下  认证的场次 共看到了多少张红牌 多少张黄牌 多少场干净的没有牌的比赛 注意单位区别
 @property (nonatomic, strong) UIView *globalMapView;
-@property (nonatomic, strong) UIView *moneyView;
-@property (nonatomic, strong) UIView *scoresView;
+@property (nonatomic, strong) UIView *moneyView;//在2026年（所选时间）下  认证的场次 共花了多少钱2026总花费=2026消费记录总和+2026所有比赛门票钱
+@property (nonatomic, strong) UIView *totalWatchTimeView;
 @property (nonatomic, strong) UIView *nothingView;
 @property (nonatomic, strong) PassportHeader2View *passportHeader2View;
+//在2026年（所选时间）下  认证的场次 去了多少个国家
+//对应的国家会被点亮
+//0场是最浅色
+//1-5场第二个颜色
+//5-10场第三个颜色
+//10-19场一个颜色
+//20场+ 一个颜色
 @property (nonatomic, strong) WorldMapView *worldMapView;
 @property (nonatomic, strong) UILabel *moneyAmountLabel;
 
@@ -80,8 +87,8 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
         [self.topView addSubview:self.globalMapView];
         self.moneyView = [self _moneyView];
         [self.topView addSubview:self.moneyView];
-        self.scoresView = [self _scoresView];
-        [self.topView addSubview:self.scoresView];
+        self.totalWatchTimeView = [self _totalWatchTimeView];
+        [self.topView addSubview:self.totalWatchTimeView];
         self.nothingView = [self _nothingView];
         [self.topView addSubview:self.nothingView];
 
@@ -137,7 +144,7 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
             make.top.equalTo(self.userInfoView.mas_bottom).offset(0.25);
             make.right.equalTo(self.userInfoView);
         }];
-        [self.scoresView mas_makeConstraints:^(MASConstraintMaker *make) {
+        [self.totalWatchTimeView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.right.equalTo(self.topView);
             make.top.equalTo(self.globalMapView.mas_bottom);
             make.height.equalTo(@(_circleLblWH));
@@ -184,14 +191,14 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
     namelbl.textColor = [UIColor colorWithHexString:@"#FFFFFF"];
     [view addSubview:namelbl];
     self.nameLabel = namelbl;
+    [namelbl mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.equalTo(idlbl);
+        make.bottom.equalTo(view.mas_bottom).offset(-16);
+    }];
 
     [idlbl mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.equalTo(@20);
-        make.top.equalTo(view.mas_centerY);
-    }];
-    [namelbl mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(idlbl);
-        make.top.equalTo(idlbl.mas_bottom);
+        make.bottom.equalTo(namelbl.mas_top);
     }];
 
     return view;
@@ -293,10 +300,11 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
     }];
     return view;
 }
-- (UIView *)_scoresView {
+- (UIView *)_totalWatchTimeView {
     UIView *view = UIView.new;
     for (int i=0; i<8; i++) {
         UILabel *lbl = [self _cicrleLabel];
+        lbl.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
         lbl.tag = 0xFF+i;
         [view addSubview:lbl];
         [lbl mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -365,7 +373,7 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
     UIView *rygCardView = self.rygCardView ?: self.topView;
     UIView *nothingView = self.nothingView ?: self.topView;
     UIView *userInfoView = self.userInfoView ?: self.topView;
-    UIView *scoresView = self.scoresView ?: self.topView;
+    UIView *scoresView = self.totalWatchTimeView ?: self.topView;
     UIView *moneyView = self.moneyView ?: self.topView;
 
     UIView *leftLine = [self newLine];
@@ -456,40 +464,57 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
     if (!model) {
         return;
     }
-
+    
     self.idLabel.text = model.headerPassportCodeLine.length ? model.headerPassportCodeLine : @"NO.0088";
     self.nameLabel.text = model.nickname.length ? model.nickname : @"";
-
+    
     if ([self.lineChartView isKindOfClass:[PassportWeekLineChartView class]]) {
         PassportWeekLineChartView *chart = (PassportWeekLineChartView *)self.lineChartView;
         if (model.headerWeekLineValues.count == 7) {
             chart.weekValues = model.headerWeekLineValues;
         }
     }
-
+    
     self.redCardLabel.text = [NSString stringWithFormat:@"%ld", (long)model.headerRedCards];
     self.yellowCardLabel.text = [NSString stringWithFormat:@"%ld", (long)model.headerYellowCards];
     self.greenCardLabel.text = [NSString stringWithFormat:@"%ld", (long)model.headerCleanMatches];
-
+    
     if (self.moneyAmountLabel) {
         self.moneyAmountLabel.text = model.headerSpendingAmountText.length ? model.headerSpendingAmountText : @"0.00";
     }
-
+    
     if (self.worldMapView) {
         self.worldMapView.oftenCountries = model.headerMapOftenISOs ?: @[];
         self.worldMapView.goneCountries = model.headerMapGoneISOs ?: @[];
         self.worldMapView.ungoCountries = @[];
         [self.worldMapView reload];
     }
-
-
-    //TODO:总得分
-    for (int i = 0; i < 8; i++) {
-        UILabel *lbl = [self.scoresView viewWithTag:0xFF + i];
-        if ([lbl isKindOfClass:[UILabel class]]) {
-            lbl.text = PassportHeaderSafeStatAt(model.headerBottomStatTexts, (NSUInteger)i, @"—");
+    
+    
+    // 个人生涯总时间：来自 PassportViewModel.totalWatchTimeTexts（按位拆分，末位为“分”）
+    // totalWatchTimeView 固定 8 个圆，做右对齐展示：不足则前面留空，超出则截取末尾 8 位
+    NSArray<NSString *> *twt = model.totalWatchTimeTexts ?: @[];
+    if (![twt isKindOfClass:NSArray.class]) {
+        twt = @[];
+    }
+    NSInteger slots = 8;
+    NSInteger count = (NSInteger)twt.count;
+    NSInteger startIndexInSlots = MAX(0, slots - count);
+    NSInteger startIndexInTexts = MAX(0, count - slots);
+    for (NSInteger i = 0; i < slots; i++) {
+        UILabel *lbl = (UILabel *)[self.totalWatchTimeView viewWithTag:0xFF + i];
+        if (![lbl isKindOfClass:UILabel.class]) {
+            continue;
+        }
+        NSInteger textIdx = (i - startIndexInSlots) + startIndexInTexts;
+        if (textIdx >= 0 && textIdx < count) {
+            id v = twt[(NSUInteger)textIdx];
+            lbl.text = [v isKindOfClass:NSString.class] ? (NSString *)v : [NSString stringWithFormat:@"%@", v];
+        } else {
+            lbl.text = @"";
         }
     }
+    
 }
 
 - (void)handlePassportHeader2Tap {

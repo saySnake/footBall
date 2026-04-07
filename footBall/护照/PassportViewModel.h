@@ -36,8 +36,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSArray<NSString *> *headerMapGoneISOs;
 /// 年度消费金额展示（RMB 数字文案，可含千分位）
 @property (nonatomic, copy) NSString *headerSpendingAmountText;
-/// 底部 8 个圆：胜、平、负、胜率、淘汰、出线、年度场次、年度进球
-@property (nonatomic, copy) NSArray<NSString *> *headerBottomStatTexts;
+/// 个人生涯总时间，没有年份因素限制认证几场就是其背后的总时间 TIME SUM
+@property (nonatomic, copy) NSArray<NSString *> *totalWatchTimeTexts;
 
 #pragma mark - 护照头部下区 PassportHeader2View
 /// 当前选中年份（与年份 Tab / 接口 year 一致）

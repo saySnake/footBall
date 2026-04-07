@@ -8,7 +8,11 @@
 #import "FileRequest.h"
 #import "HTTPResponse.h"
 #import "AuthManager.h"
-#define OSS_ENDPOINT                    @"http://oss-cn-region.aliyuncs.com"      // 访问的阿里云endpoint
+
+static NSString *const AccessKey = @"";
+static NSString *const SecretKey = @"";
+static NSString *const BucketName = @"passnomad";
+static NSString *const AliYunHost = @"oss-cn-beijing.aliyuncs.com";
 
 @implementation FileRequest
 +(instancetype)shared {
@@ -17,6 +21,7 @@
     dispatch_once(&onceToken, ^{
         instance = FileRequest.alloc.init;
         [[NSNotificationCenter defaultCenter] addObserver:instance selector:@selector(tokenExpiredNotification) name:TokenExpiredNotification object:nil];
+        [instance setupSTSToken];
     });
     return instance;
 }
@@ -27,23 +32,23 @@
 - (void)setupSTSToken {
     // 针对只有一个region下bucket的数据上传下载操作时,可以将client实例给App单例持有。
     id<OSSCredentialProvider> credentialProvider = [[OSSFederationCredentialProvider alloc] initWithFederationTokenGetter:^OSSFederationToken * _Nullable{
-        dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
-        [FileRequest.shared getOSSTokenSuccess:^(HTTPResponse <STSToken *> * _Nullable responseObject) {
-            dispatch_semaphore_signal(semaphore);
-        } failure:^(NSError * _Nonnull error) {
-            dispatch_semaphore_signal(semaphore);
-        }];
-        dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
-        NSString *ak = self.stsToken.accessKeyId;
-        NSString *sk = self.stsToken.accessKeySecret;
-        NSString *token = self.stsToken.securityToken;
-        NSString *expiration = self.stsToken.expiration;
+//        dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+//        [FileRequest.shared getOSSTokenSuccess:^(HTTPResponse <STSToken *> * _Nullable responseObject) {
+//            dispatch_semaphore_signal(semaphore);
+//        } failure:^(NSError * _Nonnull error) {
+//            dispatch_semaphore_signal(semaphore);
+//        }];
+//        dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+        NSString *ak = AccessKey;//self.stsToken.accessKeyId;
+        NSString *sk = SecretKey;//self.stsToken.accessKeySecret;
+//        NSString *token = self.stsToken.securityToken;
+//        NSString *expiration = self.stsToken.expiration;
 
         OSSFederationToken * federationToken = [OSSFederationToken new];
         federationToken.tAccessKey = ak;
         federationToken.tSecretKey = sk;
-        federationToken.tToken = token;
-        federationToken.expirationTimeInGMTFormat = expiration;
+//        federationToken.tToken = token;
+//        federationToken.expirationTimeInGMTFormat = expiration;
 
         return federationToken;
     }];
@@ -53,7 +58,7 @@
     cfg.timeoutIntervalForRequest = 15;
     cfg.isHttpdnsEnable = NO;
     cfg.crc64Verifiable = YES;
-    NSString *endpoint = [NSString stringWithFormat:@"https://%@.aliyuncs.com",self.stsToken.region];
+    NSString *endpoint = [NSString stringWithFormat:@"https://%@",AliYunHost/*self.stsToken.region*/];
     OSSClient *defaultClient = [[OSSClient alloc] initWithEndpoint:endpoint credentialProvider:credentialProvider clientConfiguration:cfg];
     self.defaultClient = defaultClient;
 
@@ -113,21 +118,21 @@
         failure(error);
         return;
     }
-    if (!self.stsToken || !self.defaultClient) {
-        __weak typeof(self) weakSelf = self;
-        [self getOSSTokenSuccess:^(HTTPResponse * _Nullable responseObject) {
-            [weakSelf setupSTSToken];
-            [weakSelf uploadImage:data type:type success:success failure:failure];
-        } failure:failure];
-        return;
-    }
+//    if (!self.stsToken || !self.defaultClient) {
+//        __weak typeof(self) weakSelf = self;
+//        [self getOSSTokenSuccess:^(HTTPResponse * _Nullable responseObject) {
+//            [weakSelf setupSTSToken];
+//            [weakSelf uploadImage:data type:type success:success failure:failure];
+//        } failure:failure];
+//        return;
+//    }
 
     NSString *objectKey = [NSString stringWithFormat:@"c/%@/%@/%.0f.jpg",
                            [self objectType:type],AuthManager.sharedManager.user.userId,
                            [NSDate date].timeIntervalSince1970 * 1000.0];
 
     OSSPutObjectRequest *_normalUploadRequest = [OSSPutObjectRequest new];
-    _normalUploadRequest.bucketName = self.stsToken.bucket;
+    _normalUploadRequest.bucketName = BucketName;//self.stsToken.bucket;
     _normalUploadRequest.objectKey = objectKey;
     _normalUploadRequest.uploadingData = data;
     _normalUploadRequest.isAuthenticationRequired = YES;
@@ -143,12 +148,12 @@
                     failure(task.error);
                 } else {
                     NSLog(@"[OSS] upload result: %@",task.result);
-                    NSString *bucket = self.stsToken.bucket ?: @"";
-                    NSString *region = self.stsToken.region.length ? self.stsToken.region : @"oss-cn-hangzhou";
-                    NSString *urlStr = [NSString stringWithFormat:@"https://%@.%@.aliyuncs.com/%@", bucket, region, objectKey];
+                    NSString *bucket = BucketName;//self.stsToken.bucket ?: @"";
+                    NSString *region = AliYunHost;//self.stsToken.region.length ? self.stsToken.region : @"oss-cn-hangzhou";
+//                    NSString *urlStr = [NSString stringWithFormat:@"https://%@.%@/%@", bucket, region, objectKey];
                     HTTPResponse *resp = [[HTTPResponse alloc] init];
                     resp.success = YES;
-                    resp.dataObject = urlStr;
+                    resp.dataObject = objectKey;
                     if (success) success(resp);
                 }
             });
