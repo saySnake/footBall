@@ -9,6 +9,7 @@
 #import <Masonry/Masonry.h>
 #import <math.h>
 #import "ColorManager.h"
+#import "LoadingManager.h"
 #import <SDWebImage/SDWebImage.h>
 
 /// Figma「添加球队 / 选球队」1:9176
@@ -146,7 +147,6 @@ static CGFloat const kAddTeamCheckBadgeD = 24.f;
 @property (nonatomic, strong) UILabel *navTitle;
 @property (nonatomic, strong) UITextField *searchField;
 @property (nonatomic, strong) UICollectionView *collectionView;
-@property (nonatomic, strong) UIButton *cancelBtn;
 @property (nonatomic, strong) UIButton *confirmBtn;
 
 @property (nonatomic, strong) NSArray<Team *> *allTeams;
@@ -281,15 +281,6 @@ static CGFloat const kAddTeamCheckBadgeD = 24.f;
         make.height.mas_equalTo(kAddTeamsBottomBtnH);
     }];
 
-    self.cancelBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    self.cancelBtn.backgroundColor = [UIColor colorWithRed:226/255.0 green:226/255.0 blue:226/255.0 alpha:1.0];
-    self.cancelBtn.layer.cornerRadius = bottomCorner;
-    self.cancelBtn.clipsToBounds = YES;
-    self.cancelBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
-    [self.cancelBtn setTitleColor:[UIColor colorWithRed:39/255.0 green:39/255.0 blue:39/255.0 alpha:1.0] forState:UIControlStateNormal];
-    [self.cancelBtn addTarget:self action:@selector(onCancelTapped) forControlEvents:UIControlEventTouchUpInside];
-    [bottom addSubview:self.cancelBtn];
-
     self.confirmBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     self.confirmBtn.backgroundColor = kGreen;
     self.confirmBtn.layer.cornerRadius = bottomCorner;
@@ -299,16 +290,10 @@ static CGFloat const kAddTeamCheckBadgeD = 24.f;
     [self.confirmBtn addTarget:self action:@selector(onConfirmTapped) forControlEvents:UIControlEventTouchUpInside];
     [bottom addSubview:self.confirmBtn];
 
-    [self.cancelBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(bottom).offset(kAddTeamsPadding);
-        make.top.bottom.equalTo(bottom);
-        make.height.mas_equalTo(kAddTeamsBottomBtnH);
-        make.width.equalTo(self.confirmBtn);
-    }];
     [self.confirmBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(bottom).offset(kAddTeamsPadding);
         make.trailing.equalTo(bottom).offset(-kAddTeamsPadding);
         make.top.bottom.equalTo(bottom);
-        make.leading.equalTo(self.cancelBtn.mas_trailing).offset(12);
     }];
 
     UICollectionViewFlowLayout *fl = [UICollectionViewFlowLayout new];
@@ -353,15 +338,20 @@ static CGFloat const kAddTeamCheckBadgeD = 24.f;
     [super updateLocalizedStrings];
     self.navTitle.text = NSLocalizedString(@"profile_add_team_title", nil);
     [self applySearchFieldPlaceholderStyle];
-    [self.cancelBtn setTitle:NSLocalizedString(@"cancel", nil) forState:UIControlStateNormal];
     [self.confirmBtn setTitle:NSLocalizedString(@"confirm", nil) forState:UIControlStateNormal];
 }
 
 - (void)onBack { [self.navigationController popViewControllerAnimated:YES]; }
-- (void)onCancelTapped { [self.navigationController popViewControllerAnimated:YES]; }
 
 - (void)onConfirmTapped {
     NSArray *ids = [self selectedIdsInStableOrder];
+    if (ids.count == 0) {
+        // 需求：不允许“跳过”，必须选择至少一个喜欢的球队
+        NSString *msg = NSLocalizedString(@"team_select_required", nil);
+        if (msg.length == 0 || [msg hasPrefix:@"team_"]) msg = @"请至少选择一个喜欢的球队";
+        [[LoadingManager sharedManager] showError:msg inView:self.view];
+        return;
+    }
     if (self.onConfirmBlock) self.onConfirmBlock(ids);
     [self.navigationController popViewControllerAnimated:YES];
 }

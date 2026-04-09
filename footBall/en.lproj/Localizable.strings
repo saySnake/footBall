@@ -267,8 +267,10 @@
 "community_rank_season" = "Season";
 "community_qrcode_hint" = "Scan QR Code to Add Friend";
 "community_qrcode_save" = "Save Image";
+"community_qrcode_add_friend" = "Add Friend Now";
 "community_qrcode_save_success" = "Saved to Photos";
 "community_qrcode_save_fail" = "Save Failed";
+"team_select_required" = "Please select at least one team";
 
 
 /* Profile */
@@ -289,7 +291,7 @@
 "profile_first_match_year" = "First Match Year";
 "profile_identity" = "Identity";
 "profile_save" = "Save";
-"profile_save_success" = "Saved";
+"profile_save_success" = "Success";
 
 "profile_chip_ultras" = "ULTRAS";
 "profile_chip_fan" = "Fan";

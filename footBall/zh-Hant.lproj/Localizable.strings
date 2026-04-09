@@ -181,8 +181,10 @@
 "community_rank_season" = "賽季榜";
 "community_qrcode_hint" = "掃描二維碼添加好友";
 "community_qrcode_save" = "儲存圖片";
+"community_qrcode_add_friend" = "立即添加好友";
 "community_qrcode_save_success" = "已儲存至相簿";
 "community_qrcode_save_fail" = "儲存失敗";
+"team_select_required" = "請至少選擇一個喜歡的球隊";
 
 
 /* Profile */
@@ -203,7 +205,7 @@
 "profile_first_match_year" = "第一次看球年份";
 "profile_identity" = "身份";
 "profile_save" = "保存";
-"profile_save_success" = "已保存";
+"profile_save_success" = "成功";
 
 "profile_chip_ultras" = "ULTRAS球迷";
 "profile_chip_fan" = "球迷";

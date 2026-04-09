@@ -7,6 +7,7 @@
 #import "MainTabBarController.h"
 #import <Masonry/Masonry.h>
 #import <math.h>
+#import "LoadingManager.h"
 
 /// 选择球队确认后展示的「欢迎来到 Pass Nomad」中间页，点击「立即探索」后执行 onExploreBlock 并关闭
 @interface PassNomadWelcomeViewController : UIViewController
@@ -195,14 +196,11 @@
 @property (nonatomic, strong) UILabel *pageTitleLabel;
 @property (nonatomic, strong) UISearchBar *searchBar;
 @property (nonatomic, strong) UICollectionView *collectionView;
-@property (nonatomic, strong) UIButton *skipButton;
 @property (nonatomic, strong) UIButton *confirmButton;
 
 @property (nonatomic, strong) NSArray<Team *> *allTeams;
 @property (nonatomic, strong) NSArray<Team *> *filteredTeams;
 @property (nonatomic, strong) NSMutableArray<Team *> *selectedTeams;
-
-@property (nonatomic, strong) UIView *bottomSheet;
 
 @end
 
@@ -291,24 +289,16 @@
     self.collectionView.delegate = self;
     [self.collectionView registerClass:[TeamCell class] forCellWithReuseIdentifier:@"TeamCell"];
     
-    self.skipButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [self.skipButton setTitle:NSLocalizedString(@"team_skip_button", nil) forState:UIControlStateNormal];
-    [self.skipButton setTitleColor:[UIColor darkGrayColor] forState:UIControlStateNormal];
-    self.skipButton.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
-    self.skipButton.layer.cornerRadius = 22;
-    [self.skipButton addTarget:self action:@selector(skipTapped) forControlEvents:UIControlEventTouchUpInside];
-    
     self.confirmButton = [UIButton buttonWithType:UIButtonTypeSystem];
     [self.confirmButton setTitle:NSLocalizedString(@"team_confirm_button", nil) forState:UIControlStateNormal];
     [self.confirmButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     self.confirmButton.backgroundColor = [ColorManager sharedManager].primaryColor;
-    self.confirmButton.layer.cornerRadius = 22;
+    self.confirmButton.layer.cornerRadius = 26;
     [self.confirmButton addTarget:self action:@selector(confirmTapped) forControlEvents:UIControlEventTouchUpInside];
     
     [self.view addSubview:self.pageTitleLabel];
     [self.view addSubview:self.searchBar];
     [self.view addSubview:self.collectionView];
-    [self.view addSubview:self.skipButton];
     [self.view addSubview:self.confirmButton];
     
     [self.pageTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -326,21 +316,14 @@
     [self.collectionView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.searchBar.mas_bottom).offset(12);
         make.leading.trailing.equalTo(self.view);
-        make.bottom.equalTo(self.skipButton.mas_top).offset(-16);
-    }];
-    
-    [self.skipButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.view).offset(24);
-        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-16);
-        make.height.mas_equalTo(44);
-        make.width.equalTo(self.view.mas_width).multipliedBy(0.4);
+        make.bottom.equalTo(self.confirmButton.mas_top).offset(-16);
     }];
     
     [self.confirmButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.view).offset(24);
         make.trailing.equalTo(self.view).offset(-24);
         make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-16);
-        make.height.mas_equalTo(44);
-        make.width.equalTo(self.view.mas_width).multipliedBy(0.4);
+        make.height.mas_equalTo(52);
     }];
 }
 
@@ -393,279 +376,44 @@
 
 #pragma mark - Actions
 
-- (void)skipTapped {
-    [self goToHome];
-}
-
 - (void)confirmTapped {
     if (self.selectedTeams.count == 0) {
-        // 未选择任何球队，使用简单提示弹层
-        [self showBottomSheetWithMessage:NSLocalizedString(@"team_message_none_selected", nil)];
-    } else {
-        // 已选择球队，展示可编辑的底部弹层
-        [self showSelectedTeamsSheet];
+        NSString *msg = NSLocalizedString(@"team_select_required", nil);
+        if (msg.length == 0 || [msg hasPrefix:@"team_"]) msg = @"请至少选择一个喜欢的球队";
+        [[LoadingManager sharedManager] showError:msg inView:self.view];
+        return;
     }
-}
 
-- (void)showSelectedTeamsSheet {
-    if (self.bottomSheet.superview) {
-        [self.bottomSheet removeFromSuperview];
-    }
-    
-    // 半透明遮罩
-    UIView *overlay = [[UIView alloc] init];
-    overlay.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.35];
-    
-    // 底部白色圆角弹层
-    UIView *sheet = [[UIView alloc] init];
-    sheet.backgroundColor = [UIColor whiteColor];
-    sheet.layer.cornerRadius = 16;
-    sheet.layer.masksToBounds = YES;
-    
-    // 顶部拖拽指示条
-    UIView *handleView = [[UIView alloc] init];
-    handleView.backgroundColor = [UIColor colorWithWhite:0.85 alpha:1.0];
-    handleView.layer.cornerRadius = 2.0;
-    
-    UILabel *label = [[UILabel alloc] init];
-    label.text = NSLocalizedString(@"team_message_selected", nil);
-    label.font = [UIFont boldSystemFontOfSize:16];
-    label.textColor = [UIColor blackColor];
-    
-    UIScrollView *scroll = [[UIScrollView alloc] init];
-    UIStackView *stack = [[UIStackView alloc] init];
-    stack.axis = UILayoutConstraintAxisHorizontal;
-    stack.spacing = 12;
-    
-    // 选中球队的小圆图标，可删除
-    [self.selectedTeams enumerateObjectsUsingBlock:^(Team *m, NSUInteger idx, BOOL *stop) {
-        UIView *chipContainer = [[UIView alloc] init];
-        chipContainer.backgroundColor = [UIColor clearColor];
-        
-        UIView *circle = [[UIView alloc] init];
-        circle.backgroundColor = [UIColor whiteColor];
-        circle.layer.cornerRadius = 24;
-        circle.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.08].CGColor;
-        circle.layer.shadowOpacity = 1.0;
-        circle.layer.shadowRadius = 6;
-        circle.layer.shadowOffset = CGSizeMake(0, 3);
-        
-        UIImageView *logoView = [[UIImageView alloc] init];
-        logoView.contentMode = UIViewContentModeScaleAspectFit;
-        [logoView sd_setImageWithURL:[NSURL URLWithString:m.logo]];
-        
-        UIButton *removeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-        if (@available(iOS 13.0, *)) {
-            UIImage *xImage = [UIImage systemImageNamed:@"xmark.circle.fill"];
-            [removeBtn setImage:xImage forState:UIControlStateNormal];
-        } else {
-            [removeBtn setTitle:@"✕" forState:UIControlStateNormal];
-        }
-        removeBtn.tintColor = [UIColor darkGrayColor];
-        removeBtn.backgroundColor = [UIColor clearColor];
-        removeBtn.tag = (NSInteger)idx;
-        [removeBtn addTarget:self action:@selector(sheetRemoveTeamTapped:) forControlEvents:UIControlEventTouchUpInside];
-        
-        [chipContainer addSubview:circle];
-        [circle addSubview:logoView];
-        [chipContainer addSubview:removeBtn];
-        [stack addArrangedSubview:chipContainer];
-        
-        [chipContainer mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.width.height.mas_equalTo(60);
-        }];
-        
-        [circle mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.center.equalTo(chipContainer);
-            make.width.height.mas_equalTo(48);
-        }];
-        
-        [logoView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.center.equalTo(circle);
-            make.width.height.mas_equalTo(36);
-        }];
-        
-        [removeBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.width.height.mas_equalTo(20);
-            make.top.equalTo(circle.mas_top).offset(-6);
-            make.trailing.equalTo(circle.mas_trailing).offset(6);
-        }];
-    }];
-    
-    UIButton *cancelBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [cancelBtn setTitle:NSLocalizedString(@"cancel", nil) forState:UIControlStateNormal];
-    [cancelBtn setTitleColor:[UIColor darkGrayColor] forState:UIControlStateNormal];
-    cancelBtn.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
-    cancelBtn.layer.cornerRadius = 25;
-    [cancelBtn addTarget:self action:@selector(hideBottomSheet) forControlEvents:UIControlEventTouchUpInside];
-    
-    UIButton *okBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [okBtn setTitle:NSLocalizedString(@"confirm", nil) forState:UIControlStateNormal];
-    [okBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    okBtn.backgroundColor = [ColorManager sharedManager].primaryColor;
-    okBtn.layer.cornerRadius = 25;
-    [okBtn addTarget:self action:@selector(onConfirmSheetOkTapped) forControlEvents:UIControlEventTouchUpInside];
-    
-    [self.view addSubview:overlay];
-    [overlay addSubview:sheet];
-    [sheet addSubview:handleView];
-    [sheet addSubview:label];
-    [sheet addSubview:scroll];
-    [sheet addSubview:cancelBtn];
-    [sheet addSubview:okBtn];
-    [scroll addSubview:stack];
-    
-    self.bottomSheet = overlay;
-    
-    [overlay mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.edges.equalTo(self.view);
-    }];
-    
-    [sheet mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.trailing.equalTo(overlay);
-        make.bottom.mas_equalTo(overlay.mas_bottom);
-        make.height.mas_equalTo(275);
-    }];
-    
-    [handleView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(sheet).offset(8);
-        make.centerX.equalTo(sheet);
-        make.width.mas_equalTo(36);
-        make.height.mas_equalTo(4);
-    }];
-    
-    [label mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.mas_equalTo(sheet.mas_top).offset(44);
-        make.leading.trailing.equalTo(sheet).inset(16);
-        make.height.mas_equalTo(28);
-    }];
-    
-    [scroll mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(label.mas_bottom).offset(24);
-        make.leading.trailing.equalTo(sheet);
-        make.height.mas_equalTo(60);
-    }];
-    
-    [stack mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.edges.equalTo(scroll).inset(16);
-        make.height.equalTo(scroll).offset(-32);
-    }];
-    
-    [cancelBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(scroll.mas_bottom).offset(33);
-        make.leading.equalTo(sheet).offset(24);
-        make.height.mas_equalTo(50);
-        make.width.equalTo(sheet.mas_width).multipliedBy(0.4);
-    }];
-    
-    [okBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(scroll.mas_bottom).offset(33);
-        make.trailing.equalTo(sheet).offset(-24);
-        make.height.mas_equalTo(50);
-        make.width.equalTo(sheet.mas_width).multipliedBy(0.4);
-    }];
-}
-
-- (void)sheetRemoveTeamTapped:(UIButton *)sender {
-    NSInteger index = sender.tag;
-    if (index >= 0 && index < (NSInteger)self.selectedTeams.count) {
-        Team *m = self.selectedTeams[(NSUInteger)index];
-        [self.selectedTeams removeObject:m];
-        [self.collectionView reloadData];
-        if (self.selectedTeams.count == 0) {
-            [self hideBottomSheet];
-        } else {
-            [self showSelectedTeamsSheet];
-        }
-    }
-}
-
-/// 未选择任何球队时的简单提示弹层
-- (void)showBottomSheetWithMessage:(NSString *)title {
-    if (self.bottomSheet.superview) {
-        [self.bottomSheet removeFromSuperview];
-    }
-    
-    UIView *sheet = [[UIView alloc] init];
-    sheet.backgroundColor = [UIColor whiteColor];
-    sheet.layer.cornerRadius = 16;
-    
-    UILabel *label = [[UILabel alloc] init];
-    label.text = title;
-    label.font = [UIFont boldSystemFontOfSize:16];
-    label.textColor = [UIColor blackColor];
-    
-    UIButton *cancelBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [cancelBtn setTitle:NSLocalizedString(@"cancel", nil) forState:UIControlStateNormal];
-    [cancelBtn setTitleColor:[UIColor darkGrayColor] forState:UIControlStateNormal];
-    cancelBtn.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
-    cancelBtn.layer.cornerRadius = 22;
-    [cancelBtn addTarget:self action:@selector(hideBottomSheet) forControlEvents:UIControlEventTouchUpInside];
-    
-    UIButton *okBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [okBtn setTitle:NSLocalizedString(@"confirm", nil) forState:UIControlStateNormal];
-    [okBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    okBtn.backgroundColor = [ColorManager sharedManager].primaryColor;
-    okBtn.layer.cornerRadius = 22;
-    [okBtn addTarget:self action:@selector(hideBottomSheet) forControlEvents:UIControlEventTouchUpInside];
-    
-    [sheet addSubview:label];
-    [sheet addSubview:cancelBtn];
-    [sheet addSubview:okBtn];
-    [self.view addSubview:sheet];
-    
-    self.bottomSheet = sheet;
-    
-    [sheet mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.trailing.equalTo(self.view);
-        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom);
-    }];
-    
-    [label mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(sheet).offset(24);
-        make.leading.trailing.equalTo(sheet).inset(24);
-    }];
-    
-    [cancelBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(label.mas_bottom).offset(20);
-        make.leading.equalTo(sheet).offset(24);
-        make.height.mas_equalTo(44);
-        make.bottom.equalTo(sheet).offset(-16);
-        make.width.equalTo(sheet.mas_width).multipliedBy(0.4);
-    }];
-    
-    [okBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(label.mas_bottom).offset(20);
-        make.trailing.equalTo(sheet).offset(-24);
-        make.height.mas_equalTo(44);
-        make.bottom.equalTo(sheet).offset(-16);
-        make.width.equalTo(sheet.mas_width).multipliedBy(0.4);
-    }];
-}
-
-- (void)hideBottomSheet {
-    [self.bottomSheet removeFromSuperview];
-    self.bottomSheet = nil;
-}
-
-/// 底部弹层「确认」：先关闭弹层，再弹出「欢迎来到 Pass Nomad」页，点击「立即探索」后再进入首页
-- (void)onConfirmSheetOkTapped {
-    [self hideBottomSheet];
     NSArray *teamIds = [self.selectedTeams qmui_mapWithBlock:^id _Nonnull(Team * _Nonnull item, NSInteger index) {
-        return item.teamId;
+        return item.teamId ?: @"";
     }];
+    NSMutableArray<NSString *> *validIds = [NSMutableArray array];
+    for (NSString *tid in teamIds) {
+        if ([tid isKindOfClass:NSString.class] && tid.length > 0) [validIds addObject:tid];
+    }
+    if (validIds.count == 0) {
+        NSString *msg = NSLocalizedString(@"team_select_required", nil);
+        if (msg.length == 0 || [msg hasPrefix:@"team_"]) msg = @"请至少选择一个喜欢的球队";
+        [[LoadingManager sharedManager] showError:msg inView:self.view];
+        return;
+    }
+
+    // 对接真实接口：新手引导批量关注球队 + 完成新手引导
     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
-    [TeamsRequest.shared onboardingFollows:teamIds success:^(HTTPResponse * _Nullable responseObject) {
-        [MBProgressHUD hideHUDForView:self.view animated:YES];
+    __weak typeof(self) wself = self;
+    [TeamsRequest.shared onboardingFollows:validIds success:^(HTTPResponse * _Nullable responseObject) {
+        [MBProgressHUD hideHUDForView:wself.view animated:YES];
         [UserRequest.shared completeNewUserOnboardingSuccess:nil failure:nil];
         PassNomadWelcomeViewController *welcomeVC = [[PassNomadWelcomeViewController alloc] init];
-        __weak typeof(self) wself = self;
         welcomeVC.onExploreBlock = ^{
             [wself goToHome];
         };
-        [self presentViewController:welcomeVC animated:YES completion:nil];
+        [wself presentViewController:welcomeVC animated:YES completion:nil];
     } failure:^(NSError * _Nonnull error) {
-        [MBProgressHUD hideHUDForView:self.view animated:YES];
+        [MBProgressHUD hideHUDForView:wself.view animated:YES];
+        NSString *msg = error.localizedDescription ?: @"";
+        if (msg.length == 0) msg = NSLocalizedString(@"network_error", nil) ?: @"请求失败";
+        [[LoadingManager sharedManager] showError:msg inView:wself.view];
     }];
 }
 

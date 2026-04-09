@@ -21,11 +21,74 @@ static UIColor *kQRBrandGreen(void) {
 static UIColor *kQRSecondaryText(void) {
     return [UIColor colorWithRed:0.612 green:0.643 blue:0.671 alpha:1.0];
 }
+/// 设计稿主浅绿文字 #AFFFE0
+static UIColor *kQRMintText(void) {
+    return [UIColor colorWithRed:0.686 green:1.0 blue:0.878 alpha:1.0];
+}
+/// 提示文字 #AAC3BD
+static UIColor *kQRHintText(void) {
+    return [UIColor colorWithRed:0.667 green:0.765 blue:0.741 alpha:1.0];
+}
+/// 卡片底色（深色半透明）
+static UIColor *kQRCardFill(void) {
+    return [[UIColor colorWithRed:0.082 green:0.200 blue:0.196 alpha:1.0] colorWithAlphaComponent:0.92];
+}
+
+@interface QRCardShapeView : UIView
+@property (nonatomic, strong) CAShapeLayer *shapeLayer;
+@end
+
+@implementation QRCardShapeView
+- (instancetype)initWithFrame:(CGRect)frame {
+    if (self = [super initWithFrame:frame]) {
+        self.backgroundColor = [UIColor clearColor];
+        _shapeLayer = [CAShapeLayer layer];
+        _shapeLayer.fillColor = kQRCardFill().CGColor;
+        [self.layer addSublayer:_shapeLayer];
+    }
+    return self;
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGRect b = self.bounds;
+    if (CGRectGetWidth(b) < 1 || CGRectGetHeight(b) < 1) return;
+
+    CGFloat w = CGRectGetWidth(b);
+    CGFloat h = CGRectGetHeight(b);
+    CGFloat r = 28.0;
+
+    // 顶部中间做一个轻微凹口，给头像“嵌入”效果（近似设计稿 Vector）
+    CGFloat notchW = 120.0;
+    CGFloat notchH = 26.0;
+    CGFloat notchLeft = (w - notchW) * 0.5;
+    CGFloat notchRight = notchLeft + notchW;
+
+    UIBezierPath *p = [UIBezierPath bezierPath];
+    [p moveToPoint:CGPointMake(r, 0)];
+    [p addLineToPoint:CGPointMake(notchLeft, 0)];
+    [p addQuadCurveToPoint:CGPointMake(notchRight, 0) controlPoint:CGPointMake(w * 0.5, notchH)];
+    [p addLineToPoint:CGPointMake(w - r, 0)];
+    [p addArcWithCenter:CGPointMake(w - r, r) radius:r startAngle:-M_PI_2 endAngle:0 clockwise:YES];
+    [p addLineToPoint:CGPointMake(w, h - r)];
+    [p addArcWithCenter:CGPointMake(w - r, h - r) radius:r startAngle:0 endAngle:M_PI_2 clockwise:YES];
+    [p addLineToPoint:CGPointMake(r, h)];
+    [p addArcWithCenter:CGPointMake(r, h - r) radius:r startAngle:M_PI_2 endAngle:M_PI clockwise:YES];
+    [p addLineToPoint:CGPointMake(0, r)];
+    [p addArcWithCenter:CGPointMake(r, r) radius:r startAngle:M_PI endAngle:-M_PI_2 clockwise:YES];
+    [p closePath];
+
+    self.shapeLayer.frame = b;
+    self.shapeLayer.path = p.CGPath;
+}
+@end
 
 @interface MyQRCodeViewController ()
 @property (nonatomic, strong) UILabel *navTitleLabel;
 @property (nonatomic, strong) UIView *navBar;
-@property (nonatomic, strong) UIView *cardView;
+@property (nonatomic, strong) UIView *bgOverlayView;
+@property (nonatomic, strong) CAGradientLayer *bgGradient;
+@property (nonatomic, strong) QRCardShapeView *cardView;
 @property (nonatomic, strong) UIImageView *avatarView;
 @property (nonatomic, strong) UILabel *nameLabel;
 @property (nonatomic, strong) UILabel *idLabel;
@@ -43,6 +106,13 @@ static UIColor *kQRSecondaryText(void) {
     self.view.backgroundColor = kQRPageBg();
 }
 
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    if (self.bgOverlayView && self.bgGradient) {
+        self.bgGradient.frame = self.bgOverlayView.bounds;
+    }
+}
+
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     __weak typeof(self) weakSelf = self;
@@ -56,8 +126,25 @@ static UIColor *kQRSecondaryText(void) {
 - (void)setupUI {
     self.view.backgroundColor = kQRPageBg();
 
+    // 背景叠加渐变（近似设计稿的暗绿光感）
+    self.bgOverlayView = [UIView new];
+    self.bgOverlayView.backgroundColor = [UIColor clearColor];
+    [self.view addSubview:self.bgOverlayView];
+    [self.bgOverlayView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.view);
+    }];
+    self.bgGradient = [CAGradientLayer layer];
+    self.bgGradient.colors = @[
+        (id)[UIColor colorWithRed:0.04 green:0.24 blue:0.20 alpha:1.0].CGColor,
+        (id)kQRPageBg().CGColor
+    ];
+    self.bgGradient.startPoint = CGPointMake(0.8, 0.0);
+    self.bgGradient.endPoint = CGPointMake(0.2, 1.0);
+    self.bgGradient.opacity = 0.9;
+    [self.bgOverlayView.layer addSublayer:self.bgGradient];
+
     self.navBar = [UIView new];
-    self.navBar.backgroundColor = kQRPageBg();
+    self.navBar.backgroundColor = [UIColor clearColor];
     [self.view addSubview:self.navBar];
 
     UIButton *backBtn = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -71,15 +158,15 @@ static UIColor *kQRSecondaryText(void) {
     [self.navBar addSubview:backBtn];
 
     self.navTitleLabel = [UILabel new];
-    self.navTitleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+    self.navTitleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightBold];
     self.navTitleLabel.textColor = [UIColor whiteColor];
     self.navTitleLabel.text = NSLocalizedString(@"community_my_qrcode", nil);
     [self.navBar addSubview:self.navTitleLabel];
 
     [backBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.navBar).offset(12);
-        make.top.equalTo(self.view.mas_safeAreaLayoutGuideTop).offset(8);
-        make.size.mas_equalTo(CGSizeMake(32, 32));
+        make.leading.equalTo(self.navBar).offset(16);
+        make.top.equalTo(self.view.mas_safeAreaLayoutGuideTop).offset(22);
+        make.size.mas_equalTo(CGSizeMake(24, 24));
     }];
     [self.navTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self.navBar);
@@ -87,26 +174,23 @@ static UIColor *kQRSecondaryText(void) {
     }];
     [self.navBar mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.leading.trailing.equalTo(self.view);
-        make.bottom.equalTo(backBtn.mas_bottom).offset(12);
+        make.bottom.equalTo(backBtn.mas_bottom).offset(16);
     }];
 
-    self.cardView = [UIView new];
-    self.cardView.backgroundColor = [UIColor whiteColor];
-    self.cardView.layer.cornerRadius = 16;
-    self.cardView.layer.masksToBounds = NO;
+    self.cardView = [QRCardShapeView new];
     self.cardView.layer.shadowColor = [UIColor blackColor].CGColor;
-    self.cardView.layer.shadowOpacity = 0.08;
-    self.cardView.layer.shadowOffset = CGSizeMake(0, 4);
-    self.cardView.layer.shadowRadius = 16;
+    self.cardView.layer.shadowOpacity = 0.25;
+    self.cardView.layer.shadowOffset = CGSizeMake(0, 10);
+    self.cardView.layer.shadowRadius = 28;
     [self.view addSubview:self.cardView];
 
     self.avatarView = [UIImageView new];
     self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
-    self.avatarView.layer.cornerRadius = 50;
+    self.avatarView.layer.cornerRadius = 28;
     self.avatarView.clipsToBounds = YES;
-    self.avatarView.layer.borderWidth = 3;
+    self.avatarView.layer.borderWidth = 2.44;
     self.avatarView.layer.borderColor = [UIColor whiteColor].CGColor;
-    self.avatarView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+    self.avatarView.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.06];
     if (@available(iOS 13.0, *)) {
         self.avatarView.image = [UIImage systemImageNamed:@"person.crop.circle.fill"];
         self.avatarView.tintColor = [UIColor colorWithWhite:0.75 alpha:1.0];
@@ -116,29 +200,30 @@ static UIColor *kQRSecondaryText(void) {
 
     [self.avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self.view);
-        make.top.equalTo(self.navTitleLabel.mas_bottom).offset(65);
-        make.size.mas_equalTo(CGSizeMake(100, 100));
+        make.top.equalTo(self.navBar.mas_bottom).offset(40);
+        make.size.mas_equalTo(CGSizeMake(56, 56));
     }];
     [self.cardView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.avatarView.mas_centerY);
-        make.leading.equalTo(self.view).offset(20);
-        make.trailing.equalTo(self.view).offset(-20);
+        make.top.equalTo(self.avatarView.mas_centerY).offset(10);
+        make.centerX.equalTo(self.view);
+        make.width.mas_equalTo(327);
+        make.height.mas_equalTo(438);
     }];
 
     self.nameLabel = [UILabel new];
-    self.nameLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
-    self.nameLabel.textColor = [UIColor blackColor];
+    self.nameLabel.font = [UIFont systemFontOfSize:32 weight:UIFontWeightSemibold];
+    self.nameLabel.textColor = kQRMintText();
     self.nameLabel.textAlignment = NSTextAlignmentCenter;
     [self.cardView addSubview:self.nameLabel];
     [self.nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.avatarView.mas_bottom).offset(12);
+        make.top.equalTo(self.cardView).offset(58);
         make.leading.equalTo(self.cardView).offset(16);
         make.trailing.equalTo(self.cardView).offset(-16);
     }];
 
     self.idLabel = [UILabel new];
-    self.idLabel.font = [UIFont systemFontOfSize:13];
-    self.idLabel.textColor = [UIColor blackColor];
+    self.idLabel.font = [UIFont systemFontOfSize:22 weight:UIFontWeightRegular];
+    self.idLabel.textColor = kQRMintText();
     self.idLabel.textAlignment = NSTextAlignmentCenter;
     [self.cardView addSubview:self.idLabel];
     [self.idLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -148,7 +233,7 @@ static UIColor *kQRSecondaryText(void) {
 
     self.qrImageView = [UIImageView new];
     self.qrImageView.contentMode = UIViewContentModeScaleAspectFit;
-    self.qrImageView.backgroundColor = [UIColor whiteColor];
+    self.qrImageView.backgroundColor = [UIColor clearColor];
     [self.cardView addSubview:self.qrImageView];
     [self.qrImageView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.idLabel.mas_bottom).offset(24);
@@ -157,8 +242,8 @@ static UIColor *kQRSecondaryText(void) {
     }];
 
     self.hintLabel = [UILabel new];
-    self.hintLabel.font = [FontManager fontOfSize:14];
-    self.hintLabel.textColor = [UIColor blackColor];
+    self.hintLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    self.hintLabel.textColor = kQRHintText();
     self.hintLabel.textAlignment = NSTextAlignmentCenter;
     self.hintLabel.numberOfLines = 2;
     [self.cardView addSubview:self.hintLabel];
@@ -171,17 +256,21 @@ static UIColor *kQRSecondaryText(void) {
 
     self.saveBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     self.saveBtn.backgroundColor = kQRBrandGreen();
-    self.saveBtn.layer.cornerRadius = 22;
+    self.saveBtn.layer.cornerRadius = 26;
+    self.saveBtn.layer.shadowColor = [UIColor blackColor].CGColor;
+    self.saveBtn.layer.shadowOpacity = 0.19f;
+    self.saveBtn.layer.shadowOffset = CGSizeMake(0, 2);
+    self.saveBtn.layer.shadowRadius = 4;
     self.saveBtn.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
-    [self.saveBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    [self.saveBtn addTarget:self action:@selector(onSave) forControlEvents:UIControlEventTouchUpInside];
+    [self.saveBtn setTitleColor:kQRMintText() forState:UIControlStateNormal];
+    [self.saveBtn addTarget:self action:@selector(onPrimaryAction) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.saveBtn];
     [self.saveBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.cardView.mas_bottom).offset(67);
+        make.top.equalTo(self.cardView.mas_bottom).offset(22);
         make.leading.equalTo(self.view).offset(24);
         make.trailing.equalTo(self.view).offset(-24);
-        make.height.mas_equalTo(44);
-        make.bottom.lessThanOrEqualTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-20);
+        make.height.mas_equalTo(52);
+        make.bottom.lessThanOrEqualTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-24);
     }];
 
     [self applyProfileToUI];
@@ -219,14 +308,15 @@ static UIColor *kQRSecondaryText(void) {
     [super updateLocalizedStrings];
     self.navTitleLabel.text = NSLocalizedString(@"community_my_qrcode", nil);
     self.hintLabel.text = NSLocalizedString(@"community_qrcode_hint", nil);
-    [self.saveBtn setTitle:NSLocalizedString(@"community_qrcode_save", nil) forState:UIControlStateNormal];
+    [self.saveBtn setTitle:NSLocalizedString(@"community_qrcode_add_friend", nil) forState:UIControlStateNormal];
 }
 
 - (void)onBack {
     [self.navigationController popViewControllerAnimated:YES];
 }
 
-- (void)onSave {
+- (void)onPrimaryAction {
+    // 设计稿为「立即添加好友」：此处分享二维码卡片截图，便于对方扫码添加
     [self.view layoutIfNeeded];
     CGRect cardBounds = self.cardView.bounds;
     if (cardBounds.size.width < 1.0 || cardBounds.size.height < 1.0) {
@@ -243,7 +333,12 @@ static UIColor *kQRSecondaryText(void) {
         return;
     }
 
-    UIImageWriteToSavedPhotosAlbum(snapshot, self, @selector(image:didFinishSavingWithError:contextInfo:), nil);
+    UIActivityViewController *avc = [[UIActivityViewController alloc] initWithActivityItems:@[snapshot] applicationActivities:nil];
+    if (avc.popoverPresentationController) {
+        avc.popoverPresentationController.sourceView = self.saveBtn;
+        avc.popoverPresentationController.sourceRect = self.saveBtn.bounds;
+    }
+    [self presentViewController:avc animated:YES completion:nil];
 }
 
 - (void)image:(UIImage *)image didFinishSavingWithError:(NSError *)error contextInfo:(void *)contextInfo {
@@ -289,10 +384,18 @@ static UIColor *kQRSecondaryText(void) {
     CGRect extent = CGRectIntegral(ciImage.extent);
     CGFloat scale = MIN(size / CGRectGetWidth(extent), size / CGRectGetHeight(extent));
     CIImage *scaled = [ciImage imageByApplyingTransform:CGAffineTransformMakeScale(scale, scale)];
+    
+    // 将二维码着色为设计稿的浅绿
+    CIFilter *color = [CIFilter filterWithName:@"CIFalseColor"];
+    [color setValue:scaled forKey:kCIInputImageKey];
+    [color setValue:[CIColor colorWithRed:0.686 green:1.0 blue:0.878 alpha:1.0] forKey:@"inputColor0"];
+    [color setValue:[CIColor colorWithRed:0 green:0 blue:0 alpha:0] forKey:@"inputColor1"];
+    CIImage *colored = color.outputImage ?: scaled;
+
     CIContext *context = [CIContext contextWithOptions:nil];
-    CGImageRef cgImage = [context createCGImage:scaled fromRect:scaled.extent];
-    UIImage *result = [UIImage imageWithCGImage:cgImage];
-    CGImageRelease(cgImage);
+    CGImageRef cgImage = [context createCGImage:colored fromRect:colored.extent];
+    UIImage *result = cgImage ? [UIImage imageWithCGImage:cgImage scale:[UIScreen mainScreen].scale orientation:UIImageOrientationUp] : nil;
+    if (cgImage) CGImageRelease(cgImage);
     return result;
 }
 

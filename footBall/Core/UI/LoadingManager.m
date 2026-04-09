@@ -203,13 +203,7 @@
 
 /// 根据名称获取图标
 - (nullable UIImage *)iconForName:(NSString *)iconName {
-    // 先尝试从资源中加载
-    UIImage *icon = [UIImage imageNamed:iconName];
-    if (icon) {
-        return icon;
-    }
-    
-    // 使用系统图标（SF Symbols）
+    // success/error/info 优先使用系统图标（避免项目资源图尺寸不规整导致观感“变形”）
     if (@available(iOS 13.0, *)) {
         UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:48 weight:UIImageSymbolWeightMedium];
         
@@ -220,6 +214,12 @@
         } else if ([iconName isEqualToString:@"info"]) {
             return [UIImage systemImageNamed:@"info.circle.fill" withConfiguration:config];
         }
+    }
+
+    // 其它名称再从资源中加载
+    UIImage *icon = [UIImage imageNamed:iconName];
+    if (icon) {
+        return icon;
     }
     
     return nil;

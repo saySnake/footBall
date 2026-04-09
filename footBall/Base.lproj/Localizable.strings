@@ -181,8 +181,10 @@
 "community_rank_season" = "Season";
 "community_qrcode_hint" = "Scan QR Code to Add Friend";
 "community_qrcode_save" = "Save Image";
+"community_qrcode_add_friend" = "Add Friend Now";
 "community_qrcode_save_success" = "Saved to Photos";
 "community_qrcode_save_fail" = "Save Failed";
+"team_select_required" = "Please select at least one team";
 
 
 /* Profile */
@@ -203,7 +205,7 @@
 "profile_first_match_year" = "第一次看球年份";
 "profile_identity" = "身份";
 "profile_save" = "保存";
-"profile_save_success" = "已保存";
+"profile_save_success" = "成功";
 
 "profile_chip_ultras" = "ULTRAS球迷";
 "profile_chip_fan" = "球迷";
