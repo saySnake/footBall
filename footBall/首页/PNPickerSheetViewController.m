@@ -50,6 +50,10 @@
     sheet.layer.cornerRadius = 18;
     sheet.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
     sheet.layer.masksToBounds = YES;
+    if (@available(iOS 13.0, *)) {
+        // 需求：无论白天/夜间，都要黑色文字。强制该弹层使用浅色外观，避免系统 Dark Mode 自动变白字。
+        sheet.overrideUserInterfaceStyle = UIUserInterfaceStyleLight;
+    }
     [self.view addSubview:sheet];
     self.sheetView = sheet;
     [sheet mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -60,6 +64,9 @@
     UIPickerView *picker = [[UIPickerView alloc] init];
     picker.dataSource = self;
     picker.delegate = self;
+    if (@available(iOS 13.0, *)) {
+        picker.overrideUserInterfaceStyle = UIUserInterfaceStyleLight;
+    }
     [sheet addSubview:picker];
     self.pickerView = picker;
     [picker mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -193,6 +200,18 @@
     }
     if (component == 0) return [NSString stringWithFormat:@"%02ld", (long)[self.hours[row] integerValue]];
     return [NSString stringWithFormat:@"%02ld", (long)[self.minutes[row] integerValue]];
+}
+
+- (UIView *)pickerView:(UIPickerView *)pickerView viewForRow:(NSInteger)row forComponent:(NSInteger)component reusingView:(UIView *)view {
+    UILabel *label = [view isKindOfClass:[UILabel class]] ? (UILabel *)view : nil;
+    if (!label) {
+        label = [[UILabel alloc] initWithFrame:CGRectZero];
+        label.textAlignment = NSTextAlignmentCenter;
+        label.font = [UIFont systemFontOfSize:17];
+    }
+    label.textColor = [UIColor blackColor];
+    label.text = [self pickerView:pickerView titleForRow:row forComponent:component];
+    return label;
 }
 
 - (void)pickerView:(UIPickerView *)pickerView didSelectRow:(NSInteger)row inComponent:(NSInteger)component {
