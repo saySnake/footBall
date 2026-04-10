@@ -12,7 +12,8 @@
 static const CGFloat kPillHeight = 56.f;
 static const CGFloat kPillCircleSize = 44.f;
 
-#define kPillBgColor     [UIColor colorWithRed:0.05 green:0.12 blue:0.11 alpha:1.0]   // 导航条深色背景
+/// Figma「我的」621:3646 底部导航条填充 #285d4b
+#define kPillBgColor     [UIColor colorWithRed:40/255.0 green:93/255.0 blue:75/255.0 alpha:1.0]
 #define kPillCircleDark  [UIColor colorWithRed:0.16 green:0.18 blue:0.19 alpha:1.0]   // 未选中圆底
 #define kPillIconGreen   [UIColor colorWithRed:0.41 green:0.83 blue:0.43 alpha:1.0]   // 绿色图标
 

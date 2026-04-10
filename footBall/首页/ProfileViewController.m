@@ -8,7 +8,6 @@
 #import "PersonalInfoViewController.h"
 #import "SettingsViewController.h"
 #import "MyTeamsViewController.h"
-#import "StampAlbumViewController.h"
 #import "ProfileTeamsStore.h"
 #import "AuthManager.h"
 #import "User.h"
@@ -21,20 +20,42 @@
 #import "StatisticsModels.h"
 #import "APIManager.h"
 #import "APIPathValues.h"
+#import <QuartzCore/QuartzCore.h>
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
+#import "PNCommonAlertViewController.h"
 
 #define kProfileHeaderBg  [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0]
-/// Figma「我的」1:6361 画板背景 #f7f7f7
-#define kProfilePageBg    [UIColor colorWithRed:0.969 green:0.969 blue:0.969 alpha:1.0]
+/// 会员券面主色（设计稿约 #2E5E4E）
+#define kProfileMembershipBannerBg [UIColor colorWithRed:46/255.0 green:94/255.0 blue:78/255.0 alpha:1.0]
+/// 副标题「限时兑换码」浅薄荷绿（参考效果图 ≈#A8E6CF）
+#define kProfileMembershipPromoText [UIColor colorWithRed:168/255.0 green:230/255.0 blue:207/255.0 alpha:1.0]
+/// 页面浅灰底 #F5F5F5
+#define kProfilePageBg    [UIColor colorWithRed:245/255.0 green:245/255.0 blue:245/255.0 alpha:1.0]
 #define kProfileCardBg    [UIColor whiteColor]
-/// 卡片距屏幕左右边距（375 宽画板下与 343 宽卡片对齐）
+/// 列表项等：Figma 560:4142 等距左右 16
 static CGFloat const kProfileScreenInset = 16.f;
+/// 「我关注的球队」白卡片：Figma 560:4141 left=26、宽 343
+static CGFloat const kProfileTeamsCardInset = 26.f;
+/// 会员横幅：Figma 560:4224 宽 323 → (375-323)/2 = 26
+static CGFloat const kProfileMembershipHorizontalInset = 26.f;
+/// Figma 560:4225 文案 x=56、券面左 x=26 → 内边距 30
+static CGFloat const kProfileMembershipTextLeading = 30.f;
+/// 券内文案纵向（相对券顶，与参考效果图对齐）
+static CGFloat const kProfileMembershipTitleTop = 10.f;
+static CGFloat const kProfileMembershipPromoTop = 36.f;
+static CGFloat const kProfileMembershipHintTop = 58.f;
 /// 卡片内标题左侧 padding（稿约 31pt ≈ 16+15）
 static CGFloat const kProfileCardInnerLeading = 15.f;
+/// 与券面设计稿比例一致（375 下约 323×87）
+static CGFloat const kProfileMembershipAspectH = 87.f;
+static CGFloat const kProfileMembershipAspectW = 323.f;
+/// 左右票券缺口：半圆半径（露底为页面灰）
+static CGFloat const kProfileMembershipNotchRadius = 7.f;
 
 static NSArray<NSString *> * _menuKeys(void) {
-    return @[@"profile_my_info", @"profile_my_stamps", @"profile_id_verify"];
+    /// Figma 621:3583：仅「个人资料」「身份认证」
+    return @[@"profile_my_info", @"profile_id_verify"];
 }
 
 // 球队小图标+名字（用于首页展示的一行）
@@ -117,8 +138,6 @@ static NSArray<NSString *> * _menuKeys(void) {
 @property (nonatomic, strong) UIImageView *avatarView;
 @property (nonatomic, strong) UIImageView *vipBadgeView;
 @property (nonatomic, strong) UILabel *nameLabel;
-@property (nonatomic, strong) UIView *reporterBadge;
-@property (nonatomic, strong) UILabel *reporterLabel;
 @property (nonatomic, strong) UILabel *idLabel;
 @property (nonatomic, strong) UILabel *stat1Num;
 @property (nonatomic, strong) UILabel *stat1Title;
@@ -126,6 +145,13 @@ static NSArray<NSString *> * _menuKeys(void) {
 @property (nonatomic, strong) UILabel *stat2Title;
 @property (nonatomic, strong) UILabel *stat3Num;
 @property (nonatomic, strong) UILabel *stat3Title;
+
+@property (nonatomic, strong) CAGradientLayer *headerGradientLayer;
+@property (nonatomic, strong) UIControl *membershipCard;
+@property (nonatomic, strong) UIImageView *membershipDecorImageView;
+@property (nonatomic, strong) UILabel *membershipTitleLabel;
+@property (nonatomic, strong) UILabel *membershipPromoLabel;
+@property (nonatomic, strong) UILabel *membershipHintLabel;
 
 @property (nonatomic, strong) UIControl *teamsCard;
 @property (nonatomic, strong) UILabel *teamsTitleLabel;
@@ -192,6 +218,7 @@ static NSArray<NSString *> * _menuKeys(void) {
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
     [self.view bringSubviewToFront:self.settingsBtn];
+    self.headerGradientLayer.frame = self.headerView.bounds;
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -344,14 +371,23 @@ static NSArray<NSString *> * _menuKeys(void) {
         make.width.equalTo(self.scrollView);
     }];
 
-    // 头部深色区
+    // 头部深色区（Figma：顶到底部轻微渐变）
     self.headerView = [UIView new];
-    self.headerView.backgroundColor = kProfileHeaderBg;
+    self.headerView.backgroundColor = [UIColor clearColor];
+    self.headerView.clipsToBounds = YES;
     [self.contentWrap addSubview:self.headerView];
     [self.headerView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.leading.trailing.equalTo(self.contentWrap);
         make.height.mas_equalTo(318);
     }];
+    self.headerGradientLayer = [CAGradientLayer layer];
+    self.headerGradientLayer.colors = @[
+        (id)[UIColor colorWithRed:0.10 green:0.20 blue:0.22 alpha:1.0].CGColor,
+        (id)kProfileHeaderBg.CGColor
+    ];
+    self.headerGradientLayer.startPoint = CGPointMake(0.5, 0.0);
+    self.headerGradientLayer.endPoint = CGPointMake(0.5, 1.0);
+    [self.headerView.layer insertSublayer:self.headerGradientLayer atIndex:0];
 
     // 头像 + VIP
     UIView *avatarRing = [UIView new];
@@ -405,34 +441,13 @@ static NSArray<NSString *> * _menuKeys(void) {
     self.nameLabel.textColor = [UIColor whiteColor];
     [nameRow addSubview:self.nameLabel];
     [self.nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.top.bottom.equalTo(nameRow);
-    }];
-
-    self.reporterBadge = [UIView new];
-    self.reporterBadge.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.2];
-    self.reporterBadge.layer.cornerRadius = 10;
-    [nameRow addSubview:self.reporterBadge];
-    [self.reporterBadge mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.nameLabel.mas_trailing).offset(8);
-        make.centerY.equalTo(nameRow);
-        make.trailing.equalTo(nameRow);
-        make.height.mas_equalTo(16);
-    }];
-
-    self.reporterLabel = [UILabel new];
-    self.reporterLabel.text = NSLocalizedString(@"profile_badge_verified", nil);
-    self.reporterLabel.font = [UIFont systemFontOfSize:12];
-    self.reporterLabel.textColor = [UIColor whiteColor];
-    [self.reporterBadge addSubview:self.reporterLabel];
-    [self.reporterLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.reporterBadge).offset(8);
-        make.trailing.equalTo(self.reporterBadge).offset(-8);
-        make.centerY.equalTo(self.reporterBadge);
+        make.centerX.top.bottom.equalTo(nameRow);
     }];
 
     self.idLabel = [UILabel new];
-    self.idLabel.font = [UIFont systemFontOfSize:14];
+    self.idLabel.font = [UIFont systemFontOfSize:16];
     self.idLabel.textColor = [UIColor whiteColor];
+    self.idLabel.textAlignment = NSTextAlignmentCenter;
     [self.headerView addSubview:self.idLabel];
     [self.idLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(nameRow.mas_bottom).offset(2);
@@ -465,7 +480,7 @@ static NSArray<NSString *> * _menuKeys(void) {
         }];
         UILabel *n = numL[i];
         n.text = nums[i];
-        n.font = [UIFont boldSystemFontOfSize:18];
+        n.font = [UIFont systemFontOfSize:18 weight:UIFontWeightRegular];
         n.textColor = [UIColor whiteColor];
         n.textAlignment = NSTextAlignmentCenter;
         [col addSubview:n];
@@ -476,7 +491,7 @@ static NSArray<NSString *> * _menuKeys(void) {
         UILabel *t = titL[i];
         t.text = @[ NSLocalizedString(@"profile_stat_friends", nil), NSLocalizedString(@"profile_stat_follow", nil), NSLocalizedString(@"profile_stat_stamps", nil) ][i];
         t.font = [UIFont systemFontOfSize:14];
-        t.textColor = [UIColor whiteColor];
+        t.textColor = [UIColor colorWithWhite:1.0 alpha:0.85];
         t.textAlignment = NSTextAlignmentCenter;
         [col addSubview:t];
         [t mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -485,16 +500,119 @@ static NSArray<NSString *> * _menuKeys(void) {
         }];
     }
 
-    // 我关注的球队 卡片
+    // 会员横幅：深绿圆角底 + 左右半圆缺口 + 左侧文案 + 右侧 set_center 装饰图
+    self.membershipCard = [UIControl new];
+    self.membershipCard.backgroundColor = kProfileMembershipBannerBg;
+    self.membershipCard.layer.cornerRadius = 10;
+    self.membershipCard.clipsToBounds = YES;
+    [self.membershipCard addTarget:self action:@selector(openMembershipCenter) forControlEvents:UIControlEventTouchUpInside];
+    [self.contentWrap addSubview:self.membershipCard];
+    [self.membershipCard mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.headerView.mas_bottom).offset(12);
+        make.leading.equalTo(self.contentWrap).offset(kProfileMembershipHorizontalInset);
+        make.trailing.equalTo(self.contentWrap).offset(-kProfileMembershipHorizontalInset);
+        make.height.equalTo(self.membershipCard.mas_width).multipliedBy(kProfileMembershipAspectH / kProfileMembershipAspectW);
+    }];
+
+    UIView *decorContainer = [UIView new];
+    decorContainer.backgroundColor = [UIColor clearColor];
+    decorContainer.clipsToBounds = YES;
+    decorContainer.userInteractionEnabled = NO;
+    [self.membershipCard addSubview:decorContainer];
+    [decorContainer mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.equalTo(self.membershipCard).offset(-4);
+        make.centerY.equalTo(self.membershipCard);
+        make.height.equalTo(self.membershipCard.mas_height).offset(-8);
+        make.width.equalTo(self.membershipCard.mas_width).multipliedBy(0.48);
+    }];
+
+    self.membershipDecorImageView = [UIImageView new];
+    self.membershipDecorImageView.contentMode = UIViewContentModeScaleAspectFit;
+    self.membershipDecorImageView.backgroundColor = [UIColor clearColor];
+    UIImage *centerBg = [UIImage imageNamed:@"set_center"];
+    self.membershipDecorImageView.image = centerBg;
+    if (centerBg && centerBg.size.width > centerBg.size.height * 1.65f) {
+        /// 整张券面导出图：只取右侧线稿区域（set_center 在右半幅）
+        self.membershipDecorImageView.layer.contentsGravity = kCAGravityResizeAspect;
+        self.membershipDecorImageView.layer.contentsRect = CGRectMake(0.40f, 0.f, 0.60f, 1.f);
+    } else {
+        self.membershipDecorImageView.layer.contentsGravity = kCAGravityResizeAspect;
+        self.membershipDecorImageView.layer.contentsRect = CGRectMake(0.f, 0.f, 1.f, 1.f);
+    }
+    if (!centerBg) {
+        self.membershipDecorImageView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.12];
+    }
+    self.membershipDecorImageView.userInteractionEnabled = NO;
+    [decorContainer addSubview:self.membershipDecorImageView];
+    [self.membershipDecorImageView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(decorContainer);
+    }];
+
+    CGFloat notchD = kProfileMembershipNotchRadius * 2.f;
+    UIView *notchLeft = [UIView new];
+    notchLeft.backgroundColor = kProfilePageBg;
+    notchLeft.layer.cornerRadius = kProfileMembershipNotchRadius;
+    notchLeft.userInteractionEnabled = NO;
+    [self.membershipCard addSubview:notchLeft];
+    [notchLeft mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerY.equalTo(self.membershipCard);
+        make.leading.equalTo(self.membershipCard);
+        make.width.height.mas_equalTo(notchD);
+    }];
+
+    UIView *notchRight = [UIView new];
+    notchRight.backgroundColor = kProfilePageBg;
+    notchRight.layer.cornerRadius = kProfileMembershipNotchRadius;
+    notchRight.userInteractionEnabled = NO;
+    [self.membershipCard addSubview:notchRight];
+    [notchRight mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerY.equalTo(self.membershipCard);
+        make.trailing.equalTo(self.membershipCard);
+        make.width.height.mas_equalTo(notchD);
+    }];
+
+    self.membershipTitleLabel = [UILabel new];
+    self.membershipTitleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    self.membershipTitleLabel.textColor = [UIColor whiteColor];
+    self.membershipTitleLabel.text = NSLocalizedString(@"profile_membership_center", nil);
+    [self.membershipCard addSubview:self.membershipTitleLabel];
+    [self.membershipTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.membershipCard).offset(kProfileMembershipTextLeading);
+        make.top.equalTo(self.membershipCard).offset(kProfileMembershipTitleTop);
+    }];
+
+    self.membershipPromoLabel = [UILabel new];
+    self.membershipPromoLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
+    self.membershipPromoLabel.textColor = kProfileMembershipPromoText;
+    self.membershipPromoLabel.text = NSLocalizedString(@"profile_membership_promo", nil);
+    [self.membershipCard addSubview:self.membershipPromoLabel];
+    [self.membershipPromoLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.membershipTitleLabel);
+        make.top.equalTo(self.membershipCard).offset(kProfileMembershipPromoTop);
+    }];
+
+    self.membershipHintLabel = [UILabel new];
+    self.membershipHintLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightRegular];
+    self.membershipHintLabel.textColor = [UIColor colorWithWhite:0.90 alpha:1.0];
+    self.membershipHintLabel.numberOfLines = 2;
+    self.membershipHintLabel.text = NSLocalizedString(@"profile_membership_hint", nil);
+    [self.membershipCard addSubview:self.membershipHintLabel];
+    [self.membershipHintLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.membershipTitleLabel);
+        make.top.equalTo(self.membershipCard).offset(kProfileMembershipHintTop);
+        make.trailing.lessThanOrEqualTo(self.membershipDecorImageView.mas_leading).offset(-10);
+    }];
+
+    // 我关注的球队 卡片（圆角与上方会员券视觉一致）
     self.teamsCard = [UIControl new];
     self.teamsCard.backgroundColor = kProfileCardBg;
-    self.teamsCard.layer.cornerRadius = 6;
+    self.teamsCard.layer.cornerRadius = 10;
     [self.teamsCard addTarget:self action:@selector(onTeamsTapped) forControlEvents:UIControlEventTouchUpInside];
     [self.contentWrap addSubview:self.teamsCard];
     [self.teamsCard mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.headerView.mas_bottom).offset(12);
-        make.leading.equalTo(self.contentWrap).offset(kProfileScreenInset);
-        make.trailing.equalTo(self.contentWrap).offset(-kProfileScreenInset);
+        make.top.equalTo(self.membershipCard.mas_bottom).offset(12);
+        make.leading.equalTo(self.contentWrap).offset(kProfileTeamsCardInset);
+        make.trailing.equalTo(self.contentWrap).offset(-kProfileTeamsCardInset);
     }];
 
     self.teamsTitleLabel = [UILabel new];
@@ -603,9 +721,9 @@ static NSArray<NSString *> * _menuKeys(void) {
 
     // 无数据：单行卡片 52pt，与「个人资料」等一致；有数据：标题行 + 球队图标区 90pt，可横向滑动
     [self.teamsCard mas_remakeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.headerView.mas_bottom).offset(12);
-        make.leading.equalTo(self.contentWrap).offset(kProfileScreenInset);
-        make.trailing.equalTo(self.contentWrap).offset(-kProfileScreenInset);
+        make.top.equalTo(self.membershipCard.mas_bottom).offset(12);
+        make.leading.equalTo(self.contentWrap).offset(kProfileTeamsCardInset);
+        make.trailing.equalTo(self.contentWrap).offset(-kProfileTeamsCardInset);
         if (hasData) {
             make.height.mas_equalTo(143);
         } else {
@@ -676,7 +794,9 @@ static NSArray<NSString *> * _menuKeys(void) {
 - (void)updateLocalizedStrings {
     [super updateLocalizedStrings];
     [self refreshIDLabel];
-    self.reporterLabel.text = NSLocalizedString(@"profile_badge_verified", nil);
+    self.membershipTitleLabel.text = NSLocalizedString(@"profile_membership_center", nil);
+    self.membershipPromoLabel.text = NSLocalizedString(@"profile_membership_promo", nil);
+    self.membershipHintLabel.text = NSLocalizedString(@"profile_membership_hint", nil);
     self.stat1Title.text = NSLocalizedString(@"profile_stat_friends", nil);
     self.stat2Title.text = NSLocalizedString(@"profile_stat_follow", nil);
     self.stat3Title.text = NSLocalizedString(@"profile_stat_stamps", nil);
@@ -714,11 +834,15 @@ static NSArray<NSString *> * _menuKeys(void) {
         PersonalInfoViewController *vc = [PersonalInfoViewController new];
         vc.hidesBottomBarWhenPushed = YES;
         [self.navigationController pushViewController:vc animated:YES];
-    } else if ([key isEqualToString:@"profile_my_stamps"]) {
-        StampAlbumViewController *vc = [[StampAlbumViewController alloc] init];
-        vc.hidesBottomBarWhenPushed = YES;
-        [self.navigationController pushViewController:vc animated:YES];
     }
+}
+
+- (void)openMembershipCenter {
+    PNCommonAlertViewController *alert = [PNCommonAlertViewController new];
+    alert.alertTitle = NSLocalizedString(@"profile_membership_center", nil);
+    alert.message = NSLocalizedString(@"profile_membership_coming_soon", nil);
+    alert.confirmTitle = NSLocalizedString(@"confirm", nil);
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 @end

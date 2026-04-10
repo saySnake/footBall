@@ -189,7 +189,7 @@
 
 /* Profile */
 "profile_badge_verified" = "記者";
-"profile_id_format" = "ID : %@";
+"profile_id_format" = "ID：%@";
 "profile_personal_title" = "個人資料";
 "profile_upload_avatar" = "上傳頭像";
 "profile_avatar_camera" = "拍照";
@@ -230,6 +230,10 @@
 "profile_my_info" = "個人資料";
 "profile_my_stamps" = "我的郵票夾";
 "profile_id_verify" = "身份認證";
+"profile_membership_center" = "會員中心";
+"profile_membership_promo" = "限時兌換碼";
+"profile_membership_hint" = "使用限時兌換碼，解鎖專屬會員優惠";
+"profile_membership_coming_soon" = "會員功能即將開放，敬請期待";
 
 /* Identity / Real-name / Professional Auth */
 "auth_identity_title" = "認證身份";

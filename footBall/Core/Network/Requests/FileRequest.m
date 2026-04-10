@@ -9,6 +9,7 @@
 #import "HTTPResponse.h"
 #import "AuthManager.h"
 
+/// 勿提交真实密钥；应使用服务端下发的 STS（见 getOSSTokenSuccess）或本地未入库配置
 static NSString *const AccessKey = @"";
 static NSString *const SecretKey = @"";
 static NSString *const BucketName = @"passnomad";

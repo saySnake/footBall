@@ -275,7 +275,7 @@
 
 /* Profile */
 "profile_badge_verified" = "Journalist";
-"profile_id_format" = "ID : %@";
+"profile_id_format" = "ID: %@";
 "profile_personal_title" = "Personal Info";
 "profile_upload_avatar" = "Upload Avatar";
 "profile_avatar_camera" = "Take Photo";
@@ -316,6 +316,10 @@
 "profile_my_info" = "Personal Info";
 "profile_my_stamps" = "My Stamp Album";
 "profile_id_verify" = "Identity Verification";
+"profile_membership_center" = "Membership";
+"profile_membership_promo" = "Limited-time code";
+"profile_membership_hint" = "Use a limited-time code to unlock member offers.";
+"profile_membership_coming_soon" = "Membership is coming soon.";
 
 /* Identity / Real-name / Professional Auth */
 "auth_identity_title" = "Identity Authentication";
