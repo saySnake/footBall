@@ -41,16 +41,16 @@ static CGFloat const kProfileTeamsCardInset = 26.f;
 static CGFloat const kProfileMembershipHorizontalInset = 26.f;
 /// Figma 560:4225 文案 x=56、券面左 x=26 → 内边距 30
 static CGFloat const kProfileMembershipTextLeading = 30.f;
-/// 券内文案纵向（相对券顶，与参考效果图对齐）
-static CGFloat const kProfileMembershipTitleTop = 10.f;
-static CGFloat const kProfileMembershipPromoTop = 36.f;
-static CGFloat const kProfileMembershipHintTop = 58.f;
+/// 券内文案纵向（Figma 560:4225 区域，相对券顶）
+static CGFloat const kProfileMembershipTitleTop = 12.f;
+static CGFloat const kProfileMembershipPromoTop = 38.f;
+static CGFloat const kProfileMembershipHintTop = 60.f;
 /// 卡片内标题左侧 padding（稿约 31pt ≈ 16+15）
 static CGFloat const kProfileCardInnerLeading = 15.f;
 /// 与券面设计稿比例一致（375 下约 323×87）
 static CGFloat const kProfileMembershipAspectH = 87.f;
 static CGFloat const kProfileMembershipAspectW = 323.f;
-/// 左右票券缺口：半圆半径（露底为页面灰）
+/// 左右票券缺口：半圆半径（圆心在左右边中点，一半露在券外；勿对券容器 clipsToBounds）
 static CGFloat const kProfileMembershipNotchRadius = 7.f;
 
 static NSArray<NSString *> * _menuKeys(void) {
@@ -504,7 +504,8 @@ static NSArray<NSString *> * _menuKeys(void) {
     self.membershipCard = [UIControl new];
     self.membershipCard.backgroundColor = kProfileMembershipBannerBg;
     self.membershipCard.layer.cornerRadius = 10;
-    self.membershipCard.clipsToBounds = YES;
+    /// 缺口圆一半在券外，必须关闭裁剪才能与 Figma 票券一致
+    self.membershipCard.clipsToBounds = NO;
     [self.membershipCard addTarget:self action:@selector(openMembershipCenter) forControlEvents:UIControlEventTouchUpInside];
     [self.contentWrap addSubview:self.membershipCard];
     [self.membershipCard mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -516,14 +517,15 @@ static NSArray<NSString *> * _menuKeys(void) {
 
     UIView *decorContainer = [UIView new];
     decorContainer.backgroundColor = [UIColor clearColor];
-    decorContainer.clipsToBounds = YES;
+    decorContainer.clipsToBounds = NO;
     decorContainer.userInteractionEnabled = NO;
     [self.membershipCard addSubview:decorContainer];
     [decorContainer mas_makeConstraints:^(MASConstraintMaker *make) {
         make.trailing.equalTo(self.membershipCard).offset(-4);
         make.centerY.equalTo(self.membershipCard);
-        make.height.equalTo(self.membershipCard.mas_height).offset(-8);
-        make.width.equalTo(self.membershipCard.mas_width).multipliedBy(0.48);
+        make.height.equalTo(self.membershipCard.mas_height).offset(-4);
+        /// 右侧插画区加宽，配合 ScaleAspectFit 完整展示 set_center
+        make.width.equalTo(self.membershipCard.mas_width).multipliedBy(0.52);
     }];
 
     self.membershipDecorImageView = [UIImageView new];
@@ -531,14 +533,6 @@ static NSArray<NSString *> * _menuKeys(void) {
     self.membershipDecorImageView.backgroundColor = [UIColor clearColor];
     UIImage *centerBg = [UIImage imageNamed:@"set_center"];
     self.membershipDecorImageView.image = centerBg;
-    if (centerBg && centerBg.size.width > centerBg.size.height * 1.65f) {
-        /// 整张券面导出图：只取右侧线稿区域（set_center 在右半幅）
-        self.membershipDecorImageView.layer.contentsGravity = kCAGravityResizeAspect;
-        self.membershipDecorImageView.layer.contentsRect = CGRectMake(0.40f, 0.f, 0.60f, 1.f);
-    } else {
-        self.membershipDecorImageView.layer.contentsGravity = kCAGravityResizeAspect;
-        self.membershipDecorImageView.layer.contentsRect = CGRectMake(0.f, 0.f, 1.f, 1.f);
-    }
     if (!centerBg) {
         self.membershipDecorImageView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.12];
     }
@@ -556,7 +550,7 @@ static NSArray<NSString *> * _menuKeys(void) {
     [self.membershipCard addSubview:notchLeft];
     [notchLeft mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerY.equalTo(self.membershipCard);
-        make.leading.equalTo(self.membershipCard);
+        make.centerX.equalTo(self.membershipCard.mas_leading);
         make.width.height.mas_equalTo(notchD);
     }];
 
@@ -567,33 +561,35 @@ static NSArray<NSString *> * _menuKeys(void) {
     [self.membershipCard addSubview:notchRight];
     [notchRight mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerY.equalTo(self.membershipCard);
-        make.trailing.equalTo(self.membershipCard);
+        make.centerX.equalTo(self.membershipCard.mas_trailing);
         make.width.height.mas_equalTo(notchD);
     }];
 
     self.membershipTitleLabel = [UILabel new];
-    self.membershipTitleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    self.membershipTitleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
     self.membershipTitleLabel.textColor = [UIColor whiteColor];
     self.membershipTitleLabel.text = NSLocalizedString(@"profile_membership_center", nil);
     [self.membershipCard addSubview:self.membershipTitleLabel];
     [self.membershipTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(self.membershipCard).offset(kProfileMembershipTextLeading);
         make.top.equalTo(self.membershipCard).offset(kProfileMembershipTitleTop);
+        make.trailing.lessThanOrEqualTo(self.membershipDecorImageView.mas_leading).offset(-10);
     }];
 
     self.membershipPromoLabel = [UILabel new];
-    self.membershipPromoLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
+    self.membershipPromoLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
     self.membershipPromoLabel.textColor = kProfileMembershipPromoText;
     self.membershipPromoLabel.text = NSLocalizedString(@"profile_membership_promo", nil);
     [self.membershipCard addSubview:self.membershipPromoLabel];
     [self.membershipPromoLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(self.membershipTitleLabel);
         make.top.equalTo(self.membershipCard).offset(kProfileMembershipPromoTop);
+        make.trailing.lessThanOrEqualTo(self.membershipDecorImageView.mas_leading).offset(-10);
     }];
 
     self.membershipHintLabel = [UILabel new];
-    self.membershipHintLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightRegular];
-    self.membershipHintLabel.textColor = [UIColor colorWithWhite:0.90 alpha:1.0];
+    self.membershipHintLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightRegular];
+    self.membershipHintLabel.textColor = [UIColor colorWithWhite:1.0 alpha:0.72];
     self.membershipHintLabel.numberOfLines = 2;
     self.membershipHintLabel.text = NSLocalizedString(@"profile_membership_hint", nil);
     [self.membershipCard addSubview:self.membershipHintLabel];
