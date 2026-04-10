@@ -20,10 +20,10 @@
 #import "StatisticsModels.h"
 #import "APIManager.h"
 #import "APIPathValues.h"
+#import "MembershipRequest.h"
 #import <QuartzCore/QuartzCore.h>
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
-#import "PNCommonAlertViewController.h"
 
 #define kProfileHeaderBg  [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0]
 /// 会员券面主色（设计稿约 #2E5E4E）
@@ -128,6 +128,246 @@ static NSArray<NSString *> * _menuKeys(void) {
         }
     }];
 }
+@end
+
+typedef NS_ENUM(NSInteger, PNMembershipPageType) {
+    PNMembershipPageTypeStatus = 0,
+    PNMembershipPageTypePlans,
+    PNMembershipPageTypeBenefits,
+    PNMembershipPageTypeRecords
+};
+
+static NSString * _pn_stringValue(id value) {
+    if ([value isKindOfClass:NSString.class]) return (NSString *)value;
+    if ([value isKindOfClass:NSNumber.class]) return [(NSNumber *)value stringValue];
+    if ([value isKindOfClass:NSNull.class] || !value) return @"-";
+    return [value description];
+}
+
+@interface PNMembershipListViewController : QMBaseViewController <UITableViewDataSource, UITableViewDelegate>
+@property (nonatomic, assign) PNMembershipPageType pageType;
+@property (nonatomic, strong) UITableView *tableView;
+@property (nonatomic, strong) NSArray<NSDictionary *> *rows;
+- (instancetype)initWithType:(PNMembershipPageType)type title:(NSString *)title;
+@end
+
+@implementation PNMembershipListViewController
+
+- (instancetype)initWithType:(PNMembershipPageType)type title:(NSString *)title {
+    if (self = [super init]) {
+        _pageType = type;
+        self.title = title;
+        _rows = @[];
+    }
+    return self;
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = kProfilePageBg;
+
+    self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleInsetGrouped];
+    self.tableView.dataSource = self;
+    self.tableView.delegate = self;
+    self.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
+    [self.view addSubview:self.tableView];
+    [self.tableView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.view);
+    }];
+
+    [self loadData];
+}
+
+- (void)loadData {
+    __weak typeof(self) weakSelf = self;
+    void (^onError)(NSError *) = ^(NSError *error) {
+        NSString *msg = error.localizedDescription.length > 0 ? error.localizedDescription : @"加载失败";
+        weakSelf.rows = @[ @{@"title": @"错误", @"value": msg} ];
+        [weakSelf.tableView reloadData];
+    };
+    void (^onPayload)(id) = ^(id payload) {
+        weakSelf.rows = [weakSelf rowsFromPayload:payload];
+        [weakSelf.tableView reloadData];
+    };
+
+    switch (self.pageType) {
+        case PNMembershipPageTypeStatus: {
+            [[MembershipRequest shared] getMembershipStatusSuccess:^(HTTPResponse * _Nullable responseObject) {
+                onPayload(responseObject.dataObject ?: responseObject.data);
+            } failure:onError];
+            break;
+        }
+        case PNMembershipPageTypePlans: {
+            [[MembershipRequest shared] getMembershipPlansSuccess:^(HTTPResponse * _Nullable responseObject) {
+                onPayload(responseObject.dataObject ?: responseObject.data);
+            } failure:onError];
+            break;
+        }
+        case PNMembershipPageTypeBenefits: {
+            [[MembershipRequest shared] getMembershipBenefitsSuccess:^(HTTPResponse * _Nullable responseObject) {
+                onPayload(responseObject.dataObject ?: responseObject.data);
+            } failure:onError];
+            break;
+        }
+        case PNMembershipPageTypeRecords: {
+            [[MembershipRequest shared] getMembershipRecordsWithPage:1 pageSize:20 success:^(HTTPResponse * _Nullable responseObject) {
+                onPayload(responseObject.dataObject ?: responseObject.data);
+            } failure:onError];
+            break;
+        }
+        default: {
+            weakSelf.rows = @[ @{@"title": @"提示", @"value": @"未知页面类型"} ];
+            [weakSelf.tableView reloadData];
+            break;
+        }
+    }
+}
+
+- (NSArray<NSDictionary *> *)rowsFromPayload:(id)payload {
+    NSMutableArray<NSDictionary *> *result = [NSMutableArray array];
+    NSArray *list = nil;
+    if ([payload isKindOfClass:NSArray.class]) {
+        list = (NSArray *)payload;
+    } else if ([payload isKindOfClass:NSDictionary.class]) {
+        NSDictionary *d = (NSDictionary *)payload;
+        NSArray *possibleList = d[@"list"];
+        if (![possibleList isKindOfClass:NSArray.class]) possibleList = d[@"records"];
+        if (![possibleList isKindOfClass:NSArray.class]) possibleList = d[@"items"];
+        if ([possibleList isKindOfClass:NSArray.class]) {
+            list = possibleList;
+        } else {
+            for (NSString *k in d.allKeys) {
+                [result addObject:@{ @"title": _pn_stringValue(k), @"value": _pn_stringValue(d[k]) }];
+            }
+        }
+    }
+
+    if (list.count > 0) {
+        for (NSInteger i = 0; i < list.count; i++) {
+            id item = list[i];
+            if ([item isKindOfClass:NSDictionary.class]) {
+                NSDictionary *d = (NSDictionary *)item;
+                NSString *title = _pn_stringValue(d[@"name"]);
+                if (title.length == 0 || [title isEqualToString:@"-"]) title = _pn_stringValue(d[@"planName"]);
+                if (title.length == 0 || [title isEqualToString:@"-"]) title = _pn_stringValue(d[@"levelName"]);
+                if (title.length == 0 || [title isEqualToString:@"-"]) title = [NSString stringWithFormat:@"Item %ld", (long)(i + 1)];
+
+                NSString *value = _pn_stringValue(d[@"description"]);
+                if (value.length == 0 || [value isEqualToString:@"-"]) value = _pn_stringValue(d[@"benefitDescription"]);
+                if (value.length == 0 || [value isEqualToString:@"-"]) value = _pn_stringValue(d[@"price"]);
+                if (value.length == 0 || [value isEqualToString:@"-"]) value = _pn_stringValue(d[@"expireTime"]);
+                [result addObject:@{ @"title": title, @"value": value.length > 0 ? value : @"-" }];
+            } else {
+                [result addObject:@{ @"title": [NSString stringWithFormat:@"Item %ld", (long)(i + 1)], @"value": _pn_stringValue(item) }];
+            }
+        }
+    }
+
+    if (result.count == 0) {
+        return @[ @{@"title": @"提示", @"value": @"暂无数据"} ];
+    }
+    return result;
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    return self.rows.count;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    static NSString *cid = @"membership_row";
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cid];
+    if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:cid];
+    NSDictionary *row = self.rows[indexPath.row];
+    cell.textLabel.text = _pn_stringValue(row[@"title"]);
+    cell.textLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    cell.detailTextLabel.text = _pn_stringValue(row[@"value"]);
+    cell.detailTextLabel.numberOfLines = 0;
+    cell.detailTextLabel.textColor = [UIColor colorWithWhite:0.35 alpha:1.0];
+    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    return cell;
+}
+
+@end
+
+@interface PNMembershipCenterHubViewController : QMBaseViewController
+@end
+
+@implementation PNMembershipCenterHubViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.title = NSLocalizedString(@"profile_membership_center", nil);
+    self.view.backgroundColor = kProfilePageBg;
+
+    UIView *container = [UIView new];
+    [self.view addSubview:container];
+    [container mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.view.mas_safeAreaLayoutGuideTop).offset(16);
+        make.leading.equalTo(self.view).offset(16);
+        make.trailing.equalTo(self.view).offset(-16);
+    }];
+
+    NSArray<NSDictionary *> *items = @[
+        @{@"title": @"会员状态", @"node": @"571-2601", @"type": @(PNMembershipPageTypeStatus)},
+        @{@"title": @"会员方案", @"node": @"571-1527", @"type": @(PNMembershipPageTypePlans)},
+        @{@"title": @"会员权益", @"node": @"571-1782", @"type": @(PNMembershipPageTypeBenefits)},
+        @{@"title": @"订阅记录", @"node": @"571-2038", @"type": @(PNMembershipPageTypeRecords)}
+    ];
+
+    UIView *prev = nil;
+    for (NSDictionary *item in items) {
+        UIControl *card = [UIControl new];
+        card.backgroundColor = UIColor.whiteColor;
+        card.layer.cornerRadius = 10;
+        card.tag = [item[@"type"] integerValue];
+        [card addTarget:self action:@selector(onTapPage:) forControlEvents:UIControlEventTouchUpInside];
+        [container addSubview:card];
+        [card mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.trailing.equalTo(container);
+            make.height.mas_equalTo(72);
+            if (prev) make.top.equalTo(prev.mas_bottom).offset(12);
+            else make.top.equalTo(container);
+        }];
+
+        UILabel *titleL = [UILabel new];
+        titleL.text = [NSString stringWithFormat:@"%@  (%@)", item[@"title"], item[@"node"]];
+        titleL.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+        titleL.textColor = [UIColor colorWithWhite:0.08 alpha:1.0];
+        [card addSubview:titleL];
+        [titleL mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(card).offset(14);
+            make.centerY.equalTo(card);
+        }];
+
+        UIImageView *arrow = [UIImageView new];
+        arrow.image = [UIImage imageNamed:@"setting_right"];
+        arrow.contentMode = UIViewContentModeScaleAspectFit;
+        [card addSubview:arrow];
+        [arrow mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.trailing.equalTo(card).offset(-12);
+            make.centerY.equalTo(card);
+            make.size.mas_equalTo(CGSizeMake(18, 18));
+        }];
+        prev = card;
+    }
+
+    [prev mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.bottom.equalTo(container);
+    }];
+}
+
+- (void)onTapPage:(UIControl *)sender {
+    PNMembershipPageType t = (PNMembershipPageType)sender.tag;
+    NSString *title = @"会员";
+    if (t == PNMembershipPageTypeStatus) title = @"会员状态";
+    else if (t == PNMembershipPageTypePlans) title = @"会员方案";
+    else if (t == PNMembershipPageTypeBenefits) title = @"会员权益";
+    else if (t == PNMembershipPageTypeRecords) title = @"订阅记录";
+
+    PNMembershipListViewController *vc = [[PNMembershipListViewController alloc] initWithType:t title:title];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
 @end
 
 @interface ProfileViewController ()
@@ -834,11 +1074,9 @@ static NSArray<NSString *> * _menuKeys(void) {
 }
 
 - (void)openMembershipCenter {
-    PNCommonAlertViewController *alert = [PNCommonAlertViewController new];
-    alert.alertTitle = NSLocalizedString(@"profile_membership_center", nil);
-    alert.message = NSLocalizedString(@"profile_membership_coming_soon", nil);
-    alert.confirmTitle = NSLocalizedString(@"confirm", nil);
-    [self presentViewController:alert animated:YES completion:nil];
+    PNMembershipCenterHubViewController *vc = [PNMembershipCenterHubViewController new];
+    vc.hidesBottomBarWhenPushed = YES;
+    [self.navigationController pushViewController:vc animated:YES];
 }
 
 @end
