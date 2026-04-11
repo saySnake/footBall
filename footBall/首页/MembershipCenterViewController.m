@@ -678,8 +678,10 @@
             benefitImage = [UIImage imageNamed:@"vip_global"];
         } else if ([line.text containsString:@"球衣"]) {
             benefitImage = [UIImage imageNamed:@"vip_clothes"];
-        } else if ([line.text containsString:@"终身全部权益"] || [line.text containsString:@"会员徽章"]) {
+        } else if ([line.text containsString:@"终身全部权益"]) {
             benefitImage = [UIImage imageNamed:@"vip_trophy"];
+        } else if ([line.text containsString:@"会员徽章"]) {
+            benefitImage = [UIImage imageNamed:@"vip_postcard"];
         } else if ([line.text containsString:@"编号徽章"]) {
             benefitImage = [UIImage imageNamed:@"vip_coins"];
         }
@@ -773,8 +775,10 @@
 
 - (NSString *)displayTitleForPlan:(MCPlan *)plan {
     if ([plan.title isEqualToString:@"连续包月"]) return @"月度通行证";
-    if ([plan.title isEqualToString:@"连续包年"]) return @"年度通行证";
-    return plan.title ?: @"会员方案";
+    if ([plan.title isEqualToString:@"连续包年"]) return @"赛季通行证";
+    if ([plan.title isEqualToString:@"永久权益"]) return @"终身会员";
+    if ([plan.title isEqualToString:@"终身权益"]) return @"创始人会员";
+    return @"会员方案";
 }
 
 - (NSAttributedString *)paymentButtonAttrTitleForPlan:(MCPlan *)plan {
