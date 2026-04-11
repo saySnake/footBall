@@ -5,7 +5,10 @@
 
 #import "MembershipCenterViewController.h"
 #import <Masonry/Masonry.h>
+#import <SDWebImage/SDWebImage.h>
 #import <math.h>
+#import "AuthManager.h"
+#import "FontManager.h"
 
 #define kMCPageBg [UIColor colorWithRed:13/255.0 green:33/255.0 blue:34/255.0 alpha:1.0]
 #define kMCMint [UIColor colorWithRed:83/255.0 green:204/255.0 blue:158/255.0 alpha:1.0]
@@ -86,13 +89,21 @@
     self.currentIndex = self.initialPlanIndex;
     [self buildPlanData];
     [self setupUI];
+    [self refreshUserProfile];
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self refreshUserProfile];
 }
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
     self.topGlowLayer.frame = self.topGlowView.bounds;
     self.bannerGradientLayer.frame = self.bannerCard.bounds;
-    self.contentGlassHighlightLayer.frame = self.contentGlassView.bounds;
+    if (self.contentGlassView && self.contentGlassHighlightLayer) {
+        self.contentGlassHighlightLayer.frame = self.contentGlassView.bounds;
+    }
     for (UIView *card in self.cardViews) {
         for (CALayer *ly in card.layer.sublayers) {
             if ([ly.name isEqualToString:@"mc.card.bg"]) {
@@ -177,16 +188,18 @@
     self.avatarView.clipsToBounds = YES;
     self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
     self.avatarView.image = [UIImage imageNamed:@"setting_icon"];
-    if (!self.avatarView.image && @available(iOS 13.0, *)) self.avatarView.image = [UIImage systemImageNamed:@"person.crop.circle.fill"];
+    if (!self.avatarView.image && @available(iOS 13.0, *)) {
+        self.avatarView.image = [UIImage systemImageNamed:@"person.crop.circle.fill"];
+    }
     [self.avatarWrap addSubview:self.avatarView];
     [self.avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.top.bottom.equalTo(self.avatarWrap);
         make.size.mas_equalTo(CGSizeMake(52, 52));
     }];
     self.nameLabel = [UILabel new];
-    self.nameLabel.text = @"challenger";
+    self.nameLabel.text = @"";
     self.nameLabel.textColor = [UIColor whiteColor];
-    self.nameLabel.font = [UIFont systemFontOfSize:15.0 weight:UIFontWeightSemibold];
+    self.nameLabel.font = [UIFont boldSystemFontOfSize:15.06];
     [self.avatarWrap addSubview:self.nameLabel];
     [self.nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(self.avatarView.mas_trailing).offset(14);
@@ -302,38 +315,13 @@
 
     /// Figma 571:2613：Tab 下方主内容黑底
     self.contentPanelView = [UIView new];
-    self.contentPanelView.backgroundColor = [UIColor colorWithWhite:0 alpha:0.82];
+    self.contentPanelView.backgroundColor = [UIColor blackColor];
     self.contentPanelView.userInteractionEnabled = NO;
     [self.view insertSubview:self.contentPanelView belowSubview:self.segmentWrap];
     [self.contentPanelView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.segmentWrap.mas_bottom);
         make.leading.trailing.bottom.equalTo(self.view);
     }];
-    /// iOS 液态玻璃感：超薄材质模糊 + 高光描边
-    UIBlurEffect *glassEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark];
-    self.contentGlassView = [[UIVisualEffectView alloc] initWithEffect:glassEffect];
-    self.contentGlassView.userInteractionEnabled = NO;
-    self.contentGlassView.alpha = 0.92;
-    self.contentGlassView.layer.cornerRadius = 26;
-    self.contentGlassView.layer.masksToBounds = YES;
-    self.contentGlassView.layer.borderWidth = 1.0;
-    self.contentGlassView.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.14].CGColor;
-    [self.contentPanelView addSubview:self.contentGlassView];
-    [self.contentGlassView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.contentPanelView).offset(8);
-        make.leading.equalTo(self.contentPanelView).offset(8);
-        make.trailing.equalTo(self.contentPanelView).offset(-8);
-        make.bottom.equalTo(self.contentPanelView).offset(-8);
-    }];
-    self.contentGlassHighlightLayer = [CAGradientLayer layer];
-    self.contentGlassHighlightLayer.colors = @[
-        (id)[UIColor colorWithRed:188/255.0 green:255/255.0 blue:233/255.0 alpha:0.24].CGColor,
-        (id)[UIColor colorWithWhite:1 alpha:0.02].CGColor,
-        (id)[UIColor colorWithRed:0 green:0 blue:0 alpha:0.16].CGColor
-    ];
-    self.contentGlassHighlightLayer.startPoint = CGPointMake(0.0, 0.0);
-    self.contentGlassHighlightLayer.endPoint = CGPointMake(1.0, 1.0);
-    [self.contentGlassView.layer insertSublayer:self.contentGlassHighlightLayer atIndex:0];
 
     self.giftContainerView = [UIView new];
     self.giftContainerView.hidden = YES;
@@ -646,7 +634,12 @@
     }];
 
     NSArray<NSString *> *icons = plan.benefitIcons;
-    CGFloat lineStep = large ? 22.0 : 21.75;
+    CGFloat lineStep = large ? 29.34 : 22.03;
+    CGFloat lineTopOffset = large ? 21.03 : 16.57;
+    CGFloat textLeading = large ? 53.54 : 40.15;
+    CGFloat ringLeading = large ? 19.0 : 14.25;
+    CGFloat ringSize = large ? 25.01 : 18.75;
+    CGFloat iconSize = large ? 15.28 : 11.46;
     for (NSInteger i = 0; i < plan.benefits.count; i++) {
         NSString *sym = (icons && i < (NSInteger)icons.count) ? icons[i] : @"circle.fill";
         UILabel *line = [UILabel new];
@@ -656,18 +649,17 @@
         line.numberOfLines = 1;
         [card addSubview:line];
         [line mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(card).offset(36);
+            make.leading.equalTo(card).offset(textLeading);
             make.trailing.lessThanOrEqualTo(card).offset(-8);
-            make.top.equalTo(crownRow.mas_bottom).offset(12 + i * lineStep);
+            make.top.equalTo(crownRow.mas_bottom).offset(lineTopOffset + i * lineStep);
         }];
         UIView *ring = [UIView new];
-        ring.backgroundColor = [UIColor colorWithWhite:0 alpha:0.35];
-        CGFloat ringSize = large ? 15.28 : 11.46;
+        ring.backgroundColor = [UIColor blackColor];
         ring.layer.cornerRadius = ringSize / 2.0;
         [card addSubview:ring];
         [ring mas_makeConstraints:^(MASConstraintMaker *make) {
             make.centerY.equalTo(line);
-            make.leading.equalTo(card).offset(14);
+            make.leading.equalTo(card).offset(ringLeading);
             make.size.mas_equalTo(CGSizeMake(ringSize, ringSize));
         }];
         UIImageView *ic = [UIImageView new];
@@ -676,8 +668,20 @@
         UIImage *benefitImage = nil;
         if ([line.text containsString:@"解锁全部内容"]) {
             benefitImage = [UIImage imageNamed:@"vip_unlock"];
-        } else if ([line.text containsString:@"数据可视化"]) {
+        } else if ([line.text containsString:@"数据可视化"] || [line.text containsString:@"数据回顾"]) {
             benefitImage = [UIImage imageNamed:@"vip_data"];
+        } else if ([line.text containsString:@"邮票"]) {
+            benefitImage = [UIImage imageNamed:@"vip_stamp"];
+        } else if ([line.text containsString:@"未来产品"]) {
+            benefitImage = [UIImage imageNamed:@"vip_product"];
+        } else if ([line.text containsString:@"社群"]) {
+            benefitImage = [UIImage imageNamed:@"vip_global"];
+        } else if ([line.text containsString:@"球衣"]) {
+            benefitImage = [UIImage imageNamed:@"vip_clothes"];
+        } else if ([line.text containsString:@"终身全部权益"] || [line.text containsString:@"会员徽章"]) {
+            benefitImage = [UIImage imageNamed:@"vip_trophy"];
+        } else if ([line.text containsString:@"编号徽章"]) {
+            benefitImage = [UIImage imageNamed:@"vip_coins"];
         }
         if (!benefitImage && @available(iOS 13.0, *)) {
             benefitImage = [[UIImage systemImageNamed:sym] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
@@ -686,7 +690,7 @@
         [card addSubview:ic];
         [ic mas_makeConstraints:^(MASConstraintMaker *make) {
             make.center.equalTo(ring);
-            make.size.mas_equalTo(CGSizeMake(large ? 11.46 : 8.0, large ? 11.46 : 8.0));
+            make.size.mas_equalTo(CGSizeMake(iconSize, iconSize));
         }];
     }
 
@@ -703,40 +707,88 @@
     }];
 
     UILabel *price = [UILabel new];
-    price.text = plan.price;
+    price.attributedText = [self cardPriceAttrTextForPlan:plan large:large];
     price.textColor = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
-    /// 选中态采用 72，侧卡缩放 0.75 后视觉约等于 Figma 的 54
-    price.font = [UIFont fontWithName:@"BebasNeue-Regular" size:large ? (isMonthlyPlan ? 72.38 : 72.0) : 54];
-    if (!price.font) {
-        if (@available(iOS 13.0, *)) {
-            price.font = [UIFont monospacedDigitSystemFontOfSize:large ? (isMonthlyPlan ? 72.38 : 72.0) : 54 weight:UIFontWeightBold];
-        } else {
-            price.font = [UIFont systemFontOfSize:large ? (isMonthlyPlan ? 72.38 : 72.0) : 54 weight:UIFontWeightBold];
-        }
-    }
     price.textAlignment = NSTextAlignmentRight;
     [card addSubview:price];
     [price mas_makeConstraints:^(MASConstraintMaker *make) {
         make.trailing.equalTo(card).offset(isMonthlyPlan ? -12 : -10);
         make.bottom.equalTo(card).offset(isMonthlyPlan ? -6 : -6);
     }];
-    UILabel *unit = [UILabel new];
-    unit.text = @"¥";
-    unit.textColor = price.textColor;
-    unit.font = [UIFont fontWithName:@"BebasNeue-Regular" size:large ? (isMonthlyPlan ? 25.46 : 25.3) : 19.0];
-    if (!unit.font) {
-        unit.font = [UIFont systemFontOfSize:large ? (isMonthlyPlan ? 25.46 : 25.3) : 19.0 weight:UIFontWeightMedium];
-    }
-    [card addSubview:unit];
-    [unit mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(price.mas_leading).offset(-2);
-        make.bottom.equalTo(card).offset(large ? (isMonthlyPlan ? -10 : -12) : -9);
-    }];
     /// 月度通行证「限时优惠」需要显示在价格上层，避免被大号金额遮挡
     if (!hint.hidden) {
         [card bringSubviewToFront:hint];
     }
     return card;
+}
+
+- (UIFont *)membershipNeueFontOfSize:(CGFloat)size fallbackWeight:(UIFontWeight)weight {
+    UIFont *base = FontManager.sharedManager.font75Regular;
+    UIFont *custom = base ? [UIFont fontWithDescriptor:base.fontDescriptor size:size] : nil;
+    if (custom) return custom;
+    if (@available(iOS 13.0, *)) {
+        return [UIFont monospacedDigitSystemFontOfSize:size weight:weight];
+    }
+    return [UIFont systemFontOfSize:size weight:weight];
+}
+
+- (NSAttributedString *)cardPriceAttrTextForPlan:(MCPlan *)plan large:(BOOL)large {
+    NSString *priceText = plan.price ?: @"";
+    NSString *full = [NSString stringWithFormat:@"¥%@", priceText];
+    UIColor *mint = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
+    CGFloat priceSize = large ? 72.38 : 54.0;
+    CGFloat unitSize = large ? 25.46 : 19.0;
+    NSMutableAttributedString *attr = [[NSMutableAttributedString alloc] initWithString:full attributes:@{
+        NSForegroundColorAttributeName: mint,
+        NSFontAttributeName: [self membershipNeueFontOfSize:priceSize fallbackWeight:UIFontWeightRegular]
+    }];
+    if (full.length > 0) {
+        [attr addAttribute:NSFontAttributeName value:[self membershipNeueFontOfSize:unitSize fallbackWeight:UIFontWeightRegular] range:NSMakeRange(0, 1)];
+    }
+    return attr;
+}
+
+- (void)refreshUserProfile {
+    User *user = AuthManager.sharedManager.user;
+    UserProfile *profile = user.profile;
+    NSString *nickname = profile.nickname.length > 0 ? profile.nickname : user.nickname;
+    self.nameLabel.text = nickname;
+
+    NSString *avatarString = profile.avatar.length > 0 ? profile.avatar : user.avatar;
+    NSURL *avatarURL = avatarString.length > 0 ? [NSURL URLWithString:avatarString] : nil;
+    UIImage *placeholder = [UIImage imageNamed:@"setting_icon"];
+    if (avatarURL) {
+        self.avatarView.tintColor = nil;
+        self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
+    } else if (!placeholder && @available(iOS 13.0, *)) {
+        placeholder = [UIImage systemImageNamed:@"person.crop.circle.fill"];
+        self.avatarView.tintColor = [UIColor colorWithWhite:1 alpha:0.85];
+        self.avatarView.contentMode = UIViewContentModeCenter;
+    } else {
+        self.avatarView.tintColor = nil;
+        self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
+    }
+    [self.avatarView sd_setImageWithURL:avatarURL placeholderImage:placeholder];
+}
+
+- (NSString *)displayTitleForPlan:(MCPlan *)plan {
+    if ([plan.title isEqualToString:@"连续包月"]) return @"月度通行证";
+    if ([plan.title isEqualToString:@"连续包年"]) return @"年度通行证";
+    return plan.title ?: @"会员方案";
+}
+
+- (NSAttributedString *)paymentButtonAttrTitleForPlan:(MCPlan *)plan {
+    NSString *pay = plan.payPrice.length ? plan.payPrice : plan.price;
+    NSString *full = [NSString stringWithFormat:@"确认协议并支付¥%@", pay ?: @""];
+    NSMutableAttributedString *attr = [[NSMutableAttributedString alloc] initWithString:full attributes:@{
+        NSForegroundColorAttributeName: [UIColor whiteColor],
+        NSFontAttributeName: [UIFont systemFontOfSize:12.57 weight:UIFontWeightSemibold]
+    }];
+    NSRange currencyRange = [full rangeOfString:@"¥"];
+    if (currencyRange.location != NSNotFound) {
+        [attr addAttribute:NSFontAttributeName value:[UIFont systemFontOfSize:8 weight:UIFontWeightSemibold] range:currencyRange];
+    }
+    return attr;
 }
 
 - (NSAttributedString *)agreementAttrText {
@@ -756,7 +808,6 @@
     MCPlan *m = [MCPlan new];
     m.title = @"连续包月";
     m.price = @"33";
-    /// Figma 571:2660 底部按钮价
     m.payPrice = @"22";
     m.hint = @"限时优惠";
     m.benefits = @[@"解锁全部内容", @"数据可视化"];
@@ -775,7 +826,6 @@
     l.price = @"698";
     l.payPrice = @"698";
     l.hint = @"";
-    l.hint = @"";
     l.benefits = @[@"解锁全部内容，永久全部权益", @"赛季终身会员徽章", @"终身限定数字邮票|边框"];
     l.benefitIcons = @[@"lock.open", @"star.circle.fill", @"stamp.fill"];
 
@@ -793,12 +843,10 @@
 - (void)refreshPlanInfoAtIndex:(NSInteger)idx {
     if (idx < 0 || idx >= self.plans.count) return;
     self.currentIndex = idx;
-    NSArray *titles = @[@"月度通行证", @"赛季通行证", @"终身会员", @"创始人会员"];
-    self.planTitleLabel.text = titles[idx];
     MCPlan *plan = self.plans[idx];
-    /// 支付按钮金额与 Figma payPrice 一致
-    NSString *pay = plan.payPrice.length ? plan.payPrice : plan.price;
-    [self.payBtn setTitle:[NSString stringWithFormat:@"确认协议并支付¥%@", pay] forState:UIControlStateNormal];
+    self.planTitleLabel.text = [self displayTitleForPlan:plan];
+    [self.payBtn setAttributedTitle:[self paymentButtonAttrTitleForPlan:plan] forState:UIControlStateNormal];
+    [self.payBtn setAttributedTitle:[self paymentButtonAttrTitleForPlan:plan] forState:UIControlStateDisabled];
     self.pageControl.currentPage = idx;
 }
 
