@@ -20,6 +20,8 @@
 @property (nonatomic, copy) NSString *price;
 /// 底部按钮展示价（稿内常与卡片价不同，如首屏 ¥22）
 @property (nonatomic, copy) NSString *payPrice;
+/// 折扣前展示价（如 33/268/748）
+@property (nonatomic, copy) NSString *originalPrice;
 @property (nonatomic, copy) NSString *hint;
 @property (nonatomic, strong) NSArray<NSString *> *benefits;
 /// SF Symbol 名，与 benefits 一一对应
@@ -62,6 +64,21 @@
 @property (nonatomic, strong) UIButton *payBtn;
 @property (nonatomic, strong) UIButton *agreementCheckBtn;
 @property (nonatomic, strong) UILabel *agreementLabel;
+
+@property (nonatomic, strong) UIView *redeemOverlayView;
+@property (nonatomic, strong) UIView *redeemDialogView;
+@property (nonatomic, strong) CAGradientLayer *redeemDialogGradientLayer;
+@property (nonatomic, strong) UIButton *redeemCloseIconBtn;
+@property (nonatomic, strong) UILabel *redeemDialogTitleLabel;
+@property (nonatomic, strong) UIImageView *redeemDialogTicketIconView;
+@property (nonatomic, strong) UIView *redeemInputWrapView;
+@property (nonatomic, strong) UITextField *redeemInputField;
+@property (nonatomic, strong) UIButton *redeemConfirmBtn;
+@property (nonatomic, strong) UILabel *redeemHelpLabel;
+@property (nonatomic, strong) UIView *redeemSuccessWrapView;
+@property (nonatomic, strong) UILabel *redeemSuccessTitleLabel;
+@property (nonatomic, strong) UILabel *redeemSuccessDescLabel;
+
 @property (nonatomic, strong) UIView *giftContainerView;
 @property (nonatomic, strong) UILabel *giftPromptLabel;
 @property (nonatomic, strong) UIButton *giftCodeTapAreaBtn;
@@ -75,6 +92,8 @@
 
 @property (nonatomic, strong) NSArray<MCPlan *> *plans;
 @property (nonatomic, assign) NSInteger currentIndex;
+@property (nonatomic, assign) BOOL redeemDialogShowingSuccess;
+@property (nonatomic, assign) BOOL hasAppliedRedeemDiscount;
 @end
 
 @implementation MembershipCenterViewController
@@ -99,6 +118,7 @@
     [super viewDidLayoutSubviews];
     self.topGlowLayer.frame = self.topGlowView.bounds;
     self.bannerGradientLayer.frame = self.bannerCard.bounds;
+    self.redeemDialogGradientLayer.frame = self.redeemDialogView.bounds;
     if (self.contentGlassView && self.contentGlassHighlightLayer) {
         self.contentGlassHighlightLayer.frame = self.contentGlassView.bounds;
     }
@@ -556,6 +576,7 @@
     [self applyPlanAtIndex:self.currentIndex animated:NO];
     [self updatePayButtonState];
     [self switchToGiftMode:NO];
+    [self setupRedeemDialog];
 
     [self.view bringSubviewToFront:self.segmentWrap];
     [self.view bringSubviewToFront:self.planTitleLabel];
@@ -564,6 +585,200 @@
     [self.view bringSubviewToFront:self.payBtn];
     [self.view bringSubviewToFront:self.agreementCheckBtn];
     [self.view bringSubviewToFront:self.agreementLabel];
+}
+
+- (void)setupRedeemDialog {
+    self.redeemOverlayView = [UIView new];
+    self.redeemOverlayView.hidden = YES;
+    self.redeemOverlayView.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.6];
+    [self.view addSubview:self.redeemOverlayView];
+    [self.redeemOverlayView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.view);
+    }];
+
+    self.redeemDialogView = [UIView new];
+    self.redeemDialogView.layer.cornerRadius = 20;
+    self.redeemDialogView.clipsToBounds = YES;
+    [self.redeemOverlayView addSubview:self.redeemDialogView];
+    [self.redeemDialogView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.center.equalTo(self.redeemOverlayView);
+        make.width.mas_equalTo(294);
+        make.height.mas_equalTo(241);
+    }];
+    self.redeemDialogGradientLayer = [CAGradientLayer layer];
+    self.redeemDialogGradientLayer.colors = @[
+        (id)[UIColor colorWithRed:40/255.0 green:93/255.0 blue:75/255.0 alpha:1.0].CGColor,
+        (id)[UIColor colorWithRed:84/255.0 green:195/255.0 blue:157/255.0 alpha:1.0].CGColor
+    ];
+    self.redeemDialogGradientLayer.startPoint = CGPointMake(0.0, 0.2);
+    self.redeemDialogGradientLayer.endPoint = CGPointMake(1.0, 1.0);
+    [self.redeemDialogView.layer insertSublayer:self.redeemDialogGradientLayer atIndex:0];
+
+    UIImageView *redeemDecor = [UIImageView new];
+    redeemDecor.userInteractionEnabled = NO;
+    redeemDecor.alpha = 0.30;
+    redeemDecor.image = [UIImage imageNamed:@"vip_alert"];
+    redeemDecor.contentMode = UIViewContentModeScaleAspectFit;
+    [self.redeemDialogView addSubview:redeemDecor];
+    [redeemDecor mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.redeemDialogView);
+        make.trailing.equalTo(self.redeemDialogView);
+        make.size.mas_equalTo(CGSizeMake(88, 88));
+    }];
+
+    self.redeemCloseIconBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.redeemCloseIconBtn.backgroundColor = [UIColor colorWithWhite:1 alpha:0.9];
+    self.redeemCloseIconBtn.layer.cornerRadius = 9;
+    [self.redeemCloseIconBtn setTitle:@"×" forState:UIControlStateNormal];
+    [self.redeemCloseIconBtn setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+    self.redeemCloseIconBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
+    [self.redeemCloseIconBtn addTarget:self action:@selector(hideRedeemDialog) forControlEvents:UIControlEventTouchUpInside];
+    [self.redeemOverlayView addSubview:self.redeemCloseIconBtn];
+    [self.redeemCloseIconBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.width.height.mas_equalTo(18);
+        make.trailing.equalTo(self.redeemDialogView.mas_trailing);
+        make.top.equalTo(self.redeemDialogView.mas_top).offset(-8);
+    }];
+
+    self.redeemDialogTitleLabel = [UILabel new];
+    self.redeemDialogTitleLabel.text = @"NOMAD PASS会员折扣";
+    self.redeemDialogTitleLabel.textColor = [UIColor whiteColor];
+    self.redeemDialogTitleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    [self.redeemDialogView addSubview:self.redeemDialogTitleLabel];
+    [self.redeemDialogTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.redeemDialogView).offset(43);
+        make.centerX.equalTo(self.redeemDialogView);
+    }];
+
+    self.redeemDialogTicketIconView = [UIImageView new];
+    self.redeemDialogTicketIconView.image = [UIImage imageNamed:@"vip_ticket"];
+    self.redeemDialogTicketIconView.contentMode = UIViewContentModeScaleAspectFit;
+    [self.redeemDialogView addSubview:self.redeemDialogTicketIconView];
+    [self.redeemDialogTicketIconView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.redeemDialogTitleLabel.mas_bottom).offset(20);
+        make.centerX.equalTo(self.redeemDialogView);
+        make.size.mas_equalTo(CGSizeMake(38, 38));
+    }];
+
+    self.redeemInputWrapView = [UIView new];
+    self.redeemInputWrapView.backgroundColor = [UIColor whiteColor];
+    self.redeemInputWrapView.layer.cornerRadius = 15.5;
+    self.redeemInputWrapView.clipsToBounds = YES;
+    [self.redeemDialogView addSubview:self.redeemInputWrapView];
+    [self.redeemInputWrapView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(self.redeemDialogView).offset(4.5);
+        make.width.mas_equalTo(228);
+        make.top.equalTo(self.redeemDialogTicketIconView.mas_bottom).offset(9);
+        make.height.mas_equalTo(31);
+    }];
+
+    self.redeemInputField = [UITextField new];
+    self.redeemInputField.placeholder = @"请输入兑换码";
+    self.redeemInputField.textColor = [UIColor colorWithRed:40/255.0 green:93/255.0 blue:75/255.0 alpha:1.0];
+    self.redeemInputField.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
+    self.redeemInputField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"请输入兑换码" attributes:@{
+        NSForegroundColorAttributeName: [UIColor colorWithRed:173/255.0 green:173/255.0 blue:173/255.0 alpha:1.0],
+        NSFontAttributeName: [UIFont systemFontOfSize:8 weight:UIFontWeightRegular]
+    }];
+    self.redeemInputField.keyboardType = UIKeyboardTypeNumberPad;
+    [self.redeemInputField addTarget:self action:@selector(onRedeemDialogInputChanged) forControlEvents:UIControlEventEditingChanged];
+    [self.redeemInputWrapView addSubview:self.redeemInputField];
+    [self.redeemInputField mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.redeemInputWrapView).offset(14);
+        make.top.bottom.equalTo(self.redeemInputWrapView);
+        make.trailing.equalTo(self.redeemInputWrapView).offset(-76);
+    }];
+
+    self.redeemConfirmBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.redeemConfirmBtn.backgroundColor = [UIColor colorWithRed:86/255.0 green:219/255.0 blue:166/255.0 alpha:1.0];
+    self.redeemConfirmBtn.layer.cornerRadius = 15.5;
+    self.redeemConfirmBtn.layer.maskedCorners = kCALayerMinXMaxYCorner | kCALayerMaxXMaxYCorner | kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+    self.redeemConfirmBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    [self.redeemConfirmBtn setTitle:@"兑换" forState:UIControlStateNormal];
+    [self.redeemConfirmBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    [self.redeemConfirmBtn addTarget:self action:@selector(onTapRedeemDialogConfirm) forControlEvents:UIControlEventTouchUpInside];
+    [self.redeemInputWrapView addSubview:self.redeemConfirmBtn];
+    [self.redeemConfirmBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.bottom.trailing.equalTo(self.redeemInputWrapView);
+        make.width.mas_equalTo(76);
+    }];
+
+    self.redeemHelpLabel = [UILabel new];
+    self.redeemHelpLabel.text = @"兑换失败  点此寻求帮助";
+    self.redeemHelpLabel.textAlignment = NSTextAlignmentCenter;
+    self.redeemHelpLabel.font = [UIFont systemFontOfSize:6 weight:UIFontWeightLight];
+    self.redeemHelpLabel.hidden = YES;
+    NSMutableAttributedString *helpAttr = [[NSMutableAttributedString alloc] initWithString:self.redeemHelpLabel.text attributes:@{
+        NSForegroundColorAttributeName: [UIColor colorWithWhite:1 alpha:0.78]
+    }];
+    NSRange failRange = [self.redeemHelpLabel.text rangeOfString:@"兑换失败"];
+    if (failRange.location != NSNotFound) {
+        [helpAttr addAttributes:@{
+            NSForegroundColorAttributeName: [UIColor colorWithRed:147/255.0 green:205/255.0 blue:1.0 alpha:1.0],
+            NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle)
+        } range:failRange];
+    }
+    self.redeemHelpLabel.attributedText = helpAttr;
+    [self.redeemDialogView addSubview:self.redeemHelpLabel];
+    [self.redeemHelpLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.redeemInputWrapView.mas_bottom).offset(12);
+        make.centerX.equalTo(self.redeemDialogView);
+    }];
+
+    self.redeemSuccessWrapView = [UIView new];
+    self.redeemSuccessWrapView.hidden = YES;
+    [self.redeemDialogView addSubview:self.redeemSuccessWrapView];
+    [self.redeemSuccessWrapView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(self.redeemDialogView);
+        make.top.equalTo(self.redeemDialogTitleLabel.mas_bottom).offset(26);
+        make.size.mas_equalTo(CGSizeMake(61.008, 61.008));
+    }];
+    UIView *successRing = [UIView new];
+    successRing.layer.cornerRadius = 30.504;
+    successRing.layer.borderWidth = 1.2;
+    successRing.layer.borderColor = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0].CGColor;
+    [self.redeemSuccessWrapView addSubview:successRing];
+    [successRing mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.redeemSuccessWrapView);
+    }];
+    UIView *successInner = [UIView new];
+    successInner.layer.cornerRadius = 23;
+    successInner.backgroundColor = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
+    [successRing addSubview:successInner];
+    [successInner mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.center.equalTo(successRing);
+        make.size.mas_equalTo(CGSizeMake(46, 46));
+    }];
+    UIImageView *successTicketIcon = [UIImageView new];
+    successTicketIcon.image = [UIImage imageNamed:@"vip_ticket"];
+    successTicketIcon.contentMode = UIViewContentModeScaleAspectFit;
+    [successInner addSubview:successTicketIcon];
+    [successTicketIcon mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.center.equalTo(successInner);
+        make.size.mas_equalTo(CGSizeMake(30, 30));
+    }];
+
+    self.redeemSuccessTitleLabel = [UILabel new];
+    self.redeemSuccessTitleLabel.text = @"兑换成功！";
+    self.redeemSuccessTitleLabel.textColor = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
+    self.redeemSuccessTitleLabel.font = [UIFont systemFontOfSize:10.805 weight:UIFontWeightSemibold];
+    self.redeemSuccessTitleLabel.hidden = YES;
+    [self.redeemDialogView addSubview:self.redeemSuccessTitleLabel];
+    [self.redeemSuccessTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.redeemSuccessWrapView.mas_bottom).offset(13);
+        make.centerX.equalTo(self.redeemDialogView);
+    }];
+
+    self.redeemSuccessDescLabel = [UILabel new];
+    self.redeemSuccessDescLabel.text = @"折扣已应用到相应会员订阅中";
+    self.redeemSuccessDescLabel.textColor = [UIColor whiteColor];
+    self.redeemSuccessDescLabel.font = [UIFont systemFontOfSize:10.805 weight:UIFontWeightLight];
+    self.redeemSuccessDescLabel.hidden = YES;
+    [self.redeemDialogView addSubview:self.redeemSuccessDescLabel];
+    [self.redeemSuccessDescLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.redeemSuccessTitleLabel.mas_bottom).offset(6);
+        make.centerX.equalTo(self.redeemDialogView);
+    }];
 }
 
 - (UIView *)buildPlanCard:(MCPlan *)plan large:(BOOL)large {
@@ -706,24 +921,48 @@
         }];
     }
 
+    NSString *hintText = [self cardHintTextForPlan:plan];
     UILabel *hint = [UILabel new];
-    hint.text = plan.hint.length ? plan.hint : nil;
-    hint.hidden = plan.hint.length == 0;
+    hint.text = hintText.length ? hintText : nil;
+    hint.hidden = hintText.length == 0;
     hint.textColor = [UIColor colorWithRed:147/255.0 green:221/255.0 blue:196/255.0 alpha:1.0];
     hint.font = [UIFont systemFontOfSize:isLargeFounderPlan ? 9.2 : 6.9];
     hint.textAlignment = NSTextAlignmentRight;
     [card addSubview:hint];
-    [hint mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(card).offset(isMonthlyPlan ? -8 : -10);
-        if (isLargeFounderPlan && lastBenefitLine) {
-            make.centerY.equalTo(lastBenefitLine);
+
+    NSString *originalPriceText = [self cardOriginalPriceTextForPlan:plan];
+    UILabel *originPrice = [UILabel new];
+    originPrice.hidden = originalPriceText.length == 0;
+    originPrice.attributedText = [self cardOriginalPriceAttrTextForPlan:plan large:large];
+    originPrice.textAlignment = NSTextAlignmentRight;
+    [card addSubview:originPrice];
+    [originPrice mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.equalTo(card).offset(isMonthlyPlan ? -12 : -10);
+        if (large && isMonthlyPlan && !originPrice.hidden) {
+            make.bottom.equalTo(card).offset(-78);
+        } else if (isLargeFounderPlan && !hint.hidden) {
+            make.bottom.equalTo(hint.mas_top).offset(-1);
         } else {
-            CGFloat hintBottom = -58;
-            if (large) {
-                if (isMonthlyPlan) hintBottom = -82;
-                else hintBottom = -78;
+            make.bottom.equalTo(card).offset(large ? -79 : -58);
+        }
+    }];
+
+    [hint mas_makeConstraints:^(MASConstraintMaker *make) {
+        if (large && isMonthlyPlan && !originPrice.hidden) {
+            make.trailing.equalTo(originPrice.mas_leading).offset(-8);
+            make.centerY.equalTo(originPrice);
+        } else {
+            make.trailing.equalTo(card).offset(isMonthlyPlan ? -8 : -10);
+            if (isLargeFounderPlan && lastBenefitLine) {
+                make.centerY.equalTo(lastBenefitLine);
+            } else {
+                CGFloat hintBottom = -58;
+                if (large) {
+                    if (isMonthlyPlan) hintBottom = -82;
+                    else hintBottom = -78;
+                }
+                make.bottom.equalTo(card).offset(hintBottom);
             }
-            make.bottom.equalTo(card).offset(hintBottom);
         }
     }];
 
@@ -814,6 +1053,40 @@
     return attr;
 }
 
+- (NSString *)cardHintTextForPlan:(MCPlan *)plan {
+    if (self.hasAppliedRedeemDiscount) {
+        if ([plan.title isEqualToString:@"连续包月"]) return @"限时优惠";
+        if ([plan.title isEqualToString:@"终身权益"]) return plan.hint ?: @"";
+        return @"";
+    }
+    return plan.hint ?: @"";
+}
+
+- (NSString *)cardOriginalPriceTextForPlan:(MCPlan *)plan {
+    if (self.hasAppliedRedeemDiscount) {
+        return plan.originalPrice ?: @"";
+    }
+    return @"";
+}
+
+- (NSAttributedString *)cardOriginalPriceAttrTextForPlan:(MCPlan *)plan large:(BOOL)large {
+    NSString *originalPrice = [self cardOriginalPriceTextForPlan:plan];
+    if (originalPrice.length == 0) return nil;
+    NSString *full = [NSString stringWithFormat:@"¥%@", originalPrice];
+    CGFloat numberSize = large ? 16.0 : 13.0;
+    CGFloat unitSize = large ? 8.0 : 6.5;
+    NSMutableAttributedString *attr = [[NSMutableAttributedString alloc] initWithString:full attributes:@{
+        NSForegroundColorAttributeName: [UIColor colorWithRed:203/255.0 green:203/255.0 blue:203/255.0 alpha:1.0],
+        NSFontAttributeName: [UIFont systemFontOfSize:numberSize weight:UIFontWeightRegular]
+    }];
+    [attr addAttribute:NSFontAttributeName value:[UIFont systemFontOfSize:unitSize weight:UIFontWeightRegular] range:NSMakeRange(0, 1)];
+    [attr addAttributes:@{
+        NSStrikethroughStyleAttributeName: @(NSUnderlineStyleSingle),
+        NSStrikethroughColorAttributeName: [UIColor colorWithRed:203/255.0 green:203/255.0 blue:203/255.0 alpha:1.0]
+    } range:NSMakeRange(0, full.length)];
+    return attr;
+}
+
 - (NSAttributedString *)agreementAttrText {
     NSString *all = @"开通前阅读并同意《会员服务协议》";
     NSMutableAttributedString *m = [[NSMutableAttributedString alloc] initWithString:all attributes:@{
@@ -832,6 +1105,7 @@
     m.title = @"连续包月";
     m.price = @"33";
     m.payPrice = @"33";
+    m.originalPrice = @"";
     m.hint = @"";
     m.benefits = @[@"解锁全部内容", @"数据可视化"];
     m.benefitIcons = @[@"lock.open", @"chart.bar.fill"];
@@ -840,6 +1114,7 @@
     y.title = @"连续包年";
     y.price = @"268";
     y.payPrice = @"268";
+    y.originalPrice = @"";
     y.hint = @"";
     y.benefits = @[@"解锁全部内容", @"赛季总结报告｜年度数据回顾", @"限定数字邮票|边框"];
     y.benefitIcons = @[@"lock.open", @"doc.text.fill", @"stamp.fill"];
@@ -848,6 +1123,7 @@
     l.title = @"永久权益";
     l.price = @"748";
     l.payPrice = @"748";
+    l.originalPrice = @"";
     l.hint = @"";
     l.benefits = @[@"解锁全部内容，永久全部权益", @"赛季终身会员徽章", @"终身限定数字邮票|边框"];
     l.benefitIcons = @[@"lock.open", @"star.circle.fill", @"stamp.fill"];
@@ -856,9 +1132,26 @@
     f.title = @"终身权益";
     f.price = @"998";
     f.payPrice = @"998";
+    f.originalPrice = @"";
     f.hint = @"限前100名";
     f.benefits = @[@"终身全部权益", @"未来产品优先体验权", @"APP 内专属编号徽章", @"创始人社群", @"限定编号球衣"];
     f.benefitIcons = @[@"trophy.fill", @"shippingbox.fill", @"number.square.fill", @"globe", @"tshirt.fill"];
+
+    if (self.hasAppliedRedeemDiscount) {
+        m.originalPrice = m.price;
+        m.price = @"22";
+        m.payPrice = @"22";
+
+        y.originalPrice = y.price;
+        y.price = @"188";
+        y.payPrice = @"188";
+
+        l.originalPrice = l.price;
+        l.price = @"698";
+        l.payPrice = @"698";
+
+        f.originalPrice = @"";
+    }
 
     self.plans = @[m, y, l, f];
 }
@@ -871,6 +1164,33 @@
     [self.payBtn setAttributedTitle:[self paymentButtonAttrTitleForPlan:plan] forState:UIControlStateNormal];
     [self.payBtn setAttributedTitle:[self paymentButtonAttrTitleForPlan:plan] forState:UIControlStateDisabled];
     self.pageControl.currentPage = idx;
+}
+
+- (void)reloadPlanCardsPreservingIndex {
+    NSInteger targetIndex = MAX(0, MIN(self.currentIndex, (NSInteger)self.plans.count - 1));
+    [self buildPlanData];
+
+    NSMutableArray<UIView *> *cards = [NSMutableArray array];
+    [self.cardViews makeObjectsPerformSelector:@selector(removeFromSuperview)];
+
+    UIView *prev = nil;
+    for (NSInteger i = 0; i < self.plans.count; i++) {
+        UIView *card = [self buildPlanCard:self.plans[i] large:YES];
+        [self.cardContentView addSubview:card];
+        [cards addObject:card];
+        [card mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.bottom.equalTo(self.cardContentView);
+            make.width.mas_equalTo(210);
+            if (prev) make.leading.equalTo(prev.mas_trailing).offset(12);
+            else make.leading.equalTo(self.cardContentView).offset(82);
+            if (i == self.plans.count - 1) make.trailing.equalTo(self.cardContentView).offset(-82);
+        }];
+        prev = card;
+    }
+
+    self.cardViews = cards;
+    self.pageControl.numberOfPages = self.plans.count;
+    [self applyPlanAtIndex:targetIndex animated:NO];
 }
 
 - (void)applyPlanAtIndex:(NSInteger)idx animated:(BOOL)animated {
@@ -919,7 +1239,7 @@
 }
 
 - (void)onTapRedeemFromBanner {
-    [self switchToGiftMode:YES];
+    [self showRedeemDialog];
 }
 
 - (void)onTapSubscribeTab {
@@ -928,6 +1248,59 @@
 
 - (void)onTapGiftTab {
     [self switchToGiftMode:YES];
+}
+
+- (void)showRedeemDialog {
+    self.redeemDialogShowingSuccess = NO;
+    [self.view bringSubviewToFront:self.redeemOverlayView];
+    self.redeemOverlayView.hidden = NO;
+    self.redeemInputField.text = @"";
+    self.redeemHelpLabel.hidden = YES;
+    self.redeemInputWrapView.hidden = NO;
+    self.redeemDialogTicketIconView.hidden = NO;
+    self.redeemSuccessWrapView.hidden = YES;
+    self.redeemSuccessTitleLabel.hidden = YES;
+    self.redeemSuccessDescLabel.hidden = YES;
+    [self updateRedeemDialogForInput];
+    [self.redeemInputField becomeFirstResponder];
+}
+
+- (void)hideRedeemDialog {
+    [self.view endEditing:YES];
+    self.redeemOverlayView.hidden = YES;
+}
+
+- (void)onRedeemDialogInputChanged {
+    NSString *raw = [self.redeemInputField.text ?: @"" stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSCharacterSet *nonDigits = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
+    NSString *code = [[raw componentsSeparatedByCharactersInSet:nonDigits] componentsJoinedByString:@""];
+    if (code.length > 5) code = [code substringToIndex:5];
+    if (![code isEqualToString:self.redeemInputField.text ?: @""]) {
+        self.redeemInputField.text = code;
+    }
+    [self updateRedeemDialogForInput];
+}
+
+- (void)updateRedeemDialogForInput {
+    NSString *code = self.redeemInputField.text ?: @"";
+    BOOL hasInput = code.length > 0;
+    self.redeemHelpLabel.hidden = !hasInput;
+    self.redeemConfirmBtn.alpha = code.length == 5 ? 1.0 : 0.88;
+}
+
+- (void)onTapRedeemDialogConfirm {
+    NSString *code = self.redeemInputField.text ?: @"";
+    if (code.length < 5) return;
+    [self.view endEditing:YES];
+    self.hasAppliedRedeemDiscount = YES;
+    self.redeemDialogShowingSuccess = YES;
+    self.redeemDialogTicketIconView.hidden = YES;
+    self.redeemInputWrapView.hidden = YES;
+    self.redeemHelpLabel.hidden = YES;
+    self.redeemSuccessWrapView.hidden = NO;
+    self.redeemSuccessTitleLabel.hidden = NO;
+    self.redeemSuccessDescLabel.hidden = NO;
+    [self reloadPlanCardsPreservingIndex];
 }
 
 - (void)switchToGiftMode:(BOOL)giftMode {
