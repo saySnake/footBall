@@ -309,7 +309,7 @@
     self.contentPanelView.userInteractionEnabled = NO;
     [self.view insertSubview:self.contentPanelView belowSubview:self.segmentWrap];
     [self.contentPanelView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.segmentWrap.mas_bottom).offset(-15);
+        make.top.equalTo(self.segmentWrap.mas_bottom);
         make.leading.trailing.bottom.equalTo(self.view);
     }];
 
@@ -317,7 +317,7 @@
     self.giftContainerView.hidden = YES;
     [self.view addSubview:self.giftContainerView];
     [self.giftContainerView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.segmentWrap.mas_bottom).offset(-15);
+        make.top.equalTo(self.segmentWrap.mas_bottom);
         make.leading.trailing.bottom.equalTo(self.view);
     }];
     self.giftPromptLabel = [UILabel new];
