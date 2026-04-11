@@ -204,11 +204,10 @@
     self.avatarView = [UIImageView new];
     self.avatarView.layer.cornerRadius = 26;
     self.avatarView.clipsToBounds = YES;
+    self.avatarView.backgroundColor = [UIColor clearColor];
     self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
-    self.avatarView.image = [UIImage imageNamed:@"setting_icon"];
-    if (!self.avatarView.image && @available(iOS 13.0, *)) {
-        self.avatarView.image = [UIImage systemImageNamed:@"person.crop.circle.fill"];
-    }
+    self.avatarView.tintColor = nil;
+    self.avatarView.image = [self defaultMembershipAvatarImage];
     [self.avatarWrap addSubview:self.avatarView];
     [self.avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.top.bottom.equalTo(self.avatarWrap);
@@ -992,6 +991,38 @@
     return [UIFont systemFontOfSize:size weight:weight];
 }
 
+- (UIImage *)defaultMembershipAvatarImage {
+    CGSize size = CGSizeMake(52, 52);
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:size];
+    return [renderer imageWithActions:^(UIGraphicsImageRendererContext * _Nonnull rendererContext) {
+        CGRect bounds = (CGRect){CGPointZero, size};
+        [[UIColor clearColor] setFill];
+        UIRectFill(bounds);
+
+        UIBezierPath *circlePath = [UIBezierPath bezierPathWithOvalInRect:bounds];
+        [[UIColor colorWithWhite:1 alpha:0.12] setFill];
+        [circlePath fill];
+
+        UIImage *icon = nil;
+        if (@available(iOS 13.0, *)) {
+            UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:24 weight:UIImageSymbolWeightRegular];
+            icon = [[UIImage systemImageNamed:@"person.fill" withConfiguration:config] imageWithTintColor:[UIColor colorWithWhite:1 alpha:0.92] renderingMode:UIImageRenderingModeAlwaysOriginal];
+        }
+        if (!icon) {
+            UIImage *fallback = [UIImage imageNamed:@"setting_photo"];
+            if (fallback) {
+                CGFloat fallbackSide = 22;
+                [fallback drawInRect:CGRectMake((size.width - fallbackSide) / 2.0, (size.height - fallbackSide) / 2.0, fallbackSide, fallbackSide)];
+            }
+            return;
+        }
+
+        CGSize iconSize = icon.size;
+        CGRect iconRect = CGRectMake((size.width - iconSize.width) / 2.0, (size.height - iconSize.height) / 2.0, iconSize.width, iconSize.height);
+        [icon drawInRect:iconRect];
+    }];
+}
+
 - (NSAttributedString *)cardPriceAttrTextForPlan:(MCPlan *)plan large:(BOOL)large {
     NSString *priceText = plan.price ?: @"";
     NSString *full = [NSString stringWithFormat:@"¥%@", priceText];
@@ -1015,18 +1046,20 @@
     self.nameLabel.text = nickname;
 
     NSString *avatarString = profile.avatar.length > 0 ? profile.avatar : user.avatar;
-    NSURL *avatarURL = avatarString.length > 0 ? [NSURL URLWithString:avatarString] : nil;
-    UIImage *placeholder = [UIImage imageNamed:@"setting_icon"];
+    NSString *trimmedAvatarString = [avatarString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSURL *avatarURL = trimmedAvatarString.length > 0 ? [NSURL URLWithString:trimmedAvatarString] : nil;
+    UIImage *placeholder = [self defaultMembershipAvatarImage];
     if (avatarURL) {
         self.avatarView.tintColor = nil;
         self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
-    } else if (!placeholder && @available(iOS 13.0, *)) {
-        placeholder = [UIImage systemImageNamed:@"person.crop.circle.fill"];
-        self.avatarView.tintColor = [UIColor colorWithWhite:1 alpha:0.85];
-        self.avatarView.contentMode = UIViewContentModeCenter;
+        self.avatarView.backgroundColor = [UIColor clearColor];
     } else {
+        [self.avatarView sd_cancelCurrentImageLoad];
         self.avatarView.tintColor = nil;
         self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
+        self.avatarView.backgroundColor = [UIColor clearColor];
+        self.avatarView.image = placeholder;
+        return;
     }
     [self.avatarView sd_setImageWithURL:avatarURL placeholderImage:placeholder];
 }
