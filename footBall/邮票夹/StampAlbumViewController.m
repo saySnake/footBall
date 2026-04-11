@@ -393,9 +393,6 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
         // 避免系统默认在首个 section 前插入额外空白，使 section 与首行紧贴
         _tableView.sectionHeaderTopPadding = 0;
     }
-    UIView *topSpacer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.view.bounds), 15)];
-    topSpacer.backgroundColor = [UIColor clearColor];
-    _tableView.tableHeaderView = topSpacer;
     [_tableView registerClass:[StampAlbumGridTableCell class] forCellReuseIdentifier:@"StampAlbumGridTableCell"];
     [self.view addSubview:_tableView];
     [_tableView mas_makeConstraints:^(MASConstraintMaker *make) {
