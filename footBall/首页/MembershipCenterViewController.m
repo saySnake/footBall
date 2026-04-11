@@ -44,8 +44,6 @@
 @property (nonatomic, strong) UILabel *bannerSubLabel;
 @property (nonatomic, strong) UILabel *bannerHintLabel;
 @property (nonatomic, strong) UIButton *redeemBtn;
-/// Figma 571:2602「光」柔光背景（非 set_center 插画）
-@property (nonatomic, strong) UIView *bannerGlowView;
 
 @property (nonatomic, strong) UIView *segmentWrap;
 @property (nonatomic, strong) UIButton *subscribeTabBtn;
@@ -218,18 +216,6 @@
         make.top.equalTo(self.avatarWrap.mas_bottom).offset(14);
         make.height.mas_equalTo(82);
     }];
-    /// 稿中横幅后的圆形光晕（571:2602），不用 set_center 插画
-    self.bannerGlowView = [UIView new];
-    self.bannerGlowView.userInteractionEnabled = NO;
-    self.bannerGlowView.backgroundColor = [UIColor colorWithRed:0.75 green:1.0 blue:0.92 alpha:0.22];
-    self.bannerGlowView.layer.cornerRadius = 122;
-    self.bannerGlowView.clipsToBounds = YES;
-    [self.view insertSubview:self.bannerGlowView belowSubview:self.bannerCard];
-    [self.bannerGlowView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self.view);
-        make.centerY.equalTo(self.bannerCard.mas_centerY);
-        make.size.mas_equalTo(CGSizeMake(244, 244));
-    }];
     /// Figma 571:2648：linear 187.85° 黑 40% → 薄荷 40%
     self.bannerGradientLayer = [CAGradientLayer layer];
     self.bannerGradientLayer.name = @"mc.banner.bg";
@@ -251,7 +237,7 @@
         make.top.equalTo(self.bannerCard).offset(12);
     }];
     self.bannerSubLabel = [UILabel new];
-    self.bannerSubLabel.text = @"限时折扣码";
+    self.bannerSubLabel.text = @"限时兑换码";
     self.bannerSubLabel.textColor = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
     self.bannerSubLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
     [self.bannerCard addSubview:self.bannerSubLabel];
@@ -260,7 +246,7 @@
         make.top.equalTo(self.bannerTitleLabel.mas_bottom).offset(2);
     }];
     self.bannerHintLabel = [UILabel new];
-    self.bannerHintLabel.text = @"使用限时折扣码，解锁专属会员优惠";
+    self.bannerHintLabel.text = @"使用限时兑换码，解锁专属会员优惠";
     self.bannerHintLabel.textColor = [UIColor colorWithWhite:1 alpha:0.5];
     self.bannerHintLabel.font = [UIFont systemFontOfSize:8 weight:UIFontWeightLight];
     [self.bannerCard addSubview:self.bannerHintLabel];
@@ -283,16 +269,19 @@
     }];
 
     self.segmentWrap = [UIView new];
+    self.segmentWrap.backgroundColor = [UIColor clearColor];
+    self.segmentWrap.clipsToBounds = NO;
     [self.view addSubview:self.segmentWrap];
     [self.segmentWrap mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.bannerCard.mas_bottom).offset(12);
-        make.leading.equalTo(self.view);
+        make.leading.equalTo(self.view).offset(0);
         make.width.mas_equalTo(280);
         make.height.mas_equalTo(41);
     }];
     self.subscribeTabBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     self.subscribeTabBtn.backgroundColor = [UIColor colorWithRed:40/255.0 green:93/255.0 blue:75/255.0 alpha:0.48];
     self.subscribeTabBtn.layer.cornerRadius = 12;
+    self.subscribeTabBtn.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
     self.subscribeTabBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
     [self.subscribeTabBtn setTitle:@"会员订阅" forState:UIControlStateNormal];
     [self.subscribeTabBtn addTarget:self action:@selector(onTapSubscribeTab) forControlEvents:UIControlEventTouchUpInside];
@@ -304,6 +293,7 @@
     self.giftTabBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     self.giftTabBtn.backgroundColor = [UIColor blackColor];
     self.giftTabBtn.layer.cornerRadius = 12;
+    self.giftTabBtn.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
     self.giftTabBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
     [self.giftTabBtn setTitle:@"礼包码" forState:UIControlStateNormal];
     [self.giftTabBtn addTarget:self action:@selector(onTapGiftTab) forControlEvents:UIControlEventTouchUpInside];
@@ -319,7 +309,7 @@
     self.contentPanelView.userInteractionEnabled = NO;
     [self.view insertSubview:self.contentPanelView belowSubview:self.segmentWrap];
     [self.contentPanelView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.segmentWrap.mas_bottom);
+        make.top.equalTo(self.segmentWrap.mas_bottom).offset(-15);
         make.leading.trailing.bottom.equalTo(self.view);
     }];
 
@@ -327,7 +317,7 @@
     self.giftContainerView.hidden = YES;
     [self.view addSubview:self.giftContainerView];
     [self.giftContainerView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.segmentWrap.mas_bottom);
+        make.top.equalTo(self.segmentWrap.mas_bottom).offset(-15);
         make.leading.trailing.bottom.equalTo(self.view);
     }];
     self.giftPromptLabel = [UILabel new];
@@ -337,7 +327,7 @@
     [self.giftContainerView addSubview:self.giftPromptLabel];
     [self.giftPromptLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(self.giftContainerView).offset(17);
-        make.top.equalTo(self.giftContainerView).offset(19);
+        make.top.equalTo(self.giftContainerView).offset(24);
     }];
 
     self.giftCodeTapAreaBtn = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -347,7 +337,7 @@
         make.leading.equalTo(self.giftContainerView).offset(28);
         make.trailing.equalTo(self.giftContainerView).offset(-31);
         make.top.equalTo(self.giftPromptLabel.mas_bottom).offset(17);
-        make.height.mas_equalTo(64.5);
+        make.height.mas_equalTo(64.453);
     }];
 
     NSMutableArray<UIView *> *digitBoxes = [NSMutableArray array];
@@ -355,20 +345,17 @@
     UIView *prevBox = nil;
     for (NSInteger i = 0; i < 5; i++) {
         UIView *box = [UIView new];
-        box.layer.cornerRadius = 13.4;
-        box.layer.borderWidth = 0.9;
+        box.layer.cornerRadius = 13.428;
+        box.layer.borderWidth = 0.895;
         box.layer.borderColor = [UIColor colorWithRed:191/255.0 green:191/255.0 blue:191/255.0 alpha:1.0].CGColor;
         [self.giftCodeTapAreaBtn addSubview:box];
         [box mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.bottom.equalTo(self.giftCodeTapAreaBtn);
-            make.width.mas_equalTo((i == 1 || i == 4) ? 57.3 : 56.4);
+            make.width.mas_equalTo(56.397);
             if (prevBox) {
-                make.leading.equalTo(prevBox.mas_trailing).offset(8);
+                make.leading.equalTo(prevBox.mas_trailing).offset(8.761);
             } else {
                 make.leading.equalTo(self.giftCodeTapAreaBtn);
-            }
-            if (i == 4) {
-                make.trailing.equalTo(self.giftCodeTapAreaBtn);
             }
         }];
         UILabel *digit = [UILabel new];
@@ -407,7 +394,7 @@
     [self.giftContainerView addSubview:self.giftRedeemBtn];
     [self.giftRedeemBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self.giftContainerView);
-        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-62);
+        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-49);
         make.width.mas_equalTo(226);
         make.height.mas_equalTo(35);
     }];
@@ -417,7 +404,7 @@
     [self.giftContainerView addSubview:self.giftSuccessWrap];
     [self.giftSuccessWrap mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self.giftContainerView);
-        make.centerY.equalTo(self.giftContainerView).offset(85);
+        make.top.equalTo(self.giftContainerView).offset(156);
         make.size.mas_equalTo(CGSizeMake(117, 117));
     }];
     UIView *successOuter = [UIView new];
@@ -434,8 +421,9 @@
     [successOuter addSubview:successInner];
     [successInner mas_makeConstraints:^(MASConstraintMaker *make) {
         make.center.equalTo(successOuter);
-        make.size.mas_equalTo(CGSizeMake(92, 92));
+        make.size.mas_equalTo(CGSizeMake(89, 89));
     }];
+    successInner.layer.cornerRadius = 44.5;
     UILabel *check = [UILabel new];
     check.text = @"✓";
     check.textColor = [UIColor blackColor];
@@ -451,7 +439,7 @@
     [self.giftContainerView addSubview:self.giftSuccessLabel];
     [self.giftSuccessLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self.giftContainerView);
-        make.top.equalTo(self.giftSuccessWrap.mas_bottom).offset(10);
+        make.top.equalTo(self.giftSuccessWrap.mas_bottom).offset(18);
     }];
 
     self.planTitleLabel = [UILabel new];
