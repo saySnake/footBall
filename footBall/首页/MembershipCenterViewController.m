@@ -580,6 +580,10 @@
 
 - (UIView *)buildPlanCard:(MCPlan *)plan large:(BOOL)large {
     BOOL isMonthlyPlan = [plan.title isEqualToString:@"连续包月"];
+    BOOL isLifetimePlan = [plan.title isEqualToString:@"永久权益"];
+    BOOL isFounderPlan = [plan.title isEqualToString:@"终身权益"];
+    BOOL isLargeLifetimePlan = large && isLifetimePlan;
+    BOOL isLargeFounderPlan = large && isFounderPlan;
     UIView *card = [UIView new];
     card.layer.cornerRadius = large ? 15.133 : 11.29;
     card.clipsToBounds = YES;
@@ -592,22 +596,30 @@
     g.endPoint = CGPointMake(0.5, 1);
     [card.layer addSublayer:g];
 
-    UILabel *type = [UILabel new];
-    type.text = plan.title;
-    type.textColor = [UIColor whiteColor];
-    type.font = [UIFont systemFontOfSize:(large ? (isMonthlyPlan ? 15.14 : 15.0) : 11.0) weight:UIFontWeightSemibold];
-    [card addSubview:type];
-    [type mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(card).offset(15);
-        make.top.equalTo(card).offset(14);
-    }];
+    UILabel *type = nil;
+    if (!isLargeLifetimePlan && !isLargeFounderPlan) {
+        type = [UILabel new];
+        type.text = plan.title;
+        type.textColor = [UIColor whiteColor];
+        type.font = [UIFont systemFontOfSize:(large ? (isMonthlyPlan ? 15.14 : 15.0) : 11.0) weight:UIFontWeightSemibold];
+        [card addSubview:type];
+        [type mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(card).offset(15);
+            make.top.equalTo(card).offset(14);
+        }];
+    }
 
     UIView *crownRow = [UIView new];
     [card addSubview:crownRow];
     [crownRow mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(card).offset(14);
-        make.top.equalTo(type.mas_bottom).offset(10);
-        make.height.mas_equalTo(18);
+        make.leading.equalTo(card).offset((isLargeLifetimePlan || isLargeFounderPlan) ? 19 : 14);
+        if (isLargeLifetimePlan || isLargeFounderPlan) {
+            make.top.equalTo(card).offset(21);
+            make.height.mas_equalTo(17.01);
+        } else {
+            make.top.equalTo(type.mas_bottom).offset(10);
+            make.height.mas_equalTo(18);
+        }
     }];
     UIImageView *crown = [UIImageView new];
     crown.contentMode = UIViewContentModeScaleAspectFit;
@@ -620,39 +632,45 @@
     [crownRow addSubview:crown];
     [crown mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.centerY.equalTo(crownRow);
-        make.size.mas_equalTo(CGSizeMake(large ? 16.0 : 12.0, large ? 16.0 : 12.0));
+        CGFloat crownSize = (isLargeLifetimePlan || isLargeFounderPlan) ? 15.998 : (large ? 16.0 : 12.0);
+        make.size.mas_equalTo(CGSizeMake(crownSize, crownSize));
     }];
     UILabel *spec = [UILabel new];
-    spec.text = @"特殊权益";
+    spec.text = (isLargeLifetimePlan || isLargeFounderPlan) ? @"终身权益" : @"特殊权益";
     spec.textColor = [UIColor whiteColor];
-    spec.font = [UIFont systemFontOfSize:large ? 12.06 : 9 weight:UIFontWeightMedium];
+    spec.font = [UIFont systemFontOfSize:(isLargeLifetimePlan || isLargeFounderPlan) ? 11.991 : (large ? 12.06 : 9) weight:UIFontWeightMedium];
     [crownRow addSubview:spec];
     [spec mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(crown.mas_trailing).offset(6);
+        make.leading.equalTo(crown.mas_trailing).offset((isLargeLifetimePlan || isLargeFounderPlan) ? 3.0 : 6.0);
         make.centerY.equalTo(crownRow);
         make.trailing.lessThanOrEqualTo(crownRow);
     }];
 
     NSArray<NSString *> *icons = plan.benefitIcons;
-    CGFloat lineStep = large ? 29.34 : 22.03;
-    CGFloat lineTopOffset = large ? 21.03 : 16.57;
+    CGFloat lineStep = isLargeFounderPlan ? 28.2 : (large ? 29.34 : 22.03);
+    CGFloat lineTopOffset = (isLargeLifetimePlan || isLargeFounderPlan) ? 19.08 : (large ? 21.03 : 16.57);
     CGFloat textLeading = large ? 53.54 : 40.15;
     CGFloat ringLeading = large ? 19.0 : 14.25;
-    CGFloat ringSize = large ? 25.01 : 18.75;
-    CGFloat iconSize = large ? 15.28 : 11.46;
+    CGFloat ringSize = isLargeFounderPlan ? 24.0 : (large ? 25.01 : 18.75);
+    CGFloat defaultIconSize = isLargeFounderPlan ? 17.777 : (large ? 15.28 : 11.46);
+    UILabel *lastBenefitLine = nil;
     for (NSInteger i = 0; i < plan.benefits.count; i++) {
         NSString *sym = (icons && i < (NSInteger)icons.count) ? icons[i] : @"circle.fill";
+        NSString *benefitText = plan.benefits[i];
         UILabel *line = [UILabel new];
-        line.text = plan.benefits[i];
+        line.text = benefitText;
         line.textColor = [UIColor whiteColor];
-        line.font = [UIFont systemFontOfSize:large ? 7.53 : 5.62 weight:UIFontWeightMedium];
+        line.font = [UIFont systemFontOfSize:(isLargeLifetimePlan ? 7.484 : (isLargeFounderPlan ? 8.71 : (large ? 7.53 : 5.62))) weight:UIFontWeightMedium];
         line.numberOfLines = 1;
         [card addSubview:line];
         [line mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(card).offset(textLeading);
-            make.trailing.lessThanOrEqualTo(card).offset(-8);
+            make.trailing.lessThanOrEqualTo(card).offset((isLargeLifetimePlan || isLargeFounderPlan) ? -15 : -8);
             make.top.equalTo(crownRow.mas_bottom).offset(lineTopOffset + i * lineStep);
         }];
+        if (isLargeFounderPlan && i == plan.benefits.count - 1) {
+            lastBenefitLine = line;
+        }
         UIView *ring = [UIView new];
         ring.backgroundColor = [UIColor blackColor];
         ring.layer.cornerRadius = ringSize / 2.0;
@@ -666,23 +684,23 @@
         ic.contentMode = UIViewContentModeScaleAspectFit;
         ic.tintColor = [UIColor whiteColor];
         UIImage *benefitImage = nil;
-        if ([line.text containsString:@"解锁全部内容"]) {
+        if ([benefitText containsString:@"解锁全部内容"]) {
             benefitImage = [UIImage imageNamed:@"vip_unlock"];
-        } else if ([line.text containsString:@"数据可视化"] || [line.text containsString:@"数据回顾"]) {
+        } else if ([benefitText containsString:@"数据可视化"] || [benefitText containsString:@"数据回顾"]) {
             benefitImage = [UIImage imageNamed:@"vip_data"];
-        } else if ([line.text containsString:@"邮票"]) {
+        } else if ([benefitText containsString:@"邮票"]) {
             benefitImage = [UIImage imageNamed:@"vip_stamp"];
-        } else if ([line.text containsString:@"未来产品"]) {
+        } else if ([benefitText containsString:@"未来产品"]) {
             benefitImage = [UIImage imageNamed:@"vip_product"];
-        } else if ([line.text containsString:@"社群"]) {
+        } else if ([benefitText containsString:@"社群"]) {
             benefitImage = [UIImage imageNamed:@"vip_global"];
-        } else if ([line.text containsString:@"球衣"]) {
+        } else if ([benefitText containsString:@"球衣"]) {
             benefitImage = [UIImage imageNamed:@"vip_clothes"];
-        } else if ([line.text containsString:@"终身全部权益"]) {
+        } else if ([benefitText containsString:@"终身全部权益"]) {
             benefitImage = [UIImage imageNamed:@"vip_trophy"];
-        } else if ([line.text containsString:@"会员徽章"]) {
+        } else if ([benefitText containsString:@"会员徽章"]) {
             benefitImage = [UIImage imageNamed:@"vip_postcard"];
-        } else if ([line.text containsString:@"编号徽章"]) {
+        } else if ([benefitText containsString:@"编号徽章"]) {
             benefitImage = [UIImage imageNamed:@"vip_coins"];
         }
         if (!benefitImage && @available(iOS 13.0, *)) {
@@ -692,6 +710,10 @@
         [card addSubview:ic];
         [ic mas_makeConstraints:^(MASConstraintMaker *make) {
             make.center.equalTo(ring);
+            CGFloat iconSize = defaultIconSize;
+            if (isLargeLifetimePlan && [benefitText containsString:@"会员徽章"]) {
+                iconSize = 13.998;
+            }
             make.size.mas_equalTo(CGSizeMake(iconSize, iconSize));
         }];
     }
@@ -700,12 +722,21 @@
     hint.text = plan.hint.length ? plan.hint : nil;
     hint.hidden = plan.hint.length == 0;
     hint.textColor = [UIColor colorWithRed:147/255.0 green:221/255.0 blue:196/255.0 alpha:1.0];
-    hint.font = [UIFont systemFontOfSize:6.9];
+    hint.font = [UIFont systemFontOfSize:isLargeFounderPlan ? 9.2 : 6.9];
     hint.textAlignment = NSTextAlignmentRight;
     [card addSubview:hint];
     [hint mas_makeConstraints:^(MASConstraintMaker *make) {
         make.trailing.equalTo(card).offset(isMonthlyPlan ? -8 : -10);
-        make.bottom.equalTo(card).offset(large ? (isMonthlyPlan ? -82 : -78) : -58);
+        if (isLargeFounderPlan && lastBenefitLine) {
+            make.centerY.equalTo(lastBenefitLine);
+        } else {
+            CGFloat hintBottom = -58;
+            if (large) {
+                if (isMonthlyPlan) hintBottom = -82;
+                else hintBottom = -78;
+            }
+            make.bottom.equalTo(card).offset(hintBottom);
+        }
     }];
 
     UILabel *price = [UILabel new];
@@ -715,7 +746,7 @@
     [card addSubview:price];
     [price mas_makeConstraints:^(MASConstraintMaker *make) {
         make.trailing.equalTo(card).offset(isMonthlyPlan ? -12 : -10);
-        make.bottom.equalTo(card).offset(isMonthlyPlan ? -6 : -6);
+        make.bottom.equalTo(card).offset(8);
     }];
     /// 月度通行证「限时优惠」需要显示在价格上层，避免被大号金额遮挡
     if (!hint.hidden) {
@@ -812,23 +843,23 @@
     MCPlan *m = [MCPlan new];
     m.title = @"连续包月";
     m.price = @"33";
-    m.payPrice = @"22";
-    m.hint = @"限时优惠";
+    m.payPrice = @"33";
+    m.hint = @"";
     m.benefits = @[@"解锁全部内容", @"数据可视化"];
     m.benefitIcons = @[@"lock.open", @"chart.bar.fill"];
 
     MCPlan *y = [MCPlan new];
     y.title = @"连续包年";
-    y.price = @"188";
-    y.payPrice = @"188";
-    y.hint = @"已优惠¥76";
+    y.price = @"268";
+    y.payPrice = @"268";
+    y.hint = @"";
     y.benefits = @[@"解锁全部内容", @"赛季总结报告｜年度数据回顾", @"限定数字邮票|边框"];
     y.benefitIcons = @[@"lock.open", @"doc.text.fill", @"stamp.fill"];
 
     MCPlan *l = [MCPlan new];
     l.title = @"永久权益";
-    l.price = @"698";
-    l.payPrice = @"698";
+    l.price = @"748";
+    l.payPrice = @"748";
     l.hint = @"";
     l.benefits = @[@"解锁全部内容，永久全部权益", @"赛季终身会员徽章", @"终身限定数字邮票|边框"];
     l.benefitIcons = @[@"lock.open", @"star.circle.fill", @"stamp.fill"];
