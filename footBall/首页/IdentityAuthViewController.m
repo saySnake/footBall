@@ -7,7 +7,10 @@
 #import "RealNameAuthViewController.h"
 #import "ProfessionalAuthViewController.h"
 #import "AuthManager.h"
+#import "AuthStateStore.h"
 #import "User.h"
+#import "VerificationRequest.h"
+#import "VerificationModels.h"
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
 
@@ -41,7 +44,38 @@ static CGFloat const kIACertCardH = 138.f;
 @property (nonatomic, strong) UILabel *conditionTitleLabel;
 @property (nonatomic, strong) UIView *professionalCard;
 @property (nonatomic, strong) UIView *realNameCard;
+@property (nonatomic, strong) UIButton *professionalCertButton;
+@property (nonatomic, strong) UIButton *realNameCertButton;
 @end
+
+static NSString *IAEffectiveStatus(NSString *apiStatus, BOOL fallbackApproved) {
+    NSString *s = apiStatus ?: @"";
+    s = [s stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (s.length > 0) {
+        return s;
+    }
+    return fallbackApproved ? @"APPROVED" : @"";
+}
+
+static BOOL IAStatusIsApproved(NSString *s) {
+    if (s.length == 0) {
+        return NO;
+    }
+    NSString *u = s.uppercaseString;
+    return [u isEqualToString:@"APPROVED"] || [u isEqualToString:@"VERIFIED"] || [u isEqualToString:@"PASSED"];
+}
+
+static BOOL IAStatusIsPending(NSString *s) {
+    return s.length && [s.uppercaseString isEqualToString:@"PENDING"];
+}
+
+static BOOL IAStatusNeedsRetry(NSString *s) {
+    if (s.length == 0) {
+        return NO;
+    }
+    NSString *u = s.uppercaseString;
+    return [u isEqualToString:@"REJECTED"] || [u isEqualToString:@"EXPIRED"];
+}
 
 @implementation IdentityAuthViewController
 
@@ -230,6 +264,9 @@ static CGFloat const kIACertCardH = 138.f;
         make.leading.equalTo(self.professionalCard.mas_trailing).offset(kIACardGap);
         make.width.equalTo(self.professionalCard);
     }];
+
+    self.professionalCertButton = [self firstButtonInSubviewTree:self.professionalCard];
+    self.realNameCertButton = [self firstButtonInSubviewTree:self.realNameCard];
 }
 
 - (UIView *)makeCertCardWithTitleKey:(NSString *)titleKey descKey:(NSString *)descKey buttonKey:(NSString *)btnKey tag:(NSInteger)tag {
@@ -290,23 +327,158 @@ static CGFloat const kIACertCardH = 138.f;
     return card;
 }
 
+- (UIButton *)firstButtonInSubviewTree:(UIView *)root {
+    if ([root isKindOfClass:[UIButton class]]) {
+        return (UIButton *)root;
+    }
+    for (UIView *v in root.subviews) {
+        UIButton *b = [self firstButtonInSubviewTree:v];
+        if (b) {
+            return b;
+        }
+    }
+    return nil;
+}
+
+- (NSInteger)approvedIdentityCount {
+    PNVerificationStatus *st = [VerificationRequest shared].cachedVerificationStatus;
+    BOOL useAPI = st && (st.professionalStatus.length > 0 || st.realnameStatus.length > 0);
+    if (useAPI) {
+        NSInteger n = 0;
+        if (IAStatusIsApproved(st.professionalStatus)) {
+            n++;
+        }
+        if (IAStatusIsApproved(st.realnameStatus)) {
+            n++;
+        }
+        return n;
+    }
+    NSInteger n = 0;
+    if ([AuthStateStore isProfessionalAuthCompleted]) {
+        n++;
+    }
+    if ([AuthStateStore isRealNameAuthCompleted]) {
+        n++;
+    }
+    return n;
+}
+
+- (NSString *)effectiveProfessionalStatusForUI {
+    PNVerificationStatus *st = [VerificationRequest shared].cachedVerificationStatus;
+    return IAEffectiveStatus(st.professionalStatus, [AuthStateStore isProfessionalAuthCompleted]);
+}
+
+- (NSString *)effectiveRealnameStatusForUI {
+    PNVerificationStatus *st = [VerificationRequest shared].cachedVerificationStatus;
+    return IAEffectiveStatus(st.realnameStatus, [AuthStateStore isRealNameAuthCompleted]);
+}
+
+- (void)applyCertButtonStyleDefault:(UIButton *)btn {
+    btn.backgroundColor = kIAButtonGreen;
+    [btn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    btn.layer.shadowOpacity = 0.19f;
+    btn.enabled = YES;
+}
+
+- (void)applyCertButtonStyleMuted:(UIButton *)btn {
+    btn.backgroundColor = [UIColor colorWithWhite:0.88 alpha:1.0];
+    [btn setTitleColor:[UIColor colorWithWhite:0.38 alpha:1.0] forState:UIControlStateNormal];
+    btn.layer.shadowOpacity = 0.f;
+}
+
+- (void)updateCertButton:(UIButton *)btn statusString:(NSString *)raw {
+    NSString *s = raw ?: @"";
+    s = [s stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+
+    if (IAStatusIsApproved(s)) {
+        [btn setTitle:NSLocalizedString(@"auth_cert_status_approved", nil) ?: @"已认证" forState:UIControlStateNormal];
+        [self applyCertButtonStyleMuted:btn];
+        btn.enabled = NO;
+        return;
+    }
+    if (IAStatusIsPending(s)) {
+        [btn setTitle:NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"审核中" forState:UIControlStateNormal];
+        [self applyCertButtonStyleMuted:btn];
+        btn.enabled = NO;
+        return;
+    }
+    if (IAStatusNeedsRetry(s)) {
+        [btn setTitle:NSLocalizedString(@"auth_cert_retry", nil) ?: @"重新认证" forState:UIControlStateNormal];
+        [self applyCertButtonStyleDefault:btn];
+        btn.enabled = YES;
+        return;
+    }
+
+    [btn setTitle:NSLocalizedString(@"auth_start_cert", nil) ?: @"开始认证" forState:UIControlStateNormal];
+    [self applyCertButtonStyleDefault:btn];
+    btn.enabled = YES;
+}
+
+- (void)refreshVerificationSummary {
+    NSInteger n = [self approvedIdentityCount];
+    if (n <= 0) {
+        self.userStatusLabel.attributedText = nil;
+        self.userStatusLabel.text = NSLocalizedString(@"auth_status_uncertified", nil);
+        return;
+    }
+
+    NSString *num = [NSString stringWithFormat:@"%ld", (long)n];
+    NSString *fmt = NSLocalizedString(@"auth_status_n_identities", nil);
+    if (fmt.length == 0) {
+        fmt = @"已认证%@种身份";
+    }
+    NSString *plain = [NSString stringWithFormat:fmt, num];
+
+    NSMutableAttributedString *attr = [[NSMutableAttributedString alloc] initWithString:plain
+                                                                             attributes:@{
+                                                                                 NSFontAttributeName: [UIFont systemFontOfSize:14],
+                                                                                 NSForegroundColorAttributeName: kIATextStatus
+                                                                             }];
+    NSRange r = [plain rangeOfString:num];
+    if (r.location != NSNotFound) {
+        UIFont *bebas = [UIFont fontWithName:@"BebasNeue-Regular" size:14];
+        if (bebas) {
+            [attr addAttributes:@{ NSFontAttributeName: bebas } range:r];
+        }
+    }
+    self.userStatusLabel.attributedText = attr;
+}
+
+- (void)refreshVerificationUI {
+    [self refreshVerificationSummary];
+    [self updateCertButton:self.professionalCertButton statusString:[self effectiveProfessionalStatusForUI]];
+    [self updateCertButton:self.realNameCertButton statusString:[self effectiveRealnameStatusForUI]];
+}
+
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    __weak typeof(self) weakSelf = self;
     if (AuthManager.sharedManager.isLoggedIn) {
-        [[VerificationRequest shared] fetchStatusSuccess:nil failure:nil];
+        [[VerificationRequest shared] fetchStatusSuccess:^(HTTPResponse * _Nullable responseObject) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [weakSelf refreshUserCard];
+            });
+        } failure:^(NSError * _Nonnull error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [weakSelf refreshUserCard];
+            });
+        }];
+    } else {
+        [self refreshUserCard];
     }
-    [self refreshUserCard];
 }
 
 - (void)refreshUserCard {
-    self.userStatusLabel.text = NSLocalizedString(@"auth_status_uncertified", nil);
     if (!AuthManager.sharedManager.isLoggedIn) {
         self.userNameLabel.text = @"--";
+        self.userStatusLabel.attributedText = nil;
+        self.userStatusLabel.text = NSLocalizedString(@"auth_status_uncertified", nil);
         [self.avatarView sd_cancelCurrentImageLoad];
         if (@available(iOS 13.0, *)) {
             self.avatarView.image = [UIImage systemImageNamed:@"person.circle.fill"];
             self.avatarView.tintColor = kIATextMuted;
         }
+        [self refreshVerificationUI];
         return;
     }
     User *u = AuthManager.sharedManager.user;
@@ -327,6 +499,8 @@ static CGFloat const kIACertCardH = 138.f;
             weakSelf.avatarView.tintColor = kIATextMuted;
         }
     }];
+
+    [self refreshVerificationUI];
 }
 
 - (void)updateLocalizedStrings {
@@ -343,6 +517,9 @@ static CGFloat const kIACertCardH = 138.f;
 }
 
 - (void)onCertTapped:(UIButton *)sender {
+    if (!sender.isEnabled) {
+        return;
+    }
     if (sender.tag == 0) {
         ProfessionalAuthViewController *vc = [ProfessionalAuthViewController new];
         vc.hidesBottomBarWhenPushed = YES;

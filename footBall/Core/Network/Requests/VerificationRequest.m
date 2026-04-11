@@ -12,6 +12,8 @@
 #import "APIError.h"
 #import "AuthManager.h"
 #import "AuthStateStore.h"
+#import "VerificationModels.h"
+#import <YYModel/YYModel.h>
 
 @implementation VerificationRequest
 
@@ -152,6 +154,9 @@
 + (void)applyVerificationStatusData:(id)data {
     if (![data isKindOfClass:[NSDictionary class]]) return;
     NSDictionary *d = (NSDictionary *)data;
+
+    PNVerificationStatus *parsed = [PNVerificationStatus yy_modelWithJSON:d];
+    [VerificationRequest shared].cachedVerificationStatus = parsed;
 
     BOOL (^parseBool)(id) = ^BOOL(id o) {
         if ([o isKindOfClass:[NSNumber class]]) return [o boolValue];

@@ -241,6 +241,10 @@
 "auth_pro_identity_title" = "身份職業認證";
 "auth_pro_identity_desc" = "適用於具有職業身份的用户。如:球員、媒體新聞、體育從業身份等...";
 "auth_status_uncertified" = "暫未認證身份";
+"auth_status_n_identities" = "已認證%@種身份";
+"auth_cert_status_approved" = "已認證";
+"auth_cert_status_pending" = "審核中";
+"auth_cert_retry" = "重新認證";
 "auth_conditions_title" = "認證條件";
 "auth_professional_title" = "職業認證";
 "auth_professional_desc" = "認證可加速曝光度";
