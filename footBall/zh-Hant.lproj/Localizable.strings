@@ -109,9 +109,10 @@
 "stamp_album_filter" = "篩選";
 "stamp_album_filter_all" = "全部";
 "stamp_album_view_more" = "查看更多";
-"stamp_album_section_stadium" = "球場分類";
-"stamp_album_section_other" = "分類二";
-"stamp_album_section_three" = "分類三";
+"stamp_album_section_stadium" = "球場";
+"stamp_album_section_trophy" = "獎盃";
+"stamp_album_section_event" = "事件";
+"stamp_album_section_identity" = "身份";
 "discover_tab_upcoming_format" = "未來觀賽(%ld)";
 "discover_tab_finished_format" = "已經觀賽(%ld)";
 "discover_verified_ticket" = "認證球票";
