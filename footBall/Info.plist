@@ -9,6 +9,8 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>用于获取比赛认证的当前位置</string>
+	<key>NSCameraUsageDescription</key>
+	<string>需要访问相机以拍摄并上传认证或内容图片</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>需要访问相册以保存您的二维码名片图片</string>
 	<key>UIApplicationSceneManifest</key>
