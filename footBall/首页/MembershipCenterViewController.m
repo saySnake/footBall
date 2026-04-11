@@ -1,0 +1,1043 @@
+//
+//  MembershipCenterViewController.m
+//  footBall
+//
+
+#import "MembershipCenterViewController.h"
+#import <Masonry/Masonry.h>
+#import <math.h>
+
+#define kMCPageBg [UIColor colorWithRed:13/255.0 green:33/255.0 blue:34/255.0 alpha:1.0]
+#define kMCMint [UIColor colorWithRed:83/255.0 green:204/255.0 blue:158/255.0 alpha:1.0]
+#define kMCMintBorder [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:0.90]
+
+@interface MCPlan : NSObject
+@property (nonatomic, copy) NSString *title;
+/// 卡片大号展示价（如 33）
+@property (nonatomic, copy) NSString *price;
+/// 底部按钮展示价（稿内常与卡片价不同，如首屏 ¥22）
+@property (nonatomic, copy) NSString *payPrice;
+@property (nonatomic, copy) NSString *hint;
+@property (nonatomic, strong) NSArray<NSString *> *benefits;
+/// SF Symbol 名，与 benefits 一一对应
+@property (nonatomic, strong) NSArray<NSString *> *benefitIcons;
+@end
+@implementation MCPlan @end
+
+@interface MembershipCenterViewController () <UIScrollViewDelegate>
+@property (nonatomic, strong) UIView *topGlowView;
+@property (nonatomic, strong) CAGradientLayer *topGlowLayer;
+@property (nonatomic, strong) UIView *navBar;
+@property (nonatomic, strong) UILabel *titleLabel;
+@property (nonatomic, strong) UIButton *backBtn;
+@property (nonatomic, strong) UIButton *helpBtn;
+
+@property (nonatomic, strong) UIView *avatarWrap;
+@property (nonatomic, strong) UIImageView *avatarView;
+@property (nonatomic, strong) UILabel *nameLabel;
+
+@property (nonatomic, strong) UIControl *bannerCard;
+@property (nonatomic, strong) UILabel *bannerTitleLabel;
+@property (nonatomic, strong) UILabel *bannerSubLabel;
+@property (nonatomic, strong) UILabel *bannerHintLabel;
+@property (nonatomic, strong) UIButton *redeemBtn;
+/// Figma 571:2602「光」柔光背景（非 set_center 插画）
+@property (nonatomic, strong) UIView *bannerGlowView;
+
+@property (nonatomic, strong) UIView *segmentWrap;
+@property (nonatomic, strong) UIButton *subscribeTabBtn;
+@property (nonatomic, strong) UIButton *giftTabBtn;
+@property (nonatomic, strong) UIView *contentPanelView;
+@property (nonatomic, strong) UIVisualEffectView *contentGlassView;
+@property (nonatomic, strong) CAGradientLayer *contentGlassHighlightLayer;
+
+@property (nonatomic, strong) CAGradientLayer *bannerGradientLayer;
+@property (nonatomic, strong) UILabel *planTitleLabel;
+@property (nonatomic, strong) UIScrollView *cardScrollView;
+@property (nonatomic, strong) UIView *cardContentView;
+@property (nonatomic, strong) NSArray<UIView *> *cardViews;
+@property (nonatomic, strong) UIPageControl *pageControl;
+
+@property (nonatomic, strong) UIButton *payBtn;
+@property (nonatomic, strong) UIButton *agreementCheckBtn;
+@property (nonatomic, strong) UILabel *agreementLabel;
+@property (nonatomic, strong) UIView *giftContainerView;
+@property (nonatomic, strong) UILabel *giftPromptLabel;
+@property (nonatomic, strong) UIButton *giftCodeTapAreaBtn;
+@property (nonatomic, strong) NSArray<UIView *> *giftDigitBoxes;
+@property (nonatomic, strong) NSArray<UILabel *> *giftDigitLabels;
+@property (nonatomic, strong) UITextField *giftHiddenInput;
+@property (nonatomic, strong) UIButton *giftRedeemBtn;
+@property (nonatomic, strong) UIView *giftSuccessWrap;
+@property (nonatomic, strong) UILabel *giftSuccessLabel;
+@property (nonatomic, assign) BOOL showingGiftCode;
+
+@property (nonatomic, strong) NSArray<MCPlan *> *plans;
+@property (nonatomic, assign) NSInteger currentIndex;
+@end
+
+@implementation MembershipCenterViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.shouldShowNavigationBar = NO;
+    self.view.backgroundColor = kMCPageBg;
+    self.initialPlanIndex = MAX(0, MIN(self.initialPlanIndex, 3));
+    self.currentIndex = self.initialPlanIndex;
+    [self buildPlanData];
+    [self setupUI];
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    self.topGlowLayer.frame = self.topGlowView.bounds;
+    self.bannerGradientLayer.frame = self.bannerCard.bounds;
+    self.contentGlassHighlightLayer.frame = self.contentGlassView.bounds;
+    for (UIView *card in self.cardViews) {
+        for (CALayer *ly in card.layer.sublayers) {
+            if ([ly.name isEqualToString:@"mc.card.bg"]) {
+                ly.frame = card.bounds;
+            }
+        }
+    }
+}
+
+- (void)setupUI {
+    self.topGlowView = [UIView new];
+    self.topGlowView.userInteractionEnabled = NO;
+    [self.view addSubview:self.topGlowView];
+    [self.topGlowView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.leading.trailing.equalTo(self.view);
+        make.height.mas_equalTo(280);
+    }];
+    self.topGlowLayer = [CAGradientLayer layer];
+    self.topGlowLayer.colors = @[
+        (id)[UIColor colorWithRed:0.00 green:0.30 blue:0.26 alpha:0.45].CGColor,
+        (id)[UIColor colorWithRed:0.00 green:0.00 blue:0.00 alpha:0.00].CGColor
+    ];
+    self.topGlowLayer.startPoint = CGPointMake(0.5, 0.0);
+    self.topGlowLayer.endPoint = CGPointMake(0.5, 1.0);
+    [self.topGlowView.layer addSublayer:self.topGlowLayer];
+
+    self.navBar = [UIView new];
+    self.navBar.backgroundColor = [UIColor clearColor];
+    [self.view addSubview:self.navBar];
+    [self.navBar mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.view.mas_safeAreaLayoutGuideTop);
+        make.leading.trailing.equalTo(self.view);
+        make.height.mas_equalTo(44);
+    }];
+
+    self.backBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    UIImage *backImage = [UIImage imageNamed:@"nav_back"];
+    if (!backImage && @available(iOS 13.0, *)) backImage = [UIImage systemImageNamed:@"arrow.left"];
+    [self.backBtn setImage:[backImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+    self.backBtn.tintColor = [UIColor whiteColor];
+    self.backBtn.imageView.contentMode = UIViewContentModeScaleAspectFit;
+    [self.backBtn addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
+    [self.navBar addSubview:self.backBtn];
+    [self.backBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.navBar).offset(16);
+        make.centerY.equalTo(self.navBar);
+        make.size.mas_equalTo(CGSizeMake(24, 24));
+    }];
+
+    self.helpBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    if (@available(iOS 13.0, *)) {
+        [self.helpBtn setImage:[UIImage systemImageNamed:@"questionmark.circle"] forState:UIControlStateNormal];
+    }
+    self.helpBtn.tintColor = [UIColor whiteColor];
+    [self.helpBtn addTarget:self action:@selector(onTapHelp) forControlEvents:UIControlEventTouchUpInside];
+    [self.navBar addSubview:self.helpBtn];
+    [self.helpBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.equalTo(self.navBar).offset(-16);
+        make.centerY.equalTo(self.navBar);
+        make.size.mas_equalTo(CGSizeMake(24, 24));
+    }];
+
+    self.titleLabel = [UILabel new];
+    self.titleLabel.text = @"会员中心";
+    /// Figma 571:2620：标题 18 semibold
+    self.titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
+    self.titleLabel.textColor = [UIColor whiteColor];
+    [self.navBar addSubview:self.titleLabel];
+    [self.titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.centerY.equalTo(self.navBar);
+    }];
+
+    self.avatarWrap = [UIView new];
+    [self.view addSubview:self.avatarWrap];
+    [self.avatarWrap mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.view).offset(20);
+        make.top.equalTo(self.navBar.mas_bottom).offset(20);
+        make.height.mas_equalTo(52);
+    }];
+    self.avatarView = [UIImageView new];
+    self.avatarView.layer.cornerRadius = 26;
+    self.avatarView.clipsToBounds = YES;
+    self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
+    self.avatarView.image = [UIImage imageNamed:@"setting_icon"];
+    if (!self.avatarView.image && @available(iOS 13.0, *)) self.avatarView.image = [UIImage systemImageNamed:@"person.crop.circle.fill"];
+    [self.avatarWrap addSubview:self.avatarView];
+    [self.avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.top.bottom.equalTo(self.avatarWrap);
+        make.size.mas_equalTo(CGSizeMake(52, 52));
+    }];
+    self.nameLabel = [UILabel new];
+    self.nameLabel.text = @"challenger";
+    self.nameLabel.textColor = [UIColor whiteColor];
+    self.nameLabel.font = [UIFont systemFontOfSize:15.0 weight:UIFontWeightSemibold];
+    [self.avatarWrap addSubview:self.nameLabel];
+    [self.nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.avatarView.mas_trailing).offset(14);
+        make.centerY.equalTo(self.avatarView);
+        make.trailing.equalTo(self.avatarWrap);
+    }];
+
+    self.bannerCard = [UIControl new];
+    self.bannerCard.layer.cornerRadius = 24;
+    self.bannerCard.clipsToBounds = YES;
+    self.bannerCard.backgroundColor = [UIColor colorWithWhite:0 alpha:0.55];
+    [self.view addSubview:self.bannerCard];
+    [self.bannerCard mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.view).offset(10);
+        make.trailing.equalTo(self.view).offset(-10);
+        make.top.equalTo(self.avatarWrap.mas_bottom).offset(14);
+        make.height.mas_equalTo(82);
+    }];
+    /// 稿中横幅后的圆形光晕（571:2602），不用 set_center 插画
+    self.bannerGlowView = [UIView new];
+    self.bannerGlowView.userInteractionEnabled = NO;
+    self.bannerGlowView.backgroundColor = [UIColor colorWithRed:0.75 green:1.0 blue:0.92 alpha:0.22];
+    self.bannerGlowView.layer.cornerRadius = 122;
+    self.bannerGlowView.clipsToBounds = YES;
+    [self.view insertSubview:self.bannerGlowView belowSubview:self.bannerCard];
+    [self.bannerGlowView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(self.view);
+        make.centerY.equalTo(self.bannerCard.mas_centerY);
+        make.size.mas_equalTo(CGSizeMake(244, 244));
+    }];
+    /// Figma 571:2648：linear 187.85° 黑 40% → 薄荷 40%
+    self.bannerGradientLayer = [CAGradientLayer layer];
+    self.bannerGradientLayer.name = @"mc.banner.bg";
+    self.bannerGradientLayer.colors = @[
+        (id)[UIColor colorWithRed:0 green:0 blue:0 alpha:0.40].CGColor,
+        (id)[UIColor colorWithRed:144/255.0 green:1.0 blue:211/255.0 alpha:0.40].CGColor
+    ];
+    self.bannerGradientLayer.startPoint = CGPointMake(0.15, 1.0);
+    self.bannerGradientLayer.endPoint = CGPointMake(0.85, 0.0);
+    [self.bannerCard.layer insertSublayer:self.bannerGradientLayer atIndex:0];
+
+    self.bannerTitleLabel = [UILabel new];
+    self.bannerTitleLabel.text = @"会员中心";
+    self.bannerTitleLabel.textColor = [UIColor whiteColor];
+    self.bannerTitleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    [self.bannerCard addSubview:self.bannerTitleLabel];
+    [self.bannerTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.bannerCard).offset(24);
+        make.top.equalTo(self.bannerCard).offset(12);
+    }];
+    self.bannerSubLabel = [UILabel new];
+    self.bannerSubLabel.text = @"限时折扣码";
+    self.bannerSubLabel.textColor = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
+    self.bannerSubLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
+    [self.bannerCard addSubview:self.bannerSubLabel];
+    [self.bannerSubLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.bannerTitleLabel);
+        make.top.equalTo(self.bannerTitleLabel.mas_bottom).offset(2);
+    }];
+    self.bannerHintLabel = [UILabel new];
+    self.bannerHintLabel.text = @"使用限时折扣码，解锁专属会员优惠";
+    self.bannerHintLabel.textColor = [UIColor colorWithWhite:1 alpha:0.5];
+    self.bannerHintLabel.font = [UIFont systemFontOfSize:8 weight:UIFontWeightLight];
+    [self.bannerCard addSubview:self.bannerHintLabel];
+    [self.bannerHintLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.bannerTitleLabel);
+        make.top.equalTo(self.bannerSubLabel.mas_bottom).offset(2);
+    }];
+    self.redeemBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.redeemBtn.backgroundColor = [UIColor colorWithRed:40/255.0 green:93/255.0 blue:75/255.0 alpha:1.0];
+    self.redeemBtn.layer.cornerRadius = 11;
+    self.redeemBtn.titleLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightSemibold];
+    [self.redeemBtn setTitle:@"去兑换" forState:UIControlStateNormal];
+    [self.redeemBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    [self.redeemBtn addTarget:self action:@selector(onTapRedeemFromBanner) forControlEvents:UIControlEventTouchUpInside];
+    [self.bannerCard addSubview:self.redeemBtn];
+    [self.redeemBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.equalTo(self.bannerCard).offset(-10);
+        make.bottom.equalTo(self.bannerCard).offset(-10);
+        make.size.mas_equalTo(CGSizeMake(62, 21));
+    }];
+
+    self.segmentWrap = [UIView new];
+    [self.view addSubview:self.segmentWrap];
+    [self.segmentWrap mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.bannerCard.mas_bottom).offset(12);
+        make.leading.equalTo(self.view);
+        make.width.mas_equalTo(280);
+        make.height.mas_equalTo(41);
+    }];
+    self.subscribeTabBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.subscribeTabBtn.backgroundColor = [UIColor colorWithRed:40/255.0 green:93/255.0 blue:75/255.0 alpha:0.48];
+    self.subscribeTabBtn.layer.cornerRadius = 12;
+    self.subscribeTabBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    [self.subscribeTabBtn setTitle:@"会员订阅" forState:UIControlStateNormal];
+    [self.subscribeTabBtn addTarget:self action:@selector(onTapSubscribeTab) forControlEvents:UIControlEventTouchUpInside];
+    [self.segmentWrap addSubview:self.subscribeTabBtn];
+    [self.subscribeTabBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.top.bottom.equalTo(self.segmentWrap);
+        make.width.mas_equalTo(140);
+    }];
+    self.giftTabBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.giftTabBtn.backgroundColor = [UIColor blackColor];
+    self.giftTabBtn.layer.cornerRadius = 12;
+    self.giftTabBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    [self.giftTabBtn setTitle:@"礼包码" forState:UIControlStateNormal];
+    [self.giftTabBtn addTarget:self action:@selector(onTapGiftTab) forControlEvents:UIControlEventTouchUpInside];
+    [self.segmentWrap addSubview:self.giftTabBtn];
+    [self.giftTabBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.top.bottom.equalTo(self.segmentWrap);
+        make.width.mas_equalTo(140);
+    }];
+
+    /// Figma 571:2613：Tab 下方主内容黑底
+    self.contentPanelView = [UIView new];
+    self.contentPanelView.backgroundColor = [UIColor colorWithWhite:0 alpha:0.82];
+    self.contentPanelView.userInteractionEnabled = NO;
+    [self.view insertSubview:self.contentPanelView belowSubview:self.segmentWrap];
+    [self.contentPanelView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.segmentWrap.mas_bottom);
+        make.leading.trailing.bottom.equalTo(self.view);
+    }];
+    /// iOS 液态玻璃感：超薄材质模糊 + 高光描边
+    UIBlurEffect *glassEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark];
+    self.contentGlassView = [[UIVisualEffectView alloc] initWithEffect:glassEffect];
+    self.contentGlassView.userInteractionEnabled = NO;
+    self.contentGlassView.alpha = 0.92;
+    self.contentGlassView.layer.cornerRadius = 26;
+    self.contentGlassView.layer.masksToBounds = YES;
+    self.contentGlassView.layer.borderWidth = 1.0;
+    self.contentGlassView.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.14].CGColor;
+    [self.contentPanelView addSubview:self.contentGlassView];
+    [self.contentGlassView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.contentPanelView).offset(8);
+        make.leading.equalTo(self.contentPanelView).offset(8);
+        make.trailing.equalTo(self.contentPanelView).offset(-8);
+        make.bottom.equalTo(self.contentPanelView).offset(-8);
+    }];
+    self.contentGlassHighlightLayer = [CAGradientLayer layer];
+    self.contentGlassHighlightLayer.colors = @[
+        (id)[UIColor colorWithRed:188/255.0 green:255/255.0 blue:233/255.0 alpha:0.24].CGColor,
+        (id)[UIColor colorWithWhite:1 alpha:0.02].CGColor,
+        (id)[UIColor colorWithRed:0 green:0 blue:0 alpha:0.16].CGColor
+    ];
+    self.contentGlassHighlightLayer.startPoint = CGPointMake(0.0, 0.0);
+    self.contentGlassHighlightLayer.endPoint = CGPointMake(1.0, 1.0);
+    [self.contentGlassView.layer insertSublayer:self.contentGlassHighlightLayer atIndex:0];
+
+    self.giftContainerView = [UIView new];
+    self.giftContainerView.hidden = YES;
+    [self.view addSubview:self.giftContainerView];
+    [self.giftContainerView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.segmentWrap.mas_bottom);
+        make.leading.trailing.bottom.equalTo(self.view);
+    }];
+    self.giftPromptLabel = [UILabel new];
+    self.giftPromptLabel.text = @"输入礼包码";
+    self.giftPromptLabel.textColor = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
+    self.giftPromptLabel.font = [UIFont systemFontOfSize:10.8 weight:UIFontWeightMedium];
+    [self.giftContainerView addSubview:self.giftPromptLabel];
+    [self.giftPromptLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.giftContainerView).offset(17);
+        make.top.equalTo(self.giftContainerView).offset(19);
+    }];
+
+    self.giftCodeTapAreaBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    [self.giftCodeTapAreaBtn addTarget:self action:@selector(onTapGiftCodeArea) forControlEvents:UIControlEventTouchUpInside];
+    [self.giftContainerView addSubview:self.giftCodeTapAreaBtn];
+    [self.giftCodeTapAreaBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.giftContainerView).offset(28);
+        make.trailing.equalTo(self.giftContainerView).offset(-31);
+        make.top.equalTo(self.giftPromptLabel.mas_bottom).offset(17);
+        make.height.mas_equalTo(64.5);
+    }];
+
+    NSMutableArray<UIView *> *digitBoxes = [NSMutableArray array];
+    NSMutableArray<UILabel *> *digitLabels = [NSMutableArray array];
+    UIView *prevBox = nil;
+    for (NSInteger i = 0; i < 5; i++) {
+        UIView *box = [UIView new];
+        box.layer.cornerRadius = 13.4;
+        box.layer.borderWidth = 0.9;
+        box.layer.borderColor = [UIColor colorWithRed:191/255.0 green:191/255.0 blue:191/255.0 alpha:1.0].CGColor;
+        [self.giftCodeTapAreaBtn addSubview:box];
+        [box mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.bottom.equalTo(self.giftCodeTapAreaBtn);
+            make.width.mas_equalTo((i == 1 || i == 4) ? 57.3 : 56.4);
+            if (prevBox) {
+                make.leading.equalTo(prevBox.mas_trailing).offset(8);
+            } else {
+                make.leading.equalTo(self.giftCodeTapAreaBtn);
+            }
+            if (i == 4) {
+                make.trailing.equalTo(self.giftCodeTapAreaBtn);
+            }
+        }];
+        UILabel *digit = [UILabel new];
+        digit.textAlignment = NSTextAlignmentCenter;
+        digit.textColor = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
+        digit.font = [UIFont systemFontOfSize:30.5 weight:UIFontWeightMedium];
+        [box addSubview:digit];
+        [digit mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.edges.equalTo(box);
+        }];
+        [digitBoxes addObject:box];
+        [digitLabels addObject:digit];
+        prevBox = box;
+    }
+    self.giftDigitBoxes = digitBoxes;
+    self.giftDigitLabels = digitLabels;
+
+    self.giftHiddenInput = [UITextField new];
+    self.giftHiddenInput.keyboardType = UIKeyboardTypeNumberPad;
+    self.giftHiddenInput.textColor = [UIColor clearColor];
+    self.giftHiddenInput.tintColor = [UIColor clearColor];
+    [self.giftHiddenInput addTarget:self action:@selector(onGiftCodeChanged) forControlEvents:UIControlEventEditingChanged];
+    [self.giftContainerView addSubview:self.giftHiddenInput];
+    [self.giftHiddenInput mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.top.equalTo(self.giftContainerView);
+        make.width.height.mas_equalTo(1);
+    }];
+
+    self.giftRedeemBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.giftRedeemBtn.backgroundColor = kMCMint;
+    self.giftRedeemBtn.layer.cornerRadius = 17.5;
+    self.giftRedeemBtn.titleLabel.font = [UIFont systemFontOfSize:12.6 weight:UIFontWeightSemibold];
+    [self.giftRedeemBtn setTitle:@"确认" forState:UIControlStateNormal];
+    [self.giftRedeemBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    [self.giftRedeemBtn addTarget:self action:@selector(onRedeemGiftCode) forControlEvents:UIControlEventTouchUpInside];
+    [self.giftContainerView addSubview:self.giftRedeemBtn];
+    [self.giftRedeemBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(self.giftContainerView);
+        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-62);
+        make.width.mas_equalTo(226);
+        make.height.mas_equalTo(35);
+    }];
+
+    self.giftSuccessWrap = [UIView new];
+    self.giftSuccessWrap.hidden = YES;
+    [self.giftContainerView addSubview:self.giftSuccessWrap];
+    [self.giftSuccessWrap mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(self.giftContainerView);
+        make.centerY.equalTo(self.giftContainerView).offset(85);
+        make.size.mas_equalTo(CGSizeMake(117, 117));
+    }];
+    UIView *successOuter = [UIView new];
+    successOuter.layer.cornerRadius = 58.5;
+    successOuter.layer.borderWidth = 1;
+    successOuter.layer.borderColor = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0].CGColor;
+    [self.giftSuccessWrap addSubview:successOuter];
+    [successOuter mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.giftSuccessWrap);
+    }];
+    UIView *successInner = [UIView new];
+    successInner.layer.cornerRadius = 46;
+    successInner.backgroundColor = [UIColor colorWithRed:157/255.0 green:234/255.0 blue:208/255.0 alpha:1.0];
+    [successOuter addSubview:successInner];
+    [successInner mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.center.equalTo(successOuter);
+        make.size.mas_equalTo(CGSizeMake(92, 92));
+    }];
+    UILabel *check = [UILabel new];
+    check.text = @"✓";
+    check.textColor = [UIColor blackColor];
+    check.font = [UIFont systemFontOfSize:42 weight:UIFontWeightSemibold];
+    [successInner addSubview:check];
+    [check mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.center.equalTo(successInner);
+    }];
+    self.giftSuccessLabel = [UILabel new];
+    self.giftSuccessLabel.text = @"验证成功";
+    self.giftSuccessLabel.textColor = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
+    self.giftSuccessLabel.font = [UIFont systemFontOfSize:10.8 weight:UIFontWeightMedium];
+    [self.giftContainerView addSubview:self.giftSuccessLabel];
+    [self.giftSuccessLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(self.giftContainerView);
+        make.top.equalTo(self.giftSuccessWrap.mas_bottom).offset(10);
+    }];
+
+    self.planTitleLabel = [UILabel new];
+    /// Figma 571:2657：#dcfff1，约 20.8pt
+    self.planTitleLabel.textColor = [UIColor colorWithRed:220/255.0 green:1.0 blue:241/255.0 alpha:1.0];
+    self.planTitleLabel.font = [UIFont systemFontOfSize:20.8 weight:UIFontWeightMedium];
+    self.planTitleLabel.textAlignment = NSTextAlignmentCenter;
+    [self.view addSubview:self.planTitleLabel];
+    [self.planTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.segmentWrap.mas_bottom).offset(34);
+        make.centerX.equalTo(self.view);
+    }];
+
+    self.cardScrollView = [UIScrollView new];
+    self.cardScrollView.showsHorizontalScrollIndicator = NO;
+    self.cardScrollView.delegate = self;
+    /// 卡片宽 210 + 间距 12 = 222，与屏宽不等，不能开启系统 paging
+    self.cardScrollView.pagingEnabled = NO;
+    self.cardScrollView.decelerationRate = UIScrollViewDecelerationRateFast;
+    [self.view addSubview:self.cardScrollView];
+    [self.cardScrollView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.planTitleLabel.mas_bottom).offset(18);
+        make.leading.trailing.equalTo(self.view);
+        make.height.mas_equalTo(252);
+    }];
+    UISwipeGestureRecognizer *swipeLeft = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(onSwipePlan:)];
+    swipeLeft.direction = UISwipeGestureRecognizerDirectionLeft;
+    [self.cardScrollView addGestureRecognizer:swipeLeft];
+    UISwipeGestureRecognizer *swipeRight = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(onSwipePlan:)];
+    swipeRight.direction = UISwipeGestureRecognizerDirectionRight;
+    [self.cardScrollView addGestureRecognizer:swipeRight];
+
+    self.cardContentView = [UIView new];
+    [self.cardScrollView addSubview:self.cardContentView];
+    /// 必须显式 content 宽度，否则横向 UIScrollView 无法正确布局，卡片区会空白
+    CGFloat cardW = 210.0, gap = 12.0, side = 82.0;
+    CGFloat contentW = side * 2 + cardW * (CGFloat)self.plans.count + gap * MAX(0, (NSInteger)self.plans.count - 1);
+    [self.cardContentView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.bottom.leading.equalTo(self.cardScrollView);
+        make.height.equalTo(self.cardScrollView);
+        make.width.mas_equalTo(contentW);
+    }];
+
+    NSMutableArray *cards = [NSMutableArray array];
+    UIView *prev = nil;
+    for (NSInteger i = 0; i < self.plans.count; i++) {
+        UIView *card = [self buildPlanCard:self.plans[i] large:YES];
+        [self.cardContentView addSubview:card];
+        [cards addObject:card];
+        [card mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.bottom.equalTo(self.cardContentView);
+            make.width.mas_equalTo(210);
+            if (prev) make.leading.equalTo(prev.mas_trailing).offset(12);
+            else make.leading.equalTo(self.cardContentView).offset(82);
+            if (i == self.plans.count - 1) make.trailing.equalTo(self.cardContentView).offset(-82);
+        }];
+        prev = card;
+    }
+    self.cardViews = cards;
+
+    self.pageControl = [UIPageControl new];
+    self.pageControl.numberOfPages = self.plans.count;
+    self.pageControl.currentPageIndicatorTintColor = [UIColor colorWithRed:141/255.0 green:249/255.0 blue:215/255.0 alpha:1.0];
+    self.pageControl.pageIndicatorTintColor = [UIColor colorWithWhite:1 alpha:0.45];
+    self.pageControl.currentPage = self.currentIndex;
+    [self.pageControl addTarget:self action:@selector(onPageChanged:) forControlEvents:UIControlEventValueChanged];
+    [self.view addSubview:self.pageControl];
+    [self.pageControl mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.cardScrollView.mas_bottom).offset(10);
+        make.centerX.equalTo(self.view);
+    }];
+
+    self.payBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.payBtn.backgroundColor = kMCMint;
+    self.payBtn.layer.cornerRadius = 17.5;
+    /// Figma 571:2659：约 12.6pt semibold
+    self.payBtn.titleLabel.font = [UIFont systemFontOfSize:12.6 weight:UIFontWeightSemibold];
+    self.payBtn.titleLabel.adjustsFontSizeToFitWidth = YES;
+    self.payBtn.titleLabel.minimumScaleFactor = 0.85;
+    [self.payBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    [self.payBtn addTarget:self action:@selector(onTapPay) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.payBtn];
+    [self.payBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.view).offset(47);
+        make.trailing.equalTo(self.view).offset(-47);
+        make.height.mas_equalTo(35);
+        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-62);
+    }];
+
+    self.agreementCheckBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.agreementCheckBtn.layer.borderColor = [UIColor colorWithWhite:0.93 alpha:1.0].CGColor;
+    self.agreementCheckBtn.layer.borderWidth = 1;
+    self.agreementCheckBtn.layer.cornerRadius = 2;
+    [self.agreementCheckBtn addTarget:self action:@selector(onToggleAgreement) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.agreementCheckBtn];
+    [self.agreementCheckBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.view).offset(99);
+        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-20);
+        make.size.mas_equalTo(CGSizeMake(14, 14));
+    }];
+
+    self.agreementLabel = [UILabel new];
+    self.agreementLabel.font = [UIFont systemFontOfSize:10];
+    self.agreementLabel.textColor = [UIColor colorWithWhite:0.93 alpha:1.0];
+    self.agreementLabel.attributedText = [self agreementAttrText];
+    [self.view addSubview:self.agreementLabel];
+    [self.agreementLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.agreementCheckBtn.mas_trailing).offset(6);
+        make.centerY.equalTo(self.agreementCheckBtn);
+    }];
+
+    self.agreementCheckBtn.selected = NO;
+    [self.agreementCheckBtn setTitle:@"" forState:UIControlStateNormal];
+    [self applyPlanAtIndex:self.currentIndex animated:NO];
+    [self updatePayButtonState];
+    [self switchToGiftMode:NO];
+
+    [self.view bringSubviewToFront:self.segmentWrap];
+    [self.view bringSubviewToFront:self.planTitleLabel];
+    [self.view bringSubviewToFront:self.cardScrollView];
+    [self.view bringSubviewToFront:self.pageControl];
+    [self.view bringSubviewToFront:self.payBtn];
+    [self.view bringSubviewToFront:self.agreementCheckBtn];
+    [self.view bringSubviewToFront:self.agreementLabel];
+}
+
+- (UIView *)buildPlanCard:(MCPlan *)plan large:(BOOL)large {
+    BOOL isMonthlyPlan = [plan.title isEqualToString:@"连续包月"];
+    UIView *card = [UIView new];
+    card.layer.cornerRadius = large ? 15.133 : 11.29;
+    card.clipsToBounds = YES;
+    card.layer.borderWidth = large ? 1.005 : 0.75;
+    card.layer.borderColor = kMCMintBorder.CGColor;
+    CAGradientLayer *g = [CAGradientLayer layer];
+    g.name = @"mc.card.bg";
+    g.colors = @[(id)[UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:0.30].CGColor, (id)[UIColor colorWithRed:0 green:0 blue:0 alpha:0.30].CGColor];
+    g.startPoint = CGPointMake(0.5, 0);
+    g.endPoint = CGPointMake(0.5, 1);
+    [card.layer addSublayer:g];
+
+    UILabel *type = [UILabel new];
+    type.text = plan.title;
+    type.textColor = [UIColor whiteColor];
+    type.font = [UIFont systemFontOfSize:(large ? (isMonthlyPlan ? 15.14 : 15.0) : 11.0) weight:UIFontWeightSemibold];
+    [card addSubview:type];
+    [type mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(card).offset(15);
+        make.top.equalTo(card).offset(14);
+    }];
+
+    UIView *crownRow = [UIView new];
+    [card addSubview:crownRow];
+    [crownRow mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(card).offset(14);
+        make.top.equalTo(type.mas_bottom).offset(10);
+        make.height.mas_equalTo(18);
+    }];
+    UIImageView *crown = [UIImageView new];
+    crown.contentMode = UIViewContentModeScaleAspectFit;
+    UIImage *crownImage = [UIImage imageNamed:@"vip_crown"];
+    if (!crownImage && @available(iOS 13.0, *)) {
+        crown.tintColor = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
+        crownImage = [[UIImage systemImageNamed:@"crown.fill"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    }
+    crown.image = crownImage;
+    [crownRow addSubview:crown];
+    [crown mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.centerY.equalTo(crownRow);
+        make.size.mas_equalTo(CGSizeMake(large ? 16.0 : 12.0, large ? 16.0 : 12.0));
+    }];
+    UILabel *spec = [UILabel new];
+    spec.text = @"特殊权益";
+    spec.textColor = [UIColor whiteColor];
+    spec.font = [UIFont systemFontOfSize:large ? 12.06 : 9 weight:UIFontWeightMedium];
+    [crownRow addSubview:spec];
+    [spec mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(crown.mas_trailing).offset(6);
+        make.centerY.equalTo(crownRow);
+        make.trailing.lessThanOrEqualTo(crownRow);
+    }];
+
+    NSArray<NSString *> *icons = plan.benefitIcons;
+    CGFloat lineStep = large ? 22.0 : 21.75;
+    for (NSInteger i = 0; i < plan.benefits.count; i++) {
+        NSString *sym = (icons && i < (NSInteger)icons.count) ? icons[i] : @"circle.fill";
+        UILabel *line = [UILabel new];
+        line.text = plan.benefits[i];
+        line.textColor = [UIColor whiteColor];
+        line.font = [UIFont systemFontOfSize:large ? 7.53 : 5.62 weight:UIFontWeightMedium];
+        line.numberOfLines = 1;
+        [card addSubview:line];
+        [line mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(card).offset(36);
+            make.trailing.lessThanOrEqualTo(card).offset(-8);
+            make.top.equalTo(crownRow.mas_bottom).offset(12 + i * lineStep);
+        }];
+        UIView *ring = [UIView new];
+        ring.backgroundColor = [UIColor colorWithWhite:0 alpha:0.35];
+        CGFloat ringSize = large ? 15.28 : 11.46;
+        ring.layer.cornerRadius = ringSize / 2.0;
+        [card addSubview:ring];
+        [ring mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.centerY.equalTo(line);
+            make.leading.equalTo(card).offset(14);
+            make.size.mas_equalTo(CGSizeMake(ringSize, ringSize));
+        }];
+        UIImageView *ic = [UIImageView new];
+        ic.contentMode = UIViewContentModeScaleAspectFit;
+        ic.tintColor = [UIColor whiteColor];
+        UIImage *benefitImage = nil;
+        if ([line.text containsString:@"解锁全部内容"]) {
+            benefitImage = [UIImage imageNamed:@"vip_unlock"];
+        } else if ([line.text containsString:@"数据可视化"]) {
+            benefitImage = [UIImage imageNamed:@"vip_data"];
+        }
+        if (!benefitImage && @available(iOS 13.0, *)) {
+            benefitImage = [[UIImage systemImageNamed:sym] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+        }
+        ic.image = benefitImage;
+        [card addSubview:ic];
+        [ic mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.center.equalTo(ring);
+            make.size.mas_equalTo(CGSizeMake(large ? 11.46 : 8.0, large ? 11.46 : 8.0));
+        }];
+    }
+
+    UILabel *hint = [UILabel new];
+    hint.text = plan.hint.length ? plan.hint : nil;
+    hint.hidden = plan.hint.length == 0;
+    hint.textColor = [UIColor colorWithRed:147/255.0 green:221/255.0 blue:196/255.0 alpha:1.0];
+    hint.font = [UIFont systemFontOfSize:6.9];
+    hint.textAlignment = NSTextAlignmentRight;
+    [card addSubview:hint];
+    [hint mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.equalTo(card).offset(isMonthlyPlan ? -8 : -10);
+        make.bottom.equalTo(card).offset(large ? (isMonthlyPlan ? -82 : -78) : -58);
+    }];
+
+    UILabel *price = [UILabel new];
+    price.text = plan.price;
+    price.textColor = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
+    /// 选中态采用 72，侧卡缩放 0.75 后视觉约等于 Figma 的 54
+    price.font = [UIFont fontWithName:@"BebasNeue-Regular" size:large ? (isMonthlyPlan ? 72.38 : 72.0) : 54];
+    if (!price.font) {
+        if (@available(iOS 13.0, *)) {
+            price.font = [UIFont monospacedDigitSystemFontOfSize:large ? (isMonthlyPlan ? 72.38 : 72.0) : 54 weight:UIFontWeightBold];
+        } else {
+            price.font = [UIFont systemFontOfSize:large ? (isMonthlyPlan ? 72.38 : 72.0) : 54 weight:UIFontWeightBold];
+        }
+    }
+    price.textAlignment = NSTextAlignmentRight;
+    [card addSubview:price];
+    [price mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.equalTo(card).offset(isMonthlyPlan ? -12 : -10);
+        make.bottom.equalTo(card).offset(isMonthlyPlan ? -6 : -6);
+    }];
+    UILabel *unit = [UILabel new];
+    unit.text = @"¥";
+    unit.textColor = price.textColor;
+    unit.font = [UIFont fontWithName:@"BebasNeue-Regular" size:large ? (isMonthlyPlan ? 25.46 : 25.3) : 19.0];
+    if (!unit.font) {
+        unit.font = [UIFont systemFontOfSize:large ? (isMonthlyPlan ? 25.46 : 25.3) : 19.0 weight:UIFontWeightMedium];
+    }
+    [card addSubview:unit];
+    [unit mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.equalTo(price.mas_leading).offset(-2);
+        make.bottom.equalTo(card).offset(large ? (isMonthlyPlan ? -10 : -12) : -9);
+    }];
+    /// 月度通行证「限时优惠」需要显示在价格上层，避免被大号金额遮挡
+    if (!hint.hidden) {
+        [card bringSubviewToFront:hint];
+    }
+    return card;
+}
+
+- (NSAttributedString *)agreementAttrText {
+    NSString *all = @"开通前阅读并同意《会员服务协议》";
+    NSMutableAttributedString *m = [[NSMutableAttributedString alloc] initWithString:all attributes:@{
+        NSForegroundColorAttributeName: [UIColor colorWithWhite:0.93 alpha:1.0],
+        NSFontAttributeName: [UIFont systemFontOfSize:10 weight:UIFontWeightMedium]
+    }];
+    NSRange r = [all rangeOfString:@"《会员服务协议》"];
+    if (r.location != NSNotFound) {
+        [m addAttribute:NSForegroundColorAttributeName value:[UIColor colorWithRed:24/255.0 green:115/255.0 blue:1 alpha:1] range:r];
+    }
+    return m;
+}
+
+- (void)buildPlanData {
+    MCPlan *m = [MCPlan new];
+    m.title = @"连续包月";
+    m.price = @"33";
+    /// Figma 571:2660 底部按钮价
+    m.payPrice = @"22";
+    m.hint = @"限时优惠";
+    m.benefits = @[@"解锁全部内容", @"数据可视化"];
+    m.benefitIcons = @[@"lock.open", @"chart.bar.fill"];
+
+    MCPlan *y = [MCPlan new];
+    y.title = @"连续包年";
+    y.price = @"188";
+    y.payPrice = @"188";
+    y.hint = @"已优惠¥76";
+    y.benefits = @[@"解锁全部内容", @"赛季总结报告｜年度数据回顾", @"限定数字邮票|边框"];
+    y.benefitIcons = @[@"lock.open", @"doc.text.fill", @"stamp.fill"];
+
+    MCPlan *l = [MCPlan new];
+    l.title = @"永久权益";
+    l.price = @"698";
+    l.payPrice = @"698";
+    l.hint = @"";
+    l.hint = @"";
+    l.benefits = @[@"解锁全部内容，永久全部权益", @"赛季终身会员徽章", @"终身限定数字邮票|边框"];
+    l.benefitIcons = @[@"lock.open", @"star.circle.fill", @"stamp.fill"];
+
+    MCPlan *f = [MCPlan new];
+    f.title = @"终身权益";
+    f.price = @"998";
+    f.payPrice = @"998";
+    f.hint = @"限前100名";
+    f.benefits = @[@"终身全部权益", @"未来产品优先体验权", @"APP 内专属编号徽章", @"创始人社群", @"限定编号球衣"];
+    f.benefitIcons = @[@"trophy.fill", @"shippingbox.fill", @"number.square.fill", @"globe", @"tshirt.fill"];
+
+    self.plans = @[m, y, l, f];
+}
+
+- (void)refreshPlanInfoAtIndex:(NSInteger)idx {
+    if (idx < 0 || idx >= self.plans.count) return;
+    self.currentIndex = idx;
+    NSArray *titles = @[@"月度通行证", @"赛季通行证", @"终身会员", @"创始人会员"];
+    self.planTitleLabel.text = titles[idx];
+    MCPlan *plan = self.plans[idx];
+    /// 支付按钮金额与 Figma payPrice 一致
+    NSString *pay = plan.payPrice.length ? plan.payPrice : plan.price;
+    [self.payBtn setTitle:[NSString stringWithFormat:@"确认协议并支付¥%@", pay] forState:UIControlStateNormal];
+    self.pageControl.currentPage = idx;
+}
+
+- (void)applyPlanAtIndex:(NSInteger)idx animated:(BOOL)animated {
+    if (idx < 0 || idx >= self.plans.count) return;
+    [self refreshPlanInfoAtIndex:idx];
+    [self updateCardScaleAtIndex:idx animated:animated];
+
+    CGFloat pageW = 222.0;
+    CGFloat target = idx * pageW;
+    [self.cardScrollView setContentOffset:CGPointMake(target, 0) animated:animated];
+}
+
+- (void)updateCardScaleAtIndex:(NSInteger)idx animated:(BOOL)animated {
+    [self.cardViews enumerateObjectsUsingBlock:^(UIView * _Nonnull card, NSUInteger i, BOOL * _Nonnull stop) {
+        CGFloat scale = (i == (NSUInteger)idx) ? 1.0 : 0.75;
+        CGAffineTransform transform = CGAffineTransformMakeScale(scale, scale);
+        if (animated) {
+            [UIView animateWithDuration:0.22 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
+                card.transform = transform;
+            } completion:nil];
+        } else {
+            card.transform = transform;
+        }
+    }];
+}
+
+- (void)updateCardInteractiveScaleForOffset:(CGFloat)offsetX {
+    CGFloat pageW = 222.0;
+    CGFloat floatingIndex = MAX(0, MIN((CGFloat)(self.plans.count - 1), offsetX / pageW));
+    [self.cardViews enumerateObjectsUsingBlock:^(UIView * _Nonnull card, NSUInteger i, BOOL * _Nonnull stop) {
+        CGFloat dist = fabs((CGFloat)i - floatingIndex);
+        CGFloat normalized = MIN(1.0, dist);
+        CGFloat scale = 1.0 - 0.25 * normalized; // 1.0 -> 0.75
+        card.transform = CGAffineTransformMakeScale(scale, scale);
+    }];
+}
+
+- (void)onBack { [self.navigationController popViewControllerAnimated:YES]; }
+
+- (void)onTapHelp {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"会员说明"
+                                                                   message:@"可左右滑动查看月度/赛季/终身/创始人方案，勾选协议后可继续支付。"
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"知道了" style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)onTapRedeemFromBanner {
+    [self switchToGiftMode:YES];
+}
+
+- (void)onTapSubscribeTab {
+    [self switchToGiftMode:NO];
+}
+
+- (void)onTapGiftTab {
+    [self switchToGiftMode:YES];
+}
+
+- (void)switchToGiftMode:(BOOL)giftMode {
+    BOOL wasGiftMode = self.showingGiftCode;
+    self.showingGiftCode = giftMode;
+    UIColor *activeBg = [UIColor colorWithRed:40/255.0 green:93/255.0 blue:75/255.0 alpha:0.48];
+    UIColor *inactiveBg = [UIColor blackColor];
+    self.subscribeTabBtn.backgroundColor = giftMode ? inactiveBg : activeBg;
+    self.giftTabBtn.backgroundColor = giftMode ? activeBg : inactiveBg;
+
+    self.planTitleLabel.hidden = giftMode;
+    self.cardScrollView.hidden = giftMode;
+    self.pageControl.hidden = giftMode;
+    self.payBtn.hidden = giftMode;
+    self.agreementCheckBtn.hidden = giftMode;
+    self.agreementLabel.hidden = giftMode;
+    self.giftContainerView.hidden = !giftMode;
+    if (giftMode) {
+        if (!wasGiftMode) {
+            [self resetGiftCodeUI];
+        }
+        [self.view bringSubviewToFront:self.giftContainerView];
+        if (self.giftSuccessWrap.hidden) {
+            [self.giftHiddenInput becomeFirstResponder];
+        }
+    } else {
+        [self.view endEditing:YES];
+    }
+}
+
+- (void)updatePayButtonState {
+    BOOL enabled = self.agreementCheckBtn.selected;
+    self.payBtn.enabled = enabled;
+    self.payBtn.alpha = enabled ? 1.0 : 0.55;
+}
+
+- (void)onTapPay {
+    if (!self.agreementCheckBtn.selected) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"提示"
+                                                                       message:@"请先勾选《会员服务协议》"
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"好的" style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
+    MCPlan *plan = self.plans[self.currentIndex];
+    NSString *pay = plan.payPrice.length ? plan.payPrice : plan.price;
+    NSString *msg = [NSString stringWithFormat:@"已选择 %@，支付金额 ¥%@", self.planTitleLabel.text ?: @"会员方案", pay];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"支付确认"
+                                                                   message:msg
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"继续支付" style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)onGiftCodeChanged {
+    NSCharacterSet *nonDigits = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
+    NSString *raw = [self.giftHiddenInput.text ?: @"" stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSString *code = [[raw componentsSeparatedByCharactersInSet:nonDigits] componentsJoinedByString:@""];
+    if (code.length > 5) code = [code substringToIndex:5];
+    if (![code isEqualToString:self.giftHiddenInput.text ?: @""]) {
+        self.giftHiddenInput.text = code;
+    }
+    for (NSInteger i = 0; i < self.giftDigitLabels.count; i++) {
+        UILabel *lb = self.giftDigitLabels[i];
+        UIView *box = self.giftDigitBoxes[i];
+        BOOL filled = i < (NSInteger)code.length;
+        lb.text = filled ? [code substringWithRange:NSMakeRange(i, 1)] : @"";
+        UIColor *active = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
+        UIColor *inactive = [UIColor colorWithRed:191/255.0 green:191/255.0 blue:191/255.0 alpha:1.0];
+        box.layer.borderColor = ((i == code.length && code.length < 5) || filled) ? active.CGColor : inactive.CGColor;
+    }
+    BOOL valid = code.length == 5;
+    BOOL typing = code.length > 0;
+    self.giftSuccessWrap.hidden = YES;
+    self.giftSuccessLabel.hidden = YES;
+    self.giftPromptLabel.hidden = NO;
+    self.giftCodeTapAreaBtn.hidden = NO;
+    self.giftRedeemBtn.hidden = NO;
+    self.giftRedeemBtn.enabled = valid;
+    self.giftRedeemBtn.alpha = valid ? 1.0 : 0.55;
+    if (typing) {
+        [self.giftRedeemBtn setTitle:@"确认" forState:UIControlStateNormal];
+    }
+}
+
+- (void)onRedeemGiftCode {
+    NSString *code = self.giftHiddenInput.text ?: @"";
+    if (code.length < 5) return;
+    [self.view endEditing:YES];
+    self.giftPromptLabel.hidden = YES;
+    self.giftCodeTapAreaBtn.hidden = YES;
+    self.giftRedeemBtn.hidden = YES;
+    self.giftSuccessWrap.hidden = NO;
+    self.giftSuccessLabel.hidden = NO;
+}
+
+- (void)onTapGiftCodeArea {
+    if (self.giftSuccessWrap.hidden) {
+        [self.giftHiddenInput becomeFirstResponder];
+    }
+}
+
+- (void)resetGiftCodeUI {
+    self.giftHiddenInput.text = @"";
+    [self onGiftCodeChanged];
+    self.giftPromptLabel.hidden = NO;
+    self.giftCodeTapAreaBtn.hidden = NO;
+    self.giftRedeemBtn.hidden = NO;
+    self.giftSuccessWrap.hidden = YES;
+    self.giftSuccessLabel.hidden = YES;
+}
+
+- (void)onToggleAgreement {
+    self.agreementCheckBtn.selected = !self.agreementCheckBtn.selected;
+    self.agreementCheckBtn.layer.borderColor = [UIColor colorWithWhite:0.93 alpha:1.0].CGColor;
+    [self.agreementCheckBtn setTitle:(self.agreementCheckBtn.selected ? @"✓" : @"") forState:UIControlStateNormal];
+    [self.agreementCheckBtn setTitleColor:kMCMint forState:UIControlStateNormal];
+    self.agreementCheckBtn.titleLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightBold];
+    [self updatePayButtonState];
+}
+
+- (void)onPageChanged:(UIPageControl *)pc {
+    [self applyPlanAtIndex:pc.currentPage animated:YES];
+}
+
+- (void)scrollViewDidScroll:(UIScrollView *)scrollView {
+    if (scrollView != self.cardScrollView || self.showingGiftCode) return;
+    [self updateCardInteractiveScaleForOffset:scrollView.contentOffset.x];
+    CGFloat pageW = 222.0;
+    NSInteger nearest = (NSInteger)llround(scrollView.contentOffset.x / pageW);
+    nearest = MAX(0, MIN(nearest, self.plans.count - 1));
+    if (nearest != self.currentIndex) {
+        [self refreshPlanInfoAtIndex:nearest];
+    }
+}
+
+- (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView {
+    if (scrollView != self.cardScrollView) return;
+    [self snapCarouselAndSyncPage];
+}
+
+- (void)scrollViewDidEndDragging:(UIScrollView *)scrollView willDecelerate:(BOOL)decelerate {
+    if (scrollView != self.cardScrollView || decelerate) return;
+    [self snapCarouselAndSyncPage];
+}
+
+- (void)scrollViewWillEndDragging:(UIScrollView *)scrollView
+                     withVelocity:(CGPoint)velocity
+              targetContentOffset:(inout CGPoint *)targetContentOffset {
+    if (scrollView != self.cardScrollView || self.showingGiftCode) return;
+    CGFloat pageW = 222.0;
+    NSInteger idx = self.currentIndex;
+    if (fabs(velocity.x) > 0.22) {
+        idx += (velocity.x > 0 ? 1 : -1);
+    } else {
+        idx = (NSInteger)llround(targetContentOffset->x / pageW);
+    }
+    idx = MAX(0, MIN(idx, self.plans.count - 1));
+    targetContentOffset->x = idx * pageW;
+    targetContentOffset->y = 0;
+    [self refreshPlanInfoAtIndex:idx];
+}
+
+- (void)snapCarouselAndSyncPage {
+    CGFloat pageW = 222.0;
+    CGFloat x = self.cardScrollView.contentOffset.x;
+    NSInteger idx = (NSInteger)llround(x / pageW);
+    idx = MAX(0, MIN(idx, self.plans.count - 1));
+    [self applyPlanAtIndex:idx animated:YES];
+}
+
+- (void)onSwipePlan:(UISwipeGestureRecognizer *)gesture {
+    if (self.showingGiftCode) return;
+    NSInteger next = self.currentIndex + (gesture.direction == UISwipeGestureRecognizerDirectionLeft ? 1 : -1);
+    next = MAX(0, MIN(next, self.plans.count - 1));
+    if (next != self.currentIndex) {
+        [self applyPlanAtIndex:next animated:YES];
+    }
+}
+
+@end
+
