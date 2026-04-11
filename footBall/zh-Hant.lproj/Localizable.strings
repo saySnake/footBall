@@ -57,10 +57,11 @@
 
 /* Login - Verify Code */
 "verify_title" = "請輸入驗證碼";
-"verify_subtitle_format" = "我們已給手機號 %@ 傳送一組 6 位數驗證碼，輸入驗證碼即可登入。";
+"verify_subtitle_format" = "我們已給手機號 %@ 傳送一組 6 位數\n驗證碼，輸入驗證碼即可登入";
 "verify_code_placeholder" = "請輸入 6 位驗證碼";
 "verify_login_button" = "登入";
 "verify_resend_button" = "重新取得驗證碼";
+"verify_code_sent" = "驗證碼已傳送";
 
 /* Team Selection */
 "team_select_title" = "請選擇你喜歡的球隊";

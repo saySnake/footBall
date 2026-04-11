@@ -57,10 +57,11 @@
 
 /* Login - Verify Code */
 "verify_title" = "请输入验证码";
-"verify_subtitle_format" = "我们已给手机号 %@ 发送了一个6位数验证码，输入验证码即可登录。";
+"verify_subtitle_format" = "我们已给手机号 %@ 发送了一个6位数\n验证码，输入验证码即可登录";
 "verify_code_placeholder" = "请输入6位验证码";
 "verify_login_button" = "登录";
 "verify_resend_button" = "重新获取验证码";
+"verify_code_sent" = "验证码已发送";
 
 /* Team Selection */
 "team_select_title" = "请选择你喜欢的球队";

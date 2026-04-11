@@ -57,10 +57,11 @@
 
 /* Login - Verify Code */
 "verify_title" = "Please enter verification code";
-"verify_subtitle_format" = "We have sent a 6-digit code to %@. Enter the code to log in.";
+"verify_subtitle_format" = "We have sent a 6-digit code to %@.\nEnter the code to log in.";
 "verify_code_placeholder" = "Please enter 6-digit code";
 "verify_login_button" = "Log in";
 "verify_resend_button" = "Resend code";
+"verify_code_sent" = "Verification code sent";
 
 /* Team Selection */
 "team_select_title" = "Choose your favorite teams";
