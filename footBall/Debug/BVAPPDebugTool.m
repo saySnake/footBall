@@ -82,6 +82,8 @@
             [[DoraemonManager shareInstance] addPluginWithTitle:@"切换环境" icon:@"doraemon_default" desc:@"切换app环境" pluginName:@"BVDebugNetworkSwitchPlugin" atModule:@"业务专区"];
             
             [[DoraemonManager shareInstance] addPluginWithTitle:@"内存检测弹窗" icon:@"doraemon_default" desc:@"检查内存泄露,循环引用" pluginName:@"BVDebugMemoryLeakPlugin" atModule:@"业务专区"];
+            
+            [[DoraemonManager shareInstance] addPluginWithTitle:@"curl日志" icon:@"doraemon_default" desc:@"开关curl命令日志打印" pluginName:@"BVDebugCurlLogPlugin" atModule:@"业务专区"];
         
             [BVAPPDebugTool setupCustomLogoStyle];
         });
