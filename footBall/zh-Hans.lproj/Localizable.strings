@@ -49,6 +49,8 @@
 "phone_input_placeholder" = "请输入手机号";
 "phone_get_code_button" = "获取验证码";
 "phone_agreement_text" = "同意《法律条款和隐私协议》";
+"phone_agreement_prefix" = "同意";
+"phone_agreement_link" = "《法律条款和隐私协议》";
 
 /* Login - Other Methods */
 "login_other_methods_title" = "其他登录方式";

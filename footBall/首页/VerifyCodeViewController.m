@@ -2,7 +2,7 @@
 //  VerifyCodeViewController.m
 //  footBall
 //
-//  Figma 1:4044「手机号登录 / 验证码」
+//  Figma「手机号登录 / 验证码」r2NHY24zoL00k6JFuwivYz / 1:4044
 //
 
 #import "VerifyCodeViewController.h"
@@ -13,21 +13,25 @@
 #import <QMUIKit/QMUIKit.h>
 #import <MBProgressHUD/MBProgressHUD.h>
 
-/// 稿 #f6f6f6
+/// 六位格子底 #f6f6f6、圆角 6
 static UIColor *kVCBoxBG(void) {
-    return [UIColor colorWithRed:0.965 green:0.965 blue:0.965 alpha:1.0];
+    return [ColorManager colorWithHexString:@"#f6f6f6"];
 }
-/// 稿副文案 #656565
+/// 副文案 / 重发 #656565
 static UIColor *kVCMutedText(void) {
-    return [UIColor colorWithRed:0.396 green:0.396 blue:0.396 alpha:1.0];
+    return [ColorManager colorWithHexString:@"#656565"];
 }
-/// 稿手机号强调 #1c1c1c
+/// 手机号强调 #1c1c1c
 static UIColor *kVCPhoneText(void) {
-    return [UIColor colorWithRed:0.11 green:0.11 blue:0.11 alpha:1.0];
+    return [ColorManager colorWithHexString:@"#1c1c1c"];
 }
-/// 稿主按钮 #285d4b
+/// 主按钮 #285d4b；阴影 0/2/4 @ 19%
 static UIColor *kVCBrandGreen(void) {
-    return [UIColor colorWithRed:40 / 255.0 green:93 / 255.0 blue:75 / 255.0 alpha:1.0];
+    return [ColorManager colorWithHexString:@"#285d4b"];
+}
+/// 稿中待输入光标 #939393
+static UIColor *kVCCaretGray(void) {
+    return [ColorManager colorWithHexString:@"#939393"];
 }
 
 @interface VerifyCodeViewController () <UITextFieldDelegate>
@@ -114,7 +118,7 @@ static UIColor *kVCBrandGreen(void) {
     [attr addAttribute:NSFontAttributeName value:[UIFont systemFontOfSize:14 weight:UIFontWeightRegular] range:NSMakeRange(0, full.length)];
 
     NSMutableParagraphStyle *para = [[NSMutableParagraphStyle alloc] init];
-    para.lineSpacing = 4;
+    para.lineSpacing = 5;
     para.alignment = NSTextAlignmentLeft;
     [attr addAttribute:NSParagraphStyleAttributeName value:para range:NSMakeRange(0, full.length)];
 
@@ -142,7 +146,7 @@ static UIColor *kVCBrandGreen(void) {
     NSMutableArray<UILabel *> *labels = [NSMutableArray arrayWithCapacity:6];
     self.codeStackView = [[UIStackView alloc] init];
     self.codeStackView.axis = UILayoutConstraintAxisHorizontal;
-    self.codeStackView.spacing = 5.0;
+    self.codeStackView.spacing = 8.0;
     self.codeStackView.distribution = UIStackViewDistributionFillEqually;
     self.codeStackView.alignment = UIStackViewAlignmentFill;
 
@@ -165,7 +169,7 @@ static UIColor *kVCBrandGreen(void) {
     self.codeLabels = [labels copy];
 
     self.caretView = [[UIView alloc] init];
-    self.caretView.backgroundColor = [UIColor blackColor];
+    self.caretView.backgroundColor = kVCCaretGray();
     self.caretView.layer.cornerRadius = 1.0;
     self.caretView.hidden = YES;
     [self.codeStackView addSubview:self.caretView];
@@ -188,7 +192,7 @@ static UIColor *kVCBrandGreen(void) {
     [self.loginButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     self.loginButton.backgroundColor = kVCBrandGreen();
     self.loginButton.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
-    self.loginButton.layer.cornerRadius = 26.0;
+    self.loginButton.layer.cornerRadius = 27.0;
     self.loginButton.layer.masksToBounds = NO;
     self.loginButton.layer.shadowColor = [UIColor blackColor].CGColor;
     self.loginButton.layer.shadowOpacity = 0.19f;
@@ -207,6 +211,9 @@ static UIColor *kVCBrandGreen(void) {
     self.resendButton.semanticContentAttribute = UISemanticContentAttributeForceLeftToRight;
     self.resendButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentRight;
     self.resendButton.titleEdgeInsets = UIEdgeInsetsMake(0, 6, 0, 0);
+    self.resendButton.titleLabel.lineBreakMode = NSLineBreakByClipping;
+    [self.resendButton setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+    [self.resendButton setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
     [self.resendButton addTarget:self action:@selector(resendTapped) forControlEvents:UIControlEventTouchUpInside];
 
     [self.view addSubview:self.titleLabel];
@@ -223,14 +230,14 @@ static UIColor *kVCBrandGreen(void) {
     }];
 
     [self.subtitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.titleLabel.mas_bottom).offset(10);
+        make.top.equalTo(self.titleLabel.mas_bottom).offset(16);
         make.leading.trailing.equalTo(self.view).inset(24);
     }];
 
     [self.codeStackView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.subtitleLabel.mas_bottom).offset(28);
         make.leading.trailing.equalTo(self.view).inset(24);
-        make.height.mas_equalTo(52);
+        make.height.mas_equalTo(58);
     }];
 
     [self.codeTextField mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -240,14 +247,14 @@ static UIColor *kVCBrandGreen(void) {
     }];
 
     [self.resendButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.codeStackView.mas_bottom).offset(12);
+        make.top.equalTo(self.codeStackView.mas_bottom).offset(18);
         make.trailing.equalTo(self.view).offset(-24);
     }];
 
     [self.loginButton mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.resendButton.mas_bottom).offset(36);
         make.leading.trailing.equalTo(self.view).inset(24);
-        make.height.mas_equalTo(52);
+        make.height.mas_equalTo(54);
     }];
 }
 
@@ -280,7 +287,7 @@ static UIColor *kVCBrandGreen(void) {
         make.centerX.equalTo(cell);
         make.centerY.equalTo(cell);
         make.width.mas_equalTo(2);
-        make.height.mas_equalTo(22);
+        make.height.mas_equalTo(26);
     }];
     [self.codeStackView bringSubviewToFront:self.caretView];
     [self.codeStackView layoutIfNeeded];

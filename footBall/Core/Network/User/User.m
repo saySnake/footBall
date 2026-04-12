@@ -9,6 +9,13 @@
 
 @implementation User
 
++ (NSDictionary<NSString *,id> *)modelCustomPropertyMapper {
+    return @{
+        @"userId": @[@"userId", @"id", @"uid"],
+        @"avatar": @[@"avatar", @"headImg", @"headUrl", @"avatarUrl", @"headImage"]
+    };
+}
+
 - (BOOL)modelCustomTransformFromDictionary:(NSDictionary *)dic {
     if (self.phone.length == 0) {
         id v = dic[@"mobile"] ?: dic[@"phoneNumber"] ?: dic[@"tel"];
@@ -23,6 +30,14 @@
 
 @end
 @implementation UserProfile
+
++ (NSDictionary<NSString *,id> *)modelCustomPropertyMapper {
+    return @{
+        @"userId": @[@"userId", @"id", @"uid"],
+        @"avatar": @[@"avatar", @"headImg", @"headUrl", @"avatarUrl", @"headImage"],
+        @"nickname": @[@"nickname", @"nickName", @"name"]
+    };
+}
 
 - (BOOL)modelCustomTransformFromDictionary:(NSDictionary *)dic {
     if (self.phone.length == 0) {

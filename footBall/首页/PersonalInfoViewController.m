@@ -885,6 +885,17 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
 
     void (^putProfile)(void) = ^{
         void (^afterSaveOK)(void) = ^{
+            AuthManager.sharedManager.user.profile = p;
+            if (p.nickname.length > 0) {
+                AuthManager.sharedManager.user.nickname = p.nickname;
+            }
+            if (p.avatar.length > 0) {
+                AuthManager.sharedManager.user.avatar = p.avatar;
+            }
+            if (p.phone.length > 0) {
+                AuthManager.sharedManager.user.phone = p.phone;
+            }
+            [AuthManager.sharedManager saveUser];
             [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
             weakSelf.avatarNeedsUpload = NO;
             [weakSelf.navigationController popViewControllerAnimated:YES];

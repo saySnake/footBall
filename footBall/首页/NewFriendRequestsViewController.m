@@ -238,6 +238,7 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
         NSArray<PNFriendRequest *> *list = page.list ?: @[];
         weakSelf.recentRequests = list.mutableCopy;
         weakSelf.olderRequests = NSMutableArray.array;
+        [weakSelf syncPendingCountWithCurrentRequests];
         [weakSelf.tableView reloadData];
     } failure:^(NSError * _Nonnull error) {
         [weakSelf.tableView reloadData];
@@ -252,9 +253,40 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
 
     [SocialRequest.shared getFriendRequestsPendingCountSuccess:^(HTTPResponse * _Nullable responseObject) {
         NSInteger count = [responseObject.dataObject respondsToSelector:@selector(integerValue)] ? [responseObject.dataObject integerValue] : 0;
-        [[NSUserDefaults standardUserDefaults] setInteger:MAX(count, 0) forKey:kCommunityPendingCountKey];
+        NSInteger actualPending = [weakSelf currentPendingRequestCount];
+        NSInteger finalCount = actualPending >= 0 ? actualPending : MAX(count, 0);
+        [weakSelf persistPendingCount:finalCount];
     } failure:^(NSError * _Nonnull error) {
     }];
+}
+
+- (NSInteger)currentPendingRequestCount {
+    NSInteger count = 0;
+    for (PNFriendRequest *request in self.recentRequests) {
+        if ([self statusForFriendRequest:request] == FriendRequestStatusPending) {
+            count += 1;
+        }
+    }
+    for (PNFriendRequest *request in self.olderRequests) {
+        if ([self statusForFriendRequest:request] == FriendRequestStatusPending) {
+            count += 1;
+        }
+    }
+    return count;
+}
+
+- (void)persistPendingCount:(NSInteger)count {
+    NSInteger safeCount = MAX(count, 0);
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSInteger oldCount = [defaults integerForKey:kCommunityPendingCountKey];
+    [defaults setInteger:safeCount forKey:kCommunityPendingCountKey];
+    if (oldCount != safeCount) {
+        [[NSNotificationCenter defaultCenter] postNotificationName:kCommunityPendingCountDidChangeNotification object:nil];
+    }
+}
+
+- (void)syncPendingCountWithCurrentRequests {
+    [self persistPendingCount:[self currentPendingRequestCount]];
 }
 
 - (void)setupUI {

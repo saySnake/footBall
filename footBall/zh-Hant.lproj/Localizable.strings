@@ -49,6 +49,8 @@
 "phone_input_placeholder" = "請輸入手機號";
 "phone_get_code_button" = "取得驗證碼";
 "phone_agreement_text" = "同意《法律條款和隱私協議》";
+"phone_agreement_prefix" = "同意";
+"phone_agreement_link" = "《法律條款和隱私協議》";
 
 /* Login - Other Methods */
 "login_other_methods_title" = "其他登入方式";
