@@ -13,14 +13,15 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) UIColor *goneFillColor;     // 已经去过的填充色
 @property (nonatomic, strong) UIColor *ungoFillColor;     // 没去过的填充色
 
-@property (nonatomic, strong) NSArray *oftenCountries; // 经常去的国家码
-@property (nonatomic, strong) NSArray *goneCountries; // 已经去过的国家码
-@property (nonatomic, strong) NSArray *ungoCountries; // 没去过的国家码
+/// 经常去 / 已去过 / 未去：元素为 **中文国家名**（与 bundle 内 `world-zh.json` 的 `properties.name` 一致），也兼容两字母 **ISO**（如 CN、US）
+@property (nonatomic, strong) NSArray *oftenCountries;
+@property (nonatomic, strong) NSArray *goneCountries;
+@property (nonatomic, strong) NSArray *ungoCountries;
 
 /// 加载并绘制 GeoJSON
 - (void)loadGeoJSON;
 
-/// 在异步赋值 oftenCountries / goneCountries / ungoCountries 后调用，按 ISO 码重绘各国填充色（可在任意线程调用，内部切回主线程）
+/// 在异步赋值 oftenCountries / goneCountries / ungoCountries 后调用，重绘各国填充色（可在任意线程调用，内部切回主线程）
 - (void)reload;
 
 @end

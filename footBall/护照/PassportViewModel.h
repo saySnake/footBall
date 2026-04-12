@@ -31,6 +31,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) NSInteger headerYellowCards;
 @property (nonatomic, assign) NSInteger headerCleanMatches;
 /// 地图填充：ISO 3166-1 alpha-2 大写（经常去 / 已去过/未去过）
+/// 世界地图填充：与 `world-zh.json` 的 `properties.name` 一致的中文国名（兼容两字母 ISO）
 @property (nonatomic, copy) NSArray<NSString *> *headerMapOftenISOs;
 @property (nonatomic, copy) NSArray<NSString *> *headerMapGoneISOs;
 @property (nonatomic, copy) NSArray<NSString *> *headerMapUngoISOs;

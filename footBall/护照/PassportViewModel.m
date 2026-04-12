@@ -40,33 +40,6 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     return [out copy];
 }
 
-+ (NSString *)isoCodeFromHeatmapCountryField:(NSString *)country {
-    if (![country isKindOfClass:[NSString class]]) {
-        return nil;
-    }
-    NSString *s = [country stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if (s.length == 0) {
-        return nil;
-    }
-    NSString *u = [s uppercaseString];
-    if (u.length == 2) {
-        NSCharacterSet *nonLetters = [[NSCharacterSet letterCharacterSet] invertedSet];
-        if ([u rangeOfCharacterFromSet:nonLetters].location == NSNotFound) {
-            return u;
-        }
-    }
-    static NSDictionary<NSString *, NSString *> *zhToISO;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        zhToISO = @{
-            @"中国": @"CN", @"日本": @"JP", @"美国": @"US", @"英国": @"GB",
-            @"法国": @"FR", @"德国": @"DE", @"韩国": @"KR", @"泰国": @"TH",
-            @"西班牙": @"ES", @"意大利": @"IT", @"澳大利亚": @"AU",
-        };
-    });
-    return zhToISO[s] ?: nil;
-}
-
 + (void)applyHeaderFromPassport:(nullable PNPassport *)passport toModel:(PassportViewModel *)m codeDigits:(NSArray<NSString *> *)box {
     NSString *prefix = NSLocalizedString(@"passport_header_no_prefix", nil);
     if (!prefix.length || [prefix isEqualToString:@"passport_header_no_prefix"]) {
@@ -82,6 +55,7 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
         m.headerCleanMatches = 0;
         m.headerMapOftenISOs = @[];
         m.headerMapGoneISOs = @[];
+        m.headerMapUngoISOs = @[];
         m.headerSpendingAmountText = @"";
         m.totalWatchTimeTexts = @[];
         return;
@@ -103,17 +77,19 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     NSMutableArray<NSString *> *often = [NSMutableArray array];
     NSMutableArray<NSString *> *gone = [NSMutableArray array];
     NSMutableArray<NSString *> *ungo = [NSMutableArray array];
+    NSMutableCharacterSet *cnTrim = [NSMutableCharacterSet whitespaceAndNewlineCharacterSet];
+    [cnTrim addCharactersInString:@"\u3000"];
     for (PNCountryHeatmap *h in passport.countryHeatmap) {
-        NSString *iso = [self isoCodeFromHeatmapCountryField:h.country];
-        if (!iso.length) {
+        NSString *cn = [h.country stringByTrimmingCharactersInSet:cnTrim];
+        if (!cn.length) {
             continue;
         }
         if (h.level >= 2) {
-            [often addObject:iso];
+            [often addObject:cn];
         } else if (h.level >= 1) {
-            [gone addObject:iso];
+            [gone addObject:cn];
         } else {
-            [ungo addObject:iso];
+            [ungo addObject:cn];
         }
     }
     m.headerMapOftenISOs = [often copy];
