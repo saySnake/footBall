@@ -163,6 +163,8 @@ static UIColor *kVCCaretGray(void) {
         label.backgroundColor = kVCBoxBG();
         label.layer.cornerRadius = 6.0;
         label.layer.masksToBounds = YES;
+        // 光标与格子同属 stackView 时，需保证数字始终压在光标之上，否则看起来像「码被挡住」
+        label.layer.zPosition = 1;
         [self.codeStackView addArrangedSubview:label];
         [labels addObject:label];
     }
@@ -172,6 +174,7 @@ static UIColor *kVCCaretGray(void) {
     self.caretView.backgroundColor = kVCCaretGray();
     self.caretView.layer.cornerRadius = 1.0;
     self.caretView.hidden = YES;
+    self.caretView.layer.zPosition = 0;
     [self.codeStackView addSubview:self.caretView];
 
     self.codeTextField = [[UITextField alloc] init];
@@ -211,7 +214,10 @@ static UIColor *kVCCaretGray(void) {
     self.resendButton.semanticContentAttribute = UISemanticContentAttributeForceLeftToRight;
     self.resendButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentRight;
     self.resendButton.titleEdgeInsets = UIEdgeInsetsMake(0, 6, 0, 0);
-    self.resendButton.titleLabel.lineBreakMode = NSLineBreakByClipping;
+    self.resendButton.titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    self.resendButton.titleLabel.numberOfLines = 1;
+    self.resendButton.titleLabel.adjustsFontSizeToFitWidth = YES;
+    self.resendButton.titleLabel.minimumScaleFactor = 0.82f;
     [self.resendButton setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
     [self.resendButton setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
     [self.resendButton addTarget:self action:@selector(resendTapped) forControlEvents:UIControlEventTouchUpInside];
@@ -248,6 +254,7 @@ static UIColor *kVCCaretGray(void) {
 
     [self.resendButton mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.codeStackView.mas_bottom).offset(18);
+        make.leading.greaterThanOrEqualTo(self.view).offset(24);
         make.trailing.equalTo(self.view).offset(-24);
     }];
 
@@ -289,7 +296,7 @@ static UIColor *kVCCaretGray(void) {
         make.width.mas_equalTo(2);
         make.height.mas_equalTo(26);
     }];
-    [self.codeStackView bringSubviewToFront:self.caretView];
+    // 勿 bringSubviewToFront 光标，否则会盖住已输入数字（格子与光标同父 view 时后加的子视图在上层）
     [self.codeStackView layoutIfNeeded];
 }
 

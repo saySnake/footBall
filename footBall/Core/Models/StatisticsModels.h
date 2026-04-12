@@ -99,6 +99,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) NSString *homeAwayRatio;
 @property (nonatomic, strong) NSArray<PNRoleDist *> *roleDistribution;
 @property (nonatomic, strong, nullable) PNStatisticsTeamRecord *teamRecord;
+/// 观赛涉及国家数（若后端提供）
+@property (nonatomic, assign) NSInteger countryCount;
 /// 月度频次（12 个月等，顺序以后端为准）
 @property (nonatomic, strong) NSArray<NSNumber *> *monthlyFrequency;
 @property (nonatomic, strong, nullable) PNHolidayStats *holidayStats;

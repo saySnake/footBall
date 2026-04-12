@@ -13,6 +13,9 @@
 #import "StampAlbumViewController.h"
 #import "PNMatchDetailViewController.h"
 #import "PNMatchInfoInputViewController.h"
+#import "AuthManager.h"
+#import "User.h"
+#import "StatisticsModels.h"
 
 #define kDiscoverHeaderBg     [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0]   // #0D2122
 #define kDiscoverGreen        [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0]   // #285D4B
@@ -25,6 +28,71 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     DiscoverMatchTypeUpcoming,
     DiscoverMatchTypeFinished
 };
+
+/// 与 MoreMatches 一致的比赛时间字符串解析（多字段名见 Match.m）
+static NSDate *DiscoverDateFromRawString(NSString *raw) {
+    if (raw.length == 0) return nil;
+    NSString *s = [raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (s.length == 0) return nil;
+
+    BOOL allDigits = YES;
+    for (NSUInteger i = 0; i < s.length; i++) {
+        unichar ch = [s characterAtIndex:i];
+        if (ch < '0' || ch > '9') {
+            allDigits = NO;
+            break;
+        }
+    }
+    if (allDigits && s.length >= 10) {
+        long long n = [s longLongValue];
+        if (n > 1000000000000LL) {
+            return [NSDate dateWithTimeIntervalSince1970:n / 1000.0];
+        }
+        if (n > 1000000000LL) {
+            return [NSDate dateWithTimeIntervalSince1970:(NSTimeInterval)n];
+        }
+    }
+    if ([s containsString:@"."]) {
+        NSScanner *scanner = [NSScanner scannerWithString:s];
+        double v = 0;
+        if ([scanner scanDouble:&v] && scanner.atEnd && v > 1e9) {
+            if (v > 1e12) {
+                return [NSDate dateWithTimeIntervalSince1970:v / 1000.0];
+            }
+            return [NSDate dateWithTimeIntervalSince1970:v];
+        }
+    }
+    if (@available(iOS 11.0, *)) {
+        NSISO8601DateFormatter *iso = [[NSISO8601DateFormatter alloc] init];
+        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
+        NSDate *d = [iso dateFromString:s];
+        if (d) return d;
+        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime;
+        d = [iso dateFromString:s];
+        if (d) return d;
+    }
+    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    NSArray<NSString *> *formats = @[
+        @"yyyy-MM-dd'T'HH:mm:ssZ",
+        @"yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+        @"yyyy-MM-dd'T'HH:mm:ssXXX",
+        @"yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+        @"yyyy-MM-dd'T'HH:mm:ss'Z'",
+        @"yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        @"yyyy-MM-dd HH:mm:ss",
+        @"yyyy-MM-dd HH:mm",
+        @"yyyy/MM/dd HH:mm:ss",
+        @"yyyy/MM/dd HH:mm",
+        @"yyyy-MM-dd",
+    ];
+    for (NSString *f in formats) {
+        fmt.dateFormat = f;
+        NSDate *d = [fmt dateFromString:s];
+        if (d) return d;
+    }
+    return nil;
+}
 
 @interface DiscoverMatch : NSObject
 @property (nonatomic, copy) NSString *matchId;
@@ -98,6 +166,12 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         _awayLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
         _awayLabel.textColor = [UIColor colorWithRed:0.208 green:0.200 blue:0.208 alpha:1.0]; // #353335
         _awayLabel.textAlignment = NSTextAlignmentLeft;
+        _homeLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+        _awayLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+        _homeLabel.adjustsFontSizeToFitWidth = YES;
+        _awayLabel.adjustsFontSizeToFitWidth = YES;
+        _homeLabel.minimumScaleFactor = 0.75f;
+        _awayLabel.minimumScaleFactor = 0.75f;
 
         _scoreLabel = [[UILabel alloc] init];
         _scoreLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
@@ -144,25 +218,26 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
         [card addSubview:_inputButton];
         [card addSubview:_verifiedPill];
 
-        // 顶部一行：主队名(右对齐) - 主队队徽 - 时间胶囊 - 客队队徽 - 客队名(左对齐)
+        // Figma 1:9284：队名 — 队徽 — 14 — 时间 — 14 — 队徽 — 队名
         [_homeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(card).offset(16);
             make.centerY.equalTo(_homeLogo);
-            make.width.mas_equalTo(80);
+            make.width.mas_lessThanOrEqualTo(card.mas_width).multipliedBy(0.34);
         }];
         [_homeLogo mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_homeLabel.mas_trailing).offset(6);
+            make.leading.equalTo(_homeLabel.mas_trailing).offset(8);
             make.top.equalTo(card).offset(14);
             make.width.height.mas_equalTo(24);
         }];
         [_scoreLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_homeLogo.mas_trailing).offset(10);
+            make.leading.equalTo(_homeLogo.mas_trailing).offset(14);
             make.centerY.equalTo(_homeLogo);
             make.height.mas_equalTo(24);
-            make.width.mas_greaterThanOrEqualTo(60);
+            make.width.mas_greaterThanOrEqualTo(56);
         }];
+        [_scoreLabel setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
         [_awayLogo mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_scoreLabel.mas_trailing).offset(10);
+            make.leading.equalTo(_scoreLabel.mas_trailing).offset(14);
             make.centerY.equalTo(_homeLogo);
             make.width.height.mas_equalTo(24);
         }];
@@ -254,6 +329,13 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 @property (nonatomic, strong) NSArray<DiscoverMatch *> *upcomingMatches;
 @property (nonatomic, strong) NSArray<DiscoverMatch *> *finishedMatches;
 @property (nonatomic, assign) DiscoverMatchType currentType;
+
+/// 联赛信息卡片大数字（对接 PNStatistics.teamRecord）
+@property (nonatomic, strong) UILabel *leagueWinValueLabel;
+@property (nonatomic, strong) UILabel *leagueDrawValueLabel;
+@property (nonatomic, strong) UILabel *leagueLossValueLabel;
+@property (nonatomic, strong) UILabel *leagueElimValueLabel;
+@property (nonatomic, strong) UILabel *leagueQualValueLabel;
 @end
 
 @implementation DiscoverViewController
@@ -306,8 +388,14 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 
     [self buildHeader];
     [self buildBody];
+    [self refreshDiscoverHeader];
     [self loadRemoteData];
     [self switchToType:DiscoverMatchTypeUpcoming];
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self refreshDiscoverHeader];
 }
 
 - (void)viewDidLayoutSubviews {
@@ -584,6 +672,11 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     UILabel *k2d = smallLab(NSLocalizedString(@"discover_eliminated", nil) ?: @"淘汰");
     UILabel *q2 = bigNum(); q2.text = @"2";
     UILabel *q2d = smallLab(NSLocalizedString(@"discover_qualified", nil) ?: @"出线");
+    self.leagueWinValueLabel = w40;
+    self.leagueDrawValueLabel = d20;
+    self.leagueLossValueLabel = l30;
+    self.leagueElimValueLabel = k2;
+    self.leagueQualValueLabel = q2;
 
     NSArray *topNums = @[ w40, d20, l30 ];
     NSArray *topDescs = @[ w40d, d20d, l30d ];
@@ -683,8 +776,8 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     _upcomingPill = [UIButton buttonWithType:UIButtonTypeSystem];
     _finishedPill = [UIButton buttonWithType:UIButtonTypeSystem];
     NSArray *tabs = @[ _upcomingPill, _finishedPill ];
-    NSString *tabUpcoming = [NSString stringWithFormat:(NSLocalizedString(@"discover_tab_upcoming_format", nil) ?: @"未来观赛(%ld)"), (long)2];
-    NSString *tabFinished = [NSString stringWithFormat:(NSLocalizedString(@"discover_tab_finished_format", nil) ?: @"已经观赛(%ld)"), (long)2];
+    NSString *tabUpcoming = [NSString stringWithFormat:(NSLocalizedString(@"discover_tab_upcoming_format", nil) ?: @"未来观赛(%ld)"), (long)0];
+    NSString *tabFinished = [NSString stringWithFormat:(NSLocalizedString(@"discover_tab_finished_format", nil) ?: @"已经观赛(%ld)"), (long)0];
     NSArray *tabTitles = @[ tabUpcoming, tabFinished ];
     for (NSInteger i = 0; i < tabs.count; i++) {
         UIButton *b = tabs[i];
@@ -758,6 +851,86 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     }];
 }
 
+- (void)refreshDiscoverHeader {
+    if (!AuthManager.sharedManager.isLoggedIn) {
+        self.nameLabel.text = @"--";
+        self.headerDateLabel.text = @"";
+        [self.avatarView sd_cancelCurrentImageLoad];
+        if (@available(iOS 13.0, *)) {
+            self.avatarView.image = [UIImage systemImageNamed:@"person.fill"];
+            self.avatarView.tintColor = [UIColor whiteColor];
+            self.avatarView.contentMode = UIViewContentModeCenter;
+        }
+        return;
+    }
+    User *u = AuthManager.sharedManager.user;
+    UserProfile *p = u.profile;
+    NSString *name = p.nickname.length > 0 ? p.nickname : (u.nickname.length > 0 ? u.nickname : @"--");
+    self.nameLabel.text = name;
+    NSDateFormatter *df = [[NSDateFormatter alloc] init];
+    df.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
+    df.dateFormat = @"MMMM d, yyyy";
+    self.headerDateLabel.text = [df stringFromDate:[NSDate date]];
+
+    NSString *avStr = p.avatar.length > 0 ? p.avatar : u.avatar;
+    NSString *trimmed = [avStr stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSURL *url = trimmed.length > 0 ? [NSURL URLWithString:trimmed] : nil;
+    UIImage *ph = nil;
+    if (@available(iOS 13.0, *)) {
+        ph = [UIImage systemImageNamed:@"person.crop.circle.fill"];
+    }
+    __weak typeof(self) weakSelf = self;
+    [self.avatarView sd_setImageWithURL:url placeholderImage:ph completed:^(UIImage * _Nullable image, NSError * _Nullable error, SDImageCacheType cacheType, NSURL * _Nullable imageURL) {
+        if (image && !error) {
+            weakSelf.avatarView.contentMode = UIViewContentModeScaleAspectFill;
+            weakSelf.avatarView.tintColor = nil;
+        } else {
+            weakSelf.avatarView.contentMode = UIViewContentModeCenter;
+            if (@available(iOS 13.0, *)) {
+                weakSelf.avatarView.image = ph;
+                weakSelf.avatarView.tintColor = [UIColor whiteColor];
+            }
+        }
+    }];
+}
+
+- (void)applyStatistics:(PNStatistics *)statistics {
+    void (^setLeagueDefaults)(void) = ^{
+        self.leagueWinValueLabel.text = @"0";
+        self.leagueDrawValueLabel.text = @"0";
+        self.leagueLossValueLabel.text = @"0";
+        self.leagueElimValueLabel.text = @"0";
+        self.leagueQualValueLabel.text = @"0";
+    };
+    if (!statistics) {
+        self.statAValue.text = @"0";
+        self.statBValue.text = @"0 min";
+        self.statCValue.text = @"0";
+        self.statDValue.text = @"0";
+        self.statEValue.text = @"0";
+        setLeagueDefaults();
+        return;
+    }
+    NSInteger totalMatches = statistics.basicStats ? MAX(statistics.basicStats.totalMatches, 0) : 0;
+    self.statAValue.text = [NSString stringWithFormat:@"%ld", (long)totalMatches];
+    NSInteger mins = MAX(statistics.cumulativeWatchTime, 0);
+    self.statBValue.text = [NSString stringWithFormat:@"%ld min", (long)mins];
+    self.statCValue.text = [NSString stringWithFormat:@"%ld", (long)MAX((NSInteger)statistics.stadiumRanking.count, 0)];
+    self.statDValue.text = [NSString stringWithFormat:@"%ld", (long)MAX((NSInteger)statistics.leagueStats.count, 0)];
+    self.statEValue.text = [NSString stringWithFormat:@"%ld", (long)MAX(statistics.countryCount, 0)];
+
+    PNStatisticsTeamRecord *tr = statistics.teamRecord;
+    if (!tr) {
+        setLeagueDefaults();
+        return;
+    }
+    self.leagueWinValueLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(tr.wins, 0)];
+    self.leagueDrawValueLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(tr.draws, 0)];
+    self.leagueLossValueLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(tr.losses, 0)];
+    self.leagueElimValueLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(tr.eliminated, 0)];
+    self.leagueQualValueLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(tr.qualified, 0)];
+}
+
 - (void)loadRemoteData {
     __weak typeof(self) weakSelf = self;
     /// 接口：`/api/v1/matches/my-team` 返回关注球队相关比赛；客户端按 `matchStatus` / 开赛时间拆成「未来观赛」「已经观赛」
@@ -782,17 +955,9 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     }];
     [[ProfileRequest shared] getMyStatisticsWithPeriod:@"all" success:^(HTTPResponse * _Nullable responseObject) {
         PNStatistics *statistics = [responseObject.dataObject isKindOfClass:PNStatistics.class] ? responseObject.dataObject : nil;
-        weakSelf.statAValue.text = [NSString stringWithFormat:@"%ld", (long)MAX(statistics.basicStats.totalMatches, 0)];
-        weakSelf.statBValue.text = [NSString stringWithFormat:@"%ld", (long)MAX(statistics.cumulativeWatchTime, 0)];
-        weakSelf.statCValue.text = [NSString stringWithFormat:@"%ld", (long)MAX(statistics.stadiumRanking.count, 0)];
-        weakSelf.statDValue.text = [NSString stringWithFormat:@"%ld", (long)MAX(statistics.leagueStats.count, 0)];
-        weakSelf.statEValue.text = @"0";
+        [weakSelf applyStatistics:statistics];
     } failure:^(NSError * _Nonnull error) {
-        weakSelf.statAValue.text = @"0";
-        weakSelf.statBValue.text = @"0";
-        weakSelf.statCValue.text = @"0";
-        weakSelf.statDValue.text = @"0";
-        weakSelf.statEValue.text = @"0";
+        [weakSelf applyStatistics:nil];
     }];
 }
 
@@ -869,16 +1034,7 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
 }
 
 - (NSDate *)dateFromRaw:(NSString *)raw {
-    if (raw.length == 0) return nil;
-    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
-    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    fmt.dateFormat = @"yyyy-MM-dd'T'HH:mm:ssZ";
-    NSDate *date = [fmt dateFromString:raw];
-    if (!date) {
-        fmt.dateFormat = @"yyyy-MM-dd HH:mm:ss";
-        date = [fmt dateFromString:raw];
-    }
-    return date;
+    return DiscoverDateFromRawString(raw);
 }
 
 
