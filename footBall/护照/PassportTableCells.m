@@ -888,7 +888,8 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
     UILabel *_title;
     UILabel *_subtitle;
     PassportDonutChartView *_donut;
-    UIStackView *_legendRow;
+    /// 纵向：每行最多 3 个图例（UIStackView horizontal）
+    UIStackView *_legendOuterStack;
 }
 
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
@@ -912,15 +913,14 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
         _donut.ringInnerRadius = 40;
         _donut.showsOutsidePercentLabels = YES;
         _donut.outsidePercentLabelColor = [UIColor whiteColor];
-        _legendRow = [[UIStackView alloc] init];
-        _legendRow.axis = UILayoutConstraintAxisHorizontal;
-        _legendRow.spacing = 8;
-        _legendRow.distribution = UIStackViewDistributionFillEqually;
-        _legendRow.alignment = UIStackViewAlignmentFill;
+        _legendOuterStack = [[UIStackView alloc] init];
+        _legendOuterStack.axis = UILayoutConstraintAxisVertical;
+        _legendOuterStack.spacing = 16;
+        _legendOuterStack.alignment = UIStackViewAlignmentFill;
         [_card addSubview:_title];
         [_card addSubview:_subtitle];
         [_card addSubview:_donut];
-        [_card addSubview:_legendRow];
+        [_card addSubview:_legendOuterStack];
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
             make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 0, 0, 0));
         }];
@@ -939,10 +939,10 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
             make.height.mas_equalTo(260);
             make.width.mas_equalTo(_card);
         }];
-        [_legendRow mas_makeConstraints:^(MASConstraintMaker *make) {
+        [_legendOuterStack mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(_donut.mas_bottom).offset(12);
             make.leading.trailing.equalTo(_card).insets(UIEdgeInsetsMake(0, 30, 0, 30));
-//            make.bottom.equalTo(_card).offset(-16);
+            make.bottom.equalTo(_card).offset(-16);
         }];
     }
     return self;
@@ -950,8 +950,8 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
 
 - (void)prepareForReuse {
     [super prepareForReuse];
-    for (UIView *v in _legendRow.arrangedSubviews) {
-        [_legendRow removeArrangedSubview:v];
+    for (UIView *v in _legendOuterStack.arrangedSubviews) {
+        [_legendOuterStack removeArrangedSubview:v];
         [v removeFromSuperview];
     }
 }
@@ -967,7 +967,10 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
     NSArray<UIColor *> *cols = @[
         [UIColor colorWithHexString:@"#CCFFDC"],
         [UIColor colorWithHexString:@"#62D486"],
-        [UIColor colorWithHexString:@"#5CB793"]
+        [UIColor colorWithHexString:@"#5CB793"],
+        [UIColor colorWithHexString:@"#3D8B7A"],
+        [UIColor colorWithHexString:@"#285D4B"],
+        [UIColor colorWithHexString:@"#1B3C3E"],
     ];
     NSMutableArray *colors = [NSMutableArray array];
     NSUInteger i = 0;
@@ -987,34 +990,43 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
     _donut.ringTrackExtraWidth = 10;
     _donut.segmentGapPoints = 5;
 
-    //观赛信息 和验证实名身份 最多允许6种身份认证
+    // 观赛身份图例：每行 3 个（最多 6 种身份 → 2 行）
     UIFont *legFont = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
-
-    i = 0;
-    for (NSDictionary *seg in model.tacticalSegments) {
-        UIView *cell = [[UIView alloc] init];
-        UIView *dot = [[UIView alloc] init];
-        dot.backgroundColor = cols[MIN(i, cols.count - 1)];
-        dot.layer.cornerRadius = 8;
-        dot.clipsToBounds = YES;
-        UILabel *l = [[UILabel alloc] init];
-        l.text = [NSString stringWithFormat:@"%@", seg[@"title"] ?: @""];
-        l.font = legFont;
-        l.textColor = [UIColor colorWithWhite:1 alpha:0.75];
-        l.textAlignment = NSTextAlignmentLeft;
-        l.numberOfLines = 0;
-        [cell addSubview:dot];
-        [cell addSubview:l];
-        [dot mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.leading.equalTo(cell);
-            make.width.height.mas_equalTo(16);
-        }];
-        [l mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(dot.mas_bottom).offset(6);
-            make.leading.trailing.bottom.equalTo(cell);
-        }];
-        [_legendRow addArrangedSubview:cell];
-        i++;
+    NSArray<NSDictionary *> *segs = model.tacticalSegments ?: @[];
+    NSUInteger nSeg = segs.count;
+    for (NSUInteger rowStart = 0; rowStart < nSeg; rowStart += 3) {
+        UIStackView *rowStack = [[UIStackView alloc] init];
+        rowStack.axis = UILayoutConstraintAxisHorizontal;
+        rowStack.spacing = 8;
+        rowStack.distribution = UIStackViewDistributionFillEqually;
+        rowStack.alignment = UIStackViewAlignmentFill;
+        for (NSUInteger k = 0; k < 3 && rowStart + k < nSeg; k++) {
+            NSUInteger i = rowStart + k;
+            NSDictionary *seg = segs[i];
+            UIView *cell = [[UIView alloc] init];
+            UIView *dot = [[UIView alloc] init];
+            dot.backgroundColor = cols[MIN(i, cols.count - 1)];
+            dot.layer.cornerRadius = 8;
+            dot.clipsToBounds = YES;
+            UILabel *l = [[UILabel alloc] init];
+            l.text = [NSString stringWithFormat:@"%@", seg[@"title"] ?: @""];
+            l.font = legFont;
+            l.textColor = [UIColor colorWithWhite:1 alpha:0.75];
+            l.textAlignment = NSTextAlignmentLeft;
+            l.numberOfLines = 0;
+            [cell addSubview:dot];
+            [cell addSubview:l];
+            [dot mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.top.leading.equalTo(cell);
+                make.width.height.mas_equalTo(16);
+            }];
+            [l mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.top.equalTo(dot.mas_bottom).offset(6);
+                make.leading.trailing.bottom.equalTo(cell);
+            }];
+            [rowStack addArrangedSubview:cell];
+        }
+        [_legendOuterStack addArrangedSubview:rowStack];
     }
 }
 

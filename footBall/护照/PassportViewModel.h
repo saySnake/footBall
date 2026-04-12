@@ -30,9 +30,11 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) NSInteger headerRedCards;
 @property (nonatomic, assign) NSInteger headerYellowCards;
 @property (nonatomic, assign) NSInteger headerCleanMatches;
-/// 地图填充：ISO 3166-1 alpha-2 大写（经常去 / 已去过）
+/// 地图填充：ISO 3166-1 alpha-2 大写（经常去 / 已去过/未去过）
 @property (nonatomic, copy) NSArray<NSString *> *headerMapOftenISOs;
 @property (nonatomic, copy) NSArray<NSString *> *headerMapGoneISOs;
+@property (nonatomic, copy) NSArray<NSString *> *headerMapUngoISOs;
+
 /// 年度消费金额展示（RMB 数字文案，可含千分位）
 @property (nonatomic, copy) NSString *headerSpendingAmountText;
 /// 个人生涯总时间，没有年份因素限制认证几场就是其背后的总时间 TIME SUM

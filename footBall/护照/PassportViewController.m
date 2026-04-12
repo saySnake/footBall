@@ -351,9 +351,9 @@ static UIColor *PassportPageBg(void) {
     if (indexPath.row == 5) {
         return 522;
     }
-    // PassportTacticalCell 设计稿（深色标题 + 圆环外百分比 + 图例）
+    // PassportTacticalCell（图例每行 3 个，最多 6 种身份为 2 行）
     if (indexPath.row == 6) {
-        return 430;
+        return 520;
     }
     // PassportMetricBarsCell 设计稿（90pt 数字 + 7 条情绪 bar）
     if (indexPath.row == 7) {
@@ -383,7 +383,7 @@ static UIColor *PassportPageBg(void) {
         return 522;
     }
     if (indexPath.row == 6) {
-        return 430;
+        return 520;
     }
     if (indexPath.row == 7) {
         return 368;

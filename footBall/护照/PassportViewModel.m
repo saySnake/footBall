@@ -102,20 +102,24 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     
     NSMutableArray<NSString *> *often = [NSMutableArray array];
     NSMutableArray<NSString *> *gone = [NSMutableArray array];
+    NSMutableArray<NSString *> *ungo = [NSMutableArray array];
     for (PNCountryHeatmap *h in passport.countryHeatmap) {
         NSString *iso = [self isoCodeFromHeatmapCountryField:h.country];
         if (!iso.length) {
             continue;
         }
-        if (h.level >= 3) {
+        if (h.level >= 2) {
             [often addObject:iso];
         } else if (h.level >= 1) {
             [gone addObject:iso];
+        } else {
+            [ungo addObject:iso];
         }
     }
     m.headerMapOftenISOs = [often copy];
     m.headerMapGoneISOs = [gone copy];
-    
+    m.headerMapUngoISOs = [ungo copy];
+
     if (passport.yearSpending.length) {
         m.headerSpendingAmountText = passport.yearSpending;
     } else {

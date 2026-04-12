@@ -486,7 +486,7 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
     if (self.worldMapView) {
         self.worldMapView.oftenCountries = model.headerMapOftenISOs ?: @[];
         self.worldMapView.goneCountries = model.headerMapGoneISOs ?: @[];
-        self.worldMapView.ungoCountries = @[];
+        self.worldMapView.ungoCountries = model.headerMapUngoISOs ? : @[];
         [self.worldMapView reload];
     }
     

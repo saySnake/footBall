@@ -18,6 +18,8 @@ static UIColor *PassportCircleStrokeColor(void) {
 
 @property (nonatomic, strong) UIImageView *avatarView;//用户信息 头像昵称来自于 我的-个人信息页面
 @property (nonatomic, strong) UILabel *cityLabel;////用户信息 头像昵称来自于 我的-个人信息页面
+@property (nonatomic, strong) NSArray<UIView *> *teamIconCircles;
+
 @property (nonatomic, strong) UILabel *matchesLabel;//个人2026年份总观看场次，有年份因素限制 选中赛季 认证几场的场次 game number 2026 SUM
 @property (nonatomic, strong) UILabel *matchesUnitLabel;
 @property (nonatomic, strong) UILabel *afterLabel;
@@ -37,6 +39,7 @@ static UIColor *PassportCircleStrokeColor(void) {
 @property (nonatomic, strong) UILabel *countriesUnitLabel;
 
 @property (nonatomic, strong) NSArray<UIView *> *iconCircles;
+@property (nonatomic, strong) UILabel *countRedLabel;
 @property (nonatomic, strong) UILabel *yearPinkLabel;
 @property (nonatomic, strong) UILabel *yearBlackLabel;
 @end
@@ -97,11 +100,7 @@ static UIColor *PassportCircleStrokeColor(void) {
         strongSelf.avatarView.contentMode = UIViewContentModeScaleAspectFill;
     }];
 
-    NSString *cityPh = NSLocalizedString(@"passport_header2_city_placeholder", nil);
-    if (!cityPh.length || [cityPh isEqualToString:@"passport_header2_city_placeholder"]) {
-        cityPh = @"上海";
-    }
-    self.cityLabel.text = model.userCity.length ? model.userCity : cityPh;
+    self.cityLabel.text = model.userCity;
 
     self.matchesLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, model.header2YearMatchCount)];
     NSString *matchUnit = NSLocalizedString(@"passport_unit_matches", nil);
@@ -152,25 +151,18 @@ static UIColor *PassportCircleStrokeColor(void) {
     self.yearBlackLabel.text = yearStr;
 
     NSArray<NSString *> *urls = model.header2FollowedTeamLogoURLs;
-    NSArray<NSString *> *iconNames = @[ @"passport_icon_1", @"passport_icon_2", @"passport_icon_3", @"passport_icon_4", @"passport_icon_5" ];
-    for (NSInteger i = 0; i < MIN(5, (NSInteger)self.iconCircles.count); i++) {
-        UIView *circle = self.iconCircles[i];
-        UIImageView *iv = nil;
-        for (UIView *sub in circle.subviews) {
-            if ([sub isKindOfClass:[UIImageView class]]) {
-                iv = (UIImageView *)sub;
-                break;
-            }
-        }
+    for (NSInteger i = 0; i < MIN(5, (NSInteger)self.teamIconCircles.count); i++) {
+        UIView *circle = self.teamIconCircles[i];
+        UIImageView *iv = (UIImageView *)[circle viewWithTag:0xFF];
         if (!iv) {
             continue;
         }
         NSString *u = (urls && i < (NSInteger)urls.count) ? urls[(NSUInteger)i] : nil;
         if (u.length) {
-            [iv sd_setImageWithURL:[NSURL URLWithString:u] placeholderImage:[UIImage imageNamed:iconNames[i]]];
+            [iv sd_setImageWithURL:[NSURL URLWithString:u]];
         } else {
             [iv sd_cancelCurrentImageLoad];
-            iv.image = [UIImage imageNamed:iconNames[i]];
+            iv.image = nil;
         }
     }
 }
@@ -235,8 +227,9 @@ static UIColor *PassportCircleStrokeColor(void) {
     [self addSubview:emptyCircle7];
     UIView *emptyCircle8 = [self circleContainer];
     [self addSubview:emptyCircle8];
-
-    NSArray *firstRowItems = @[avatarCircle,emptyCircle2,cityCircle,emptyCircle4,emptyCircle5,emptyCircle6,emptyCircle7,emptyCircle8];
+    self.teamIconCircles = @[emptyCircle4,emptyCircle5,emptyCircle6,emptyCircle7,emptyCircle8];
+    
+    NSArray *firstRowItems = [@[avatarCircle,emptyCircle2,cityCircle] arrayByAddingObjectsFromArray:self.teamIconCircles];
     for (int i=0; i<firstRowItems.count; i++) {
         UIView *view = firstRowItems[i];
         [view mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -244,6 +237,16 @@ static UIColor *PassportCircleStrokeColor(void) {
             make.width.height.equalTo(@(wh));
             make.centerX.equalTo(self).multipliedBy((2*i+1)/8.0);
         }];
+        if ([self.teamIconCircles containsObject:view]) {
+            UIImageView *iv = [[UIImageView alloc] init];
+            iv.tag = 0xFF;
+            iv.contentMode = UIViewContentModeScaleAspectFit;
+            [view addSubview:iv];
+            [iv mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.center.equalTo(view);
+                make.width.height.equalTo(view).multipliedBy(0.707);//圆内切正方形宽高
+            }];
+        }
     }
     
     
@@ -285,7 +288,8 @@ static UIColor *PassportCircleStrokeColor(void) {
     _afterLabel.text = @"05";
     [afterCircle addSubview:_afterLabel];
     [_afterLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.center.equalTo(afterCircle);
+        make.centerY.equalTo(afterCircle);
+        make.centerX.equalTo(afterCircle).offset(-6);
     }];
     UILabel *afterUnitLabel = UILabel.new;
     afterUnitLabel.text = @"后";
@@ -460,8 +464,13 @@ static UIColor *PassportCircleStrokeColor(void) {
     
     // 底部一排圆形按钮（设计稿 8 个，其中最后两个为年份）
     NSMutableArray *icons = [NSMutableArray array];
-    for (NSInteger i = 0; i < 8; i++) {
+    NSArray *bottomItemBgColors=@[@"#F5001F",@"#000000",@"#8E17A8",@"#00938F",@"#960060",@"",@"#FEB7DF",@"#000000"];
+    for (NSInteger i = 0; i < bottomItemBgColors.count; i++) {
         UIView *c = [self circleContainer];
+        NSString *colorHex = bottomItemBgColors[i];
+        if (colorHex.length > 0) {
+            c.backgroundColor = [UIColor colorWithHexString:bottomItemBgColors[i]];
+        }
         [self addSubview:c];
         [c mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.equalTo(self).offset(wh * i);
@@ -471,23 +480,32 @@ static UIColor *PassportCircleStrokeColor(void) {
         [icons addObject:c];
     }
     self.iconCircles = icons;
+    // 第1个 数量
+    UIView *countRed = self.iconCircles[0];
+    self.countRedLabel = [[UILabel alloc] init];
+    _countRedLabel.font = FontManager.sharedManager.font22Regular;
+    _countRedLabel.textColor = [UIColor whiteColor];
+    _countRedLabel.textAlignment = NSTextAlignmentCenter;
+    _countRedLabel.text = @"5000";
+    [countRed addSubview:_countRedLabel];
+    [_countRedLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.center.equalTo(countRed);
+    }];
 
-    // 给前 5 个放占位图标（如果你有资源名，后面直接替换 imageNamed）
-    NSArray<NSString *> *iconNames = @[ @"passport_icon_1", @"passport_icon_2", @"passport_icon_3", @"passport_icon_4", @"passport_icon_5" ];
-    for (NSInteger i = 0; i < MIN(5, self.iconCircles.count); i++) {
+    // 给前 2-5 个放占位图标（如果你有资源名，后面直接替换 imageNamed）
+    NSArray<NSString *> *iconNames = @[ @"", @"passport_icon_2", @"passport_icon_3", @"passport_icon_4", @"passport_icon_5" ];
+    for (NSInteger i = 1; i < MIN(5, self.iconCircles.count); i++) {
         UIImageView *iv = [[UIImageView alloc] initWithImage:[UIImage imageNamed:iconNames[i]]];
         iv.contentMode = UIViewContentModeScaleAspectFit;
         [self.iconCircles[i] addSubview:iv];
         [iv mas_makeConstraints:^(MASConstraintMaker *make) {
             make.center.equalTo(self.iconCircles[i]);
-            make.width.height.mas_equalTo(wh * 0.55);
+//            make.width.height.mas_equalTo(wh * 0.55);
         }];
     }
 
     // 第 6、7 个：年份圆
     UIView *yearPink = self.iconCircles[6];
-    yearPink.backgroundColor = [UIColor colorWithHexString:@"#F4B6CD"];
-    yearPink.layer.borderWidth = 0;
     _yearPinkLabel = [[UILabel alloc] init];
     _yearPinkLabel.font = FontManager.sharedManager.font20Regular;
     _yearPinkLabel.textColor = [UIColor whiteColor];
@@ -499,8 +517,6 @@ static UIColor *PassportCircleStrokeColor(void) {
     }];
 
     UIView *yearBlack = self.iconCircles[7];
-    yearBlack.backgroundColor = [UIColor blackColor];
-    yearBlack.layer.borderWidth = 0;
     _yearBlackLabel = [[UILabel alloc] init];
     _yearBlackLabel.font = FontManager.sharedManager.font20Regular;
     _yearBlackLabel.textColor = [UIColor whiteColor];
