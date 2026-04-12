@@ -8,10 +8,15 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+@class PNVerificationStatus;
+
 /// 身份认证相关接口（/api/v1/verification/*）
 @interface VerificationRequest : NSObject
 
 + (instancetype)shared;
+
+/// 最近一次 `GET /api/v1/verification/status` 解析结果（供身份认证页展示）
+@property (nonatomic, strong, nullable) PNVerificationStatus *cachedVerificationStatus;
 
 /// GET /api/v1/verification/status
 - (void)fetchStatusSuccess:(nullable APISuccessBlock)success failure:(nullable APIFailureBlock)failure;

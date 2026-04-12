@@ -17,6 +17,43 @@ static UIColor *StampAlbumNavBg(void) {
 }
 
 static const CGFloat kStampFilterRowHeight = 40;
+/// 分类标题与上一 section 网格底部、下一 section 网格顶部的间距（各 15pt）
+static const CGFloat kStampAlbumSectionTitleTopGap = 15;
+static const CGFloat kStampAlbumSectionTitleBottomGap = 15;
+
+static CGFloat StampAlbumSectionHeaderHeight(void) {
+    UIFont *titleFont = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    return kStampAlbumSectionTitleTopGap + ceil(titleFont.lineHeight) + kStampAlbumSectionTitleBottomGap;
+}
+
+static NSArray<NSString *> *StampAlbumCanonicalTitles(void) {
+    return @[
+        NSLocalizedString(@"stamp_album_section_stadium", nil) ?: @"球场",
+        NSLocalizedString(@"stamp_album_section_trophy", nil) ?: @"奖杯",
+        NSLocalizedString(@"stamp_album_section_event", nil) ?: @"事件",
+        NSLocalizedString(@"stamp_album_section_identity", nil) ?: @"身份"
+    ];
+}
+
+static NSString *StampAlbumNormalizedCategoryTitle(NSString *rawTitle, NSInteger fallbackIndex) {
+    NSArray<NSString *> *canonical = StampAlbumCanonicalTitles();
+    NSString *raw = [rawTitle isKindOfClass:NSString.class] ? rawTitle : @"";
+    NSString *trimmed = [raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSString *lower = trimmed.lowercaseString;
+
+    if ([trimmed containsString:@"球场"] || [lower containsString:@"stadium"]) return canonical[0];
+    if ([trimmed containsString:@"奖杯"] || [lower containsString:@"trophy"]) return canonical[1];
+    if ([trimmed containsString:@"事件"] || [lower containsString:@"event"]) return canonical[2];
+    if ([trimmed containsString:@"身份"] || [lower containsString:@"identity"]) return canonical[3];
+
+    for (NSString *title in canonical) {
+        if ([trimmed isEqualToString:title]) return title;
+    }
+    if (fallbackIndex >= 0 && fallbackIndex < (NSInteger)canonical.count) {
+        return canonical[fallbackIndex];
+    }
+    return nil;
+}
 
 #pragma mark - Grid table cell
 
@@ -33,6 +70,9 @@ static const CGFloat kStampFilterRowHeight = 40;
         self.selectionStyle = UITableViewCellSelectionStyleNone;
         self.backgroundColor = [UIColor clearColor];
         self.contentView.backgroundColor = [UIColor clearColor];
+        self.contentView.layoutMargins = UIEdgeInsetsZero;
+        self.preservesSuperviewLayoutMargins = NO;
+        self.separatorInset = UIEdgeInsetsZero;
         UICollectionViewFlowLayout *flow = [[UICollectionViewFlowLayout alloc] init];
         flow.minimumInteritemSpacing = 0;
         flow.minimumLineSpacing = 0;
@@ -47,9 +87,9 @@ static const CGFloat kStampFilterRowHeight = 40;
         [_collectionView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(self.contentView).offset(16);
             make.trailing.equalTo(self.contentView).offset(-16);
-            make.top.equalTo(self.contentView).offset(8);
+            make.top.equalTo(self.contentView);
             make.height.mas_equalTo(0);
-            make.bottom.equalTo(self.contentView).offset(-8);
+            make.bottom.equalTo(self.contentView);
         }];
     }
     return self;
@@ -145,9 +185,10 @@ static const CGFloat kStampFilterRowHeight = 40;
         [UIColor colorWithRed:0.42 green:0.58 blue:0.48 alpha:1.0],
     ];
     NSMutableArray<StampAlbumSectionModel *> *sec = [NSMutableArray array];
-    // 球场分类：10 枚已解锁
+    NSArray<NSString *> *titles = StampAlbumCanonicalTitles();
+    // 球场：10 枚已解锁
     StampAlbumSectionModel *s1 = [[StampAlbumSectionModel alloc] init];
-    s1.title = NSLocalizedString(@"stamp_album_section_stadium", nil) ?: @"球场分类";
+    s1.title = titles[0];
     NSMutableArray *i1 = [NSMutableArray array];
     for (NSInteger k = 0; k < 10; k++) {
         StampAlbumItem *it = [[StampAlbumItem alloc] init];
@@ -157,9 +198,9 @@ static const CGFloat kStampFilterRowHeight = 40;
     }
     s1.items = [i1 copy];
     [sec addObject:s1];
-    // 分类二：上排 5 蓝，下排 5 空
+    // 奖杯：上排 5 蓝，下排 5 空
     StampAlbumSectionModel *s2 = [[StampAlbumSectionModel alloc] init];
-    s2.title = NSLocalizedString(@"stamp_album_section_other", nil) ?: @"分类二";
+    s2.title = titles[1];
     NSMutableArray *i2 = [NSMutableArray array];
     for (NSInteger k = 0; k < 5; k++) {
         StampAlbumItem *it = [[StampAlbumItem alloc] init];
@@ -174,9 +215,9 @@ static const CGFloat kStampFilterRowHeight = 40;
     }
     s2.items = [i2 copy];
     [sec addObject:s2];
-    // 再一组分类二
+    // 事件：10 枚已解锁
     StampAlbumSectionModel *s3 = [[StampAlbumSectionModel alloc] init];
-    s3.title = NSLocalizedString(@"stamp_album_section_three", nil) ?: @"分类三";
+    s3.title = titles[2];
     NSMutableArray *i3 = [NSMutableArray array];
     for (NSInteger k = 0; k < 10; k++) {
         StampAlbumItem *it = [[StampAlbumItem alloc] init];
@@ -186,6 +227,19 @@ static const CGFloat kStampFilterRowHeight = 40;
     }
     s3.items = [i3 copy];
     [sec addObject:s3];
+
+    // 身份：10 枚已解锁
+    StampAlbumSectionModel *s4 = [[StampAlbumSectionModel alloc] init];
+    s4.title = titles[3];
+    NSMutableArray *i4 = [NSMutableArray array];
+    for (NSInteger k = 0; k < 10; k++) {
+        StampAlbumItem *it = [[StampAlbumItem alloc] init];
+        it.unlocked = YES;
+        it.circleColor = (k < 5) ? [UIColor colorWithRed:0.55 green:0.62 blue:0.45 alpha:1.0] : [UIColor colorWithRed:0.55 green:0.42 blue:0.35 alpha:1.0];
+        [i4 addObject:it];
+    }
+    s4.items = [i4 copy];
+    [sec addObject:s4];
 
     self.allSections = [sec copy];
     self.sections = self.allSections;
@@ -207,9 +261,13 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
         weakSelf.apiCategories = c.categories ?: @[];
 
         NSMutableArray<StampAlbumSectionModel *> *sec = [NSMutableArray array];
-        for (PNStampCategorySection *cat in weakSelf.apiCategories) {
+        [weakSelf.apiCategories enumerateObjectsUsingBlock:^(PNStampCategorySection * _Nonnull cat, NSUInteger idx, BOOL * _Nonnull stop) {
+            NSString *displayTitle = StampAlbumNormalizedCategoryTitle(cat.name, (NSInteger)idx);
+            if (displayTitle.length == 0) {
+                return;
+            }
             StampAlbumSectionModel *s = [[StampAlbumSectionModel alloc] init];
-            s.title = cat.name ?: @"";
+            s.title = displayTitle;
             NSMutableArray<StampAlbumItem *> *items = [NSMutableArray array];
             for (PNStampAlbumItem *st in (cat.stamps ?: @[])) {
                 StampAlbumItem *it = [[StampAlbumItem alloc] init];
@@ -222,7 +280,7 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
             }
             s.items = [items copy];
             [sec addObject:s];
-        }
+        }];
 
         weakSelf.allSections = [sec copy];
         weakSelf.sections = weakSelf.allSections;
@@ -272,27 +330,34 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
     _topBar.backgroundColor = StampAlbumNavBg();
     [self.view addSubview:_topBar];
     _backButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    if (@available(iOS 13.0, *)) {
-        UIImage *img = [UIImage systemImageNamed:@"chevron.left"];
-        [_backButton setImage:[img imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+    UIImage *backImage = [[UIImage imageNamed:@"nav_back"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    if (backImage) {
+        [_backButton setImage:backImage forState:UIControlStateNormal];
+        _backButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
     } else {
         [_backButton setTitle:NSLocalizedString(@"back", nil) ?: @"返回" forState:UIControlStateNormal];
     }
     _backButton.tintColor = [UIColor whiteColor];
     [_backButton addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
     _titleLabel = [[UILabel alloc] init];
-    _titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+    _titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
     _titleLabel.textColor = [UIColor whiteColor];
     _titleLabel.text = NSLocalizedString(@"discover_stamp_album", nil) ?: @"邮票夹";
     _filterButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    _filterButton.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    _filterButton.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    _filterButton.backgroundColor = [UIColor clearColor];
+    _filterButton.tintColor = [UIColor whiteColor];
+    _filterButton.adjustsImageWhenHighlighted = NO;
+    _filterButton.adjustsImageWhenDisabled = NO;
+    _filterButton.showsTouchWhenHighlighted = NO;
     [_filterButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    [_filterButton setTitleColor:[UIColor whiteColor] forState:UIControlStateHighlighted];
     self.filterBaseTitle = NSLocalizedString(@"stamp_album_filter", nil) ?: @"筛选";
     [_filterButton setTitle:[NSString stringWithFormat:@"%@ ▼", self.filterBaseTitle] forState:UIControlStateNormal];
-    _filterButton.layer.cornerRadius = 6;
+    _filterButton.layer.cornerRadius = 2;
     _filterButton.layer.borderWidth = 0.6;
     _filterButton.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.55].CGColor;
-    _filterButton.contentEdgeInsets = UIEdgeInsetsMake(6, 12, 6, 12);
+    _filterButton.contentEdgeInsets = UIEdgeInsetsMake(3.5, 8, 3.5, 8);
     [_filterButton addTarget:self action:@selector(onFilterTapped) forControlEvents:UIControlEventTouchUpInside];
     [_topBar addSubview:_backButton];
     [_topBar addSubview:_titleLabel];
@@ -302,9 +367,9 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
         make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideTop).offset(44);
     }];
     [_backButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(_topBar).offset(8);
+        make.leading.equalTo(_topBar).offset(16);
         make.bottom.equalTo(_topBar).offset(-8);
-        make.width.height.mas_equalTo(36);
+        make.width.height.mas_equalTo(24);
     }];
     [_titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(_topBar);
@@ -324,6 +389,10 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
     _tableView.backgroundColor = [UIColor colorWithWhite:0.96 alpha:1.0];
     _tableView.estimatedRowHeight = 200;
     _tableView.rowHeight = UITableViewAutomaticDimension;
+    if (@available(iOS 15.0, *)) {
+        // 避免系统默认在首个 section 前插入额外空白，使 section 与首行紧贴
+        _tableView.sectionHeaderTopPadding = 0;
+    }
     [_tableView registerClass:[StampAlbumGridTableCell class] forCellReuseIdentifier:@"StampAlbumGridTableCell"];
     [self.view addSubview:_tableView];
     [_tableView mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -364,7 +433,7 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
     _filterTableView.scrollEnabled = NO;
     _filterTableView.allowsSelection = YES;
     _filterTableView.separatorInset = UIEdgeInsetsMake(0, 16, 0, 16);
-    _filterTableView.separatorColor = [UIColor colorWithWhite:0.85 alpha:1.0];
+    _filterTableView.separatorColor = [UIColor colorWithWhite:0.88 alpha:1.0];
     _filterTableView.rowHeight = kStampFilterRowHeight;
     _filterTableView.estimatedRowHeight = 0;
     if (@available(iOS 15.0, *)) {
@@ -501,6 +570,8 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
     if (tableView == self.filterTableView) {
         UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"StampFilterCell" forIndexPath:indexPath];
         NSString *opt = (indexPath.row < self.filterOptions.count) ? self.filterOptions[indexPath.row] : @"";
+        cell.backgroundColor = [UIColor clearColor];
+        cell.contentView.backgroundColor = [UIColor clearColor];
         cell.textLabel.text = opt;
         cell.textLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
         cell.textLabel.textColor = [UIColor colorWithWhite:0 alpha:1.0];
@@ -510,6 +581,9 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
         // 下拉列表设计稿：纯文字点击即可，不额外展示勾选图标
         cell.accessoryType = UITableViewCellAccessoryNone;
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        UIView *selectedBg = [[UIView alloc] init];
+        selectedBg.backgroundColor = [UIColor clearColor];
+        cell.selectedBackgroundView = selectedBg;
         return cell;
     }
 
@@ -540,25 +614,26 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
     more.tag = section;
     [wrap addSubview:title];
     [wrap addSubview:more];
+    // 标题上距上一 section 的 StampAlbumGridTableCell 底部 15pt、下距本 section 网格顶 15pt（由 header 总高保证）
     [title mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(wrap).offset(16);
-        make.centerY.equalTo(wrap);
+        make.top.equalTo(wrap).offset(kStampAlbumSectionTitleTopGap);
     }];
     [more mas_makeConstraints:^(MASConstraintMaker *make) {
         make.trailing.equalTo(wrap).offset(-16);
-        make.centerY.equalTo(wrap);
+        make.centerY.equalTo(title);
     }];
     return wrap;
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
     if (tableView == self.filterTableView) return 0;
-    return 44;
+    return StampAlbumSectionHeaderHeight();
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForFooterInSection:(NSInteger)section {
     if (tableView == self.filterTableView) return 0;
-    return 12;
+    return 0.01;
 }
 
 - (UIView *)tableView:(UITableView *)tableView viewForFooterInSection:(NSInteger)section {
@@ -607,14 +682,15 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
     }
     StampAlbumSectionModel *sec = self.sections[section];
     // 尝试从接口 categories 找到对应分类并传 categoryId（若当前是筛选后的 sections，同名可能重复，以 first match 为准）
-    NSString *catId = nil;
+    __block NSString *catId = nil;
     NSString *catName = sec.title;
-    for (PNStampCategorySection *c in self.apiCategories) {
-        if (catName.length && [c.name isEqualToString:catName] && c.categoryId.length) {
+    [self.apiCategories enumerateObjectsUsingBlock:^(PNStampCategorySection * _Nonnull c, NSUInteger idx, BOOL * _Nonnull stop) {
+        NSString *displayTitle = StampAlbumNormalizedCategoryTitle(c.name, (NSInteger)idx);
+        if (catName.length && [displayTitle isEqualToString:catName] && c.categoryId.length) {
             catId = c.categoryId;
-            break;
+            *stop = YES;
         }
-    }
+    }];
     StampAlbumCategoryViewController *vc = nil;
     if (catId.length) {
         vc = [[StampAlbumCategoryViewController alloc] initWithCategoryId:catId categoryName:catName];

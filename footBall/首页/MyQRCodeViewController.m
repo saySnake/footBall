@@ -34,6 +34,19 @@ static UIColor *kQRCardFill(void) {
     return [[UIColor colorWithRed:0.082 green:0.200 blue:0.196 alpha:1.0] colorWithAlphaComponent:0.92];
 }
 
+/// 头像边长（Figma 56）
+static CGFloat const kQRAvatarSide = 56.f;
+static CGFloat const kQRAvatarBorderW = 2.44f;
+/// 头像外圆半径（白边外沿）
+static CGFloat kQRAvatarOuterRadius(void) {
+    return kQRAvatarSide * 0.5f + kQRAvatarBorderW;
+}
+/// 卡片凹口路径半径：略大于头像外圆，半圆切入更深、更宽，凹口更醒目（仍共心于顶边中点）
+static CGFloat const kQRNotchRadiusBoost = 9.f;
+static CGFloat kQRNotchPathRadius(void) {
+    return kQRAvatarOuterRadius() + kQRNotchRadiusBoost;
+}
+
 @interface QRCardShapeView : UIView
 @property (nonatomic, strong) CAShapeLayer *shapeLayer;
 @end
@@ -57,17 +70,17 @@ static UIColor *kQRCardFill(void) {
     CGFloat w = CGRectGetWidth(b);
     CGFloat h = CGRectGetHeight(b);
     CGFloat r = 28.0;
-
-    // 顶部中间做一个轻微凹口，给头像“嵌入”效果（近似设计稿 Vector）
-    CGFloat notchW = 120.0;
-    CGFloat notchH = 26.0;
-    CGFloat notchLeft = (w - notchW) * 0.5;
-    CGFloat notchRight = notchLeft + notchW;
+    CGFloat R = kQRNotchPathRadius();
+    CGFloat cx = w * 0.5;
+    CGFloat leftArc = cx - R;
 
     UIBezierPath *p = [UIBezierPath bezierPath];
     [p moveToPoint:CGPointMake(r, 0)];
-    [p addLineToPoint:CGPointMake(notchLeft, 0)];
-    [p addQuadCurveToPoint:CGPointMake(notchRight, 0) controlPoint:CGPointMake(w * 0.5, notchH)];
+    if (leftArc > r + 0.5) {
+        [p addLineToPoint:CGPointMake(leftArc, 0)];
+    }
+    // 头像中心在卡片顶边中点：顶边向下凹的半圆与头像外圆共圆（Figma 574:4288）
+    [p addArcWithCenter:CGPointMake(cx, 0) radius:R startAngle:M_PI endAngle:0 clockwise:NO];
     [p addLineToPoint:CGPointMake(w - r, 0)];
     [p addArcWithCenter:CGPointMake(w - r, r) radius:r startAngle:-M_PI_2 endAngle:0 clockwise:YES];
     [p addLineToPoint:CGPointMake(w, h - r)];
@@ -80,6 +93,7 @@ static UIColor *kQRCardFill(void) {
 
     self.shapeLayer.frame = b;
     self.shapeLayer.path = p.CGPath;
+    self.layer.shadowPath = p.CGPath;
 }
 @end
 
@@ -140,7 +154,7 @@ static UIColor *kQRCardFill(void) {
     ];
     self.bgGradient.startPoint = CGPointMake(0.8, 0.0);
     self.bgGradient.endPoint = CGPointMake(0.2, 1.0);
-    self.bgGradient.opacity = 0.9;
+    self.bgGradient.opacity = 0.55;
     [self.bgOverlayView.layer addSublayer:self.bgGradient];
 
     self.navBar = [UIView new];
@@ -148,9 +162,12 @@ static UIColor *kQRCardFill(void) {
     [self.view addSubview:self.navBar];
 
     UIButton *backBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    UIImage *backIcon = [UIImage imageNamed:@"ad_left"];
+    UIImage *backIcon = [[UIImage imageNamed:@"nav_back"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    if (!backIcon) {
+        backIcon = [UIImage imageNamed:@"ad_left"];
+    }
     if (!backIcon && @available(iOS 13.0, *)) {
-        backIcon = [UIImage systemImageNamed:@"arrow.left"];
+        backIcon = [[UIImage systemImageNamed:@"arrow.left"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
     }
     [backBtn setImage:backIcon forState:UIControlStateNormal];
     backBtn.tintColor = [UIColor whiteColor];
@@ -179,16 +196,16 @@ static UIColor *kQRCardFill(void) {
 
     self.cardView = [QRCardShapeView new];
     self.cardView.layer.shadowColor = [UIColor blackColor].CGColor;
-    self.cardView.layer.shadowOpacity = 0.25;
-    self.cardView.layer.shadowOffset = CGSizeMake(0, 10);
-    self.cardView.layer.shadowRadius = 28;
+    self.cardView.layer.shadowOpacity = 0.34;
+    self.cardView.layer.shadowOffset = CGSizeMake(0, 12);
+    self.cardView.layer.shadowRadius = 32;
     [self.view addSubview:self.cardView];
 
     self.avatarView = [UIImageView new];
     self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
-    self.avatarView.layer.cornerRadius = 28;
+    self.avatarView.layer.cornerRadius = kQRAvatarSide * 0.5f;
     self.avatarView.clipsToBounds = YES;
-    self.avatarView.layer.borderWidth = 2.44;
+    self.avatarView.layer.borderWidth = kQRAvatarBorderW;
     self.avatarView.layer.borderColor = [UIColor whiteColor].CGColor;
     self.avatarView.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.06];
     if (@available(iOS 13.0, *)) {
@@ -201,10 +218,11 @@ static UIColor *kQRCardFill(void) {
     [self.avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self.view);
         make.top.equalTo(self.navBar.mas_bottom).offset(40);
-        make.size.mas_equalTo(CGSizeMake(56, 56));
+        make.size.mas_equalTo(CGSizeMake(kQRAvatarSide, kQRAvatarSide));
     }];
     [self.cardView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.avatarView.mas_centerY).offset(10);
+        // 卡片顶边穿过头像中心：头像一半在卡片上方，凹口圆弧与头像下缘贴合（574:4288）
+        make.top.equalTo(self.avatarView.mas_centerY);
         make.centerX.equalTo(self.view);
         make.width.mas_equalTo(327);
         make.height.mas_equalTo(438);
@@ -216,7 +234,8 @@ static UIColor *kQRCardFill(void) {
     self.nameLabel.textAlignment = NSTextAlignmentCenter;
     [self.cardView addSubview:self.nameLabel];
     [self.nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.cardView).offset(58);
+        // 凹口最深处约 R，文案从圆弧下缘留白（对齐 Figma 用户信息区）
+        make.top.equalTo(self.cardView).offset(ceil(kQRNotchPathRadius()) + 20);
         make.leading.equalTo(self.cardView).offset(16);
         make.trailing.equalTo(self.cardView).offset(-16);
     }];
@@ -248,7 +267,7 @@ static UIColor *kQRCardFill(void) {
     self.hintLabel.numberOfLines = 2;
     [self.cardView addSubview:self.hintLabel];
     [self.hintLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.qrImageView.mas_bottom).offset(20);
+        make.top.equalTo(self.qrImageView.mas_bottom).offset(16);
         make.leading.equalTo(self.cardView).offset(16);
         make.trailing.equalTo(self.cardView).offset(-16);
         make.bottom.equalTo(self.cardView).offset(-24);

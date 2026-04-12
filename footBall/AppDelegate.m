@@ -28,6 +28,15 @@
 
 @implementation AppDelegate
 
+- (void)configureGlobalDefaultTextAppearance {
+    UIColor *defaultTextColor = [UIColor blackColor];
+
+    // 只覆盖依赖系统默认文字色的控件，不干预已显式设置的业务配色。
+    [[UILabel appearance] setTextColor:defaultTextColor];
+    [[UITextField appearance] setTextColor:defaultTextColor];
+    [[UITextView appearance] setTextColor:defaultTextColor];
+}
+
 // 重写 window 的 getter，返回 SceneDelegate 的 window（兼容 DoKit）
 - (UIWindow *)window {
     if (@available(iOS 13.0, *)) {
@@ -54,6 +63,8 @@
 }
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+    [self configureGlobalDefaultTextAppearance];
+
     // 初始化主题管理器
     [[ThemeManager sharedManager] setupThemeConfiguration];
     

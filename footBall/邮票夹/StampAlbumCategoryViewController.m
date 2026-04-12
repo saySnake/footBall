@@ -152,9 +152,10 @@ static inline UIEdgeInsets StampCategorySectionInset(void) {
     [self.view addSubview:_topBar];
 
     _backButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    if (@available(iOS 13.0, *)) {
-        UIImage *img = [UIImage systemImageNamed:@"chevron.left"];
-        [_backButton setImage:[img imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+    UIImage *backImage = [[UIImage imageNamed:@"nav_back"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    if (backImage) {
+        [_backButton setImage:backImage forState:UIControlStateNormal];
+        _backButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
     } else {
         [_backButton setTitle:NSLocalizedString(@"back", nil) ?: @"返回" forState:UIControlStateNormal];
     }
@@ -162,7 +163,7 @@ static inline UIEdgeInsets StampCategorySectionInset(void) {
     [_backButton addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
 
     _titleLabel = [[UILabel alloc] init];
-    _titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+    _titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
     _titleLabel.textColor = [UIColor whiteColor];
     // 设计稿：与邮票夹主页相同顶栏标题
     _titleLabel.text = self.categoryName.length ? self.categoryName : (NSLocalizedString(@"discover_stamp_album", nil) ?: @"邮票夹");
@@ -203,9 +204,9 @@ static inline UIEdgeInsets StampCategorySectionInset(void) {
         make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideTop).offset(44);
     }];
     [_backButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(_topBar).offset(8);
+        make.leading.equalTo(_topBar).offset(16);
         make.bottom.equalTo(_topBar).offset(-8);
-        make.width.height.mas_equalTo(36);
+        make.width.height.mas_equalTo(24);
     }];
     [_titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(_topBar);

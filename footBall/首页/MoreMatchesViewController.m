@@ -169,6 +169,7 @@
     title.text = NSLocalizedString(@"more_matches_title", nil) ?: @"更多比赛";
     title.font = [UIFont boldSystemFontOfSize:18];
     title.textAlignment = NSTextAlignmentCenter;
+    title.textColor = [UIColor blackColor];
 
     [bar addSubview:back];
     [bar addSubview:calendar];
@@ -206,6 +207,7 @@
     self.monthLabel = [[UILabel alloc] init];
     self.monthLabel.font = [UIFont boldSystemFontOfSize:18];
     self.monthLabel.textAlignment = NSTextAlignmentCenter;
+    self.monthLabel.textColor = [UIColor blackColor];
     [header addSubview:self.monthLabel];
 
     NSArray *weekTitles = @[ @"周日", @"周一", @"周二", @"周三", @"周四", @"周五", @"周六" ];

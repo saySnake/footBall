@@ -57,10 +57,11 @@
 
 /* Login - Verify Code */
 "verify_title" = "Please enter verification code";
-"verify_subtitle_format" = "We have sent a 6-digit code to %@. Enter the code to log in.";
+"verify_subtitle_format" = "We have sent a 6-digit code to %@.\nEnter the code to log in.";
 "verify_code_placeholder" = "Please enter 6-digit code";
 "verify_login_button" = "Log in";
 "verify_resend_button" = "Resend code";
+"verify_code_sent" = "Verification code sent";
 
 /* Team Selection */
 "team_select_title" = "Choose your favorite teams";
@@ -109,9 +110,10 @@
 "stamp_album_filter" = "Filter";
 "stamp_album_filter_all" = "All";
 "stamp_album_view_more" = "View More";
-"stamp_album_section_stadium" = "Stadium categories";
-"stamp_album_section_other" = "Category 2";
-"stamp_album_section_three" = "Category 3";
+"stamp_album_section_stadium" = "Stadium";
+"stamp_album_section_trophy" = "Trophy";
+"stamp_album_section_event" = "Event";
+"stamp_album_section_identity" = "Identity";
 "discover_tab_upcoming_format" = "Upcoming (%ld)";
 "discover_tab_finished_format" = "Attended (%ld)";
 "discover_verified_ticket" = "Verified Ticket";
@@ -326,6 +328,10 @@
 "auth_pro_identity_title" = "Professional Identity Certification";
 "auth_pro_identity_desc" = "For users with professional identity. E.g.: players, media, sports professionals, etc.";
 "auth_status_uncertified" = "Not certified";
+"auth_status_n_identities" = "Verified %@ identity type(s)";
+"auth_cert_status_approved" = "Verified";
+"auth_cert_status_pending" = "Pending review";
+"auth_cert_retry" = "Retry verification";
 "auth_conditions_title" = "Certification Conditions";
 "auth_professional_title" = "Professional Certification";
 "auth_professional_desc" = "Certification can increase exposure";
