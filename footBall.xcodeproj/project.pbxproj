@@ -224,6 +224,9 @@
 				GCC_PREFIX_HEADER = "footBall/footBall-Prefix.pch";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = footBall/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "需要访问相机以拍摄并上传认证或内容图片";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "用于获取比赛认证的当前位置";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "需要访问相册以保存您的二维码名片图片";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -254,6 +257,9 @@
 				GCC_PREFIX_HEADER = "footBall/footBall-Prefix.pch";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = footBall/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "需要访问相机以拍摄并上传认证或内容图片";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "用于获取比赛认证的当前位置";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "需要访问相册以保存您的二维码名片图片";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;

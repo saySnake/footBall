@@ -10,6 +10,7 @@
 @implementation Match
 +(NSDictionary<NSString *,id> *)modelCustomPropertyMapper {
     return @{@"matchId": @"id",
+             @"matchDate": @[@"matchDate", @"matchTime", @"startTime", @"kickoffTime", @"gameTime", @"beginTime", @"match_date", @"match_time", @"start_time"],
              @"homeTeamId": @"homeTeamId",
              @"awayTeamId": @"awayTeamId",
              @"homeTeamLogo": @"homeTeamLogo",

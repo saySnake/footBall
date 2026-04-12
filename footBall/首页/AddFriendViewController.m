@@ -308,13 +308,19 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
         return @[];
     }
     if ([data isKindOfClass:[NSArray class]]) {
+        NSArray *arr = (NSArray *)data;
+        if (arr.count > 0 && [arr.firstObject isKindOfClass:PNUser.class]) {
+            return arr;
+        }
+    }
+    if ([data isKindOfClass:[NSArray class]]) {
         return [self pnUsersFromSearchJSONArray:(NSArray *)data];
     }
     if ([data isKindOfClass:[NSDictionary class]]) {
         NSDictionary *d = (NSDictionary *)data;
         PNUserPage *page = [PNUserPage yy_modelWithJSON:d];
         if (page.list.count > 0) {
-            return [self pnUsersFromSearchJSONArray:page.list];
+            return page.list;
         }
         for (NSString *key in @[@"list", @"users", @"records", @"items", @"rows", @"content"]) {
             id list = d[key];
@@ -333,6 +339,13 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 - (NSArray<PNUser *> *)pnUsersFromSearchJSONArray:(NSArray *)raw {
     NSMutableArray<PNUser *> *out = [NSMutableArray array];
     for (id item in raw) {
+        if ([item isKindOfClass:PNUser.class]) {
+            PNUser *u = (PNUser *)item;
+            if (u.userId.length > 0 || u.nickname.length > 0) {
+                [out addObject:u];
+            }
+            continue;
+        }
         if (![item isKindOfClass:[NSDictionary class]]) {
             continue;
         }
@@ -365,7 +378,8 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
         [self hideLoading];
-        self.searchResults = [self pnUsersFromSearchResponseData:responseObject.data];
+        id raw = responseObject.dataObject ?: responseObject.data;
+        self.searchResults = [self pnUsersFromSearchResponseData:raw];
         [self.tableView reloadData];
     } failure:^(NSError * _Nonnull error) {
         __strong typeof(weakSelf) self = weakSelf;
@@ -468,7 +482,7 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 
 - (void)updateLocalizedStrings {
     [super updateLocalizedStrings];
-    self.titleLabel.text = NSLocalizedString(@"community_add_friend", nil);
+    self.titleLabel.text = NSLocalizedString(@"community_new_friends", nil);
     [self updateSearchFieldPlaceholder];
     [self.searchBtn setTitle:NSLocalizedString(@"community_search", nil) forState:UIControlStateNormal];
     [self.tableView reloadData];

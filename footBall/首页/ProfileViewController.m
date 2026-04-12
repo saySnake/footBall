@@ -334,18 +334,36 @@ static NSArray<NSString *> * _menuKeys(void) {
     [self refreshIDLabel];
 
     NSString *avStr = profile.avatar.length > 0 ? profile.avatar : u.avatar;
-    NSURL *avURL = avStr.length > 0 ? [NSURL URLWithString:avStr] : nil;
+    NSString *trimmedAvatar = [avStr stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSURL *avURL = trimmedAvatar.length > 0 ? [NSURL URLWithString:trimmedAvatar] : nil;
     UIImage *placeholder = nil;
     if (@available(iOS 13.0, *)) {
         placeholder = [UIImage systemImageNamed:@"person.crop.circle.fill"];
     }
-    [self.avatarView sd_setImageWithURL:avURL placeholderImage:placeholder];
-    if (!self.avatarView.image && @available(iOS 13.0, *)) {
+    [self.avatarView sd_cancelCurrentImageLoad];
+    if (!avURL) {
+        self.avatarView.image = placeholder;
         self.avatarView.tintColor = [UIColor whiteColor];
         self.avatarView.contentMode = UIViewContentModeCenter;
-    } else {
-        self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
+        return;
     }
+    self.avatarView.tintColor = nil;
+    self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
+    __weak typeof(self) weakSelf = self;
+    [self.avatarView sd_setImageWithURL:avURL
+                       placeholderImage:placeholder
+                              completed:^(UIImage * _Nullable image, NSError * _Nullable error, SDImageCacheType cacheType, NSURL * _Nullable imageURL) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        if (image) {
+            self.avatarView.tintColor = nil;
+            self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
+        } else if (@available(iOS 13.0, *)) {
+            self.avatarView.image = placeholder;
+            self.avatarView.tintColor = [UIColor whiteColor];
+            self.avatarView.contentMode = UIViewContentModeCenter;
+        }
+    }];
 }
 
 - (void)refreshIDLabel {

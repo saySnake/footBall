@@ -7,13 +7,127 @@
 #import "MoreDatePickerController.h"
 #import <Masonry/Masonry.h>
 
+static UIColor *kMoreMatchesCardBG(void) {
+    return [UIColor colorWithRed:0.965 green:0.965 blue:0.965 alpha:1.0]; // #f6f6f6
+}
+
+static UIColor *kMoreMatchesWeekdayText(void) {
+    return [UIColor colorWithRed:0.612 green:0.643 blue:0.671 alpha:1.0]; // #9CA4AB
+}
+
+static UIColor *kMoreMatchesDateText(void) {
+    return [UIColor colorWithRed:0.345 green:0.255 blue:0.255 alpha:1.0]; // #584141
+}
+
+static UIColor *kMoreMatchesGreen(void) {
+    return [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0]; // #285D4B
+}
+
+static UIImage *kMoreMatchesCalendarBarIcon(void) {
+    UIImage *asset = [UIImage imageNamed:@"Calendar"];
+    if (asset) {
+        return [asset imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    }
+    if (@available(iOS 13.0, *)) {
+        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:24 weight:UIImageSymbolWeightRegular];
+        return [[UIImage systemImageNamed:@"calendar" withConfiguration:cfg] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    }
+    return nil;
+}
+
+/// 解析比赛时间字段（接口可能用多种字段名与格式，见 Match 的 matchDate 映射）。
+static NSDate *kMoreMatchesDateFromRawString(NSString *raw) {
+    if (raw.length == 0) return nil;
+    NSString *s = [raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (s.length == 0) return nil;
+
+    BOOL allDigits = YES;
+    for (NSUInteger i = 0; i < s.length; i++) {
+        unichar ch = [s characterAtIndex:i];
+        if (ch < '0' || ch > '9') {
+            allDigits = NO;
+            break;
+        }
+    }
+    if (allDigits && s.length >= 10) {
+        long long n = [s longLongValue];
+        if (n > 1000000000000LL) {
+            return [NSDate dateWithTimeIntervalSince1970:n / 1000.0];
+        }
+        if (n > 1000000000LL) {
+            return [NSDate dateWithTimeIntervalSince1970:(NSTimeInterval)n];
+        }
+    }
+    // Unix 时间戳带小数秒：整串须能完整 scan 为 double，避免 ISO 串里的毫秒被误当成数字
+    if ([s containsString:@"."]) {
+        NSScanner *scanner = [NSScanner scannerWithString:s];
+        double v = 0;
+        if ([scanner scanDouble:&v] && scanner.atEnd && v > 1e9) {
+            if (v > 1e12) {
+                return [NSDate dateWithTimeIntervalSince1970:v / 1000.0];
+            }
+            return [NSDate dateWithTimeIntervalSince1970:v];
+        }
+    }
+
+    if (@available(iOS 11.0, *)) {
+        NSISO8601DateFormatter *iso = [[NSISO8601DateFormatter alloc] init];
+        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
+        NSDate *d = [iso dateFromString:s];
+        if (d) return d;
+        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime;
+        d = [iso dateFromString:s];
+        if (d) return d;
+    }
+
+    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    NSArray<NSString *> *formats = @[
+        @"yyyy-MM-dd'T'HH:mm:ssZ",
+        @"yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+        @"yyyy-MM-dd'T'HH:mm:ssXXX",
+        @"yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+        @"yyyy-MM-dd'T'HH:mm:ss'Z'",
+        @"yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        @"yyyy-MM-dd HH:mm:ss",
+        @"yyyy-MM-dd HH:mm",
+        @"yyyy/MM/dd HH:mm:ss",
+        @"yyyy/MM/dd HH:mm",
+        @"yyyy-MM-dd",
+    ];
+    for (NSString *f in formats) {
+        fmt.dateFormat = f;
+        NSDate *d = [fmt dateFromString:s];
+        if (d) return d;
+    }
+    return nil;
+}
+
+/// 比赛行右侧收藏图标：优先使用资源图 match_star，缺失时回退 SF Symbol。
+static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
+    UIImage *asset = [UIImage imageNamed:@"match_star"];
+    if (asset) {
+        if (favorited) {
+            return [asset imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+        }
+        return [asset imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    }
+    if (@available(iOS 13.0, *)) {
+        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:20 weight:UIImageSymbolWeightRegular];
+        NSString *iconName = favorited ? @"star.fill" : @"star";
+        return [UIImage systemImageNamed:iconName withConfiguration:cfg];
+    }
+    return nil;
+}
+
 @interface MoreMatchCell : UITableViewCell
+@property (nonatomic, strong) UIView *cardView;
 @property (nonatomic, strong) UIImageView *homeLogo;
 @property (nonatomic, strong) UIImageView *awayLogo;
 @property (nonatomic, strong) UILabel *homeLabel;
 @property (nonatomic, strong) UILabel *awayLabel;
 @property (nonatomic, strong) UIButton *timePill;
-@property (nonatomic, strong) UIButton *shareBtn;
+@property (nonatomic, strong) UIButton *favoriteBtn;
 @end
 
 @implementation MoreMatchCell
@@ -24,71 +138,136 @@
         self.backgroundColor = [UIColor clearColor];
 
         UIView *card = [[UIView alloc] init];
-        card.backgroundColor = [UIColor colorWithWhite:0.97 alpha:1.0];
-        card.layer.cornerRadius = 12;
+        card.backgroundColor = kMoreMatchesCardBG();
+        card.layer.cornerRadius = 8;
         [self.contentView addSubview:card];
+        self.cardView = card;
         [card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(4, 16, 4, 16));
+            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(5, 17, 5, 15));
         }];
 
         _homeLogo = [[UIImageView alloc] init];
         _awayLogo = [[UIImageView alloc] init];
         _homeLogo.contentMode = _awayLogo.contentMode = UIViewContentModeScaleAspectFit;
-        _homeLogo.layer.cornerRadius = _awayLogo.layer.cornerRadius = 14;
-        _homeLogo.clipsToBounds = _awayLogo.clipsToBounds = YES;
+        _homeLogo.backgroundColor = [UIColor clearColor];
+        _awayLogo.backgroundColor = [UIColor clearColor];
 
         _homeLabel = [[UILabel alloc] init];
         _awayLabel = [[UILabel alloc] init];
-        _homeLabel.font = _awayLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+        _homeLabel.font = _awayLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+        _homeLabel.textColor = _awayLabel.textColor = [UIColor colorWithRed:0.208 green:0.200 blue:0.208 alpha:1.0];
+        _homeLabel.textAlignment = NSTextAlignmentRight;
+        _awayLabel.textAlignment = NSTextAlignmentLeft;
+        _homeLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+        _awayLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+        _homeLabel.adjustsFontSizeToFitWidth = YES;
+        _awayLabel.adjustsFontSizeToFitWidth = YES;
+        _homeLabel.minimumScaleFactor = 0.75f;
+        _awayLabel.minimumScaleFactor = 0.75f;
 
         _timePill = [UIButton buttonWithType:UIButtonTypeSystem];
-        _timePill.titleLabel.font = [UIFont systemFontOfSize:12];
-        [_timePill setTitleColor:[UIColor colorWithRed:0.20 green:0.45 blue:0.33 alpha:1.0] forState:UIControlStateNormal];
+        _timePill.userInteractionEnabled = NO;
+        _timePill.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+        [_timePill setTitleColor:kMoreMatchesGreen() forState:UIControlStateNormal];
         _timePill.layer.cornerRadius = 12;
-        _timePill.layer.borderWidth = 1;
-        _timePill.layer.borderColor = [UIColor colorWithRed:0.20 green:0.45 blue:0.33 alpha:1.0].CGColor;
+        _timePill.layer.borderWidth = 0.5;
+        _timePill.layer.borderColor = kMoreMatchesGreen().CGColor;
+        _timePill.contentEdgeInsets = UIEdgeInsetsMake(4, 8, 4, 8);
+        _timePill.backgroundColor = [UIColor clearColor];
 
-        _shareBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-        if (@available(iOS 13.0, *)) {
-            [_shareBtn setImage:[UIImage systemImageNamed:@"square.and.arrow.up"] forState:UIControlStateNormal];
-            _shareBtn.tintColor = [UIColor blackColor];
-        }
+        _favoriteBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        _favoriteBtn.adjustsImageWhenHighlighted = NO;
 
-        [card addSubview:_homeLogo];
         [card addSubview:_homeLabel];
+        [card addSubview:_homeLogo];
+        [card addSubview:_timePill];
         [card addSubview:_awayLogo];
         [card addSubview:_awayLabel];
-        [card addSubview:_timePill];
-        [card addSubview:_shareBtn];
+        [card addSubview:_favoriteBtn];
 
-        [_homeLogo mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(card).offset(16);
-            make.centerY.equalTo(card);
-            make.width.height.mas_equalTo(28);
-        }];
         [_homeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_homeLogo.mas_trailing).offset(8);
-            make.centerY.equalTo(_homeLogo);
-        }];
-        [_awayLogo mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(card.mas_centerX).offset(8);
+            make.leading.equalTo(card).offset(12);
             make.centerY.equalTo(card);
-            make.width.height.mas_equalTo(28);
+            // 主队名：随卡片宽度占一行可用空间（原 70pt 过窄），由与 timePill 的间距约束自然截断
+            make.width.mas_lessThanOrEqualTo(card.mas_width).multipliedBy(0.34);
         }];
-        [_awayLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_awayLogo.mas_trailing).offset(8);
-            make.centerY.equalTo(_awayLogo);
-        }];
-        [_shareBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.trailing.equalTo(card).offset(-16);
+        [_homeLogo mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(_homeLabel.mas_trailing).offset(8);
             make.centerY.equalTo(card);
-            make.width.height.mas_equalTo(28);
+            make.width.height.mas_equalTo(24);
         }];
         [_timePill mas_makeConstraints:^(MASConstraintMaker *make) {
+            // 时间与两侧队徽固定 14pt 间距（设计稿）
+            make.leading.equalTo(_homeLogo.mas_trailing).offset(14);
             make.centerY.equalTo(card);
-            make.trailing.equalTo(_shareBtn.mas_leading).offset(-12);
+            make.width.mas_greaterThanOrEqualTo(56);
             make.height.mas_equalTo(24);
-            make.width.mas_greaterThanOrEqualTo(64);
+        }];
+        [_timePill setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+        [_favoriteBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.trailing.equalTo(card).offset(-16);
+            make.centerY.equalTo(card);
+            make.width.height.mas_equalTo(20);
+        }];
+        [_awayLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.trailing.equalTo(_favoriteBtn.mas_leading).offset(-12);
+            make.centerY.equalTo(card);
+            make.width.mas_lessThanOrEqualTo(card.mas_width).multipliedBy(0.34);
+        }];
+        [_awayLogo mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(_timePill.mas_trailing).offset(14);
+            make.trailing.equalTo(_awayLabel.mas_leading).offset(-8);
+            make.centerY.equalTo(card);
+            make.width.height.mas_equalTo(24);
+        }];
+    }
+    return self;
+}
+
+@end
+
+@interface MoreMatchDayView : UIControl
+@property (nonatomic, strong) UIView *selectionBackgroundView;
+@property (nonatomic, strong) UILabel *weekdayLabel;
+@property (nonatomic, strong) UILabel *dateLabel;
+@end
+
+@implementation MoreMatchDayView
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
+    if (self) {
+        self.selectionBackgroundView = [[UIView alloc] init];
+        self.selectionBackgroundView.backgroundColor = kMoreMatchesGreen();
+        self.selectionBackgroundView.layer.cornerRadius = 6.0;
+        self.selectionBackgroundView.hidden = YES;
+
+        self.weekdayLabel = [[UILabel alloc] init];
+        self.weekdayLabel.textAlignment = NSTextAlignmentCenter;
+        self.weekdayLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
+        self.weekdayLabel.textColor = kMoreMatchesWeekdayText();
+
+        self.dateLabel = [[UILabel alloc] init];
+        self.dateLabel.textAlignment = NSTextAlignmentCenter;
+        self.dateLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+        self.dateLabel.textColor = kMoreMatchesDateText();
+
+        [self addSubview:self.selectionBackgroundView];
+        [self addSubview:self.weekdayLabel];
+        [self addSubview:self.dateLabel];
+
+        [self.selectionBackgroundView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.center.equalTo(self);
+            make.width.mas_equalTo(38);
+            make.height.mas_equalTo(56);
+        }];
+        [self.weekdayLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.equalTo(self.selectionBackgroundView).offset(6);
+            make.centerX.equalTo(self.selectionBackgroundView);
+        }];
+        [self.dateLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.equalTo(self.weekdayLabel.mas_bottom).offset(2);
+            make.centerX.equalTo(self.selectionBackgroundView);
         }];
     }
     return self;
@@ -152,15 +331,22 @@
     self.topBar = bar;
 
     UIButton *back = [UIButton buttonWithType:UIButtonTypeSystem];
-    if (@available(iOS 13.0, *)) {
-        [back setImage:[UIImage systemImageNamed:@"chevron.left"] forState:UIControlStateNormal];
+    UIImage *backImage = [[UIImage imageNamed:@"nav_back"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    if (!backImage) {
+        backImage = [UIImage imageNamed:@"left"];
+        backImage = [backImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
     }
+    if (!backImage && @available(iOS 13.0, *)) {
+        backImage = [UIImage systemImageNamed:@"chevron.left"];
+    }
+    [back setImage:backImage forState:UIControlStateNormal];
     back.tintColor = [UIColor blackColor];
     [back addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
 
     UIButton *calendar = [UIButton buttonWithType:UIButtonTypeSystem];
-    if (@available(iOS 13.0, *)) {
-        [calendar setImage:[UIImage systemImageNamed:@"calendar"] forState:UIControlStateNormal];
+    UIImage *calendarImage = kMoreMatchesCalendarBarIcon();
+    if (calendarImage) {
+        [calendar setImage:calendarImage forState:UIControlStateNormal];
     }
     calendar.tintColor = [UIColor blackColor];
     [calendar addTarget:self action:@selector(onCalendar) forControlEvents:UIControlEventTouchUpInside];
@@ -186,12 +372,12 @@
     [back mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(bar).offset(16);
         make.centerY.equalTo(bar);
-        make.width.height.mas_equalTo(28);
+        make.width.height.mas_equalTo(24);
     }];
     [calendar mas_makeConstraints:^(MASConstraintMaker *make) {
         make.trailing.equalTo(bar).offset(-16);
         make.centerY.equalTo(bar);
-        make.width.height.mas_equalTo(28);
+        make.width.height.mas_equalTo(24);
     }];
     [title mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(bar);
@@ -205,7 +391,7 @@
     [self.view addSubview:header];
 
     self.monthLabel = [[UILabel alloc] init];
-    self.monthLabel.font = [UIFont boldSystemFontOfSize:18];
+    self.monthLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
     self.monthLabel.textAlignment = NSTextAlignmentCenter;
     self.monthLabel.textColor = [UIColor blackColor];
     [header addSubview:self.monthLabel];
@@ -219,52 +405,30 @@
         make.leading.trailing.equalTo(self.view);
     }];
     [self.monthLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(header).offset(12);
+        make.top.equalTo(header).offset(10);
         make.centerX.equalTo(header);
     }];
     [weekRow mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.monthLabel.mas_bottom).offset(12);
+        make.top.equalTo(self.monthLabel.mas_bottom).offset(10);
         make.leading.trailing.equalTo(header);
         make.height.mas_equalTo(56);
-        make.bottom.equalTo(header);
+        make.bottom.equalTo(header).offset(-8);
     }];
 
     CGFloat width = [UIScreen mainScreen].bounds.size.width / 7.0;
     NSMutableArray<UIControl *> *views = [NSMutableArray array];
     for (NSInteger i = 0; i < 7; i++) {
-        UIControl *day = [[UIControl alloc] initWithFrame:CGRectZero];
+        MoreMatchDayView *day = [[MoreMatchDayView alloc] initWithFrame:CGRectZero];
         day.backgroundColor = [UIColor clearColor];
         day.tag = i;
         [day addTarget:self action:@selector(onWeekTapped:) forControlEvents:UIControlEventTouchUpInside];
         [weekRow addSubview:day];
-
-        UILabel *weekLab = [[UILabel alloc] init];
-        weekLab.textAlignment = NSTextAlignmentCenter;
-        weekLab.font = [UIFont systemFontOfSize:11];
-        weekLab.textColor = [UIColor darkGrayColor];
-        weekLab.text = weekTitles[i];
-
-        UILabel *dateLab = [[UILabel alloc] init];
-        dateLab.textAlignment = NSTextAlignmentCenter;
-        dateLab.font = [UIFont boldSystemFontOfSize:14];
-        dateLab.textColor = [UIColor blackColor];
-        dateLab.tag = 200; // 用于后续更新日期
-
-        [day addSubview:weekLab];
-        [day addSubview:dateLab];
+        day.weekdayLabel.text = weekTitles[i];
 
         [day mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.bottom.equalTo(weekRow);
             make.width.mas_equalTo(width);
             make.leading.equalTo(weekRow.mas_leading).offset(width * i);
-        }];
-        [weekLab mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(day).offset(4);
-            make.leading.trailing.equalTo(day);
-        }];
-        [dateLab mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(weekLab.mas_bottom).offset(4);
-            make.leading.trailing.equalTo(day);
         }];
 
         [views addObject:day];
@@ -281,9 +445,10 @@
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.tableView.backgroundColor = [UIColor whiteColor];
     [self.tableView registerClass:[MoreMatchCell class] forCellReuseIdentifier:@"MoreMatchCell"];
+    self.tableView.showsVerticalScrollIndicator = NO;
+    self.tableView.contentInset = UIEdgeInsetsMake(8, 0, 16, 0);
     [self.view addSubview:self.tableView];
     [self.tableView mas_makeConstraints:^(MASConstraintMaker *make) {
-        // 列表紧跟在头部（月份 + 星期行）下面
         make.top.equalTo(self.monthLabel.superview.mas_bottom);
         make.leading.trailing.bottom.equalTo(self.view);
     }];
@@ -297,7 +462,11 @@
     __weak typeof(self) weakSelf = self;
     [[MatchRequest shared] getMatchScheduleWithDate:dateStr myTeamOnly:NO page:1 pageSize:50 success:^(HTTPResponse * _Nullable responseObject) {
         NSArray *matches = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
-        weakSelf.matches = matches;
+        weakSelf.matches = [matches sortedArrayUsingComparator:^NSComparisonResult(Match *obj1, Match *obj2) {
+            NSString *d1 = obj1.matchDate ?: @"";
+            NSString *d2 = obj2.matchDate ?: @"";
+            return [d1 compare:d2];
+        }];
         [weakSelf.tableView reloadData];
     } failure:^(NSError * _Nonnull error) {
         weakSelf.matches = @[];
@@ -306,19 +475,19 @@
 }
 
 - (NSString *)timeTextFromMatchDate:(NSString *)matchDate {
-    if (matchDate.length == 0) return @"--:--";
-    NSDateFormatter *input = [[NSDateFormatter alloc] init];
-    input.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    input.dateFormat = @"yyyy-MM-dd'T'HH:mm:ssZ";
-    NSDate *date = [input dateFromString:matchDate];
-    if (!date) {
-        input.dateFormat = @"yyyy-MM-dd HH:mm:ss";
-        date = [input dateFromString:matchDate];
-    }
+    NSDate *date = kMoreMatchesDateFromRawString(matchDate);
     if (!date) return @"--:--";
     NSDateFormatter *output = [[NSDateFormatter alloc] init];
     output.dateFormat = @"HH:mm";
     return [output stringFromDate:date];
+}
+
+- (UIImage *)matchPlaceholderLogo {
+    if (@available(iOS 13.0, *)) {
+        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:20 weight:UIImageSymbolWeightRegular];
+        return [UIImage systemImageNamed:@"shield" withConfiguration:cfg];
+    }
+    return nil;
 }
 
 - (void)updateWeekHeaderForSelectedDate {
@@ -342,43 +511,23 @@
     dayFmt.dateFormat = @"d";
 
     for (NSInteger i = 0; i < self.weekDayViews.count; i++) {
-        UIControl *dayView = self.weekDayViews[i];
+        MoreMatchDayView *dayView = (MoreMatchDayView *)self.weekDayViews[i];
         NSDate *date = [self.calendar dateByAddingUnit:NSCalendarUnitDay value:i toDate:self.weekStartDate options:0];
         NSString *dayString = [dayFmt stringFromDate:date];
-
-        UILabel *dateLab = nil;
-        for (UIView *sub in dayView.subviews) {
-            if (sub.tag == 200 && [sub isKindOfClass:[UILabel class]]) {
-                dateLab = (UILabel *)sub;
-                break;
-            }
-        }
-        dateLab.text = dayString;
+        dayView.dateLabel.text = dayString;
 
         // 高亮当前选中的那一天
         BOOL isSameDay = [self isSameDay:date other:self.selectedDate];
         if (isSameDay) {
-            dayView.backgroundColor = [ColorManager sharedManager].primaryColor;
-            dayView.layer.cornerRadius = 8;
-            dayView.layer.masksToBounds = YES;
-            for (UIView *sub in dayView.subviews) {
-                if ([sub isKindOfClass:[UILabel class]]) {
-                    ((UILabel *)sub).textColor = [UIColor whiteColor];
-                }
-            }
+            dayView.selectionBackgroundView.hidden = NO;
+            dayView.weekdayLabel.textColor = [UIColor whiteColor];
+            dayView.dateLabel.textColor = [UIColor whiteColor];
+            dayView.dateLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
         } else {
-            dayView.backgroundColor = [UIColor clearColor];
-            dayView.layer.cornerRadius = 0;
-            for (UIView *sub in dayView.subviews) {
-                if ([sub isKindOfClass:[UILabel class]]) {
-                    UILabel *lab = (UILabel *)sub;
-                    if (lab.tag == 200) {
-                        lab.textColor = [UIColor blackColor];
-                    } else {
-                        lab.textColor = [UIColor darkGrayColor];
-                    }
-                }
-            }
+            dayView.selectionBackgroundView.hidden = YES;
+            dayView.weekdayLabel.textColor = kMoreMatchesWeekdayText();
+            dayView.dateLabel.textColor = kMoreMatchesDateText();
+            dayView.dateLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
         }
     }
 }
@@ -428,7 +577,7 @@
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    return 64;
+    return 66;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -437,9 +586,53 @@
     cell.homeLabel.text = m.homeTeamName ?: @"-";
     cell.awayLabel.text = m.awayTeamName ?: @"-";
     [cell.timePill setTitle:[self timeTextFromMatchDate:m.matchDate] forState:UIControlStateNormal];
-    cell.homeLogo.backgroundColor = [UIColor colorWithWhite:0.9 alpha:1.0];
-    cell.awayLogo.backgroundColor = [UIColor colorWithWhite:0.9 alpha:1.0];
+    UIImage *placeholder = [self matchPlaceholderLogo];
+    [cell.homeLogo sd_setImageWithURL:(m.homeTeamLogo.length > 0 ? [NSURL URLWithString:m.homeTeamLogo] : nil) placeholderImage:placeholder];
+    [cell.awayLogo sd_setImageWithURL:(m.awayTeamLogo.length > 0 ? [NSURL URLWithString:m.awayTeamLogo] : nil) placeholderImage:placeholder];
+    UIImage *starImg = kMoreMatchesFavoriteIcon(m.favorited);
+    [cell.favoriteBtn setImage:starImg forState:UIControlStateNormal];
+    if (m.favorited) {
+        cell.favoriteBtn.tintColor = [UIColor clearColor];
+    } else {
+        cell.favoriteBtn.tintColor = [UIColor colorWithRed:0.58 green:0.58 blue:0.58 alpha:1.0];
+    }
+    cell.favoriteBtn.tag = indexPath.row;
+    [cell.favoriteBtn removeTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];
+    [cell.favoriteBtn addTarget:self action:@selector(onFavoriteTapped:) forControlEvents:UIControlEventTouchUpInside];
     return cell;
+}
+
+- (void)onFavoriteTapped:(UIButton *)sender {
+    NSInteger index = sender.tag;
+    if (index < 0 || index >= self.matches.count) return;
+    Match *match = self.matches[index];
+    if (match.matchId.length == 0) return;
+
+    __weak typeof(self) weakSelf = self;
+    void (^reloadRow)(void) = ^{
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        NSIndexPath *indexPath = [NSIndexPath indexPathForRow:index inSection:0];
+        if (index < self.matches.count) {
+            [self.tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationNone];
+        }
+    };
+
+    if (match.favorited) {
+        [[MatchRequest shared] unfavoriteMatch:match.matchId success:^(HTTPResponse * _Nullable responseObject) {
+            match.favorited = NO;
+            reloadRow();
+        } failure:^(NSError * _Nonnull error) {
+            [QMUITips showError:error.localizedDescription ?: @"取消收藏失败"];
+        }];
+    } else {
+        [[MatchRequest shared] favoriteMatch:match.matchId success:^(HTTPResponse * _Nullable responseObject) {
+            match.favorited = YES;
+            reloadRow();
+        } failure:^(NSError * _Nonnull error) {
+            [QMUITips showError:error.localizedDescription ?: @"收藏失败"];
+        }];
+    }
 }
 
 @end
