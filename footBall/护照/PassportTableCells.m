@@ -41,25 +41,6 @@ static CGFloat PCAbilityMaxLabelWidthForTitles(NSArray<NSString *> *titles, UIFo
     return maxW;
 }
 
-static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **rest) {
-    if (!line.length) {
-        *num = @"";
-        *rest = @"";
-        return;
-    }
-    NSUInteger i = 0;
-    while (i < line.length) {
-        unichar ch = [line characterAtIndex:i];
-        if (ch >= '0' && ch <= '9') {
-            i++;
-        } else {
-            break;
-        }
-    }
-    *num = [line substringToIndex:i];
-    *rest = [[line substringFromIndex:i] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-}
-
 #pragma mark - Dark stats
 
 @implementation PassportDarkStatsCardCell {
@@ -491,11 +472,18 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
      胜利与 打平+失败的比值计算胜率x100%
      */
     _title.text = model.possessionCardTitle;
-    NSString *n1, *r1, *n2, *r2;
-    PCPossessionSplitLine(model.possessionLeftLine1, &n1, &r1);
-    PCPossessionSplitLine(model.possessionLeftLine2, &n2, &r2);
-    _num1.text = n1; _desc1.text = r1;
-    _num2.text = n2; _desc2.text = r2;
+    _num1.text = model.possessionLeftLine1;
+    NSString *winsFmt = NSLocalizedString(@"passport_possession_wins_label_format", nil);
+    if (!winsFmt.length || [winsFmt isEqualToString:@"passport_possession_wins_label_format"]) {
+        winsFmt = @"赢球%@次";
+    }
+    _desc1.text = [NSString stringWithFormat:winsFmt, model.possessionLeftLine1 ?: @""];
+    _num2.text = model.possessionLeftLine2;
+    NSString *rateFmt = NSLocalizedString(@"passport_possession_win_rate_label_format", nil);
+    if (!rateFmt.length || [rateFmt isEqualToString:@"passport_possession_win_rate_label_format"]) {
+        rateFmt = @"胜率为%@%%";
+    }
+    _desc2.text = [NSString stringWithFormat:rateFmt, model.possessionLeftLine2 ?: @""];
     CGFloat p = model.possessionCenterPercent;
     p = MIN(1, MAX(0, p));
     _donut.lineWidth = 24;
@@ -507,11 +495,6 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
     _donut.segmentRatios = @[ @(p), @(1 - p) ];
     _donut.segmentColors = @[ [UIColor colorWithHexString:@"#5CB793"] , [UIColor colorWithHexString:@"#0D2122"]];
     _donut.centerText = [NSString stringWithFormat:@"%.0f%%", p * 100];
-    // TODO: possessionLeftLine1/2 与 possessionCenterPercent。
-    _num1.text = model.possessionLeftLine1;
-    _desc1.text = [NSString stringWithFormat:@"赢球%@次",model.possessionLeftLine1];
-    _num2.text = model.possessionLeftLine1;
-    _desc2.text = [NSString stringWithFormat:@"胜率为%@%%",model.possessionLeftLine2];
 }
 
 @end
@@ -1368,10 +1351,17 @@ static UIView *PCOutcomeLegendItemView(NSString *title, NSString *numStr, UIColo
         [vals addObject:@(v)];
         sum += v;
     }
+    BOOL allZeroWeights = (sum < 1e-9 && legs.count > 0);
     for (NSUInteger i = 0; i < legs.count; i++) {
         NSDictionary *leg = legs[i];
         double v = [vals[i] doubleValue];
-        [ratios addObject:@(sum > 0 ? v / sum : 0)];
+        double r = 0;
+        if (allZeroWeights) {
+            r = 1.0 / (double)legs.count;
+        } else {
+            r = sum > 0 ? v / sum : 0;
+        }
+        [ratios addObject:@(r)];
         [segColors addObject:PCHex([NSString stringWithFormat:@"%@", leg[@"h"] ?: @"000000"])];
     }
     if (ratios.count == 0) {

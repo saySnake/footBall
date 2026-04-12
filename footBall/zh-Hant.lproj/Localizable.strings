@@ -148,9 +148,13 @@
 "passport_day_night_ratio" = "白天/夜晚";
 "passport_growth_wake_suffix" = "年睡醒時間裡的";
 "passport_location_frequency_title" = "觀賽地點頻次";
-"passport_coverage_stadium" = "球場";
-"passport_coverage_city" = "城市";
-"passport_coverage_country" = "國家";
+"passport_coverage_stadium" = "我去過的\n球場";
+"passport_coverage_city" = "我去過的\n城市";
+"passport_coverage_country" = "我去過的\n國家";
+"passport_followed_team_win_rate_title" = "%ld年我關注的主隊勝率";
+"passport_possession_wins_label_format" = "贏球%@次";
+"passport_possession_win_rate_label_format" = "勝率為%@%%";
+"passport_online_viewing_title" = "線上觀賽數據";
 "passport_regular_stats" = "常規賽數據";
 "passport_avg_duration" = "平均時長";
 "passport_matches_this_year" = "今年登場比賽場次";
@@ -163,7 +167,7 @@
 "passport_possession_title" = "1場平均控球/射門統計";
 "passport_per_game_shots" = "次/場";
 "passport_per_game_score" = "分/場";
-"passport_position_strength" = "空间维度";
+"passport_position_strength" = "空間維度";
 "passport_position_fwd" = "前鋒 Forward";
 "passport_position_mid" = "中場 Midfield";
 "passport_position_def" = "後衛 Defender";
@@ -221,7 +225,7 @@
 "passport_metric_emotion_4" = "失望";
 "passport_metric_emotion_5" = "遺憾";
 "passport_metric_emotion_6" = "暴躁";
-"passport_outcome_vs_last" = "比上場勝勢情況";
+"passport_outcome_vs_last" = "線上觀賽數據";
 "passport_legend_win" = "勝";
 "passport_legend_draw" = "平";
 "passport_legend_loss" = "負";

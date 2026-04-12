@@ -151,6 +151,10 @@
 "passport_coverage_stadium" = "我去过的\n球场";
 "passport_coverage_city" = "我去过的\n城市";
 "passport_coverage_country" = "我去过的\n国家";
+"passport_followed_team_win_rate_title" = "%ld年我关注的主队胜率";
+"passport_possession_wins_label_format" = "赢球%@次";
+"passport_possession_win_rate_label_format" = "胜率为%@%%";
+"passport_online_viewing_title" = "线上观赛数据";
 "passport_regular_stats" = "常规赛数据";
 "passport_avg_duration" = "平均时长";
 "passport_matches_this_year" = "今年登场比赛场次";
@@ -221,7 +225,7 @@
 "passport_metric_emotion_4" = "失望";
 "passport_metric_emotion_5" = "遗憾";
 "passport_metric_emotion_6" = "暴躁";
-"passport_outcome_vs_last" = "比上场胜势情况";
+"passport_outcome_vs_last" = "线上观赛数据";
 "passport_legend_win" = "胜";
 "passport_legend_draw" = "平";
 "passport_legend_loss" = "负";

@@ -8,6 +8,16 @@
 #import "PassportNestedModels.h"
 #import "Team.h"
 
+/// 线上观赛方式饼图扇区颜色（与条数对应循环使用）
+static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
+    static NSArray<NSString *> *p;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        p = @[ @"62D486", @"5CB793", @"285D4B", @"0D2122", @"3D8B7A", @"1A5C52" ];
+    });
+    return p;
+}
+
 @implementation PassportViewModel
 
 + (NSArray<NSNumber *> *)headerWeekValuesNormalizedFromWeekly:(NSArray<NSNumber *> *)weekly {
@@ -237,6 +247,7 @@
     NSArray<PNEmotionDist *> *emotionList = passport ? (passport.emotionDist ?: @[]) : @[];
     NSArray<PNStandDist *> *standList = passport ? (passport.standDist ?: @[]) : @[];
     NSArray<PNLocationDist *> *locationList = passport ? (passport.locationDist ?: @[]) : @[];
+    NSArray<PNOnlineMethodDist *> *onlineList = passport ? (passport.onlineMethodDist ?: @[]) : @[];
 
     m.codeDigitTexts = [box copy];
     m.avatarURL = passport ? passport.avatar : nil;
@@ -280,13 +291,27 @@
     }
     m.goalTrendValues = [locTrend copy];
 
-    // 2026年我关注的主队胜率
-    m.possessionCardTitle = @"2026年我关注的主队胜率";
-    m.possessionLeftLine1 = [NSString stringWithFormat:@"%ld",passport.teamRecord.wins];//passport.teamRecord.wins 主队赢球次数
-    m.possessionLeftLine2 = [NSString stringWithFormat:@"%.f",passport.teamRecord.winRate];//passport.teamRecord.winRate 主队胜率
-    m.possessionCenterPercent = passport.teamRecord.winRate;//passport.teamRecord.winRate 主队胜率
+    PNPassportTeamRecord *tr = passport ? passport.teamRecord : nil;
 
-    //空间维度
+    // %ld年我关注的主队胜率（赛季 Tab 年份）
+    {
+        NSString *winTitleFmt = NSLocalizedString(@"passport_followed_team_win_rate_title", nil);
+        if (!winTitleFmt.length || [winTitleFmt isEqualToString:@"passport_followed_team_win_rate_title"]) {
+            winTitleFmt = @"%ld年我关注的主队胜率";
+        }
+        m.possessionCardTitle = [NSString stringWithFormat:winTitleFmt, (long)y];
+    }
+    NSInteger teamWins = tr ? tr.wins : 0;
+    float winRateVal = tr ? tr.winRate : 0.f;
+    m.possessionLeftLine1 = [NSString stringWithFormat:@"%ld", (long)teamWins];
+    m.possessionLeftLine2 = [NSString stringWithFormat:@"%.0f", winRateVal];
+    CGFloat winRate01 = (CGFloat)winRateVal;
+    if (winRate01 > 1.0f) {
+        winRate01 = winRate01 / 100.f;
+    }
+    m.possessionCenterPercent = MIN(1, MAX(0, winRate01));
+
+    // 空间维度（球场 / 城市 / 国家覆盖）
     m.positionSectionTitle = NSLocalizedString(@"passport_position_strength", nil) ?: @"空间维度";
     m.positionForwardLabel = NSLocalizedString(@"passport_coverage_stadium", nil) ?: @"我去过的\n球场";
     m.positionMidfieldLabel = NSLocalizedString(@"passport_coverage_city", nil) ?: @"我去过的\n城市";
@@ -335,19 +360,60 @@
     m.recentGoalsTitle = @"";
     m.recentGoalsSubtitle = @"";
 
-    //线上观赛数据 onlineMethodDist
-    m.outcomeTitle = NSLocalizedString(@"passport_outcome_vs_last", nil) ?: @"";
-    PNPassportTeamRecord *tr = passport ? passport.teamRecord : nil;
-    NSInteger w = tr ? tr.wins : 0;
-    NSInteger d = tr ? tr.draws : 0;
-    NSInteger l = tr ? tr.losses : 0;
-    double sum = (double)(MAX(0, w) + MAX(0, d) + MAX(0, l));
-    m.outcomeCenterPercent = sum > 0 ? ((double)MAX(0, w) / sum) : 0;
-    m.outcomeLegend = @[
-        @{@"t": NSLocalizedString(@"passport_legend_win", nil) ?: @"胜", @"n": [NSString stringWithFormat:@"%ld", (long)MAX(0, w)], @"h": @"62D486"},
-        @{@"t": NSLocalizedString(@"passport_legend_draw", nil) ?: @"平", @"n": [NSString stringWithFormat:@"%ld", (long)MAX(0, d)], @"h": @"5CB793"},
-        @{@"t": NSLocalizedString(@"passport_legend_loss", nil) ?: @"负", @"n": [NSString stringWithFormat:@"%ld", (long)MAX(0, l)], @"h": @"285D4B"},
-    ];
+    // 线上观赛数据：onlineMethodDist（method / count / percentage）
+    {
+        NSString *onlineTitle = NSLocalizedString(@"passport_online_viewing_title", nil);
+        if (!onlineTitle.length || [onlineTitle isEqualToString:@"passport_online_viewing_title"]) {
+            onlineTitle = NSLocalizedString(@"passport_outcome_vs_last", nil) ?: @"线上观赛数据";
+        }
+        m.outcomeTitle = onlineTitle;
+    }
+    NSMutableArray<NSDictionary *> *onlineLegend = [NSMutableArray array];
+    double totalOnlineCount = 0;
+    NSInteger maxOnlineCount = 0;
+    for (PNOnlineMethodDist *om in onlineList) {
+        NSInteger c = MAX(0, om.count);
+        totalOnlineCount += (double)c;
+        maxOnlineCount = MAX(maxOnlineCount, c);
+    }
+    NSUInteger omIdx = 0;
+    NSArray<NSString *> *pal = PassportOnlineMethodHexPalette();
+    for (PNOnlineMethodDist *om in onlineList) {
+        NSString *hex = pal[omIdx % pal.count];
+        NSInteger c = MAX(0, om.count);
+        [onlineLegend addObject:@{
+            @"t": om.method ?: @"",
+            @"n": [NSString stringWithFormat:@"%ld", (long)c],
+            @"h": hex,
+        }];
+        omIdx++;
+    }
+    m.outcomeLegend = [onlineLegend copy];
+
+    CGFloat centerShare = 0;
+    if (onlineList.count == 0) {
+        centerShare = 0;
+    } else if (totalOnlineCount > 1e-6) {
+        centerShare = (CGFloat)((double)maxOnlineCount / totalOnlineCount);
+    } else {
+        double pSum = 0;
+        double maxP = 0;
+        for (PNOnlineMethodDist *om in onlineList) {
+            double pv = om.percentage.length ? om.percentage.doubleValue : 0;
+            if (pv > 1.0 + 1e-6) {
+                pv = pv / 100.0;
+            }
+            pv = MAX(0, MIN(1, pv));
+            pSum += pv;
+            maxP = MAX(maxP, pv);
+        }
+        if (pSum > 1e-6) {
+            centerShare = (CGFloat)(maxP / pSum);
+        } else {
+            centerShare = (CGFloat)(1.0 / (double)onlineList.count);
+        }
+    }
+    m.outcomeCenterPercent = MIN(1, MAX(0, centerShare));
 
     [self applyHeaderFromPassport:passport toModel:m codeDigits:[box copy]];
     [self applyHeader2FromPassport:passport toModel:m year:y];
