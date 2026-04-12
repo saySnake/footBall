@@ -18,7 +18,6 @@
 
 #ifdef DEBUG
 #import <easydebug/EasyDebug.h>
-#import "APICurlLogInterceptor.h"
 #import "EasyDebugPositionConfig.h"
 #endif
 
@@ -110,10 +109,6 @@
             [[APILoggingInterceptor alloc] initWithLogLevel:2];
         [apiManager addInterceptor:loggingInterceptor];
         NSLog(@"✅ 日志拦截器已配置（Debug模式）");
-    
-        // curl 日志拦截器 - 每次请求打印等效 curl 命令
-        [apiManager addInterceptor:[APICurlLogInterceptor shared]];
-        NSLog(@"✅ curl 日志拦截器已配置（Debug模式）");
     #endif
     
     // 初始化DoKit（仅在Debug模式下启用）
