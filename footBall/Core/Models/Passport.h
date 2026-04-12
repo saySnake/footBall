@@ -41,7 +41,7 @@ NS_ASSUME_NONNULL_BEGIN
 #pragma mark - 年度统计
 /// 年度总场次
 @property (nonatomic, assign) NSInteger yearTotalMatches;
-/// 年度总观赛时长（分钟）
+/// 年度总观赛时长（分钟；后端可能为数字或字符串）
 @property (nonatomic, assign) NSInteger yearTotalWatchTime;
 /// 年度总进球数
 @property (nonatomic, assign) NSInteger yearTotalGoals;
@@ -57,9 +57,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSArray<PNCountryHeatmap *> *countryHeatmap;
 /// 纪律统计（红黄牌/干净场）
 @property (nonatomic, strong, nullable) PNDisciplineStats *discipline;
-/// 年度消费总额（金额字符串）
+/// 年度消费总额（后端可能为数字或字符串，解析后统一为字符串展示）
 @property (nonatomic, copy, nullable) NSString *yearSpending;
-/// 生涯总观赛时长（分钟，不限年份）
+/// 生涯总观赛时长（分钟，不限年份；后端可能为数字或字符串）
 @property (nonatomic, assign) NSInteger careerTotalWatchTime;
 
 #pragma mark - 主队战绩 / 空间
@@ -69,13 +69,13 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) NSInteger yearStadiumCount;
 
 #pragma mark - 观赛数据观
-/// 赛季投入天数
+/// 赛季投入天数（后端可能为数字或字符串，如 0.000）
 @property (nonatomic, copy, nullable) NSString *seasonDays;
 /// 周末:工作日比值化简，如 34:1
 @property (nonatomic, copy, nullable) NSString *weekendWeekdayRatio;
 /// 白天:深夜比值化简
 @property (nonatomic, copy, nullable) NSString *dayNightRatio;
-/// 睡醒时间看球百分比（字符串）
+/// 睡醒时间看球百分比（后端可能为数字或字符串）
 @property (nonatomic, copy, nullable) NSString *awakeWatchPercent;
 
 #pragma mark - 分布

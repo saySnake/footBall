@@ -82,7 +82,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) NSInteger wins;
 @property (nonatomic, assign) NSInteger draws;
 @property (nonatomic, assign) NSInteger losses;
-@property (nonatomic, copy, nullable) NSString *winRate;
+@property (nonatomic, assign) float winRate;
 /// 被淘汰场次
 @property (nonatomic, assign) NSInteger eliminated;
 /// 晋级场次

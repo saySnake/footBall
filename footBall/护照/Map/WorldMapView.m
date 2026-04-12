@@ -1,12 +1,39 @@
 #import "WorldMapView.h"
 #import <Masonry/Masonry.h>
 
+/// 与 GeoJSON `properties.name`、业务侧中文国名对齐：去空白（含全角空格）、兼容预组合
+static NSString *WMNormalizeCountryLabel(NSString *s) {
+    if (![s isKindOfClass:[NSString class]] || s.length == 0) {
+        return @"";
+    }
+    NSMutableCharacterSet *ws = [NSMutableCharacterSet whitespaceAndNewlineCharacterSet];
+    [ws addCharactersInString:@"\u3000"];
+    NSString *t = [s stringByTrimmingCharactersInSet:ws];
+    if (t.length == 0) {
+        return @"";
+    }
+    return [t precomposedStringWithCompatibilityMapping];
+}
+
+static BOOL WMStringLooksLikeISOAlpha2(NSString *s) {
+    if (s.length != 2) {
+        return NO;
+    }
+    unichar c0 = [s characterAtIndex:0];
+    unichar c1 = [s characterAtIndex:1];
+    BOOL a = (c0 >= 'A' && c0 <= 'Z') || (c0 >= 'a' && c0 <= 'z');
+    BOOL b = (c1 >= 'A' && c1 <= 'Z') || (c1 >= 'a' && c1 <= 'z');
+    return a && b;
+}
+
 @interface WorldMapView ()
 @property (nonatomic, strong) UIView *visitLegendContainer;
 @property (nonatomic, strong) CALayer *contentLayer;                 // 所有国家的容器
 @property (nonatomic, strong) NSMutableArray<CAShapeLayer *> *countryLayers;
-/// 与 countryLayers 顺序一一对应，来自 GeoJSON properties.iso（大写），用于重绘填充
+/// 与 countryLayers 顺序一一对应，来自 GeoJSON properties.iso（大写）
 @property (nonatomic, strong) NSMutableArray<NSString *> *countryISOs;
+/// 与 countryLayers 顺序一一对应，来自 GeoJSON properties.name（中文常用名）
+@property (nonatomic, strong) NSMutableArray<NSString *> *countryZhNames;
 /// 已解析的 GeoJSON，等布局出有效 bounds 后再 build（避免首次 load 时 bounds 为 0 画不出）
 @property (nonatomic, strong, nullable) NSDictionary *geoJSONData;
 @property (nonatomic, assign) CGSize lastBuiltBoundsSize;
@@ -48,6 +75,7 @@
 
     _countryLayers = [NSMutableArray array];
     _countryISOs = [NSMutableArray array];
+    _countryZhNames = [NSMutableArray array];
     _lastBuiltBoundsSize = CGSizeMake(-1, -1);
 
     _contentLayer = [CALayer layer];
@@ -128,6 +156,7 @@
     [self.countryLayers makeObjectsPerformSelector:@selector(removeFromSuperlayer)];
     [self.countryLayers removeAllObjects];
     [self.countryISOs removeAllObjects];
+    [self.countryZhNames removeAllObjects];
     self.geoJSONData = nil;
     self.lastBuiltBoundsSize = CGSizeMake(-1, -1);
 
@@ -167,6 +196,7 @@
     [self.countryLayers makeObjectsPerformSelector:@selector(removeFromSuperlayer)];
     [self.countryLayers removeAllObjects];
     [self.countryISOs removeAllObjects];
+    [self.countryZhNames removeAllObjects];
 
     [self buildLayersFromGeoJSON:self.geoJSONData];
     [self applyTransformClamped:YES];
@@ -183,11 +213,14 @@
 /// 仅更新已有 shapeLayer 的 fillColor，不重建路径
 - (void)applyFillColorsToCountryLayers {
     NSUInteger n = self.countryLayers.count;
-    if (n == 0 || n != self.countryISOs.count) return;
+    if (n == 0 || n != self.countryISOs.count || n != self.countryZhNames.count) {
+        return;
+    }
     for (NSUInteger i = 0; i < n; i++) {
         CAShapeLayer *layer = self.countryLayers[i];
         NSString *iso = self.countryISOs[i];
-        layer.fillColor = [self fillColorForISOCode:iso].CGColor;
+        NSString *zh = self.countryZhNames[i];
+        layer.fillColor = [self fillColorForISO:iso chineseName:zh].CGColor;
     }
 }
 
@@ -224,6 +257,7 @@
         if (countryPath.isEmpty) continue;
 
         NSString *isoCode = [self isoCodeFromFeature:feat];
+        NSString *zhName = [self chineseNameFromFeature:feat];
 
         CAShapeLayer *layer = [CAShapeLayer layer];
         layer.frame = rect;
@@ -232,14 +266,27 @@
 
         layer.strokeColor = self.strokeColor.CGColor;
         layer.lineWidth = self.lineWidth;
-        layer.fillColor = [self fillColorForISOCode:isoCode].CGColor;
+        layer.fillColor = [self fillColorForISO:isoCode chineseName:zhName].CGColor;
         layer.lineJoin = kCALineJoinRound;
         layer.lineCap = kCALineCapRound;
 
         [self.contentLayer addSublayer:layer];
         [self.countryLayers addObject:layer];
         [self.countryISOs addObject:isoCode ?: @""];
+        [self.countryZhNames addObject:zhName ?: @""];
     }
+}
+
+- (NSString *)chineseNameFromFeature:(NSDictionary *)feature {
+    NSDictionary *props = feature[@"properties"];
+    if (![props isKindOfClass:[NSDictionary class]]) {
+        return @"";
+    }
+    id v = props[@"name"];
+    if (![v isKindOfClass:[NSString class]]) {
+        return @"";
+    }
+    return WMNormalizeCountryLabel((NSString *)v);
 }
 
 - (NSString *)isoCodeFromFeature:(NSDictionary *)feature {
@@ -251,30 +298,49 @@
     return [s uppercaseString];
 }
 
-/// 优先级：经常去 > 已经去过 > 没去过的；无 ISO 或未出现在任一列表时用 ungoFillColor
-- (UIColor *)fillColorForISOCode:(NSString *)iso {
-    NSString *key = [iso length] ? [iso uppercaseString] : @"";
-    if (!key.length) {
-        return self.ungoFillColor ?: [UIColor colorWithRed:175.0 / 255.0 green:1.0 blue:224.0 / 255.0 alpha:1.0];
+/// 优先级：经常去 > 已去过 > 未去；按 **ISO 两字母** 或 **中文名**（与 GeoJSON `name` 一致）匹配
+- (UIColor *)fillColorForISO:(NSString *)iso chineseName:(NSString *)zh {
+    NSString *isoKey = [iso length] ? [iso uppercaseString] : @"";
+    NSString *zhKey = WMNormalizeCountryLabel(zh);
+
+    NSSet *often = [self normalizedCountryTokenSetFromArray:self.oftenCountries];
+    NSSet *gone = [self normalizedCountryTokenSetFromArray:self.goneCountries];
+    NSSet *ungo = [self normalizedCountryTokenSetFromArray:self.ungoCountries];
+
+    BOOL hitOften = (isoKey.length && [often containsObject:isoKey]) || (zhKey.length && [often containsObject:zhKey]);
+    BOOL hitGone = (isoKey.length && [gone containsObject:isoKey]) || (zhKey.length && [gone containsObject:zhKey]);
+    BOOL hitUngo = (isoKey.length && [ungo containsObject:isoKey]) || (zhKey.length && [ungo containsObject:zhKey]);
+
+    if (hitOften) {
+        return self.oftenFillColor;
     }
-
-    NSSet *often = [self normalizedISOSetFromArray:self.oftenCountries];
-    NSSet *gone = [self normalizedISOSetFromArray:self.goneCountries];
-    NSSet *ungo = [self normalizedISOSetFromArray:self.ungoCountries];
-
-    if ([often containsObject:key]) return self.oftenFillColor;
-    if ([gone containsObject:key]) return self.goneFillColor;
-    if ([ungo containsObject:key]) return self.ungoFillColor;
+    if (hitGone) {
+        return self.goneFillColor;
+    }
+    if (hitUngo) {
+        return self.ungoFillColor;
+    }
     return self.ungoFillColor;
 }
 
-- (NSSet<NSString *> *)normalizedISOSetFromArray:(NSArray *)arr {
-    if (![arr isKindOfClass:[NSArray class]] || arr.count == 0) return [NSSet set];
-    NSMutableSet *set = [NSMutableSet setWithCapacity:arr.count];
+- (NSSet<NSString *> *)normalizedCountryTokenSetFromArray:(NSArray *)arr {
+    if (![arr isKindOfClass:[NSArray class]] || arr.count == 0) {
+        return [NSSet set];
+    }
+    NSMutableSet<NSString *> *set = [NSMutableSet setWithCapacity:arr.count];
     for (id o in arr) {
-        if (![o isKindOfClass:[NSString class]]) continue;
-        NSString *u = [[(NSString *)o stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] uppercaseString];
-        if (u.length) [set addObject:u];
+        if (![o isKindOfClass:[NSString class]]) {
+            continue;
+        }
+        NSString *raw = WMNormalizeCountryLabel((NSString *)o);
+        if (!raw.length) {
+            continue;
+        }
+        if (WMStringLooksLikeISOAlpha2(raw)) {
+            [set addObject:[raw uppercaseString]];
+        } else {
+            [set addObject:raw];
+        }
     }
     return [set copy];
 }

@@ -41,25 +41,6 @@ static CGFloat PCAbilityMaxLabelWidthForTitles(NSArray<NSString *> *titles, UIFo
     return maxW;
 }
 
-static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **rest) {
-    if (!line.length) {
-        *num = @"";
-        *rest = @"";
-        return;
-    }
-    NSUInteger i = 0;
-    while (i < line.length) {
-        unichar ch = [line characterAtIndex:i];
-        if (ch >= '0' && ch <= '9') {
-            i++;
-        } else {
-            break;
-        }
-    }
-    *num = [line substringToIndex:i];
-    *rest = [[line substringFromIndex:i] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-}
-
 #pragma mark - Dark stats
 
 @implementation PassportDarkStatsCardCell {
@@ -491,11 +472,18 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
      胜利与 打平+失败的比值计算胜率x100%
      */
     _title.text = model.possessionCardTitle;
-    NSString *n1, *r1, *n2, *r2;
-    PCPossessionSplitLine(model.possessionLeftLine1, &n1, &r1);
-    PCPossessionSplitLine(model.possessionLeftLine2, &n2, &r2);
-    _num1.text = n1; _desc1.text = r1;
-    _num2.text = n2; _desc2.text = r2;
+    _num1.text = model.possessionLeftLine1;
+    NSString *winsFmt = NSLocalizedString(@"passport_possession_wins_label_format", nil);
+    if (!winsFmt.length || [winsFmt isEqualToString:@"passport_possession_wins_label_format"]) {
+        winsFmt = @"赢球%@次";
+    }
+    _desc1.text = [NSString stringWithFormat:winsFmt, model.possessionLeftLine1 ?: @""];
+    _num2.text = model.possessionLeftLine2;
+    NSString *rateFmt = NSLocalizedString(@"passport_possession_win_rate_label_format", nil);
+    if (!rateFmt.length || [rateFmt isEqualToString:@"passport_possession_win_rate_label_format"]) {
+        rateFmt = @"胜率为%@%%";
+    }
+    _desc2.text = [NSString stringWithFormat:rateFmt, model.possessionLeftLine2 ?: @""];
     CGFloat p = model.possessionCenterPercent;
     p = MIN(1, MAX(0, p));
     _donut.lineWidth = 24;
@@ -507,7 +495,6 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
     _donut.segmentRatios = @[ @(p), @(1 - p) ];
     _donut.segmentColors = @[ [UIColor colorWithHexString:@"#5CB793"] , [UIColor colorWithHexString:@"#0D2122"]];
     _donut.centerText = [NSString stringWithFormat:@"%.0f%%", p * 100];
-    // TODO: possessionLeftLine1/2 与 possessionCenterPercent 目前由 ViewModel 占位生成；待对接后端统计口径（控球/射门/得分等）后再调整。
 }
 
 @end
@@ -901,7 +888,8 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
     UILabel *_title;
     UILabel *_subtitle;
     PassportDonutChartView *_donut;
-    UIStackView *_legendRow;
+    /// 纵向：每行最多 3 个图例（UIStackView horizontal）
+    UIStackView *_legendOuterStack;
 }
 
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
@@ -925,15 +913,14 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
         _donut.ringInnerRadius = 40;
         _donut.showsOutsidePercentLabels = YES;
         _donut.outsidePercentLabelColor = [UIColor whiteColor];
-        _legendRow = [[UIStackView alloc] init];
-        _legendRow.axis = UILayoutConstraintAxisHorizontal;
-        _legendRow.spacing = 8;
-        _legendRow.distribution = UIStackViewDistributionFillEqually;
-        _legendRow.alignment = UIStackViewAlignmentFill;
+        _legendOuterStack = [[UIStackView alloc] init];
+        _legendOuterStack.axis = UILayoutConstraintAxisVertical;
+        _legendOuterStack.spacing = 16;
+        _legendOuterStack.alignment = UIStackViewAlignmentFill;
         [_card addSubview:_title];
         [_card addSubview:_subtitle];
         [_card addSubview:_donut];
-        [_card addSubview:_legendRow];
+        [_card addSubview:_legendOuterStack];
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
             make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 0, 0, 0));
         }];
@@ -952,10 +939,10 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
             make.height.mas_equalTo(260);
             make.width.mas_equalTo(_card);
         }];
-        [_legendRow mas_makeConstraints:^(MASConstraintMaker *make) {
+        [_legendOuterStack mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(_donut.mas_bottom).offset(12);
             make.leading.trailing.equalTo(_card).insets(UIEdgeInsetsMake(0, 30, 0, 30));
-//            make.bottom.equalTo(_card).offset(-16);
+            make.bottom.equalTo(_card).offset(-16);
         }];
     }
     return self;
@@ -963,8 +950,8 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
 
 - (void)prepareForReuse {
     [super prepareForReuse];
-    for (UIView *v in _legendRow.arrangedSubviews) {
-        [_legendRow removeArrangedSubview:v];
+    for (UIView *v in _legendOuterStack.arrangedSubviews) {
+        [_legendOuterStack removeArrangedSubview:v];
         [v removeFromSuperview];
     }
 }
@@ -980,7 +967,10 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
     NSArray<UIColor *> *cols = @[
         [UIColor colorWithHexString:@"#CCFFDC"],
         [UIColor colorWithHexString:@"#62D486"],
-        [UIColor colorWithHexString:@"#5CB793"]
+        [UIColor colorWithHexString:@"#5CB793"],
+        [UIColor colorWithHexString:@"#3D8B7A"],
+        [UIColor colorWithHexString:@"#285D4B"],
+        [UIColor colorWithHexString:@"#1B3C3E"],
     ];
     NSMutableArray *colors = [NSMutableArray array];
     NSUInteger i = 0;
@@ -1000,34 +990,43 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
     _donut.ringTrackExtraWidth = 10;
     _donut.segmentGapPoints = 5;
 
-    //观赛信息 和验证实名身份 最多允许6种身份认证
+    // 观赛身份图例：每行 3 个（最多 6 种身份 → 2 行）
     UIFont *legFont = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
-
-    i = 0;
-    for (NSDictionary *seg in model.tacticalSegments) {
-        UIView *cell = [[UIView alloc] init];
-        UIView *dot = [[UIView alloc] init];
-        dot.backgroundColor = cols[MIN(i, cols.count - 1)];
-        dot.layer.cornerRadius = 8;
-        dot.clipsToBounds = YES;
-        UILabel *l = [[UILabel alloc] init];
-        l.text = [NSString stringWithFormat:@"%@", seg[@"title"] ?: @""];
-        l.font = legFont;
-        l.textColor = [UIColor colorWithWhite:1 alpha:0.75];
-        l.textAlignment = NSTextAlignmentLeft;
-        l.numberOfLines = 0;
-        [cell addSubview:dot];
-        [cell addSubview:l];
-        [dot mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.leading.equalTo(cell);
-            make.width.height.mas_equalTo(16);
-        }];
-        [l mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(dot.mas_bottom).offset(6);
-            make.leading.trailing.bottom.equalTo(cell);
-        }];
-        [_legendRow addArrangedSubview:cell];
-        i++;
+    NSArray<NSDictionary *> *segs = model.tacticalSegments ?: @[];
+    NSUInteger nSeg = segs.count;
+    for (NSUInteger rowStart = 0; rowStart < nSeg; rowStart += 3) {
+        UIStackView *rowStack = [[UIStackView alloc] init];
+        rowStack.axis = UILayoutConstraintAxisHorizontal;
+        rowStack.spacing = 8;
+        rowStack.distribution = UIStackViewDistributionFillEqually;
+        rowStack.alignment = UIStackViewAlignmentFill;
+        for (NSUInteger k = 0; k < 3 && rowStart + k < nSeg; k++) {
+            NSUInteger i = rowStart + k;
+            NSDictionary *seg = segs[i];
+            UIView *cell = [[UIView alloc] init];
+            UIView *dot = [[UIView alloc] init];
+            dot.backgroundColor = cols[MIN(i, cols.count - 1)];
+            dot.layer.cornerRadius = 8;
+            dot.clipsToBounds = YES;
+            UILabel *l = [[UILabel alloc] init];
+            l.text = [NSString stringWithFormat:@"%@", seg[@"title"] ?: @""];
+            l.font = legFont;
+            l.textColor = [UIColor colorWithWhite:1 alpha:0.75];
+            l.textAlignment = NSTextAlignmentLeft;
+            l.numberOfLines = 0;
+            [cell addSubview:dot];
+            [cell addSubview:l];
+            [dot mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.top.leading.equalTo(cell);
+                make.width.height.mas_equalTo(16);
+            }];
+            [l mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.top.equalTo(dot.mas_bottom).offset(6);
+                make.leading.trailing.bottom.equalTo(cell);
+            }];
+            [rowStack addArrangedSubview:cell];
+        }
+        [_legendOuterStack addArrangedSubview:rowStack];
     }
 }
 
@@ -1364,10 +1363,17 @@ static UIView *PCOutcomeLegendItemView(NSString *title, NSString *numStr, UIColo
         [vals addObject:@(v)];
         sum += v;
     }
+    BOOL allZeroWeights = (sum < 1e-9 && legs.count > 0);
     for (NSUInteger i = 0; i < legs.count; i++) {
         NSDictionary *leg = legs[i];
         double v = [vals[i] doubleValue];
-        [ratios addObject:@(sum > 0 ? v / sum : 0)];
+        double r = 0;
+        if (allZeroWeights) {
+            r = 1.0 / (double)legs.count;
+        } else {
+            r = sum > 0 ? v / sum : 0;
+        }
+        [ratios addObject:@(r)];
         [segColors addObject:PCHex([NSString stringWithFormat:@"%@", leg[@"h"] ?: @"000000"])];
     }
     if (ratios.count == 0) {

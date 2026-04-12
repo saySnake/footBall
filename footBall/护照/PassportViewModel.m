@@ -8,6 +8,16 @@
 #import "PassportNestedModels.h"
 #import "Team.h"
 
+/// 线上观赛方式饼图扇区颜色（与条数对应循环使用）
+static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
+    static NSArray<NSString *> *p;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        p = @[ @"62D486", @"5CB793", @"285D4B", @"0D2122", @"3D8B7A", @"1A5C52" ];
+    });
+    return p;
+}
+
 @implementation PassportViewModel
 
 + (NSArray<NSNumber *> *)headerWeekValuesNormalizedFromWeekly:(NSArray<NSNumber *> *)weekly {
@@ -30,33 +40,6 @@
     return [out copy];
 }
 
-+ (NSString *)isoCodeFromHeatmapCountryField:(NSString *)country {
-    if (![country isKindOfClass:[NSString class]]) {
-        return nil;
-    }
-    NSString *s = [country stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if (s.length == 0) {
-        return nil;
-    }
-    NSString *u = [s uppercaseString];
-    if (u.length == 2) {
-        NSCharacterSet *nonLetters = [[NSCharacterSet letterCharacterSet] invertedSet];
-        if ([u rangeOfCharacterFromSet:nonLetters].location == NSNotFound) {
-            return u;
-        }
-    }
-    static NSDictionary<NSString *, NSString *> *zhToISO;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        zhToISO = @{
-            @"中国": @"CN", @"日本": @"JP", @"美国": @"US", @"英国": @"GB",
-            @"法国": @"FR", @"德国": @"DE", @"韩国": @"KR", @"泰国": @"TH",
-            @"西班牙": @"ES", @"意大利": @"IT", @"澳大利亚": @"AU",
-        };
-    });
-    return zhToISO[s] ?: nil;
-}
-
 + (void)applyHeaderFromPassport:(nullable PNPassport *)passport toModel:(PassportViewModel *)m codeDigits:(NSArray<NSString *> *)box {
     NSString *prefix = NSLocalizedString(@"passport_header_no_prefix", nil);
     if (!prefix.length || [prefix isEqualToString:@"passport_header_no_prefix"]) {
@@ -72,6 +55,7 @@
         m.headerCleanMatches = 0;
         m.headerMapOftenISOs = @[];
         m.headerMapGoneISOs = @[];
+        m.headerMapUngoISOs = @[];
         m.headerSpendingAmountText = @"";
         m.totalWatchTimeTexts = @[];
         return;
@@ -92,21 +76,31 @@
     
     NSMutableArray<NSString *> *often = [NSMutableArray array];
     NSMutableArray<NSString *> *gone = [NSMutableArray array];
+    NSMutableArray<NSString *> *ungo = [NSMutableArray array];
+    NSMutableCharacterSet *cnTrim = [NSMutableCharacterSet whitespaceAndNewlineCharacterSet];
+    [cnTrim addCharactersInString:@"\u3000"];
     for (PNCountryHeatmap *h in passport.countryHeatmap) {
-        NSString *iso = [self isoCodeFromHeatmapCountryField:h.country];
-        if (!iso.length) {
+        NSString *cn = [h.country stringByTrimmingCharactersInSet:cnTrim];
+        if (!cn.length) {
             continue;
         }
-        if (h.level >= 3) {
-            [often addObject:iso];
+        if (h.level >= 2) {
+            [often addObject:cn];
         } else if (h.level >= 1) {
-            [gone addObject:iso];
+            [gone addObject:cn];
+        } else {
+            [ungo addObject:cn];
         }
     }
     m.headerMapOftenISOs = [often copy];
     m.headerMapGoneISOs = [gone copy];
-    
-    m.headerSpendingAmountText = passport.yearSpending.length ? passport.yearSpending : @"";
+    m.headerMapUngoISOs = [ungo copy];
+
+    if (passport.yearSpending.length) {
+        m.headerSpendingAmountText = passport.yearSpending;
+    } else {
+        m.headerSpendingAmountText = @"";
+    }
     
     // careerTotalWatchTime -> totalWatchTimeTexts
     NSInteger minutes = MAX(0, passport.careerTotalWatchTime);
@@ -183,6 +177,34 @@
     m.header2FollowedTeamLogoURLs = [logos copy];
 }
 
+/// 暗色统计卡四行：与 PassportDarkStatsCardCell 行序一致（总时长 / 赛季天数 / 周末工作日比 / 昼夜比）。
++ (NSString *)seasonDaysLineFromPassport:(nullable PNPassport *)passport {
+    if (!passport) {
+        return @"";
+    }
+    NSString *raw = [passport.seasonDays stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (raw.length) {
+        return [NSString stringWithFormat:@"%@ %@", raw, NSLocalizedString(@"passport_days_unit", nil) ?: @"天"];
+    }
+    NSInteger minutes = MAX(0, passport.yearTotalWatchTime);
+    if (minutes <= 0) {
+        return @"";
+    }
+    double days = minutes / (24.0 * 60.0);
+    return [NSString stringWithFormat:@"%.3f %@", days, NSLocalizedString(@"passport_days_unit", nil) ?: @"天"];
+}
+
++ (NSString *)awakeWatchPercentDisplay:(nullable NSString *)awake {
+    NSString *t = [awake stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (!t.length) {
+        return @"";
+    }
+    if ([t hasSuffix:@"%"]) {
+        return t;
+    }
+    return [NSString stringWithFormat:@"%@%%", t];
+}
+
 + (instancetype)viewModelWithPassport:(nullable PNPassport *)passport year:(NSInteger)year {
     PassportViewModel *m = [[PassportViewModel alloc] init];
     NSInteger y = year > 0 ? year : (NSInteger)[[NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian] component:NSCalendarUnitYear fromDate:[NSDate date]];
@@ -201,8 +223,12 @@
     }
     while (box.count < 4) { [box addObject:@"0"]; }
 
-    // TODO: 后端暂无“护照积分/总分”字段时，不填该展示；待接口补字段后再映射（例如 points/score 等）。
-    m.mainScoreText = @"";
+    NSArray<PNIdentityDist *> *identityList = passport ? (passport.identityDist ?: @[]) : @[];
+    NSArray<PNEmotionDist *> *emotionList = passport ? (passport.emotionDist ?: @[]) : @[];
+    NSArray<PNStandDist *> *standList = passport ? (passport.standDist ?: @[]) : @[];
+    NSArray<PNLocationDist *> *locationList = passport ? (passport.locationDist ?: @[]) : @[];
+    NSArray<PNOnlineMethodDist *> *onlineList = passport ? (passport.onlineMethodDist ?: @[]) : @[];
+
     m.codeDigitTexts = [box copy];
     m.avatarURL = passport ? passport.avatar : nil;
     m.nickname = (passport && passport.nickname.length) ? passport.nickname : @"";
@@ -212,100 +238,162 @@
     m.promoButtonTitle = NSLocalizedString(@"passport_promo_car", nil) ?: @"特惠购车";
 
     m.regularSeasonTitle = NSLocalizedString(@"passport_regular_stats", nil) ?: @"常规赛数据";
-    m.avgDurationTitle = NSLocalizedString(@"passport_avg_duration", nil) ?: @"平均时长";
-    // 平均时长：年度总时长 / 年度场次（分钟）
-    if (passport && passport.yearTotalMatches > 0) {
-        double avg = (double)passport.yearTotalWatchTime / (double)passport.yearTotalMatches;
-        m.avgDurationValue = [NSString stringWithFormat:@"%.2f min", avg];
+    // 行 0：年度总观赛时长（分钟，接口 yearTotalWatchTime）
+    m.avgDurationTitle = NSLocalizedString(@"passport_year_total_watch_time", nil) ?: @"年度总观赛时长";
+    if (passport) {
+        NSInteger minutes = MAX(0, passport.yearTotalWatchTime);
+        if (minutes > 0) {
+            m.avgDurationValue = [NSString stringWithFormat:@"%ld %@", (long)minutes, NSLocalizedString(@"passport_minutes_unit", nil) ?: @"分钟"];
+        } else {
+            m.avgDurationValue = @"";
+        }
     } else {
         m.avgDurationValue = @"";
     }
-    m.matchesYearTitle = NSLocalizedString(@"passport_matches_this_year", nil) ?: @"今年登场比赛场次";
-    if (ym > 0) {
-        m.matchesYearValue = [NSString stringWithFormat:@"%ld %@", (long)ym, NSLocalizedString(@"passport_times_unit", nil) ?: @"次"];
-    } else {
-        m.matchesYearValue = @"";
+    // 行 1：赛季投入天数（接口 seasonDays；无则按总分钟换算）
+    m.matchesYearTitle = NSLocalizedString(@"passport_season_days", nil) ?: @"赛季投入天数";
+    m.matchesYearValue = [self seasonDaysLineFromPassport:passport];
+    // 行 2、3：周末:工作日、白天:夜晚（接口为化简字符串，如 34:1）
+    m.avgGoalsMatchTitle = NSLocalizedString(@"passport_weekend_weekday_ratio", nil) ?: @"周末/工作日";
+    m.avgGoalsMatchValue = (passport && passport.weekendWeekdayRatio.length) ? passport.weekendWeekdayRatio : @"";
+    m.totalGoalsTitle = NSLocalizedString(@"passport_day_night_ratio", nil) ?: @"白天/夜晚";
+    m.totalGoalsValue = (passport && passport.dayNightRatio.length) ? passport.dayNightRatio : @"";
+
+    // 成长横幅：年份文案 + 睡醒时间看球占比（接口 awakeWatchPercent）
+    m.growthHeadline = [NSString stringWithFormat:@"%ld%@", (long)y, NSLocalizedString(@"passport_growth_wake_suffix", nil) ?: @"年睡醒时间里的"];
+    m.growthSubtitle = [self awakeWatchPercentDisplay:passport ? passport.awakeWatchPercent : nil];
+
+    // 柱状图：用 locationDist 各点 count 作为 Y 值（与设计注释「地点频次」一致）
+    m.goalTrendTitle = NSLocalizedString(@"passport_location_frequency_title", nil) ?: @"观赛地点频次";
+    NSMutableArray<NSNumber *> *locTrend = [NSMutableArray array];
+    for (PNLocationDist *ld in locationList) {
+        [locTrend addObject:@(MAX(0, ld.count))];
     }
-    m.avgGoalsMatchTitle = NSLocalizedString(@"passport_avg_goals_per_match", nil) ?: @"单场平均进球";
-    if (passport && passport.yearTotalMatches > 0) {
-        double g = (double)passport.yearTotalGoals / (double)passport.yearTotalMatches;
-        m.avgGoalsMatchValue = [NSString stringWithFormat:@"%.2f", g];
-    } else {
-        m.avgGoalsMatchValue = @"";
+    m.goalTrendValues = [locTrend copy];
+
+    PNPassportTeamRecord *tr = passport ? passport.teamRecord : nil;
+
+    // %ld年我关注的主队胜率（赛季 Tab 年份）
+    {
+        NSString *winTitleFmt = NSLocalizedString(@"passport_followed_team_win_rate_title", nil);
+        if (!winTitleFmt.length || [winTitleFmt isEqualToString:@"passport_followed_team_win_rate_title"]) {
+            winTitleFmt = @"%ld年我关注的主队胜率";
+        }
+        m.possessionCardTitle = [NSString stringWithFormat:winTitleFmt, (long)y];
     }
-    m.totalGoalsTitle = NSLocalizedString(@"passport_total_goals", nil) ?: @"总进球数";
-    if (passport) {
-        m.totalGoalsValue = [NSString stringWithFormat:@"%ld", (long)MAX(0, passport.yearTotalGoals)];
-    } else {
-        m.totalGoalsValue = @"";
+    NSInteger teamWins = tr ? tr.wins : 0;
+    float winRateVal = tr ? tr.winRate : 0.f;
+    m.possessionLeftLine1 = [NSString stringWithFormat:@"%ld", (long)teamWins];
+    m.possessionLeftLine2 = [NSString stringWithFormat:@"%.0f", winRateVal];
+    CGFloat winRate01 = (CGFloat)winRateVal;
+    if (winRate01 > 1.0f) {
+        winRate01 = winRate01 / 100.f;
     }
+    m.possessionCenterPercent = MIN(1, MAX(0, winRate01));
 
-    // TODO: growth 相关（awakeWatchPercent/seasonDays 等）需与设计稿口径确认后再组装文案
-    m.growthHeadline = @"";
-    m.growthSubtitle = @"";
-
-    // TODO: 近 N 场趋势类数据目前 PNPassport 未提供
-    m.goalTrendTitle = @"";
-    m.goalTrendValues = @[];
-
-    // TODO: 控球/射门等 per-game 统计目前 PNPassport 未提供
-    m.possessionCardTitle = @"";
-    m.possessionLeftLine1 = @"";
-    m.possessionLeftLine2 = @"";
-    m.possessionCenterPercent = 0;
-
-    // 该 cell 当前注释更像“球场/城市/国家覆盖数”，用已有字段先对齐（不再用 mock）
-    m.positionSectionTitle = NSLocalizedString(@"passport_position_strength", nil) ?: @"各位置强度";
-    m.positionForwardLabel = NSLocalizedString(@"passport_position_fwd", nil) ?: @"球场";
-    m.positionMidfieldLabel = NSLocalizedString(@"passport_position_mid", nil) ?: @"城市";
-    m.positionDefenderLabel = NSLocalizedString(@"passport_position_def", nil) ?: @"国家";
+    // 空间维度（球场 / 城市 / 国家覆盖）
+    m.positionSectionTitle = NSLocalizedString(@"passport_position_strength", nil) ?: @"空间维度";
+    m.positionForwardLabel = NSLocalizedString(@"passport_coverage_stadium", nil) ?: @"我去过的\n球场";
+    m.positionMidfieldLabel = NSLocalizedString(@"passport_coverage_city", nil) ?: @"我去过的\n城市";
+    m.positionDefenderLabel = NSLocalizedString(@"passport_coverage_country", nil) ?: @"我去过的\n国家";
     m.positionForward = passport ? passport.yearStadiumCount : 0;
     m.positionMidfield = passport ? passport.yearCityCount : 0;
     m.positionDefender = passport ? passport.yearCountryCount : 0;
 
-    // TODO: ability（线下观赛类型/层数分布）需要用 standDist/locationDist 等字段重组为 abilityItems
+    //线下观赛数据 ability：看台类型分布 standDist → 柱状条目；平均层数 averageFloor
     m.abilitySectionTitle = NSLocalizedString(@"passport_ability_detail", nil) ?: @"线下观赛数据观";
-    m.abilityAverageLevel = passport.averageFloor.doubleValue;
-    m.abilityItems = @[];
+    if (passport && passport.averageFloor.length) {
+        m.abilityAverageLevel = passport.averageFloor.doubleValue;
+    } else {
+        m.abilityAverageLevel = 0;
+    }
+    NSMutableArray<NSDictionary *> *abilityRows = [NSMutableArray array];
+    for (PNStandDist *sd in standList) {
+        [abilityRows addObject:@{ @"title": sd.standType ?: @"", @"value": @(MAX(0, sd.count)) }];
+    }
+    m.abilityItems = [abilityRows copy];
 
-    // tactical：用 identityDist（有 count/percentage）构建 segments
+    //观赛身份 tactical：用 identityDist（有 count/percentage）构建 segments
     m.tacticalTitle = NSLocalizedString(@"passport_tactical_identity_title", nil) ?: @"观赛身份";
     NSMutableArray<NSDictionary *> *segs = [NSMutableArray array];
     double totalIdentity = 0;
-    for (PNIdentityDist *d in passport.identityDist) { totalIdentity += MAX(0, (double)d.count); }
-    for (PNIdentityDist *d in passport.identityDist) {
+    for (PNIdentityDist *d in identityList) {
+        totalIdentity += MAX(0, (double)d.count);
+    }
+    for (PNIdentityDist *d in identityList) {
         double p = totalIdentity > 0 ? ((double)MAX(0, d.count) / totalIdentity) : 0;
-        [segs addObject:@{@"p": @(p), @"title": d.identity ?: @""}];
+        [segs addObject:@{ @"p": @(p), @"title": d.identity ?: @"" }];
     }
     m.tacticalSegments = [segs copy];
     m.tacticalIdentityCount = (NSInteger)MIN(6, m.tacticalSegments.count);
 
-    // metric bars：用 emotionDist
-    m.metricEmotionCount = (NSInteger)MIN(9, passport.emotionDist.count);
-    m.metricHeaderAsideLine1 = NSLocalizedString(@"passport_metric_aside_1", nil) ?: @"";
-    m.metricHeaderAsideLine2 = NSLocalizedString(@"passport_metric_aside_2", nil) ?: @"";
+    //观赛后的情绪 metric bars：用 emotionDist
+    m.metricEmotionCount = (NSInteger)MIN(9, (NSInteger)emotionList.count);
+    m.metricHeaderAsideLine1 = (passport && passport.topLocation.length) ? passport.topLocation : @"";
+    m.metricHeaderAsideLine2 = (passport && passport.topEmotion.length) ? passport.topEmotion : @"";
     m.metricBarsPrompt = NSLocalizedString(@"passport_metric_prompt", nil) ?: @"";
     NSMutableArray *bars = [NSMutableArray array];
-    for (PNEmotionDist *d in passport.emotionDist) {
+    for (PNEmotionDist *d in emotionList) {
         [bars addObject:@{ @"title": d.emotion ?: @"", @"value": @(MAX(0, d.count)) }];
     }
     m.recentMetricBars = [bars copy];
     m.recentGoalsTitle = @"";
     m.recentGoalsSubtitle = @"";
 
-    // outcome：用 teamRecord（胜平负/胜率），无则置空
-    m.outcomeTitle = NSLocalizedString(@"passport_outcome_vs_last", nil) ?: @"";
-    PNPassportTeamRecord *tr = passport.teamRecord;
-    NSInteger w = tr ? tr.wins : 0;
-    NSInteger d = tr ? tr.draws : 0;
-    NSInteger l = tr ? tr.losses : 0;
-    double sum = (double)(MAX(0, w) + MAX(0, d) + MAX(0, l));
-    m.outcomeCenterPercent = sum > 0 ? ((double)MAX(0, w) / sum) : 0;
-    m.outcomeLegend = @[
-        @{@"t": NSLocalizedString(@"passport_legend_win", nil) ?: @"胜", @"n": [NSString stringWithFormat:@"%ld", (long)MAX(0, w)], @"h": @"62D486"},
-        @{@"t": NSLocalizedString(@"passport_legend_draw", nil) ?: @"平", @"n": [NSString stringWithFormat:@"%ld", (long)MAX(0, d)], @"h": @"5CB793"},
-        @{@"t": NSLocalizedString(@"passport_legend_loss", nil) ?: @"负", @"n": [NSString stringWithFormat:@"%ld", (long)MAX(0, l)], @"h": @"285D4B"},
-    ];
+    // 线上观赛数据：onlineMethodDist（method / count / percentage）
+    {
+        NSString *onlineTitle = NSLocalizedString(@"passport_online_viewing_title", nil);
+        if (!onlineTitle.length || [onlineTitle isEqualToString:@"passport_online_viewing_title"]) {
+            onlineTitle = NSLocalizedString(@"passport_outcome_vs_last", nil) ?: @"线上观赛数据";
+        }
+        m.outcomeTitle = onlineTitle;
+    }
+    NSMutableArray<NSDictionary *> *onlineLegend = [NSMutableArray array];
+    double totalOnlineCount = 0;
+    NSInteger maxOnlineCount = 0;
+    for (PNOnlineMethodDist *om in onlineList) {
+        NSInteger c = MAX(0, om.count);
+        totalOnlineCount += (double)c;
+        maxOnlineCount = MAX(maxOnlineCount, c);
+    }
+    NSUInteger omIdx = 0;
+    NSArray<NSString *> *pal = PassportOnlineMethodHexPalette();
+    for (PNOnlineMethodDist *om in onlineList) {
+        NSString *hex = pal[omIdx % pal.count];
+        NSInteger c = MAX(0, om.count);
+        [onlineLegend addObject:@{
+            @"t": om.method ?: @"",
+            @"n": [NSString stringWithFormat:@"%ld", (long)c],
+            @"h": hex,
+        }];
+        omIdx++;
+    }
+    m.outcomeLegend = [onlineLegend copy];
+
+    CGFloat centerShare = 0;
+    if (onlineList.count == 0) {
+        centerShare = 0;
+    } else if (totalOnlineCount > 1e-6) {
+        centerShare = (CGFloat)((double)maxOnlineCount / totalOnlineCount);
+    } else {
+        double pSum = 0;
+        double maxP = 0;
+        for (PNOnlineMethodDist *om in onlineList) {
+            double pv = om.percentage.length ? om.percentage.doubleValue : 0;
+            if (pv > 1.0 + 1e-6) {
+                pv = pv / 100.0;
+            }
+            pv = MAX(0, MIN(1, pv));
+            pSum += pv;
+            maxP = MAX(maxP, pv);
+        }
+        if (pSum > 1e-6) {
+            centerShare = (CGFloat)(maxP / pSum);
+        } else {
+            centerShare = (CGFloat)(1.0 / (double)onlineList.count);
+        }
+    }
+    m.outcomeCenterPercent = MIN(1, MAX(0, centerShare));
 
     [self applyHeaderFromPassport:passport toModel:m codeDigits:[box copy]];
     [self applyHeader2FromPassport:passport toModel:m year:y];
