@@ -5,6 +5,19 @@
 
 #import "PassportNestedModels.h"
 
+static NSString * _Nullable PNPassportNestedStringFromJson(id v) {
+    if (!v || v == (id)kCFNull) {
+        return nil;
+    }
+    if ([v isKindOfClass:NSString.class]) {
+        return (NSString *)v;
+    }
+    if ([v isKindOfClass:NSNumber.class]) {
+        return [(NSNumber *)v stringValue];
+    }
+    return [v description];
+}
+
 @implementation PNCountryHeatmap
 @end
 
@@ -21,12 +34,26 @@
 @end
 
 @implementation PNIdentityDist
+- (BOOL)modelCustomTransformFromDictionary:(NSDictionary *)dic {
+    id p = dic[@"percentage"];
+    if (p) {
+        self.percentage = PNPassportNestedStringFromJson(p);
+    }
+    return YES;
+}
 @end
 
 @implementation PNEmotionDist
 @end
 
 @implementation PNOnlineMethodDist
+- (BOOL)modelCustomTransformFromDictionary:(NSDictionary *)dic {
+    id p = dic[@"percentage"];
+    if (p) {
+        self.percentage = PNPassportNestedStringFromJson(p);
+    }
+    return YES;
+}
 @end
 
 @implementation PNStampShort

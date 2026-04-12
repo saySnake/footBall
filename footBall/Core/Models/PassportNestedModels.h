@@ -37,8 +37,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) NSInteger draws;
 /// 负场
 @property (nonatomic, assign) NSInteger losses;
-/// 胜率（BigDecimal 序列化字符串）
-@property (nonatomic, copy, nullable) NSString *winRate;
+/// 胜率
+@property (nonatomic, assign) float winRate;
 /// 淘汰次数
 @property (nonatomic, assign) NSInteger eliminated;
 /// 出线次数
@@ -57,7 +57,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// StandDistVO — 看台类型分布
 @interface PNStandDist : NSObject <YYModel>
-/// 看台类型：PITCH / LEVEL_1 / VIP 等
+/// 看台类型：内场 / 1层 / 2层 等
 @property (nonatomic, copy) NSString *standType;
 /// 出现次数
 @property (nonatomic, assign) NSInteger count;
@@ -69,7 +69,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSString *identity;
 /// 出现次数
 @property (nonatomic, assign) NSInteger count;
-/// 占比百分比（字符串）
+/// 占比百分比（后端可能为数字或字符串）
 @property (nonatomic, copy, nullable) NSString *percentage;
 @end
 
@@ -89,7 +89,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSString *method;
 /// 出现次数
 @property (nonatomic, assign) NSInteger count;
-/// 占比百分比（字符串）
+/// 占比百分比（后端可能为数字或字符串）
 @property (nonatomic, copy, nullable) NSString *percentage;
 @end
 

@@ -507,7 +507,11 @@ static void PCPossessionSplitLine(NSString *line, NSString **num, NSString **res
     _donut.segmentRatios = @[ @(p), @(1 - p) ];
     _donut.segmentColors = @[ [UIColor colorWithHexString:@"#5CB793"] , [UIColor colorWithHexString:@"#0D2122"]];
     _donut.centerText = [NSString stringWithFormat:@"%.0f%%", p * 100];
-    // TODO: possessionLeftLine1/2 与 possessionCenterPercent 目前由 ViewModel 占位生成；待对接后端统计口径（控球/射门/得分等）后再调整。
+    // TODO: possessionLeftLine1/2 与 possessionCenterPercent。
+    _num1.text = model.possessionLeftLine1;
+    _desc1.text = [NSString stringWithFormat:@"赢球%@次",model.possessionLeftLine1];
+    _num2.text = model.possessionLeftLine1;
+    _desc2.text = [NSString stringWithFormat:@"胜率为%@%%",model.possessionLeftLine2];
 }
 
 @end

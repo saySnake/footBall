@@ -13,7 +13,6 @@ NS_ASSUME_NONNULL_BEGIN
 /// 护照页展示数据（合并接口 PNPassport 与设计稿占位，便于后续对接完整 API）
 @interface PassportViewModel : NSObject
 
-@property (nonatomic, copy) NSString *mainScoreText;
 @property (nonatomic, copy) NSArray<NSString *> *codeDigitTexts;
 
 @property (nonatomic, copy, nullable) NSString *avatarURL;
