@@ -36,14 +36,14 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
         _cardView.backgroundColor = [UIColor whiteColor];
         _cardView.layer.cornerRadius = 6;
         _avatarView = [UIImageView new];
-        _avatarView.layer.cornerRadius = 24;
+        _avatarView.layer.cornerRadius = 27;
         _avatarView.clipsToBounds = YES;
         _nameLabel = [UILabel new];
         _nameLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
         _nameLabel.textColor = [UIColor blackColor];
         _idLabel = [UILabel new];
         _idLabel.font = [UIFont systemFontOfSize:12];
-        _idLabel.textColor = [UIColor blackColor];
+        _idLabel.textColor = [UIColor colorWithRed:0.259 green:0.259 blue:0.259 alpha:1.0];
         _statusDot = [UIView new];
         _statusDot.layer.cornerRadius = 4;
         _statusDot.backgroundColor = [UIColor colorWithWhite:0.65 alpha:1.0];
@@ -63,11 +63,11 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
         [_cardView addSubview:_statusDot];
         [_cardView addSubview:_statusLabel];
         [_cardView addSubview:_addBtn];
-        [_cardView mas_makeConstraints:^(MASConstraintMaker *make) { make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(5, 18, 5, 14)); }];
-        [_avatarView mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_cardView).offset(10); make.centerY.equalTo(_cardView); make.size.mas_equalTo(CGSizeMake(48, 48)); }];
-        [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_avatarView.mas_trailing).offset(10); make.top.equalTo(_cardView).offset(9); }];
+        [_cardView mas_makeConstraints:^(MASConstraintMaker *make) { make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(5, 16, 5, 16)); }];
+        [_avatarView mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_cardView).offset(10); make.centerY.equalTo(_cardView); make.size.mas_equalTo(CGSizeMake(54, 54)); }];
+        [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_avatarView.mas_trailing).offset(8); make.top.equalTo(_cardView).offset(10); }];
         [_idLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_nameLabel); make.top.equalTo(_nameLabel.mas_bottom).offset(1); }];
-        [_statusDot mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_nameLabel); make.top.equalTo(_idLabel.mas_bottom).offset(5); make.size.mas_equalTo(CGSizeMake(8, 8)); }];
+        [_statusDot mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_nameLabel); make.top.equalTo(_idLabel.mas_bottom).offset(6); make.size.mas_equalTo(CGSizeMake(8, 8)); }];
         [_statusLabel mas_makeConstraints:^(MASConstraintMaker *make) { make.leading.equalTo(_statusDot.mas_trailing).offset(6); make.centerY.equalTo(_statusDot); }];
         [_addBtn mas_makeConstraints:^(MASConstraintMaker *make) { make.trailing.equalTo(_cardView).offset(-12); make.centerY.equalTo(_cardView); make.size.mas_equalTo(CGSizeMake(76, 30)); }];
     }
@@ -435,10 +435,12 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
     UIView *searchBg = [UIView new];
     searchBg.backgroundColor = [UIColor whiteColor];
     searchBg.layer.cornerRadius = 22;
+    searchBg.layer.borderWidth = 1;
+    searchBg.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.8].CGColor;
     [self.headerView addSubview:searchBg];
 
     UIImageView *searchIcon = [UIImageView new];
-    if (@available(iOS 13.0, *)) { searchIcon.image = [UIImage systemImageNamed:@"magnifyingglass"]; searchIcon.tintColor = [UIColor grayColor]; }
+    if (@available(iOS 13.0, *)) { searchIcon.image = [UIImage systemImageNamed:@"magnifyingglass"]; searchIcon.tintColor = kAddFriendGreen; }
     [searchBg addSubview:searchIcon];
 
     self.searchField = [UITextField new];
@@ -466,6 +468,8 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
     self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
     self.tableView.backgroundColor = [UIColor clearColor];
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    self.tableView.contentInset = UIEdgeInsetsMake(8, 0, 24, 0);
+    self.tableView.scrollIndicatorInsets = self.tableView.contentInset;
     if (@available(iOS 15.0, *)) {
         self.tableView.sectionHeaderTopPadding = 0;
     }
