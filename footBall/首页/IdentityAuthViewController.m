@@ -7,7 +7,6 @@
 #import "RealNameAuthViewController.h"
 #import "ProfessionalAuthViewController.h"
 #import "AuthManager.h"
-#import "AuthStateStore.h"
 #import "User.h"
 #import "VerificationRequest.h"
 #import "VerificationModels.h"
@@ -48,13 +47,13 @@ static CGFloat const kIACertCardH = 138.f;
 @property (nonatomic, strong) UIButton *realNameCertButton;
 @end
 
-static NSString *IAEffectiveStatus(NSString *apiStatus, BOOL fallbackApproved) {
+static NSString *IAEffectiveStatus(NSString *apiStatus) {
     NSString *s = apiStatus ?: @"";
     s = [s stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (s.length > 0) {
         return s;
     }
-    return fallbackApproved ? @"APPROVED" : @"";
+    return @"";
 }
 
 static BOOL IAStatusIsApproved(NSString *s) {
@@ -342,22 +341,11 @@ static BOOL IAStatusNeedsRetry(NSString *s) {
 
 - (NSInteger)approvedIdentityCount {
     PNVerificationStatus *st = [VerificationRequest shared].cachedVerificationStatus;
-    BOOL useAPI = st && (st.professionalStatus.length > 0 || st.realnameStatus.length > 0);
-    if (useAPI) {
-        NSInteger n = 0;
-        if (IAStatusIsApproved(st.professionalStatus)) {
-            n++;
-        }
-        if (IAStatusIsApproved(st.realnameStatus)) {
-            n++;
-        }
-        return n;
-    }
     NSInteger n = 0;
-    if ([AuthStateStore isProfessionalAuthCompleted]) {
+    if (IAStatusIsApproved(st.professionalStatus)) {
         n++;
     }
-    if ([AuthStateStore isRealNameAuthCompleted]) {
+    if (IAStatusIsApproved(st.realnameStatus)) {
         n++;
     }
     return n;
@@ -365,12 +353,12 @@ static BOOL IAStatusNeedsRetry(NSString *s) {
 
 - (NSString *)effectiveProfessionalStatusForUI {
     PNVerificationStatus *st = [VerificationRequest shared].cachedVerificationStatus;
-    return IAEffectiveStatus(st.professionalStatus, [AuthStateStore isProfessionalAuthCompleted]);
+    return IAEffectiveStatus(st.professionalStatus);
 }
 
 - (NSString *)effectiveRealnameStatusForUI {
     PNVerificationStatus *st = [VerificationRequest shared].cachedVerificationStatus;
-    return IAEffectiveStatus(st.realnameStatus, [AuthStateStore isRealNameAuthCompleted]);
+    return IAEffectiveStatus(st.realnameStatus);
 }
 
 - (void)applyCertButtonStyleDefault:(UIButton *)btn {
@@ -455,6 +443,12 @@ static BOOL IAStatusNeedsRetry(NSString *s) {
     __weak typeof(self) weakSelf = self;
     if (AuthManager.sharedManager.isLoggedIn) {
         [[VerificationRequest shared] fetchStatusSuccess:^(HTTPResponse * _Nullable responseObject) {
+            [[VerificationRequest shared] fetchRealnameInfoSuccess:^(HTTPResponse * _Nullable responseObject) {
+            } failure:^(NSError * _Nonnull error) {
+            }];
+            [[VerificationRequest shared] fetchHistorySuccess:^(HTTPResponse * _Nullable responseObject) {
+            } failure:^(NSError * _Nonnull error) {
+            }];
             dispatch_async(dispatch_get_main_queue(), ^{
                 [weakSelf refreshUserCard];
             });

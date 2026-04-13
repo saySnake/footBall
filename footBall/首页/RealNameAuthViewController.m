@@ -4,8 +4,8 @@
 //
 
 #import "RealNameAuthViewController.h"
-#import "AuthStateStore.h"
 #import <Masonry/Masonry.h>
+#import <SDWebImage/SDWebImage.h>
 
 // Figma 1:4137「实名认证」
 #define kRANavBg        [UIColor colorWithRed:13/255.0 green:33/255.0 blue:34/255.0 alpha:1.0]   // #0d2122
@@ -81,9 +81,29 @@ static CGFloat const kRAVerifiedBackImageToCaption = 8.f;   // 稿 643−638 约
     self.hidesBottomBarWhenPushed = YES;
     self.shouldShowNavigationBar = NO;
     self.view.backgroundColor = kRAPageBg;
-    self.completed = [AuthStateStore isRealNameAuthCompleted];
-    self.frontImage = [AuthStateStore realNameFrontImage];
-    self.backImage = [AuthStateStore realNameBackImage];
+    self.completed = NO;
+    self.frontImage = nil;
+    self.backImage = nil;
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    __weak typeof(self) weakSelf = self;
+    [[VerificationRequest shared] fetchStatusSuccess:^(HTTPResponse * _Nullable responseObject) {
+        [[VerificationRequest shared] fetchRealnameInfoSuccess:^(HTTPResponse * _Nullable responseObject) {
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) return;
+            [self refreshState];
+        } failure:^(NSError * _Nonnull error) {
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) return;
+            [self refreshState];
+        }];
+    } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [self refreshState];
+    }];
 }
 
 - (void)setupUI {
@@ -416,9 +436,9 @@ static CGFloat const kRAVerifiedBackImageToCaption = 8.f;   // 稿 643−638 约
 }
 
 - (void)refreshState {
-    self.completed = [AuthStateStore isRealNameAuthCompleted];
-    self.frontImage = [AuthStateStore realNameFrontImage];
-    self.backImage = [AuthStateStore realNameBackImage];
+    NSString *status = [VerificationRequest shared].cachedVerificationStatus.realnameStatus ?: @"";
+    BOOL approvedByAPI = [[status uppercaseString] isEqualToString:@"APPROVED"];
+    self.completed = approvedByAPI;
 
     BOOL showUnverified = !self.completed;
     self.headerView.hidden = NO;
@@ -440,8 +460,12 @@ static CGFloat const kRAVerifiedBackImageToCaption = 8.f;   // 稿 643−638 约
         self.backPreview.hidden = !hasBack;
         self.backIconView.hidden = hasBack;
     } else {
-        self.frontDisplayImage.image = self.frontImage;
-        self.backDisplayImage.image = self.backImage;
+        NSString *frontUrlStr = [VerificationRequest shared].cachedRealnameFrontUrl;
+        NSString *backUrlStr = [VerificationRequest shared].cachedRealnameBackUrl;
+        NSURL *frontURL = frontUrlStr.length > 0 ? [NSURL URLWithString:frontUrlStr] : nil;
+        NSURL *backURL = backUrlStr.length > 0 ? [NSURL URLWithString:backUrlStr] : nil;
+        [self.frontDisplayImage sd_setImageWithURL:frontURL placeholderImage:nil];
+        [self.backDisplayImage sd_setImageWithURL:backURL placeholderImage:nil];
     }
 
     [self.content mas_remakeConstraints:^(MASConstraintMaker *make) {
@@ -531,20 +555,17 @@ static CGFloat const kRAVerifiedBackImageToCaption = 8.f;   // 稿 643−638 约
             [[VerificationRequest shared] submitRealnameWithFrontUrl:frontUrl backUrl:backUrl success:^(HTTPResponse * _Nullable responseObject) {
                 __strong typeof(weakSelf) self = weakSelf;
                 if (!self) return;
-                void (^applyLocalAndFinish)(void) = ^{
+                void (^finishFlow)(void) = ^{
                     [self hideLoading];
-                    [AuthStateStore saveRealNameFrontImage:self.frontImage backImage:self.backImage];
-                    [AuthStateStore setRealNameAuthCompleted:YES];
                     [self showSuccess:NSLocalizedString(@"auth_realname_success", nil)];
-                    __weak typeof(self) w = self;
                     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                        [w refreshState];
+                        [self.navigationController popViewControllerAnimated:YES];
                     });
                 };
-                [[UserRequest shared] getLoginUserInfoSuccess:^(HTTPResponse * _Nullable resp) {
-                    applyLocalAndFinish();
+                [[VerificationRequest shared] fetchStatusSuccess:^(HTTPResponse * _Nullable responseObject) {
+                    finishFlow();
                 } failure:^(NSError * _Nonnull error) {
-                    applyLocalAndFinish();
+                    finishFlow();
                 }];
             } failure:^(NSError * _Nonnull error) {
                 __strong typeof(weakSelf) self = weakSelf;

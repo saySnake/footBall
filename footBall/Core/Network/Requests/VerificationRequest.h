@@ -9,6 +9,8 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @class PNVerificationStatus;
+@class PNRealnameInfo;
+@class PNVerificationHistory;
 
 /// 身份认证相关接口（/api/v1/verification/*）
 @interface VerificationRequest : NSObject
@@ -17,6 +19,15 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 最近一次 `GET /api/v1/verification/status` 解析结果（供身份认证页展示）
 @property (nonatomic, strong, nullable) PNVerificationStatus *cachedVerificationStatus;
+/// 最近一次 `GET /api/v1/verification/realname/info` 解析结果
+@property (nonatomic, strong, nullable) PNRealnameInfo *cachedRealnameInfo;
+/// 最近一次 `GET /api/v1/verification/history` 解析结果（按后端返回顺序）
+@property (nonatomic, strong) NSArray<PNVerificationHistory *> *cachedHistory;
+/// 最近一次从服务端解析到的实名认证正反面图片地址
+@property (nonatomic, copy, nullable) NSString *cachedRealnameFrontUrl;
+@property (nonatomic, copy, nullable) NSString *cachedRealnameBackUrl;
+/// 最近一次从服务端解析到的职业认证材料地址列表
+@property (nonatomic, strong) NSArray<NSString *> *cachedProfessionalImageUrls;
 
 /// GET /api/v1/verification/status
 - (void)fetchStatusSuccess:(nullable APISuccessBlock)success failure:(nullable APIFailureBlock)failure;

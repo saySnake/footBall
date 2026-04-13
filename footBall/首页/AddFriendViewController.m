@@ -321,10 +321,12 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
     if (content.length == 0) return;
     self.didHandleResult = YES;
     [self.captureSession stopRunning];
-    if (self.onScanned) {
-        self.onScanned(content);
-    }
     [self.navigationController popViewControllerAnimated:YES];
+    if (self.onScanned) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            self.onScanned(content);
+        });
+    }
 }
 
 @end
@@ -339,6 +341,7 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 @property (nonatomic, strong) NSMutableSet<NSString *> *sendingFriendIds;
 @property (nonatomic, assign) BOOL isSearching;
 @property (nonatomic, assign) NSInteger pendingRequestCount;
+@property (nonatomic, copy) NSString *activeScanRequestToken;
 @end
 
 @implementation AddFriendViewController
@@ -719,14 +722,18 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
     scanVC.onScanned = ^(NSString * _Nonnull content) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
-        NSString *targetUserId = [self targetUserIdFromScanContent:content];
-        if (targetUserId.length == 0) {
-            [self showError:NSLocalizedString(@"community_search_failed", nil)];
-            return;
-        }
-        [self sendScanAddFriendRequest:targetUserId];
+        [self handleScannedContent:content];
     };
     [self.navigationController pushViewController:scanVC animated:YES];
+}
+
+- (void)handleScannedContent:(NSString *)content {
+    NSString *targetUserId = [self targetUserIdFromScanContent:content];
+    if (targetUserId.length > 0) {
+        [self sendScanAddFriendRequestWithTargetUserId:targetUserId rawContent:content allowFallback:YES];
+    } else {
+        [self sendScanAddFriendRequestWithRawContent:content];
+    }
 }
 
 - (NSString *)targetUserIdFromScanContent:(NSString *)content {
@@ -747,10 +754,11 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
         }
     }
 
-    NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@"(\\d{4,})" options:0 error:nil];
-    NSTextCheckingResult *match = [regex firstMatchInString:trimmed options:0 range:NSMakeRange(0, trimmed.length)];
-    if (match.numberOfRanges > 1) {
-        return [trimmed substringWithRange:[match rangeAtIndex:1]];
+    NSArray<NSString *> *segments = [components.path componentsSeparatedByString:@"/"];
+    for (NSString *seg in segments.reverseObjectEnumerator) {
+        if (seg.length > 0 && [seg rangeOfCharacterFromSet:nonDigits].location == NSNotFound) {
+            return seg;
+        }
     }
     return @"";
 }
@@ -765,17 +773,82 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 }
 
 - (void)sendScanAddFriendRequest:(NSString *)targetUserId {
+    [self sendScanAddFriendRequestWithTargetUserId:targetUserId rawContent:nil allowFallback:NO];
+}
+
+- (void)sendScanAddFriendRequestWithTargetUserId:(NSString *)targetUserId rawContent:(NSString *)rawContent allowFallback:(BOOL)allowFallback {
     [self showLoading];
+    NSString *requestToken = [NSUUID UUID].UUIDString;
+    self.activeScanRequestToken = requestToken;
     __weak typeof(self) weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(20 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        if ([self.activeScanRequestToken isEqualToString:requestToken]) {
+            self.activeScanRequestToken = nil;
+            [self hideLoading];
+            [self showError:NSLocalizedString(@"community_search_failed", nil)];
+        }
+    });
     NSDictionary *payload = @{@"targetUserId": @([targetUserId longLongValue])};
     [SocialRequest.shared scanAddFriendWithPayload:payload success:^(HTTPResponse * _Nullable responseObject) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
+        if (![self.activeScanRequestToken isEqualToString:requestToken]) return;
+        self.activeScanRequestToken = nil;
         [self hideLoading];
         [self showSuccess:NSLocalizedString(@"community_request_sent", nil)];
     } failure:^(NSError * _Nonnull error) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
+        if (![self.activeScanRequestToken isEqualToString:requestToken]) return;
+        if (allowFallback && rawContent.length > 0) {
+            self.activeScanRequestToken = nil;
+            [self hideLoading];
+            [self sendScanAddFriendRequestWithRawContent:rawContent];
+            return;
+        }
+        self.activeScanRequestToken = nil;
+        [self hideLoading];
+        NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"community_search_failed", nil);
+        [self showError:msg];
+    }];
+}
+
+- (void)sendScanAddFriendRequestWithRawContent:(NSString *)rawContent {
+    NSString *trimmed = [rawContent stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmed.length == 0) {
+        [self showError:NSLocalizedString(@"community_search_failed", nil)];
+        return;
+    }
+
+    [self showLoading];
+    NSString *requestToken = [NSUUID UUID].UUIDString;
+    self.activeScanRequestToken = requestToken;
+    __weak typeof(self) weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(20 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        if ([self.activeScanRequestToken isEqualToString:requestToken]) {
+            self.activeScanRequestToken = nil;
+            [self hideLoading];
+            [self showError:NSLocalizedString(@"community_search_failed", nil)];
+        }
+    });
+
+    NSDictionary *payload = @{@"qrCodeContent": trimmed};
+    [SocialRequest.shared scanAddFriendWithPayload:payload success:^(HTTPResponse * _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        if (![self.activeScanRequestToken isEqualToString:requestToken]) return;
+        self.activeScanRequestToken = nil;
+        [self hideLoading];
+        [self showSuccess:NSLocalizedString(@"community_request_sent", nil)];
+    } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        if (![self.activeScanRequestToken isEqualToString:requestToken]) return;
+        self.activeScanRequestToken = nil;
         [self hideLoading];
         NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"community_search_failed", nil);
         [self showError:msg];
