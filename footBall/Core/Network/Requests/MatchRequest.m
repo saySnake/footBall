@@ -8,6 +8,33 @@
 
 #import "MatchRequest.h"
 
+/// 与 Expense 等接口一致：`data` 可能是 `{ list }`、嵌套 `data`、或直接数组
+static NSArray *PNMatchJSONArrayFromPageData(id data) {
+    if ([data isKindOfClass:NSArray.class]) {
+        return (NSArray *)data;
+    }
+    if (![data isKindOfClass:NSDictionary.class]) {
+        return nil;
+    }
+    NSDictionary *d = (NSDictionary *)data;
+    id list = d[@"list"] ?: d[@"records"] ?: d[@"rows"] ?: d[@"matches"] ?: d[@"items"];
+    if ([list isKindOfClass:NSArray.class]) {
+        return list;
+    }
+    id inner = d[@"data"];
+    if ([inner isKindOfClass:NSArray.class]) {
+        return (NSArray *)inner;
+    }
+    if ([inner isKindOfClass:NSDictionary.class]) {
+        NSDictionary *idict = (NSDictionary *)inner;
+        id l2 = idict[@"list"] ?: idict[@"records"] ?: idict[@"matches"] ?: idict[@"items"];
+        if ([l2 isKindOfClass:NSArray.class]) {
+            return l2;
+        }
+    }
+    return nil;
+}
+
 @implementation MatchRequest
 
 + (instancetype)shared {
@@ -50,9 +77,9 @@
     params[@"pageSize"] = @(MAX(pageSize, 1));
     [[APIManager sharedManager] GET:APIPathValueMatchSchedule parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            NSArray *list = responseObject.data[@"list"];
-            if (![list isKindOfClass:NSArray.class]) {
-                list = [responseObject.data isKindOfClass:NSArray.class] ? responseObject.data : @[];
+            NSArray *list = PNMatchJSONArrayFromPageData(responseObject.data);
+            if (!list) {
+                list = @[];
             }
             NSArray *matches = [NSArray yy_modelArrayWithClass:Match.class json:list];
             responseObject.dataObject = matches;
@@ -158,9 +185,9 @@
     NSDictionary *params = @{ @"pageNum": @(MAX(page, 1)), @"pageSize": @(MAX(pageSize, 1)) };
     [[APIManager sharedManager] GET:APIPathValueMatchMyTeams parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            NSArray *list = responseObject.data[@"list"];
-            if (![list isKindOfClass:NSArray.class]) {
-                list = [responseObject.data isKindOfClass:NSArray.class] ? responseObject.data : @[];
+            NSArray *list = PNMatchJSONArrayFromPageData(responseObject.data);
+            if (!list) {
+                list = @[];
             }
             NSArray *matches = [NSArray yy_modelArrayWithClass:Match.class json:list];
             responseObject.dataObject = matches;
@@ -178,7 +205,8 @@
         if (failure) failure([NSError errorWithDomain:@"MatchRequestErrorDomain" code:-1 userInfo:@{ NSLocalizedDescriptionKey: @"比赛ID不能为空" }]);
         return;
     }
-    [[APIManager sharedManager] POST:APIPathValueMatchFavorite(matchId) parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+    // 部分服务端要求 JSON body 非空，传 {} 与 application/json 一致
+    [[APIManager sharedManager] POST:APIPathValueMatchFavorite(matchId) parameters:@{} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
             responseObject.dataObject = responseObject.data;
             if (success) success(responseObject);

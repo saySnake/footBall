@@ -5,6 +5,7 @@
 
 #import "MoreMatchesViewController.h"
 #import "MoreDatePickerController.h"
+#import "APIError.h"
 #import <Masonry/Masonry.h>
 
 static UIColor *kMoreMatchesCardBG(void) {
@@ -602,16 +603,31 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
     return cell;
 }
 
+- (NSString *)moreMatches_errorText:(NSError *)error defaultText:(NSString *)def {
+    if ([error isKindOfClass:[APIError class]]) {
+        APIError *ae = (APIError *)error;
+        if (ae.businessMessage.length > 0) return ae.businessMessage;
+    }
+    NSString *msg = error.localizedDescription;
+    return msg.length > 0 ? msg : def;
+}
+
 - (void)onFavoriteTapped:(UIButton *)sender {
     NSInteger index = sender.tag;
     if (index < 0 || index >= self.matches.count) return;
     Match *match = self.matches[index];
-    if (match.matchId.length == 0) return;
+    if (match.matchId.length == 0) {
+        [QMUITips showError:NSLocalizedString(@"more_matches_favorite_no_id", nil) ?: @"比赛信息不完整，无法收藏"];
+        return;
+    }
 
+    sender.enabled = NO;
     __weak typeof(self) weakSelf = self;
+    __weak UIButton *weakBtn = sender;
     void (^reloadRow)(void) = ^{
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
+        weakBtn.enabled = YES;
         NSIndexPath *indexPath = [NSIndexPath indexPathForRow:index inSection:0];
         if (index < self.matches.count) {
             [self.tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationNone];
@@ -623,14 +639,18 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
             match.favorited = NO;
             reloadRow();
         } failure:^(NSError * _Nonnull error) {
-            [QMUITips showError:error.localizedDescription ?: @"取消收藏失败"];
+            weakBtn.enabled = YES;
+            __strong typeof(weakSelf) self = weakSelf;
+            [QMUITips showError:[self moreMatches_errorText:error defaultText:@"取消收藏失败"]];
         }];
     } else {
         [[MatchRequest shared] favoriteMatch:match.matchId success:^(HTTPResponse * _Nullable responseObject) {
             match.favorited = YES;
             reloadRow();
         } failure:^(NSError * _Nonnull error) {
-            [QMUITips showError:error.localizedDescription ?: @"收藏失败"];
+            weakBtn.enabled = YES;
+            __strong typeof(weakSelf) self = weakSelf;
+            [QMUITips showError:[self moreMatches_errorText:error defaultText:@"收藏失败"]];
         }];
     }
 }

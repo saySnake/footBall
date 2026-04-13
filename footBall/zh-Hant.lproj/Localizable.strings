@@ -27,6 +27,7 @@
 "welcome" = "歡迎";
 "home_view_matches" = "查看賽事";
 "more_matches_title" = "更多比賽";
+"more_matches_favorite_no_id" = "比賽資訊不完整，無法收藏";
 "tab_home" = "首頁";
 "tab_discover" = "發現";
 "tab_location" = "位置";

@@ -27,6 +27,7 @@
 "welcome" = "Welcome";
 "home_view_matches" = "View Matches";
 "more_matches_title" = "More Matches";
+"more_matches_favorite_no_id" = "Match data is incomplete; cannot favorite.";
 "tab_home" = "Home";
 "tab_discover" = "Discover";
 "tab_location" = "Location";

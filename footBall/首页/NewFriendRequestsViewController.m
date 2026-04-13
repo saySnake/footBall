@@ -5,7 +5,9 @@
 
 #import "NewFriendRequestsViewController.h"
 #import <Masonry/Masonry.h>
+#import <SDWebImage/SDWebImage.h>
 #import "ColorManager.h"
+#import "SocialModels.h"
 
 #define kRequestGreen    [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0] // #285D4B
 #define kRequestHeaderBg [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0] // #0D2122
@@ -38,6 +40,7 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
                   message:(NSString *)message
                  isOnline:(BOOL)isOnline
                    status:(FriendRequestStatus)status;
+- (void)applyAvatarWithURLString:(nullable NSString *)urlString;
 @end
 
 @implementation FriendRequestCell
@@ -201,6 +204,37 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
             break;
     }
 }
+
+- (void)applyAvatarWithURLString:(NSString *)urlString {
+    NSString *trimmed = [urlString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmed.length == 0) {
+        [self.avatarView sd_cancelCurrentImageLoad];
+        if (@available(iOS 13.0, *)) {
+            self.avatarView.image = [UIImage systemImageNamed:@"person.crop.circle.fill"];
+            self.avatarView.tintColor = [UIColor colorWithWhite:0.7 alpha:1.0];
+        }
+        self.avatarView.contentMode = UIViewContentModeCenter;
+        return;
+    }
+    NSURL *url = [NSURL URLWithString:trimmed];
+    UIImage *ph = nil;
+    if (@available(iOS 13.0, *)) {
+        ph = [UIImage systemImageNamed:@"person.crop.circle.fill"];
+    }
+    __weak typeof(self) weakSelf = self;
+    [self.avatarView sd_setImageWithURL:url placeholderImage:ph completed:^(UIImage * _Nullable image, NSError * _Nullable error, SDImageCacheType cacheType, NSURL * _Nullable imageURL) {
+        if (image && !error) {
+            weakSelf.avatarView.contentMode = UIViewContentModeScaleAspectFill;
+            weakSelf.avatarView.tintColor = nil;
+        } else {
+            weakSelf.avatarView.contentMode = UIViewContentModeCenter;
+            if (@available(iOS 13.0, *)) {
+                weakSelf.avatarView.image = ph;
+                weakSelf.avatarView.tintColor = [UIColor colorWithWhite:0.7 alpha:1.0];
+            }
+        }
+    }];
+}
 @end
 
 @interface NewFriendRequestsViewController () <UITableViewDataSource, UITableViewDelegate, UITextFieldDelegate>
@@ -217,6 +251,59 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
 @end
 
 @implementation NewFriendRequestsViewController
+
+/// 按 timeGroup / createTime 拆成「最近三天」与「一周前」两 section
+- (void)applyFriendRequestsFromList:(NSArray<PNFriendRequest *> *)list {
+    NSMutableArray<PNFriendRequest *> *recent = [NSMutableArray array];
+    NSMutableArray<PNFriendRequest *> *older = [NSMutableArray array];
+    NSCalendar *cal = [NSCalendar currentCalendar];
+    NSDate *now = [NSDate date];
+    NSDate *threeDaysAgo = [cal dateByAddingUnit:NSCalendarUnitDay value:-3 toDate:now options:0];
+    for (PNFriendRequest *r in list) {
+        NSString *tg = (r.timeGroup ?: @"").uppercaseString;
+        if ([tg isEqualToString:@"OLDER"] || [tg isEqualToString:@"OLD"] || [tg isEqualToString:@"WEEK_AGO"]) {
+            [older addObject:r];
+            continue;
+        }
+        if ([tg isEqualToString:@"RECENT"] || [tg isEqualToString:@"THREE_DAYS"] || [tg isEqualToString:@"TODAY"] || [tg isEqualToString:@"RECENT_3_DAYS"]) {
+            [recent addObject:r];
+            continue;
+        }
+        NSDate *created = [self dateFromFriendAPIString:r.createTime];
+        if (!created) {
+            [recent addObject:r];
+            continue;
+        }
+        if ([created compare:threeDaysAgo] == NSOrderedDescending) {
+            [recent addObject:r];
+        } else {
+            [older addObject:r];
+        }
+    }
+    self.recentRequests = recent;
+    self.olderRequests = older;
+}
+
+- (NSDate *)dateFromFriendAPIString:(NSString *)s {
+    if (s.length == 0) return nil;
+    NSString *trimmed = [s stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (@available(iOS 11.0, *)) {
+        NSISO8601DateFormatter *iso = [[NSISO8601DateFormatter alloc] init];
+        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
+        NSDate *d = [iso dateFromString:trimmed];
+        if (d) return d;
+        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime;
+        d = [iso dateFromString:trimmed];
+        if (d) return d;
+    }
+    NSDateFormatter *f = [[NSDateFormatter alloc] init];
+    f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    f.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+    NSDate *d = [f dateFromString:trimmed];
+    if (d) return d;
+    f.dateFormat = @"yyyy-MM-dd'T'HH:mm:ssZ";
+    return [f dateFromString:trimmed];
+}
 
 - (void)viewDidLoad {
     self.hidesBottomBarWhenPushed = YES;
@@ -236,8 +323,7 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     [SocialRequest.shared getFriendRequestsSuccess:^(HTTPResponse * _Nullable responseObject) {
         PNFriendRequestPage *page = [responseObject.dataObject isKindOfClass:PNFriendRequestPage.class] ? responseObject.dataObject : nil;
         NSArray<PNFriendRequest *> *list = page.list ?: @[];
-        weakSelf.recentRequests = list.mutableCopy;
-        weakSelf.olderRequests = NSMutableArray.array;
+        [weakSelf applyFriendRequestsFromList:list];
         [weakSelf syncPendingCountWithCurrentRequests];
         [weakSelf.tableView reloadData];
     } failure:^(NSError * _Nonnull error) {
@@ -423,6 +509,7 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
                         message:@""
                        isOnline:user.online
                          status:FriendRequestStatusAdded];
+        [cell applyAvatarWithURLString:user.avatar];
         cell.acceptBtn.hidden = YES;
         cell.rejectBtn.hidden = YES;
         cell.statusBtn.hidden = NO;
@@ -440,6 +527,7 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
                     message:(request.message ?: @"")
                    isOnline:NO
                      status:status];
+    [cell applyAvatarWithURLString:request.fromUserAvatar];
     cell.acceptBtn.tag = tag;
     cell.rejectBtn.tag = tag;
     [cell.acceptBtn removeTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];

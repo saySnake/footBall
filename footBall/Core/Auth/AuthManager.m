@@ -111,6 +111,9 @@ static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
         }
         return;
     }
+#if DEBUG
+    NSLog(@"[Auth] refreshToken 请求前: %@", refreshToken.length ? refreshToken : @"(空)");
+#endif
     [[APIManager sharedManager] POST:APIPathValueRefreshToken parameters:@{@"refreshToken":refreshToken} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
             NSDictionary *data = responseObject.data;
@@ -121,6 +124,9 @@ static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
             self.user.refreshToken = refreshToken;
             self.user.expiresIn = expiresIn;
             [self saveUser];
+#if DEBUG
+            NSLog(@"[Auth] refreshToken 刷新后: %@", self.user.refreshToken.length ? self.user.refreshToken : @"(空)");
+#endif
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);
@@ -162,6 +168,13 @@ static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
     if (user && user.length > 0) {
         _user = [User yy_modelWithJSON:user];
         NSLog(@"📂 已从本地加载User");
+#if DEBUG
+        if (_user.refreshToken.length > 0) {
+            NSLog(@"[Auth] 本地 refreshToken: %@", _user.refreshToken);
+        } else {
+            NSLog(@"[Auth] 本地 refreshToken: (空)");
+        }
+#endif
     }
 }
 

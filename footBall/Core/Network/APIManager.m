@@ -11,6 +11,44 @@
 #import "APIError.h"
 #import <YYModel/YYModel.h>
 NSString * const TokenExpiredNotification = @"TokenExpiredNotification";
+
+#if DEBUG
+/// 单引号转义，便于拼进 shell 单引号包裹的 curl 片段
+static NSString *APIEscapeForCurl(NSString *s) {
+    if (s.length == 0) return @"";
+    return [s stringByReplacingOccurrencesOfString:@"'" withString:@"'\\''"];
+}
+
+/// 根据最终 NSURLRequest 打印可复制的 curl（含 -k，与当前 session 忽略证书策略一致）
+static void APIDebugPrintCurl(NSURLRequest *req, id parameters, NSString *methodStr) {
+    if (!req.URL) return;
+    NSString *verb = methodStr.length ? methodStr : (req.HTTPMethod.length ? req.HTTPMethod : @"GET");
+    NSMutableString *curl = [NSMutableString stringWithFormat:@"curl -k -X %@ '%@'", verb, APIEscapeForCurl(req.URL.absoluteString)];
+
+    NSDictionary *headers = req.allHTTPHeaderFields;
+    for (NSString *key in [headers.allKeys sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)]) {
+        NSString *val = headers[key];
+        [curl appendFormat:@" \\\n  -H '%@: %@'", APIEscapeForCurl(key), APIEscapeForCurl(val)];
+    }
+
+    NSData *body = req.HTTPBody;
+    NSString *uverb = verb.uppercaseString;
+    if (body.length == 0 && parameters && ([uverb isEqualToString:@"POST"] || [uverb isEqualToString:@"PUT"] || [uverb isEqualToString:@"PATCH"])) {
+        if ([parameters isKindOfClass:NSDictionary.class] || [parameters isKindOfClass:NSArray.class]) {
+            NSError *err = nil;
+            body = [NSJSONSerialization dataWithJSONObject:parameters options:0 error:&err];
+        }
+    }
+    if (body.length > 0) {
+        NSString *bodyStr = [[NSString alloc] initWithData:body encoding:NSUTF8StringEncoding];
+        if (!bodyStr) {
+            bodyStr = [NSString stringWithFormat:@"<binary %lu bytes>", (unsigned long)body.length];
+        }
+        [curl appendFormat:@" \\\n  -d '%@'", APIEscapeForCurl(bodyStr)];
+    }
+    NSLog(@"\n📡 [API curl] ─────────────────────────────────────────\n%@\n────────────────────────────────────────────────────────\n", curl);
+}
+#endif
 @interface APIManager ()
 
 @property (nonatomic, strong) AFHTTPSessionManager *sessionManager;
@@ -276,6 +314,10 @@ NSString * const TokenExpiredNotification = @"TokenExpiredNotification";
         }
     };
     
+#if DEBUG
+    APIDebugPrintCurl(interceptedRequest, parameters, [self HTTPMethodString:method]);
+#endif
+
     // 根据方法类型发起请求
     NSURLSessionDataTask *task = nil;
     

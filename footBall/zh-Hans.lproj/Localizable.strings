@@ -27,6 +27,7 @@
 "welcome" = "欢迎";
 "home_view_matches" = "查看赛事";
 "more_matches_title" = "更多比赛";
+"more_matches_favorite_no_id" = "比赛信息不完整，无法收藏";
 "tab_home" = "首页";
 "tab_discover" = "发现";
 "tab_location" = "位置";

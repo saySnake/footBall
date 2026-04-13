@@ -6,6 +6,71 @@
 //
 
 #import "SocialRequest.h"
+#import "SocialModels.h"
+#import <YYModel/YYModel.h>
+
+/// 兼容 data 为分页对象、或直接为数组
+static PNFriendRequestPage *PNFriendRequestPageFromAPIPayload(id data) {
+    if (!data) {
+        return nil;
+    }
+    if ([data isKindOfClass:NSArray.class]) {
+        PNFriendRequestPage *page = [PNFriendRequestPage new];
+        page.list = [NSArray yy_modelArrayWithClass:PNFriendRequest.class json:data] ?: @[];
+        page.total = page.list.count;
+        return page;
+    }
+    if ([data isKindOfClass:NSDictionary.class]) {
+        PNFriendRequestPage *page = [PNFriendRequestPage yy_modelWithJSON:data];
+        if (!page) {
+            page = [PNFriendRequestPage new];
+        }
+        if (page.list.count == 0) {
+            id list = [(NSDictionary *)data objectForKey:@"list"];
+            if (![list isKindOfClass:NSArray.class]) {
+                list = [(NSDictionary *)data objectForKey:@"records"] ?: [(NSDictionary *)data objectForKey:@"items"];
+            }
+            if ([list isKindOfClass:NSArray.class]) {
+                page.list = [NSArray yy_modelArrayWithClass:PNFriendRequest.class json:list] ?: @[];
+            }
+        }
+        return page;
+    }
+    return nil;
+}
+
+static PNFriendPage *PNFriendPageFromAPIPayload(id data) {
+    if (!data) {
+        return nil;
+    }
+    if ([data isKindOfClass:NSArray.class]) {
+        PNFriendPage *page = [PNFriendPage new];
+        page.list = [NSArray yy_modelArrayWithClass:PNFriend.class json:data] ?: @[];
+        page.total = page.list.count;
+        return page;
+    }
+    if ([data isKindOfClass:NSDictionary.class]) {
+        return [PNFriendPage yy_modelWithJSON:data];
+    }
+    return nil;
+}
+
+static NSInteger PNPendingFriendCountFromAPIPayload(id data) {
+    if ([data isKindOfClass:NSNumber.class]) {
+        return [(NSNumber *)data integerValue];
+    }
+    if ([data isKindOfClass:NSString.class]) {
+        return [(NSString *)data integerValue];
+    }
+    if ([data isKindOfClass:NSDictionary.class]) {
+        NSDictionary *d = data;
+        id v = d[@"count"] ?: d[@"pendingCount"] ?: d[@"pending"] ?: d[@"total"] ?: d[@"pending_count"];
+        if ([v respondsToSelector:@selector(integerValue)]) {
+            return [v integerValue];
+        }
+    }
+    return 0;
+}
 
 @implementation SocialRequest
 + (instancetype)shared {
@@ -20,7 +85,7 @@
 - (void)getFriendRequestsSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     [[APIManager sharedManager] GET:APIPathValueFriendsRequests parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            PNFriendRequestPage *page = [PNFriendRequestPage yy_modelWithJSON:responseObject.data];
+            PNFriendRequestPage *page = PNFriendRequestPageFromAPIPayload(responseObject.data);
             responseObject.dataObject = page;
             success(responseObject);
         }
@@ -33,7 +98,8 @@
 - (void)getFriendRequestsPendingCountSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     [[APIManager sharedManager] GET:APIPathValueFriendsRequestsPendingCount parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            responseObject.dataObject = @([responseObject.data respondsToSelector:@selector(integerValue)] ? [responseObject.data integerValue] : 0);
+            NSInteger n = PNPendingFriendCountFromAPIPayload(responseObject.data);
+            responseObject.dataObject = @(n);
             success(responseObject);
         }
         else failure([APIError errorWithResponse:responseObject]);
@@ -59,7 +125,7 @@
 - (void)getFriendsSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     [[APIManager sharedManager] GET:APIPathValueFriendsList parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            PNFriendPage *page = [PNFriendPage yy_modelWithJSON:responseObject.data];
+            PNFriendPage *page = PNFriendPageFromAPIPayload(responseObject.data);
             responseObject.dataObject = page;
             success(responseObject);
         }

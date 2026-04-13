@@ -8,13 +8,35 @@
 #import "RefreshPagHeader.h"
 #import <Masonry/Masonry.h>
 #import "ColorManager.h"
+#import "MatchRequest.h"
+#import "APIError.h"
+#import <QMUIKit/QMUITips.h>
 
 #define kHeaderGreen [UIColor colorWithRed:0.05 green:0.13 blue:0.13 alpha:1.0]
 #define kCardDarkerGreen [UIColor colorWithRed:0.17 green:0.42 blue:0.34 alpha:1.0]
 #define kCardLightGray [UIColor colorWithRed:0.96 green:0.96 blue:0.96 alpha:1.0]
-#define kScoreOvalBg [UIColor clearColor]
-#define kTimePillGreen [UIColor colorWithRed:0.94 green:0.97 blue:0.93 alpha:1.0]
+/// Figma 1:9843 赛程列表卡片：#F4F4F4
+#define kHomeMatchCardBg [UIColor colorWithRed:0.957 green:0.957 blue:0.957 alpha:1.0]
+#define kHomeMatchGreen [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0]
+#define kHomeTeamBadgeBg [UIColor colorWithRed:0.965 green:0.973 blue:0.996 alpha:1.0]
 static NSString *const kLogoPlaceholder = @"team_placeholder";
+
+/// 与「更多比赛」一致：收藏用 match_star
+static UIImage *kHomeFavoriteIcon(BOOL favorited) {
+    UIImage *asset = [UIImage imageNamed:@"match_star"];
+    if (asset) {
+        if (favorited) {
+            return [asset imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+        }
+        return [asset imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    }
+    if (@available(iOS 13.0, *)) {
+        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:20 weight:UIImageSymbolWeightRegular];
+        NSString *iconName = favorited ? @"star.fill" : @"star";
+        return [UIImage systemImageNamed:iconName withConfiguration:cfg];
+    }
+    return nil;
+}
 
 #pragma mark - 顶部球队 Cell
 @interface HomeTeamCell : UICollectionViewCell
@@ -60,7 +82,7 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
 }
 @end
 
-#pragma mark - 赛程卡片 Cell（含日期、比分/时间、06:30 胶囊、播放/收藏）
+#pragma mark - 赛程卡片 Cell（Figma 1:9843：日期下 — 队名+队徽 / 比分 / 队徽+队名；底行日期 + 时间胶囊 + 播放 + match_star）
 @interface MatchCell : UITableViewCell
 @property (nonatomic, strong) UIImageView *homeLogo;
 @property (nonatomic, strong) UIImageView *awayLogo;
@@ -76,99 +98,140 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
     if (self = [super initWithStyle:style reuseIdentifier:reuseIdentifier]) {
         self.selectionStyle = UITableViewCellSelectionStyleNone;
-        self.backgroundColor = kCardLightGray;
+        self.backgroundColor = [UIColor clearColor];
         UIView *card = [[UIView alloc] init];
-        card.backgroundColor = [UIColor colorWithWhite:0.91 alpha:1.0];
+        card.backgroundColor = kHomeMatchCardBg;
         card.layer.cornerRadius = 8;
+        card.clipsToBounds = YES;
         [self.contentView addSubview:card];
         [card mas_makeConstraints:^(MASConstraintMaker *make) {
             make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 16, 6, 16));
         }];
-        _dateLabel = [[UILabel alloc] init];
-        _dateLabel.font = [UIFont systemFontOfSize:11];
-        _dateLabel.textColor = [UIColor colorWithWhite:0.47 alpha:1.0];
+
+        UIView *homeBadge = [[UIView alloc] init];
+        homeBadge.backgroundColor = kHomeTeamBadgeBg;
+        homeBadge.layer.cornerRadius = 16;
+        homeBadge.clipsToBounds = YES;
+        UIView *awayBadge = [[UIView alloc] init];
+        awayBadge.backgroundColor = kHomeTeamBadgeBg;
+        awayBadge.layer.cornerRadius = 16;
+        awayBadge.clipsToBounds = YES;
+
         _homeLogo = [[UIImageView alloc] init];
         _awayLogo = [[UIImageView alloc] init];
+        _homeLogo.contentMode = _awayLogo.contentMode = UIViewContentModeScaleAspectFit;
+        _homeLogo.backgroundColor = [UIColor clearColor];
+        _awayLogo.backgroundColor = [UIColor clearColor];
+
         _homeLabel = [[UILabel alloc] init];
         _awayLabel = [[UILabel alloc] init];
-        UIView *scoreOval = [[UIView alloc] init];
-        scoreOval.backgroundColor = kScoreOvalBg;
-        scoreOval.layer.cornerRadius = 14;
+        _homeLabel.font = _awayLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
+        _homeLabel.textColor = _awayLabel.textColor = [UIColor blackColor];
+        _homeLabel.textAlignment = NSTextAlignmentRight;
+        _awayLabel.textAlignment = NSTextAlignmentLeft;
+        _homeLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+        _awayLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+
         _centerLabel = [[UILabel alloc] init];
-        _centerLabel.font = [UIFont boldSystemFontOfSize:16];
+        _centerLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightBold];
         _centerLabel.textAlignment = NSTextAlignmentCenter;
-        _centerLabel.textColor = [UIColor whiteColor];
-        [scoreOval addSubview:_centerLabel];
-        [_centerLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(scoreOval).insets(UIEdgeInsetsMake(4, 12, 4, 12));
-        }];
-        _timePill = [UIButton buttonWithType:UIButtonTypeSystem];
-        _timePill.titleLabel.font = [UIFont systemFontOfSize:12];
-        [_timePill setTitleColor:[UIColor darkGrayColor] forState:UIControlStateNormal];
-        _timePill.backgroundColor = kTimePillGreen;
-        _timePill.layer.cornerRadius = 10;
-        _playBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-        _bookmarkBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+        _centerLabel.textColor = [UIColor blackColor];
+
+        _dateLabel = [[UILabel alloc] init];
+        _dateLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+        _dateLabel.textColor = [UIColor colorWithRed:0.471 green:0.471 blue:0.471 alpha:1.0];
+
+        _timePill = [UIButton buttonWithType:UIButtonTypeCustom];
+        _timePill.userInteractionEnabled = NO;
+        _timePill.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+        [_timePill setTitleColor:kHomeMatchGreen forState:UIControlStateNormal];
+        _timePill.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.18];
+        _timePill.layer.cornerRadius = 12;
+        _timePill.layer.borderWidth = 0.5;
+        _timePill.layer.borderColor = kHomeMatchGreen.CGColor;
+        _timePill.contentEdgeInsets = UIEdgeInsetsMake(4, 8, 4, 8);
+
+        _playBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        _bookmarkBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        _bookmarkBtn.adjustsImageWhenHighlighted = NO;
+        _playBtn.adjustsImageWhenHighlighted = NO;
         if (@available(iOS 13.0, *)) {
-            [_playBtn setImage:[UIImage systemImageNamed:@"play.circle.fill"] forState:UIControlStateNormal];
-            [_bookmarkBtn setImage:[UIImage systemImageNamed:@"bookmark"] forState:UIControlStateNormal];
-            _playBtn.tintColor = [UIColor darkGrayColor];
-            _bookmarkBtn.tintColor = [UIColor darkGrayColor];
+            UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:18 weight:UIImageSymbolWeightRegular];
+            [_playBtn setImage:[UIImage systemImageNamed:@"play.circle" withConfiguration:cfg] forState:UIControlStateNormal];
+            _playBtn.tintColor = [UIColor colorWithRed:0.471 green:0.471 blue:0.471 alpha:1.0];
         }
-        _homeLabel.font = _awayLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
-        [card addSubview:_homeLogo];
+
         [card addSubview:_homeLabel];
-        [card addSubview:_dateLabel];
-        [card addSubview:scoreOval];
+        [card addSubview:homeBadge];
+        [homeBadge addSubview:_homeLogo];
+        [card addSubview:_centerLabel];
+        [card addSubview:awayBadge];
+        [awayBadge addSubview:_awayLogo];
         [card addSubview:_awayLabel];
-        [card addSubview:_awayLogo];
+        [card addSubview:_dateLabel];
         [card addSubview:_timePill];
         [card addSubview:_playBtn];
         [card addSubview:_bookmarkBtn];
-        [_homeLogo mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(card).offset(24);
-            make.centerY.equalTo(card).offset(-13);
-            make.width.height.mas_equalTo(24);
-        }];
+
         [_homeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_homeLogo.mas_trailing).offset(10);
-            make.centerY.equalTo(_homeLogo);
+            make.leading.equalTo(card).offset(12);
+            make.top.equalTo(card).offset(14);
+            make.width.mas_lessThanOrEqualTo(card.mas_width).multipliedBy(0.30);
         }];
+        [homeBadge mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(_homeLabel.mas_trailing).offset(8);
+            make.top.equalTo(card).offset(14);
+            make.width.height.mas_equalTo(32);
+        }];
+        [_homeLogo mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.center.equalTo(homeBadge);
+            make.width.height.mas_equalTo(18);
+        }];
+        [_centerLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(homeBadge.mas_trailing).offset(14);
+            make.centerY.equalTo(homeBadge);
+            make.width.mas_greaterThanOrEqualTo(52);
+        }];
+        [awayBadge mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(_centerLabel.mas_trailing).offset(14);
+            make.centerY.equalTo(homeBadge);
+            make.width.height.mas_equalTo(32);
+        }];
+        [_awayLogo mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.center.equalTo(awayBadge);
+            make.width.height.mas_equalTo(18);
+        }];
+        [_awayLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(awayBadge.mas_trailing).offset(6);
+            make.centerY.equalTo(homeBadge);
+            make.trailing.lessThanOrEqualTo(card).offset(-12);
+        }];
+
         [_dateLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_homeLabel);
-            make.top.equalTo(_homeLabel.mas_bottom).offset(14);
-        }];
-        [scoreOval mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.centerX.equalTo(card);
-            make.centerY.equalTo(card).offset(-13);
+            make.leading.equalTo(card).offset(33);
+            make.bottom.equalTo(card).offset(-12);
         }];
         [_timePill mas_makeConstraints:^(MASConstraintMaker *make) {
             make.centerX.equalTo(card);
-            make.top.equalTo(scoreOval.mas_bottom).offset(14);
+            make.centerY.equalTo(_dateLabel);
             make.height.mas_equalTo(24);
-            make.width.mas_greaterThanOrEqualTo(56);
-        }];
-        [_awayLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.trailing.equalTo(_awayLogo.mas_leading).offset(-10);
-            make.centerY.equalTo(_homeLogo);
-        }];
-        [_awayLogo mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.trailing.equalTo(_playBtn.mas_leading).offset(-12);
-            make.centerY.equalTo(card).offset(-13);
-            make.width.height.mas_equalTo(24);
         }];
         [_bookmarkBtn mas_makeConstraints:^(MASConstraintMaker *make) {
             make.trailing.equalTo(card).offset(-16);
-            make.bottom.equalTo(card).offset(-12);
+            make.centerY.equalTo(_dateLabel);
             make.width.height.mas_equalTo(20);
         }];
         [_playBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.trailing.equalTo(_bookmarkBtn.mas_leading).offset(-8);
-            make.centerY.equalTo(_bookmarkBtn);
+            make.trailing.equalTo(_bookmarkBtn.mas_leading).offset(-12);
+            make.centerY.equalTo(_dateLabel);
             make.width.height.mas_equalTo(20);
         }];
     }
     return self;
+}
+- (void)prepareForReuse {
+    [super prepareForReuse];
+    [_bookmarkBtn removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
 }
 @end
 
@@ -691,6 +754,7 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
     NSDate *date = [self dateFromRaw:raw];
     if (!date) return @"--";
     NSDateFormatter *fmt = NSDateFormatter.new;
+    fmt.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
     fmt.dateFormat = @"dd MMM, yyyy";
     return [fmt stringFromDate:date];
 }
@@ -744,14 +808,19 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
     UIView *v = [[UIView alloc] init];
     v.backgroundColor = kCardLightGray;
     UIImageView *cal = [[UIImageView alloc] init];
-    if (@available(iOS 13.0, *)) {
+    UIImage *calAsset = [UIImage imageNamed:@"Calendar"];
+    if (calAsset) {
+        cal.image = [calAsset imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+        cal.tintColor = [UIColor blackColor];
+    } else if (@available(iOS 13.0, *)) {
         cal.image = [UIImage systemImageNamed:@"calendar"];
-        cal.tintColor = [UIColor darkGrayColor];
+        cal.tintColor = [UIColor blackColor];
     }
     cal.contentMode = UIViewContentModeScaleAspectFit;
     [v addSubview:cal];
     UILabel *lab = [[UILabel alloc] init];
-    lab.text = [self sortedDates][section];
+    NSString *monthKey = [self sortedDates][section];
+    lab.text = [NSString stringWithFormat:@" %@", monthKey];
     lab.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
     lab.textColor = [UIColor blackColor];
     [v addSubview:lab];
@@ -780,20 +849,108 @@ static NSString *const kLogoPlaceholder = @"team_placeholder";
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     MatchCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MatchCell"];
     Match *m = [self modelAtIndexPath:indexPath];
-    cell.homeLabel.text = m.homeTeamName;
-    cell.awayLabel.text = m.awayTeamName;
+    cell.homeLabel.text = m.homeTeamName ?: @"";
+    cell.awayLabel.text = m.awayTeamName ?: @"";
     cell.dateLabel.text = [self dateDetailFromRaw:m.matchDate];
     [cell.timePill setTitle:[self timeTextFromRaw:m.matchDate] forState:UIControlStateNormal];
-    BOOL finished = [m.matchStatus isEqualToString:@"FINISHED"];
-    cell.centerLabel.text = finished ? [NSString stringWithFormat:@"%ld : %ld", (long)m.homeScore, (long)m.awayScore] : [self timeTextFromRaw:m.matchDate];
+    BOOL finished = [self home_isMatchFinished:m];
+    cell.centerLabel.text = finished ? [NSString stringWithFormat:@"%ld : %ld", (long)m.homeScore, (long)m.awayScore] : @"VS";
     [cell.homeLogo sd_setImageWithURL:[NSURL URLWithString:m.homeTeamLogo] placeholderImage:[UIImage imageNamed:kLogoPlaceholder]];
     [cell.awayLogo sd_setImageWithURL:[NSURL URLWithString:m.awayTeamLogo] placeholderImage:[UIImage imageNamed:kLogoPlaceholder]];
-    UIImage *img = [UIImage imageNamed:kLogoPlaceholder];
-    if (!img) {
+    UIImage *ph = [UIImage imageNamed:kLogoPlaceholder];
+    if (!ph) {
         cell.homeLogo.backgroundColor = [UIColor colorWithWhite:0.85 alpha:1.0];
         cell.awayLogo.backgroundColor = [UIColor colorWithWhite:0.85 alpha:1.0];
     }
+
+    UIImage *starImg = kHomeFavoriteIcon(m.favorited);
+    [cell.bookmarkBtn setImage:starImg forState:UIControlStateNormal];
+    if (m.favorited) {
+        cell.bookmarkBtn.tintColor = [UIColor clearColor];
+    } else {
+        cell.bookmarkBtn.tintColor = [UIColor colorWithRed:0.58 green:0.58 blue:0.58 alpha:1.0];
+    }
+    cell.bookmarkBtn.tag = (NSInteger)(indexPath.section * 10000 + indexPath.row);
+    [cell.bookmarkBtn removeTarget:self action:@selector(onHomeFavoriteTapped:) forControlEvents:UIControlEventTouchUpInside];
+    [cell.bookmarkBtn addTarget:self action:@selector(onHomeFavoriteTapped:) forControlEvents:UIControlEventTouchUpInside];
     return cell;
+}
+
+/// 与发现页逻辑接近：已结束赛事中间显示比分，未结束显示开球时间
+- (BOOL)home_isMatchFinished:(Match *)match {
+    NSString *st = match.matchStatus.uppercaseString;
+    if (st.length > 0) {
+        if ([st containsString:@"FINISH"] || [st containsString:@"COMPLETE"] || [st isEqualToString:@"FT"] || [st containsString:@"ENDED"]) {
+            return YES;
+        }
+        if ([st containsString:@"已结束"] || [st containsString:@"完赛"]) {
+            return YES;
+        }
+        if ([st containsString:@"SCHEDULE"] || [st containsString:@"UPCOM"] || [st isEqualToString:@"NS"] || [st containsString:@"LIVE"]) {
+            return NO;
+        }
+        if ([st containsString:@"未开始"] || [st containsString:@"未赛"] || [st containsString:@"待定"]) {
+            return NO;
+        }
+    }
+    NSDate *kickoff = [self dateFromRaw:match.matchDate];
+    if (!kickoff) {
+        return NO;
+    }
+    return [kickoff compare:[NSDate date]] == NSOrderedAscending;
+}
+
+- (NSString *)home_errorText:(NSError *)error defaultText:(NSString *)def {
+    if ([error isKindOfClass:[APIError class]]) {
+        APIError *ae = (APIError *)error;
+        if (ae.businessMessage.length > 0) {
+            return ae.businessMessage;
+        }
+    }
+    NSString *msg = error.localizedDescription;
+    return msg.length > 0 ? msg : def;
+}
+
+- (void)onHomeFavoriteTapped:(UIButton *)sender {
+    NSInteger tag = sender.tag;
+    NSInteger section = tag / 10000;
+    NSInteger row = tag % 10000;
+    NSIndexPath *indexPath = [NSIndexPath indexPathForRow:row inSection:section];
+    Match *match = [self modelAtIndexPath:indexPath];
+    if (match.matchId.length == 0) {
+        [QMUITips showError:NSLocalizedString(@"more_matches_favorite_no_id", nil) ?: @"比赛信息不完整，无法收藏"];
+        return;
+    }
+    sender.enabled = NO;
+    __weak typeof(self) weakSelf = self;
+    __weak UIButton *weakBtn = sender;
+    void (^reloadRow)(void) = ^{
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) {
+            return;
+        }
+        weakBtn.enabled = YES;
+        [self.tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationNone];
+    };
+    if (match.favorited) {
+        [[MatchRequest shared] unfavoriteMatch:match.matchId success:^(HTTPResponse * _Nullable responseObject) {
+            match.favorited = NO;
+            reloadRow();
+        } failure:^(NSError * _Nonnull error) {
+            weakBtn.enabled = YES;
+            __strong typeof(weakSelf) self = weakSelf;
+            [QMUITips showError:[self home_errorText:error defaultText:@"取消收藏失败"]];
+        }];
+    } else {
+        [[MatchRequest shared] favoriteMatch:match.matchId success:^(HTTPResponse * _Nullable responseObject) {
+            match.favorited = YES;
+            reloadRow();
+        } failure:^(NSError * _Nonnull error) {
+            weakBtn.enabled = YES;
+            __strong typeof(weakSelf) self = weakSelf;
+            [QMUITips showError:[self home_errorText:error defaultText:@"收藏失败"]];
+        }];
+    }
 }
 
 @end

@@ -389,13 +389,14 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
     [self buildHeader];
     [self buildBody];
     [self refreshDiscoverHeader];
-    [self loadRemoteData];
     [self switchToType:DiscoverMatchTypeUpcoming];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     [self refreshDiscoverHeader];
+    /// 每次进入发现页拉取关注球队比赛，保证「未来观赛 / 已经观赛」与后端一致（如刚关注球队后返回）
+    [self loadRemoteData];
 }
 
 - (void)viewDidLayoutSubviews {
@@ -933,6 +934,13 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
 
 - (void)loadRemoteData {
     __weak typeof(self) weakSelf = self;
+    if (!AuthManager.sharedManager.isLoggedIn) {
+        self.upcomingMatches = @[];
+        self.finishedMatches = @[];
+        [self refreshTabs];
+        [self applyStatistics:nil];
+        return;
+    }
     /// 接口：`/api/v1/matches/my-team` 返回关注球队相关比赛；客户端按 `matchStatus` / 开赛时间拆成「未来观赛」「已经观赛」
     [[MatchRequest shared] getMyTeamMatchesWithPage:1 pageSize:50 success:^(HTTPResponse * _Nullable responseObject) {
         NSArray *matches = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
@@ -945,6 +953,34 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
                 [upList addObject:m];
             }
         }
+        [upList sortUsingComparator:^NSComparisonResult(Match *a, Match *b) {
+            NSDate *da = [weakSelf dateFromRaw:a.matchDate];
+            NSDate *db = [weakSelf dateFromRaw:b.matchDate];
+            if (!da && !db) {
+                return NSOrderedSame;
+            }
+            if (!da) {
+                return NSOrderedDescending;
+            }
+            if (!db) {
+                return NSOrderedAscending;
+            }
+            return [da compare:db];
+        }];
+        [finList sortUsingComparator:^NSComparisonResult(Match *a, Match *b) {
+            NSDate *da = [weakSelf dateFromRaw:a.matchDate];
+            NSDate *db = [weakSelf dateFromRaw:b.matchDate];
+            if (!da && !db) {
+                return NSOrderedSame;
+            }
+            if (!da) {
+                return NSOrderedAscending;
+            }
+            if (!db) {
+                return NSOrderedDescending;
+            }
+            return [db compare:da];
+        }];
         weakSelf.upcomingMatches = [weakSelf discoverMatchesFrom:upList type:DiscoverMatchTypeUpcoming];
         weakSelf.finishedMatches = [weakSelf discoverMatchesFrom:finList type:DiscoverMatchTypeFinished];
         [weakSelf refreshTabs];
@@ -968,7 +1004,13 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
         if ([st containsString:@"FINISH"] || [st containsString:@"COMPLETE"] || [st isEqualToString:@"FT"] || [st containsString:@"ENDED"]) {
             return YES;
         }
+        if ([st containsString:@"已结束"] || [st containsString:@"完赛"] || [st containsString:@"已完"]) {
+            return YES;
+        }
         if ([st containsString:@"SCHEDULE"] || [st containsString:@"UPCOM"] || [st isEqualToString:@"NS"] || [st containsString:@"LIVE"]) {
+            return NO;
+        }
+        if ([st containsString:@"未开始"] || [st containsString:@"未赛"] || [st containsString:@"待定"]) {
             return NO;
         }
     }
