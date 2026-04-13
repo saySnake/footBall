@@ -27,6 +27,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) NSString *unlockCondition;
 /// 获取时间
 @property (nonatomic, copy, nullable) NSString *acquiredTime;
+
+@property (nonatomic, copy) NSString *position;
 @end
 
 /// StampCollectionVO.StampCategoryItemVO — 带邮票列表的分类块

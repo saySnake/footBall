@@ -13,9 +13,12 @@
 #import <SDWebImage/SDWebImage.h>
 #import "StampRequest.h"
 #import "StampModels.h"
+#define STAMP_SECTION_COUNT  1000
+#define STAMP_SECTION_ITEMS  15
+#define STAMP_ITEAM_FREE  5
 
 static UIColor *PassportSheetsNavBg(void) {
-    return [UIColor colorWithRed:0.05 green:0.05 blue:0.06 alpha:1.0];
+    return [UIColor colorWithHexString:@"#0D2122"];
 }
 
 static UIColor *PassportSheetsListBg(void) {
@@ -23,9 +26,64 @@ static UIColor *PassportSheetsListBg(void) {
 }
 
 #pragma mark - Stamp sheet grid
+@interface PassportStampGridItem : NSObject
+@property (nonatomic, assign) BOOL unlocked;
+@property (nonatomic, strong, nullable) PNStampAlbumItem *stamp;
+@end
+@implementation PassportStampGridItem
+@end
+typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
+    PassportStampGridItemViewStateAdd,//添加
+    PassportStampGridItemViewStateUnlock,//解锁
+    PassportStampGridItemViewStateUpdate,//更换
+    PassportStampGridItemViewStateDelete//长按等待删除
+};
+@interface PassportStampGridItemView : UIButton
+@property (nonatomic, strong) UIImageView *lockView;
+@property (nonatomic, strong) PassportStampGridItem *item;
+@property (nonatomic, assign) PassportStampGridItemViewState stampState;
+@end
+@implementation PassportStampGridItemView
+- (instancetype)initWithFrame:(CGRect)frame
+{
+    self = [super initWithFrame:frame];
+    if (self) {
+        _lockView = [UIImageView.alloc initWithImage:[UIImage imageNamed:@"lock_icon"]];
+        [self addSubview:_lockView];
+        [_lockView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.center.equalTo(self);
+        }];
+    }
+    return self;
+}
+- (void)setItem:(PassportStampGridItem *)item {
+    _item = item;
+    if (item.unlocked) {
+        self.backgroundColor = [UIColor colorWithHexString:@"#9C9C9C"];
+        self.lockView.image = [UIImage imageNamed:@"stamp_add"];
+        self.lockView.hidden = (item.stamp != nil);
+        if (item.stamp) {
+            [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
+        } else {
+            [self sd_cancelImageLoadForState:UIControlStateNormal];
+            [self setImage:nil forState:UIControlStateNormal];
+        }
+    } else {
+        self.backgroundColor = [UIColor colorWithHexString:@"#E9E9E9"];
+        self.lockView.image = [UIImage imageNamed:@"lock_icon"];
+        self.lockView.hidden = NO;
+        [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
+    }
+}
+@end
 @interface PassportStampSheetGridView : UIView
-@property (nonatomic, copy) NSArray<PNStampAlbumItem *> *items;
-- (void)configureWithItems:(NSArray<PNStampAlbumItem *> *)items;
+@property (nonatomic, copy) NSArray<PassportStampGridItem *> *items;
+@property (nonatomic, copy) void (^onClickAdd)(NSInteger index,PassportStampGridItem *item);
+@property (nonatomic, copy) void (^onClickLock)(NSInteger index,PassportStampGridItem *item);
+@property (nonatomic, copy) void (^onClickStamp)(NSInteger index,PassportStampGridItem *item);
+@property (nonatomic, copy) void (^onClickDelete)(NSInteger index,PassportStampGridItem *item);
+
+- (void)configureWithItems:(NSArray<PassportStampGridItem *> *)items;
 @end
 @implementation PassportStampSheetGridView
 - (instancetype)initWithFrame:(CGRect)frame
@@ -33,14 +91,14 @@ static UIColor *PassportSheetsListBg(void) {
     self = [super initWithFrame:frame];
     if (self) {
         NSInteger rowItemCount = 5;
-        UIImageView *preItem = nil;
+        PassportStampGridItemView *preItem = nil;
         CGFloat itemHorMargin = (SCREEN_WIDTH - 32 - 20 - rowItemCount*50)/(rowItemCount-1);
-        for (int i = 0; i<15; i++) {
-            UIImageView *item = UIImageView.alloc.init;
+        for (int i = 0; i<STAMP_SECTION_ITEMS; i++) {
+            PassportStampGridItemView *item = PassportStampGridItemView.alloc.init;
             item.tag = 0x900 + i;
-            item.image = [UIImage imageNamed:@"stamp_add"];
             item.layer.cornerRadius = 25;
             item.clipsToBounds = YES;
+            [item addTarget:self action:@selector(onClick:) forControlEvents:UIControlEventTouchUpInside];
             [self addSubview:item];
             [item mas_makeConstraints:^(MASConstraintMaker *make) {
                 make.width.height.equalTo(@50);
@@ -67,34 +125,31 @@ static UIColor *PassportSheetsListBg(void) {
     }
     return self;
 }
-
-- (void)configureWithItems:(NSArray<PNStampAlbumItem *> *)items {
+- (void)onClick:(PassportStampGridItemView *)sender {
+    
+}
+- (void)configureWithItems:(NSArray<PassportStampGridItem *> *)items {
     self.items = items ?: @[];
-    for (int i = 0; i < 15; i++) {
-        UIImageView *iv = (UIImageView *)[self viewWithTag:0x900 + i];
-        if (![iv isKindOfClass:UIImageView.class]) {
+    for (int i = 0; i < items.count; i++) {
+        PassportStampGridItemView *iv = (PassportStampGridItemView *)[self viewWithTag:0x900 + i];
+        if (![iv isKindOfClass:PassportStampGridItemView.class]) {
             continue;
         }
-        if (i < (int)self.items.count) {
-            PNStampAlbumItem *it = self.items[(NSUInteger)i];
-            if (it.image.length > 0) {
-                [iv sd_setImageWithURL:[NSURL URLWithString:it.image] placeholderImage:[UIImage imageNamed:@"stamp_add"]];
-            } else {
-                [iv sd_cancelCurrentImageLoad];
-                iv.image = [UIImage imageNamed:@"stamp_add"];
-            }
-            iv.alpha = it.unlocked ? 1.0 : 0.35;
-        } else {
-            [iv sd_cancelCurrentImageLoad];
-            iv.image = [UIImage imageNamed:@"stamp_add"];
-            iv.alpha = 1.0;
-        }
+        PassportStampGridItem *it = self.items[(NSUInteger)i];
+        iv.item = it;
     }
 }
 
 @end
 
 #pragma mark - Header2 card (first row)
+@interface PassportStampSheetCardItem : NSObject
+@property (nonatomic, strong) NSArray <PassportStampGridItem *> *topItems;
+@property (nonatomic, strong) NSArray <PassportStampGridItem *> *bottomItems;
+@end
+@implementation PassportStampSheetCardItem
+
+@end
 
 @interface PassportHeader2Card : UIView
 @property (nonatomic, strong) UIView *card;
@@ -175,18 +230,17 @@ static UIColor *PassportSheetsListBg(void) {
 - (void)configureWithModel:(PassportViewModel *)model {
     [self.header2 configureWithModel:model];
 }
-
+- (void)configureWithSectionItem:(PassportStampSheetCardItem *)item {
+    [self.bottomGridView configureWithItems:item.bottomItems];
+}
 @end
 
 #pragma mark - Stamp sheet placeholder (5×3 grid)
-
 @interface PassportStampSheetCardCell : UITableViewCell
 @property (nonatomic, strong) UIView *card;
 @property (nonatomic, strong) PassportStampSheetGridView *topGridView;
 @property (nonatomic, strong) PassportStampSheetGridView *bottomGridView;
-@property (nonatomic, strong) UILabel *categoryTitleLabel;
-@property (nonatomic, strong) UILabel *categoryProgressLabel;
-
+- (void)configureWithSectionItem:(PassportStampSheetCardItem *)item;
 @end
 
 @implementation PassportStampSheetCardCell
@@ -213,28 +267,11 @@ static UIColor *PassportSheetsListBg(void) {
             make.height.mas_equalTo(10);
             make.leading.trailing.equalTo(_card).insets(UIEdgeInsetsMake(0, 10, 0, 10));
         }];
-        self.categoryTitleLabel = [[UILabel alloc] init];
-        self.categoryTitleLabel.font = FontManager.sharedManager.font16Bold;
-        self.categoryTitleLabel.textColor = [UIColor colorWithHexString:@"#285D4B"];
-        [_card addSubview:self.categoryTitleLabel];
-        self.categoryProgressLabel = [[UILabel alloc] init];
-        self.categoryProgressLabel.font = FontManager.sharedManager.font14Regular;
-        self.categoryProgressLabel.textColor = [UIColor colorWithHexString:@"#34343B"];
-        self.categoryProgressLabel.textAlignment = NSTextAlignmentRight;
-        [_card addSubview:self.categoryProgressLabel];
-        [self.categoryTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.left.equalTo(_card).offset(16);
-            make.top.equalTo(_card).offset(26);
-        }];
-        [self.categoryProgressLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.right.equalTo(_card).offset(-16);
-            make.centerY.equalTo(self.categoryTitleLabel);
-        }];
 
         self.topGridView = PassportStampSheetGridView.alloc.init;
         [_card addSubview:self.topGridView];
         [self.topGridView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(self.categoryTitleLabel.mas_bottom).offset(10);
+            make.top.equalTo(sepTop.mas_bottom).offset(10);
             make.height.mas_equalTo(200);
             make.leading.trailing.equalTo(_card).insets(UIEdgeInsetsMake(0, 10, 0, 10));
         }];
@@ -267,11 +304,9 @@ static UIColor *PassportSheetsListBg(void) {
     return self;
 }
 
-- (void)configureWithCategory:(PNStampCategorySection *)category {
-    self.categoryTitleLabel.text = category.name ?: @"";
-    self.categoryProgressLabel.text = [NSString stringWithFormat:@"%ld/%ld", (long)category.collectedCount, (long)category.totalCount];
-    [self.topGridView configureWithItems:category.stamps ?: @[]];
-    [self.bottomGridView configureWithItems:@[]];
+- (void)configureWithSectionItem:(PassportStampSheetCardItem *)item {
+    [self.topGridView configureWithItems:item.topItems];
+    [self.bottomGridView configureWithItems:item.bottomItems];
 }
 
 
@@ -286,10 +321,11 @@ static UIColor *PassportSheetsListBg(void) {
 @property (nonatomic, strong) UIView *topBar;
 @property (nonatomic, strong) UIButton *backButton;
 @property (nonatomic, strong) UILabel *titleLabel;
-@property (nonatomic, strong) UIButton *refreshButton;
+@property (nonatomic, strong) UIButton *shareButton;
 @property (nonatomic, strong) UITableView *tableView;
-@property (nonatomic, strong, nullable) PNStampCollection *stampCollection;
-@property (nonatomic, copy) NSArray<PNStampCategorySection *> *stampCategories;
+@property (nonatomic, strong) PassportHeader2Card *headerCard;
+@property (nonatomic, strong) NSArray <PassportStampSheetCardItem *> *items;
+
 @end
 
 @implementation PassportSheetsViewController
@@ -310,7 +346,7 @@ static UIColor *PassportSheetsListBg(void) {
 
     [self buildTopBar];
     [self buildTable];
-    [self reloadStampRows];
+    [self reloadStamps:@[]];
     [self loadStampCollection];
 }
 
@@ -334,17 +370,17 @@ static UIColor *PassportSheetsListBg(void) {
     _titleLabel.textColor = [UIColor whiteColor];
     _titleLabel.text = NSLocalizedString(@"passport_nav_title", nil) ?: @"我的护照";
 
-    _refreshButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    _shareButton = [UIButton buttonWithType:UIButtonTypeSystem];
     if (@available(iOS 13.0, *)) {
         UIImage *img = [UIImage imageNamed:@"passport_share"];
-        [_refreshButton setImage:[img imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+        [_shareButton setImage:[img imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
     }
-    _refreshButton.tintColor = [UIColor whiteColor];
-    [_refreshButton addTarget:self action:@selector(loadPassportData) forControlEvents:UIControlEventTouchUpInside];
+    _shareButton.tintColor = [UIColor whiteColor];
+    [_shareButton addTarget:self action:@selector(share) forControlEvents:UIControlEventTouchUpInside];
 
     [_topBar addSubview:_backButton];
     [_topBar addSubview:_titleLabel];
-    [_topBar addSubview:_refreshButton];
+    [_topBar addSubview:_shareButton];
 
     [_topBar mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.leading.trailing.equalTo(self.view);
@@ -355,7 +391,7 @@ static UIColor *PassportSheetsListBg(void) {
         make.bottom.equalTo(_topBar).offset(-8);
         make.width.height.mas_equalTo(36);
     }];
-    [_refreshButton mas_makeConstraints:^(MASConstraintMaker *make) {
+    [_shareButton mas_makeConstraints:^(MASConstraintMaker *make) {
         make.trailing.equalTo(_topBar).offset(-8);
         make.centerY.equalTo(_backButton);
         make.width.height.mas_equalTo(36);
@@ -379,6 +415,8 @@ static UIColor *PassportSheetsListBg(void) {
     [self.view addSubview:_tableView];
 
     PassportHeader2Card *header = [PassportHeader2Card.alloc initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH, 516)];
+    [header configureWithModel:self.viewModel];
+    self.headerCard = header;
     self.tableView.tableHeaderView = header;
     
     [_tableView mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -389,7 +427,62 @@ static UIColor *PassportSheetsListBg(void) {
     [_tableView registerClass:[PassportStampSheetCardCell class] forCellReuseIdentifier:@"stamp"];
 }
 
-- (void)reloadStampRows {
+- (void)reloadStamps:(NSArray <PNStampAlbumItem *> *)stamps {
+    //第一组 tableView headerView
+    PassportStampSheetCardItem *headerItem = PassportStampSheetCardItem.alloc.init;
+    NSMutableArray *subItem = [NSMutableArray arrayWithCapacity:STAMP_SECTION_ITEMS];
+    for (int j=0; j<STAMP_SECTION_ITEMS; j++) {
+        PassportStampGridItem *gridItem1 = PassportStampGridItem.alloc.init;
+        if (j<STAMP_ITEAM_FREE) {
+            gridItem1.unlocked = YES;
+        }
+        [subItem addObject:gridItem1];
+    }
+    headerItem.bottomItems = subItem;
+    [self.headerCard configureWithSectionItem:headerItem];
+    //一个cell对应两组， tableView dataSource
+    NSMutableArray *array = [NSMutableArray arrayWithCapacity:STAMP_SECTION_COUNT];
+    for (int i=0; i<STAMP_SECTION_COUNT; i++) {
+        PassportStampSheetCardItem *item = PassportStampSheetCardItem.alloc.init;
+        NSMutableArray *subItem1 = [NSMutableArray arrayWithCapacity:STAMP_SECTION_ITEMS];
+        NSMutableArray *subItem2 = [NSMutableArray arrayWithCapacity:STAMP_SECTION_ITEMS];
+        for (int j=0; j<STAMP_SECTION_ITEMS; j++) {
+            PassportStampGridItem *gridItem1 = PassportStampGridItem.alloc.init;
+            [subItem1 addObject:gridItem1];
+            PassportStampGridItem *gridItem2 = PassportStampGridItem.alloc.init;
+            [subItem2 addObject:gridItem2];
+        }
+        item.topItems = subItem1;
+        item.bottomItems = subItem2;
+        [array addObject:item];
+    }
+    self.items = array.copy;
+    
+    //e.g stamp position = "3,10"
+    // row 0 => section 2 & 3
+    // row 1 => section 4 & 5
+    // row 2 => section 6 & 7
+    // NSInteger row = (section - 2) / 2;
+    // NSInteger section = row * 2 + 2 + (0 or 1)
+    for (int i = 0; i<stamps.count; i++) {
+        NSArray <NSString *> *position = [stamps[i].position componentsSeparatedByString:@","];
+        if (position.count == 2) {
+            NSInteger section = position.firstObject.integerValue;
+            NSInteger index = position.lastObject.integerValue;
+            if (section < 2) {
+                headerItem.bottomItems[index].stamp = stamps[i];
+            } else {
+                NSInteger row = (section - 2) / 2;
+                PassportStampSheetCardItem *item = self.items[row];
+                if (section%2 == 0) {
+                    item.topItems[index].stamp = stamps[i];
+                } else {
+                    item.bottomItems[index].stamp = stamps[i];
+                }
+            }
+            
+        }
+    }
     [self.tableView reloadData];
 }
 
@@ -397,29 +490,16 @@ static UIColor *PassportSheetsListBg(void) {
     __weak typeof(self) weakSelf = self;
     [[StampRequest shared] getStampCollectionSuccess:^(HTTPResponse * _Nullable responseObject) {
         PNStampCollection *c = (PNStampCollection *)responseObject.dataObject;
-        weakSelf.stampCollection = c;
-        weakSelf.stampCategories = c.categories ?: @[];
 
-        [weakSelf reloadStampRows];
+        [weakSelf reloadStamps:@[]];
     } failure:^(NSError * _Nonnull error) {
         // 页面不阻塞：保持空列表即可
         [QMUITips showError:error.localizedDescription];
     }];
 }
-
-- (void)loadPassportData {
-    __weak typeof(self) weakSelf = self;
-    [self showLoading];
-    NSString *y = [NSString stringWithFormat:@"%ld", (long)self.year];
-    [[ProfileRequest shared] getMyPassportWithYear:y success:^(HTTPResponse * _Nullable responseObject) {
-        [weakSelf hideLoading];
-        PNPassport *p = responseObject.dataObject;
-        weakSelf.viewModel = [PassportViewModel viewModelWithPassport:p year:weakSelf.year];
-        [weakSelf.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:0 inSection:0]] withRowAnimation:UITableViewRowAnimationNone];
-    } failure:^(NSError * _Nonnull error) {
-        [weakSelf hideLoading];
-        [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
-    }];
+// 分享
+- (void)share {
+    
 }
 
 - (void)onBack {
@@ -429,14 +509,12 @@ static UIColor *PassportSheetsListBg(void) {
 #pragma mark - UITableView
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    return self.stampCategories.count;
+    return self.items.count;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     PassportStampSheetCardCell *c = [tableView dequeueReusableCellWithIdentifier:@"stamp" forIndexPath:indexPath];
-    if (indexPath.row < self.stampCategories.count) {
-        [c configureWithCategory:self.stampCategories[(NSUInteger)indexPath.row]];
-    }
+    [c configureWithSectionItem:self.items[indexPath.row]];
     return c;
 }
 
