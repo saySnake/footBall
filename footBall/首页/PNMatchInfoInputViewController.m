@@ -14,6 +14,22 @@ static UIColor *PNInputGreenColor(void) {
     return [ColorManager sharedManager].primaryColor;
 }
 
+static UIColor *PNInputFieldBgColor(void) {
+    return [UIColor colorWithRed:0.965 green:0.965 blue:0.965 alpha:1.0]; // #F6F6F6
+}
+
+static UIColor *PNInputPlaceholderColor(void) {
+    return [UIColor colorWithRed:0.435 green:0.435 blue:0.435 alpha:1.0]; // #6F6F6F
+}
+
+static UIColor *PNInputPillTextColor(void) {
+    return [UIColor colorWithRed:0.435 green:0.435 blue:0.435 alpha:1.0];
+}
+
+static CGFloat PNInputSectionSpacing(void) {
+    return 20.0;
+}
+
 @interface PNMatchInfoInputViewController () <UITextViewDelegate, UITextFieldDelegate>
 @property (nonatomic, strong) UIView *dimmingView;
 @property (nonatomic, strong) UIView *cardView;
@@ -50,6 +66,15 @@ static UIColor *PNInputGreenColor(void) {
 
 @implementation PNMatchInfoInputViewController
 
+- (void)pn_applyPillButton:(UIButton *)button selected:(BOOL)selected {
+    button.selected = selected;
+    button.layer.borderWidth = selected ? 1 : 0;
+    button.layer.borderColor = selected ? PNInputGreenColor().CGColor : UIColor.clearColor.CGColor;
+    button.backgroundColor = selected ? [UIColor whiteColor] : PNInputFieldBgColor();
+    button.titleLabel.font = [UIFont systemFontOfSize:12 weight:(selected ? UIFontWeightMedium : UIFontWeightRegular)];
+    [button setTitleColor:(selected ? PNInputGreenColor() : PNInputPillTextColor()) forState:UIControlStateNormal];
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = [UIColor clearColor];
@@ -57,7 +82,7 @@ static UIColor *PNInputGreenColor(void) {
     
     [self buildUI];
     [self fillDefaultValues];
-    [self.emotionButton setTitle:[self.selectedEmotion stringByAppendingString:@" "] forState:UIControlStateNormal];
+    [self.emotionButton setTitle:@"选择情绪" forState:UIControlStateNormal];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -104,7 +129,7 @@ static UIColor *PNInputGreenColor(void) {
 
 - (void)buildUI {
     UIView *dim = [[UIView alloc] init];
-    dim.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.35];
+    dim.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.5];
     [self.view addSubview:dim];
     self.dimmingView = dim;
     [dim mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -114,7 +139,7 @@ static UIColor *PNInputGreenColor(void) {
     
     UIView *card = [[UIView alloc] init];
     card.backgroundColor = [UIColor whiteColor];
-    card.layer.cornerRadius = 18;
+    card.layer.cornerRadius = 24;
     card.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
     card.layer.masksToBounds = YES;
     [self.view addSubview:card];
@@ -129,14 +154,14 @@ static UIColor *PNInputGreenColor(void) {
     }];
     
     UIView *handle = [[UIView alloc] init];
-    handle.backgroundColor = [UIColor colorWithWhite:0.85 alpha:1.0];
-    handle.layer.cornerRadius = 2;
+    handle.backgroundColor = [UIColor colorWithRed:0.831 green:0.831 blue:0.831 alpha:1.0];
+    handle.layer.cornerRadius = 2.5;
     [card addSubview:handle];
     [handle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(card).offset(8);
         make.centerX.equalTo(card);
-        make.width.mas_equalTo(40);
-        make.height.mas_equalTo(4);
+        make.width.mas_equalTo(84);
+        make.height.mas_equalTo(5);
     }];
     
     UILabel *title = [[UILabel alloc] init];
@@ -145,26 +170,32 @@ static UIColor *PNInputGreenColor(void) {
     title.textAlignment = NSTextAlignmentCenter;
     [card addSubview:title];
     [title mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(handle.mas_bottom).offset(10);
+        make.top.equalTo(handle.mas_bottom).offset(12);
         make.centerX.equalTo(card);
     }];
     
     // 使用 Custom 类型避免系统蓝色高亮背景
     UIButton *emotionBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    [emotionBtn setTitle:@"选择情绪 " forState:UIControlStateNormal];
-    [emotionBtn setTitleColor:[UIColor darkGrayColor] forState:UIControlStateNormal];
-    emotionBtn.titleLabel.font = [UIFont systemFontOfSize:13];
-    emotionBtn.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+    [emotionBtn setTitle:@"选择情绪" forState:UIControlStateNormal];
+    [emotionBtn setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+    emotionBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightBold];
+    emotionBtn.backgroundColor = PNInputFieldBgColor();
     emotionBtn.layer.cornerRadius = 16;
-    if (@available(iOS 13.0, *)) {
-        UIImage *chevron = [UIImage systemImageNamed:@"chevron.down"];
-        if (chevron) {
-            [emotionBtn setImage:[chevron imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
-            emotionBtn.tintColor = [UIColor darkGrayColor];
+    UIImage *teamAd = [UIImage imageNamed:@"teamAd"];
+    if (teamAd) {
+        [emotionBtn setImage:[teamAd imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal] forState:UIControlStateNormal];
+        emotionBtn.semanticContentAttribute = UISemanticContentAttributeForceRightToLeft;
+        emotionBtn.imageEdgeInsets = UIEdgeInsetsMake(0, 6, 0, -2);
+    } else if (@available(iOS 13.0, *)) {
+        UIImage *plus = [UIImage systemImageNamed:@"plus.circle.fill"];
+        if (plus) {
+            [emotionBtn setImage:[plus imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+            emotionBtn.tintColor = [UIColor colorWithWhite:0.72 alpha:1.0];
             emotionBtn.semanticContentAttribute = UISemanticContentAttributeForceRightToLeft;
-            emotionBtn.imageEdgeInsets = UIEdgeInsetsMake(0, 4, 0, 0);
+            emotionBtn.imageEdgeInsets = UIEdgeInsetsMake(0, 6, 0, -2);
         }
     }
+    emotionBtn.contentEdgeInsets = UIEdgeInsetsMake(0, 10, 0, 10);
     // 去掉高亮时的系统效果
     emotionBtn.adjustsImageWhenHighlighted = NO;
     emotionBtn.showsTouchWhenHighlighted = NO;
@@ -175,7 +206,7 @@ static UIColor *PNInputGreenColor(void) {
         make.centerY.equalTo(title);
         make.trailing.equalTo(card).offset(-16);
         make.height.mas_equalTo(32);
-        make.width.mas_greaterThanOrEqualTo(100);
+        make.width.mas_equalTo(84);
     }];
     
     // 情绪面板先添加（在底层），scroll 后添加（在上层），保证默认时 scroll 可正常滑动
@@ -252,7 +283,7 @@ static UIColor *PNInputGreenColor(void) {
     [card addSubview:scroll];
     self.scrollView = scroll;
     [scroll mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(title.mas_bottom).offset(8);
+        make.top.equalTo(title.mas_bottom).offset(14);
         make.leading.trailing.equalTo(card);
         // 设计要求底部完全贴合，不再预留额外白色区域
         if (@available(iOS 11.0, *)) {
@@ -280,7 +311,7 @@ static UIColor *PNInputGreenColor(void) {
     // 比赛输入（content 直接从这里开始，不依赖 emotionPanel）
     UILabel *matchTitle = [[UILabel alloc] init];
     matchTitle.text = @"比赛";
-    matchTitle.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    matchTitle.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [content addSubview:matchTitle];
     [matchTitle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(content).offset(0);
@@ -288,12 +319,15 @@ static UIColor *PNInputGreenColor(void) {
     }];
     
     UITextField *matchField = [[UITextField alloc] init];
-    matchField.placeholder = @"请输入";
+    matchField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"请输入" attributes:@{
+        NSForegroundColorAttributeName: PNInputPlaceholderColor(),
+        NSFontAttributeName: [UIFont systemFontOfSize:14 weight:UIFontWeightMedium]
+    }];
     matchField.font = [UIFont systemFontOfSize:14];
     matchField.borderStyle = UITextBorderStyleNone;
-    matchField.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+    matchField.backgroundColor = PNInputFieldBgColor();
     matchField.layer.cornerRadius = 8;
-    matchField.leftView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 12, 1)];
+    matchField.leftView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 16, 1)];
     matchField.leftViewMode = UITextFieldViewModeAlways;
     // 键盘为默认文字键盘，Return 为「完成」，方便收起键盘
     matchField.keyboardType = UIKeyboardTypeDefault;
@@ -311,16 +345,16 @@ static UIColor *PNInputGreenColor(void) {
         make.top.equalTo(matchTitle.mas_bottom).offset(8);
         make.leading.equalTo(content).offset(18);
         make.trailing.equalTo(content).offset(-18);
-        make.height.mas_equalTo(44);
+        make.height.mas_equalTo(50);
     }];
     
     // 观赛信息
     UILabel *watchTitle = [[UILabel alloc] init];
     watchTitle.text = @"观赛信息";
-    watchTitle.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    watchTitle.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [content addSubview:watchTitle];
     [watchTitle mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(matchField.mas_bottom).offset(18);
+        make.top.equalTo(matchField.mas_bottom).offset(PNInputSectionSpacing());
         make.leading.equalTo(content).offset(18);
     }];
     
@@ -333,10 +367,10 @@ static UIColor *PNInputGreenColor(void) {
     // 座位
     UILabel *seatTitle = [[UILabel alloc] init];
     seatTitle.text = @"座位";
-    seatTitle.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    seatTitle.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [content addSubview:seatTitle];
     [seatTitle mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(((UIButton *)self.watchButtons.lastObject).mas_bottom).offset(18);
+        make.top.equalTo(((UIButton *)self.watchButtons.lastObject).mas_bottom).offset(PNInputSectionSpacing());
         make.leading.equalTo(content).offset(18);
     }];
     
@@ -349,10 +383,10 @@ static UIColor *PNInputGreenColor(void) {
     // 观赛身份（多选）
     UILabel *idTitle = [[UILabel alloc] init];
     idTitle.text = @"观赛身份（多选）";
-    idTitle.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    idTitle.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [content addSubview:idTitle];
     [idTitle mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(((UIButton *)self.seatButtons.lastObject).mas_bottom).offset(18);
+        make.top.equalTo(((UIButton *)self.seatButtons.lastObject).mas_bottom).offset(PNInputSectionSpacing());
         make.leading.equalTo(content).offset(18);
     }];
     
@@ -365,10 +399,10 @@ static UIColor *PNInputGreenColor(void) {
     // 看球原因
     UILabel *reasonTitle = [[UILabel alloc] init];
     reasonTitle.text = @"看球原因";
-    reasonTitle.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    reasonTitle.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [content addSubview:reasonTitle];
     [reasonTitle mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(((UIButton *)self.identityButtons.lastObject).mas_bottom).offset(18);
+        make.top.equalTo(((UIButton *)self.identityButtons.lastObject).mas_bottom).offset(PNInputSectionSpacing());
         make.leading.equalTo(content).offset(18);
     }];
     
@@ -381,20 +415,23 @@ static UIColor *PNInputGreenColor(void) {
     // 售票价格
     UILabel *priceTitle = [[UILabel alloc] init];
     priceTitle.text = @"售票价格";
-    priceTitle.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    priceTitle.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [content addSubview:priceTitle];
     [priceTitle mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(((UIButton *)self.reasonButtons.lastObject).mas_bottom).offset(18);
+        make.top.equalTo(((UIButton *)self.reasonButtons.lastObject).mas_bottom).offset(PNInputSectionSpacing());
         make.leading.equalTo(content).offset(18);
     }];
     
     UITextField *priceField = [[UITextField alloc] init];
-    priceField.placeholder = @"请输入价格";
+    priceField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"请输入价格" attributes:@{
+        NSForegroundColorAttributeName: PNInputPlaceholderColor(),
+        NSFontAttributeName: [UIFont systemFontOfSize:14 weight:UIFontWeightMedium]
+    }];
     priceField.font = [UIFont systemFontOfSize:14];
     priceField.borderStyle = UITextBorderStyleNone;
-    priceField.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+    priceField.backgroundColor = PNInputFieldBgColor();
     priceField.layer.cornerRadius = 8;
-    priceField.leftView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 12, 1)];
+    priceField.leftView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 16, 1)];
     priceField.leftViewMode = UITextFieldViewModeAlways;
     priceField.keyboardType = UIKeyboardTypeDecimalPad;
     // 数字键盘没有「完成」，增加一个工具栏按钮用于收起键盘
@@ -421,15 +458,15 @@ static UIColor *PNInputGreenColor(void) {
     // 比赛日期 + 时间（设计图：两个独立标签，两个并排按钮式输入框）
     UILabel *dateTitle = [[UILabel alloc] init];
     dateTitle.text = @"比赛日期";
-    dateTitle.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    dateTitle.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [content addSubview:dateTitle];
     [dateTitle mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(priceField.mas_bottom).offset(18);
+        make.top.equalTo(priceField.mas_bottom).offset(PNInputSectionSpacing());
         make.leading.equalTo(content).offset(18);
     }];
     UILabel *timeTitle = [[UILabel alloc] init];
     timeTitle.text = @"时间";
-    timeTitle.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    timeTitle.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [content addSubview:timeTitle];
     [timeTitle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerY.equalTo(dateTitle);
@@ -437,7 +474,7 @@ static UIColor *PNInputGreenColor(void) {
     }];
     
     UIButton *dateBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    dateBtn.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+    dateBtn.backgroundColor = PNInputFieldBgColor();
     dateBtn.layer.cornerRadius = 8;
     [dateBtn setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
     dateBtn.titleLabel.font = [UIFont systemFontOfSize:14];
@@ -446,7 +483,7 @@ static UIColor *PNInputGreenColor(void) {
     self.dateBtn = dateBtn;
     
     UIButton *timeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    timeBtn.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+    timeBtn.backgroundColor = PNInputFieldBgColor();
     timeBtn.layer.cornerRadius = 8;
     [timeBtn setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
     timeBtn.titleLabel.font = [UIFont systemFontOfSize:14];
@@ -458,7 +495,7 @@ static UIColor *PNInputGreenColor(void) {
         make.top.equalTo(dateTitle.mas_bottom).offset(8);
         make.leading.equalTo(content).offset(18);
         make.trailing.equalTo(content.mas_centerX).offset(-8);
-        make.height.mas_equalTo(44);
+        make.height.mas_equalTo(50);
     }];
     [timeBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(dateBtn);
@@ -470,17 +507,17 @@ static UIColor *PNInputGreenColor(void) {
     // 比赛感想
     UILabel *commentTitle = [[UILabel alloc] init];
     commentTitle.text = @"比赛感想";
-    commentTitle.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    commentTitle.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     [content addSubview:commentTitle];
     [commentTitle mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(timeBtn.mas_bottom).offset(18);
+        make.top.equalTo(timeBtn.mas_bottom).offset(PNInputSectionSpacing());
         make.leading.equalTo(content).offset(18);
     }];
     
     UITextView *commentView = [[UITextView alloc] init];
     commentView.font = [UIFont systemFontOfSize:14];
     commentView.delegate = self;
-    commentView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
+    commentView.backgroundColor = PNInputFieldBgColor();
     commentView.layer.cornerRadius = 8;
     // 光标与占位文字保持同一起点（左边距统一为 8，去掉内部 padding）
     commentView.textContainerInset = UIEdgeInsetsMake(8, 8, 28, 8);
@@ -497,47 +534,47 @@ static UIColor *PNInputGreenColor(void) {
     UILabel *commentCount = [[UILabel alloc] init];
     commentCount.text = @"0/200";
     commentCount.font = [UIFont systemFontOfSize:12];
-    commentCount.textColor = [UIColor lightGrayColor];
+    commentCount.textColor = PNInputPlaceholderColor();
     [content addSubview:commentCount];
     self.commentCountLabel = commentCount;
     [commentView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(commentTitle.mas_bottom).offset(8);
         make.leading.equalTo(content).offset(18);
         make.trailing.equalTo(content).offset(-18);
-        make.height.mas_equalTo(100);
+        make.height.mas_equalTo(97);
     }];
     [commentCount mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(commentView).offset(-8);
-        make.bottom.equalTo(commentView).offset(-8);
+        make.trailing.equalTo(commentView).offset(-12);
+        make.bottom.equalTo(commentView).offset(-10);
     }];
     UILabel *ph = [[UILabel alloc] init];
     ph.text = @"请输入比赛心情~";
-    ph.font = [UIFont systemFontOfSize:14];
-    ph.textColor = [UIColor lightGrayColor];
+    ph.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    ph.textColor = PNInputPlaceholderColor();
     [content addSubview:ph];
     self.commentPlaceholderLabel = ph;
     [ph mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(commentView).offset(8);
-        make.top.equalTo(commentView).offset(8);
+        make.leading.equalTo(commentView).offset(12);
+        make.top.equalTo(commentView).offset(13);
     }];
     
     UIButton *confirmBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     [confirmBtn setTitle:@"确认" forState:UIControlStateNormal];
     [confirmBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     confirmBtn.backgroundColor = PNInputGreenColor();
-    confirmBtn.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    confirmBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     confirmBtn.layer.cornerRadius = 26;
     [confirmBtn addTarget:self action:@selector(onConfirmTapped) forControlEvents:UIControlEventTouchUpInside];
     [content addSubview:confirmBtn];
     [confirmBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(commentView.mas_bottom).offset(24);
+        make.top.equalTo(commentView.mas_bottom).offset(20);
         make.leading.equalTo(content).offset(18);
         make.trailing.equalTo(content).offset(-18);
-        make.height.mas_equalTo(44);
+        make.height.mas_equalTo(40);
     }];
     // 用确认按钮底部撑开 content 高度，使 scrollView 的 contentSize 正确，可滚动到底
     [content mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.bottom.equalTo(confirmBtn.mas_bottom).offset(20);
+        make.bottom.equalTo(confirmBtn.mas_bottom).offset(24);
     }];
     if (@available(iOS 11.0, *)) {
         [scroll.contentLayoutGuide.bottomAnchor constraintEqualToAnchor:content.bottomAnchor].active = YES;
@@ -564,14 +601,14 @@ static UIColor *PNInputGreenColor(void) {
         // 使用 Custom 类型，完全去掉系统点击高亮背景
         UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
         [btn setTitle:titles[i] forState:UIControlStateNormal];
-        btn.titleLabel.font = [UIFont systemFontOfSize:12];
-        btn.contentEdgeInsets = UIEdgeInsetsMake(6, 12, 6, 12);
+        btn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
+        btn.contentEdgeInsets = UIEdgeInsetsMake(0, 14, 0, 14);
         // 与设计图一致：未选中为圆角胶囊灰底，选中为白底绿色描边文字
-        btn.layer.cornerRadius = 16;
-        btn.layer.borderWidth = 1;
-        btn.layer.borderColor = [UIColor colorWithWhite:0.82 alpha:1.0].CGColor;
-        [btn setTitleColor:[UIColor colorWithWhite:0.4 alpha:1.0] forState:UIControlStateNormal];
-        btn.backgroundColor = [UIColor colorWithWhite:0.96 alpha:1.0];
+        btn.layer.cornerRadius = 15;
+        btn.layer.borderWidth = 0;
+        btn.layer.borderColor = UIColor.clearColor.CGColor;
+        [btn setTitleColor:PNInputPillTextColor() forState:UIControlStateNormal];
+        btn.backgroundColor = PNInputFieldBgColor();
         btn.adjustsImageWhenHighlighted = NO;
         btn.showsTouchWhenHighlighted = NO;
         btn.tag = multiSelect ? 1 : 0;
@@ -607,7 +644,7 @@ static UIColor *PNInputGreenColor(void) {
         }
         
         [btn mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.height.mas_equalTo(32);
+            make.height.mas_equalTo(30);
             if (rowFirstButton == nil) {
                 // 新行行首
                 rowFirstButton = btn;
@@ -655,43 +692,21 @@ static UIColor *PNInputGreenColor(void) {
     [self refreshDateTimeButtons];
     self.commentView.text = @"";
 
-    UIColor *unselBorder = [UIColor colorWithWhite:0.82 alpha:1.0];
-    UIColor *unselText = [UIColor colorWithWhite:0.4 alpha:1.0];
-    UIColor *unselBg = [UIColor colorWithWhite:0.96 alpha:1.0];
-    // 选中样式：白底 + 绿色描边 + 绿色文字
-    UIColor *selBorder = PNInputGreenColor();
-    UIColor *selText = PNInputGreenColor();
     for (UIButton *b in self.watchButtons) {
         BOOL sel = [b.titleLabel.text isEqualToString:self.selectedWatchInfo];
-        b.selected = sel;
-        b.layer.borderWidth = 1;
-        b.layer.borderColor = sel ? selBorder.CGColor : unselBorder.CGColor;
-        b.backgroundColor = sel ? [UIColor whiteColor] : unselBg;
-        [b setTitleColor:(sel ? selText : unselText) forState:UIControlStateNormal];
+        [self pn_applyPillButton:b selected:sel];
     }
     for (UIButton *b in self.seatButtons) {
         BOOL sel = [b.titleLabel.text isEqualToString:self.selectedSeat];
-        b.selected = sel;
-        b.layer.borderWidth = 1;
-        b.layer.borderColor = sel ? selBorder.CGColor : unselBorder.CGColor;
-        b.backgroundColor = sel ? [UIColor whiteColor] : unselBg;
-        [b setTitleColor:(sel ? selText : unselText) forState:UIControlStateNormal];
+        [self pn_applyPillButton:b selected:sel];
     }
     for (UIButton *b in self.reasonButtons) {
         BOOL sel = [b.titleLabel.text isEqualToString:self.selectedReason];
-        b.selected = sel;
-        b.layer.borderWidth = 1;
-        b.layer.borderColor = sel ? selBorder.CGColor : unselBorder.CGColor;
-        b.backgroundColor = sel ? [UIColor whiteColor] : unselBg;
-        [b setTitleColor:(sel ? selText : unselText) forState:UIControlStateNormal];
+        [self pn_applyPillButton:b selected:sel];
     }
     for (UIButton *b in self.identityButtons) {
         BOOL sel = [self.selectedIdentities containsObject:b.titleLabel.text];
-        b.selected = sel;
-        b.layer.borderWidth = 1;
-        b.layer.borderColor = sel ? selBorder.CGColor : unselBorder.CGColor;
-        b.backgroundColor = sel ? [UIColor whiteColor] : unselBg;
-        [b setTitleColor:(sel ? selText : unselText) forState:UIControlStateNormal];
+        [self pn_applyPillButton:b selected:sel];
     }
     [self updateCommentCountLabel];
 }
@@ -710,11 +725,7 @@ static UIColor *PNInputGreenColor(void) {
 - (void)onEmotionOptionTapped:(UIButton *)sender {
     NSString *title = sender.titleLabel.text ?: @"";
     self.selectedEmotion = title;
-    [self.emotionButton setTitle:[title stringByAppendingString:@" "] forState:UIControlStateNormal];
-    if (@available(iOS 13.0, *)) {
-        UIImage *chevron = [UIImage systemImageNamed:@"chevron.down"];
-        if (chevron) [self.emotionButton setImage:[chevron imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
-    }
+    [self.emotionButton setTitle:@"选择情绪" forState:UIControlStateNormal];
     self.emotionPanel.hidden = YES;
 }
 
@@ -837,16 +848,10 @@ shouldChangeTextInRange:(NSRange)range
     if (multi) {
         sender.selected = !sender.selected;
         if (sender.selected) {
-            sender.layer.borderWidth = 1;
-            sender.layer.borderColor = PNInputGreenColor().CGColor;
-            sender.backgroundColor = [UIColor whiteColor];
-            [sender setTitleColor:PNInputGreenColor() forState:UIControlStateNormal];
+            [self pn_applyPillButton:sender selected:YES];
             [self.selectedIdentities addObject:title];
         } else {
-            sender.layer.borderWidth = 1;
-            sender.layer.borderColor = [UIColor colorWithWhite:0.82 alpha:1.0].CGColor;
-            sender.backgroundColor = [UIColor colorWithWhite:0.96 alpha:1.0];
-            [sender setTitleColor:[UIColor colorWithWhite:0.4 alpha:1.0] forState:UIControlStateNormal];
+            [self pn_applyPillButton:sender selected:NO];
             [self.selectedIdentities removeObject:title];
         }
     } else {
@@ -862,19 +867,7 @@ shouldChangeTextInRange:(NSRange)range
             self.selectedReason = title;
         }
         for (UIButton *b in group) {
-            if (b == sender) {
-                b.selected = YES;
-                b.layer.borderWidth = 1;
-                b.layer.borderColor = PNInputGreenColor().CGColor;
-                b.backgroundColor = [UIColor whiteColor];
-                [b setTitleColor:PNInputGreenColor() forState:UIControlStateNormal];
-            } else {
-                b.selected = NO;
-                b.layer.borderWidth = 1;
-                b.layer.borderColor = [UIColor colorWithWhite:0.82 alpha:1.0].CGColor;
-                b.backgroundColor = [UIColor colorWithWhite:0.96 alpha:1.0];
-                [b setTitleColor:[UIColor colorWithWhite:0.4 alpha:1.0] forState:UIControlStateNormal];
-            }
+            [self pn_applyPillButton:b selected:(b == sender)];
         }
     }
 }

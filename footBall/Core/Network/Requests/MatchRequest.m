@@ -17,7 +17,7 @@ static NSArray *PNMatchJSONArrayFromPageData(id data) {
         return nil;
     }
     NSDictionary *d = (NSDictionary *)data;
-    id list = d[@"list"] ?: d[@"records"] ?: d[@"rows"] ?: d[@"matches"] ?: d[@"items"];
+    id list = d[@"list"] ?: d[@"records"] ?: d[@"rows"] ?: d[@"matches"] ?: d[@"items"] ?: d[@"featuredMatches"];
     if ([list isKindOfClass:NSArray.class]) {
         return list;
     }
@@ -27,7 +27,7 @@ static NSArray *PNMatchJSONArrayFromPageData(id data) {
     }
     if ([inner isKindOfClass:NSDictionary.class]) {
         NSDictionary *idict = (NSDictionary *)inner;
-        id l2 = idict[@"list"] ?: idict[@"records"] ?: idict[@"matches"] ?: idict[@"items"];
+        id l2 = idict[@"list"] ?: idict[@"records"] ?: idict[@"matches"] ?: idict[@"items"] ?: idict[@"featuredMatches"];
         if ([l2 isKindOfClass:NSArray.class]) {
             return l2;
         }
@@ -51,8 +51,12 @@ static NSArray *PNMatchJSONArrayFromPageData(id data) {
 - (void)getFeaturesMatchsSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     [[APIManager sharedManager] GET:APIPathValueMatchFeatured parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            NSArray *teams = [NSArray yy_modelArrayWithClass:Match.class json:responseObject.data];
-            responseObject.dataObject = teams;
+            NSArray *list = PNMatchJSONArrayFromPageData(responseObject.data);
+            if (!list) {
+                list = @[];
+            }
+            NSArray *matches = [NSArray yy_modelArrayWithClass:Match.class json:list];
+            responseObject.dataObject = matches;
             if (success) success(responseObject);
         } else {
             if (failure) failure([APIError errorWithResponse:responseObject]);
