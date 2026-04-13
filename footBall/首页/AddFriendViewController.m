@@ -176,6 +176,7 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) NSArray<PNUser *> *searchResults;
 @property (nonatomic, strong) NSMutableSet<NSString *> *sentFriendIds;
+@property (nonatomic, strong) NSMutableSet<NSString *> *sendingFriendIds;
 @property (nonatomic, assign) BOOL isSearching;
 @property (nonatomic, assign) NSInteger pendingRequestCount;
 @end
@@ -202,6 +203,7 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     self.pendingRequestCount = MAX(0, storedCount);
     NSArray *sentIds = [[NSUserDefaults standardUserDefaults] arrayForKey:kCommunitySentSearchFriendIdsKey];
     self.sentFriendIds = [NSMutableSet setWithArray:(sentIds ?: @[])];
+    self.sendingFriendIds = [NSMutableSet set];
     [super viewDidLoad];
     // 勿再次调用 setupUI / updateLocalizedStrings：QMBaseViewController.viewDidLoad 已调用，重复会导致头部与列表叠两层
     self.view.backgroundColor = kAddFriendPageBg;
@@ -433,11 +435,13 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
         PNUser *result = self.searchResults[indexPath.row];
         [cell configureWithResult:result];
         BOOL sent = [self.sentFriendIds containsObject:result.userId];
+        BOOL sending = [self.sendingFriendIds containsObject:result.userId];
         NSString *title = sent ? NSLocalizedString(@"community_request_sent", nil) : NSLocalizedString(@"community_add_friend", nil);
         [cell.addBtn setTitle:title forState:UIControlStateNormal];
-        [cell.addBtn setTitleColor:(sent ? [UIColor grayColor] : [UIColor blackColor]) forState:UIControlStateNormal];
-        cell.addBtn.layer.borderColor = (sent ? [UIColor lightGrayColor].CGColor : [UIColor colorWithWhite:0.75 alpha:1.0].CGColor);
-        cell.addBtn.enabled = YES;
+        UIColor *titleColor = (sent || sending) ? [UIColor grayColor] : [UIColor blackColor];
+        [cell.addBtn setTitleColor:titleColor forState:UIControlStateNormal];
+        cell.addBtn.layer.borderColor = (sent || sending) ? [UIColor lightGrayColor].CGColor : [UIColor colorWithWhite:0.75 alpha:1.0].CGColor;
+        cell.addBtn.enabled = !sent && !sending;
         cell.addBtn.tag = indexPath.row;
         [cell.addBtn removeTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];
         [cell.addBtn addTarget:self action:@selector(onAddSearchFriendTapped:) forControlEvents:UIControlEventTouchUpInside];
@@ -495,10 +499,63 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
         [self showSuccess:NSLocalizedString(@"community_request_sent", nil)];
         return;
     }
-    [self.sentFriendIds addObject:result.userId];
-    [[NSUserDefaults standardUserDefaults] setObject:self.sentFriendIds.allObjects forKey:kCommunitySentSearchFriendIdsKey];
-    [self.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:sender.tag inSection:0]] withRowAnimation:UITableViewRowAnimationNone];
-    [self showSuccess:NSLocalizedString(@"community_request_sent", nil)];
+    if (result.userId.length == 0) {
+        [self showError:NSLocalizedString(@"community_search_failed", nil)];
+        return;
+    }
+    if ([self.sendingFriendIds containsObject:result.userId]) {
+        return;
+    }
+
+    NSCharacterSet *nonDigits = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
+    if ([result.userId rangeOfCharacterFromSet:nonDigits].location != NSNotFound) {
+        [self showError:NSLocalizedString(@"community_search_failed", nil)];
+        return;
+    }
+
+    [self.sendingFriendIds addObject:result.userId];
+    NSIndexPath *tappedIndexPath = [NSIndexPath indexPathForRow:sender.tag inSection:0];
+    [self.tableView reloadRowsAtIndexPaths:@[tappedIndexPath]
+                          withRowAnimation:UITableViewRowAnimationNone];
+
+    NSDictionary *body = @{@"toUserId": @([result.userId longLongValue])};
+    __weak typeof(self) weakSelf = self;
+    [SocialRequest.shared sendFriendRequestWithBody:body success:^(HTTPResponse * _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [self.sendingFriendIds removeObject:result.userId];
+        [self.sentFriendIds addObject:result.userId];
+        [[NSUserDefaults standardUserDefaults] setObject:self.sentFriendIds.allObjects forKey:kCommunitySentSearchFriendIdsKey];
+        NSUInteger idx = [self.searchResults indexOfObjectPassingTest:^BOOL(PNUser * _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+            return [obj.userId isEqualToString:result.userId];
+        }];
+        if (idx != NSNotFound && idx < self.searchResults.count) {
+            [self.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:idx inSection:0]]
+                                  withRowAnimation:UITableViewRowAnimationNone];
+        } else {
+            [self.tableView reloadRowsAtIndexPaths:@[tappedIndexPath]
+                                  withRowAnimation:UITableViewRowAnimationNone];
+        }
+        [self showSuccess:NSLocalizedString(@"community_request_sent", nil)];
+    } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [self.sendingFriendIds removeObject:result.userId];
+        NSUInteger idx = [self.searchResults indexOfObjectPassingTest:^BOOL(PNUser * _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+            return [obj.userId isEqualToString:result.userId];
+        }];
+        if (idx != NSNotFound && idx < self.searchResults.count) {
+            [self.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:idx inSection:0]]
+                                  withRowAnimation:UITableViewRowAnimationNone];
+        } else if (tappedIndexPath.row < self.searchResults.count) {
+            [self.tableView reloadRowsAtIndexPaths:@[tappedIndexPath]
+                                  withRowAnimation:UITableViewRowAnimationNone];
+        } else {
+            [self.tableView reloadData];
+        }
+        NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"community_search_failed", nil);
+        [self showError:msg];
+    }];
 }
 
 @end
