@@ -16,11 +16,10 @@
 #import "SocialRequest.h"
 #import "ProfileRequest.h"
 #import "TeamsRequest.h"
+#import "MembershipRequest.h"
 #import "Team.h"
 #import "SocialModels.h"
 #import "StatisticsModels.h"
-#import "APIManager.h"
-#import "APIPathValues.h"
 #import <QuartzCore/QuartzCore.h>
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
@@ -246,28 +245,23 @@ static NSArray<NSString *> * _menuKeys(void) {
         UserProfile *p = AuthManager.sharedManager.user.profile;
         [weakSelf applyUserProfile:p];
     } failure:^(NSError * _Nonnull error) {
-        [weakSelf applyUserProfile:AuthManager.sharedManager.user.profile];
+        [weakSelf applyUserProfile:nil];
     }];
 
-    [SocialRequest.shared getFriendsSuccess:^(HTTPResponse * _Nullable responseObject) {
-        PNFriendPage *page = [responseObject.dataObject isKindOfClass:PNFriendPage.class] ? responseObject.dataObject : nil;
-        NSInteger n = 0;
-        if (page) {
-            n = page.total > 0 ? page.total : page.list.count;
+    [SocialRequest.shared getFriendStatsSuccess:^(HTTPResponse * _Nullable responseObject) {
+        NSDictionary *statsDict = [responseObject.dataObject isKindOfClass:NSDictionary.class] ? responseObject.dataObject : nil;
+        NSInteger friendCount = 0;
+        NSInteger followingCount = 0;
+        if (statsDict) {
+            id f = statsDict[@"friendCount"] ?: statsDict[@"friends"] ?: statsDict[@"friend_count"];
+            id g = statsDict[@"followingCount"] ?: statsDict[@"followings"] ?: statsDict[@"following_count"];
+            friendCount = [f respondsToSelector:@selector(integerValue)] ? MAX([f integerValue], 0) : 0;
+            followingCount = [g respondsToSelector:@selector(integerValue)] ? MAX([g integerValue], 0) : 0;
         }
-        weakSelf.stat1Num.text = [NSString stringWithFormat:@"%ld", (long)MAX(n, 0)];
+        weakSelf.stat1Num.text = [NSString stringWithFormat:@"%ld", (long)friendCount];
+        weakSelf.stat2Num.text = [NSString stringWithFormat:@"%ld", (long)followingCount];
     } failure:^(NSError * _Nonnull error) {
         weakSelf.stat1Num.text = @"0";
-    }];
-
-    [SocialRequest.shared getFollowingSuccess:^(HTTPResponse * _Nullable responseObject) {
-        PNUserPage *page = [responseObject.dataObject isKindOfClass:PNUserPage.class] ? responseObject.dataObject : nil;
-        NSInteger n = 0;
-        if (page) {
-            n = page.total > 0 ? page.total : page.list.count;
-        }
-        weakSelf.stat2Num.text = [NSString stringWithFormat:@"%ld", (long)MAX(n, 0)];
-    } failure:^(NSError * _Nonnull error) {
         weakSelf.stat2Num.text = @"0";
     }];
 
@@ -288,12 +282,12 @@ static NSArray<NSString *> * _menuKeys(void) {
         [weakSelf updateTeamsCardUI];
     }];
 
-    [[APIManager sharedManager] GET:APIPathValueMembershipStatus parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+    [[MembershipRequest shared] getMembershipStatusSuccess:^(HTTPResponse * _Nullable responseObject) {
         if (!responseObject.success) {
             weakSelf.vipBadgeView.hidden = YES;
             return;
         }
-        BOOL showVIP = [weakSelf parseMembershipActiveFromPayload:responseObject.data];
+        BOOL showVIP = [weakSelf parseMembershipActiveFromPayload:(responseObject.dataObject ?: responseObject.data)];
         weakSelf.vipBadgeView.hidden = !showVIP;
     } failure:^(NSError * _Nonnull error) {
         weakSelf.vipBadgeView.hidden = YES;
@@ -455,7 +449,7 @@ static NSArray<NSString *> * _menuKeys(void) {
     }];
 
     self.nameLabel = [UILabel new];
-    self.nameLabel.text = @"Arisha Ireen";
+    self.nameLabel.text = @"--";
     self.nameLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
     self.nameLabel.textColor = [UIColor whiteColor];
     [nameRow addSubview:self.nameLabel];

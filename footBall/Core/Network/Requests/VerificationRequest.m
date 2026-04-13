@@ -17,6 +17,30 @@
 
 @implementation VerificationRequest
 
+static NSString *PNStringOrEmpty(id value) {
+    if ([value isKindOfClass:NSString.class]) {
+        return (NSString *)value;
+    }
+    if ([value respondsToSelector:@selector(stringValue)]) {
+        return [value stringValue];
+    }
+    return @"";
+}
+
+static NSArray<NSString *> *PNStringArray(id value) {
+    if (![value isKindOfClass:NSArray.class]) {
+        return @[];
+    }
+    NSMutableArray<NSString *> *out = [NSMutableArray array];
+    for (id item in (NSArray *)value) {
+        NSString *s = PNStringOrEmpty(item);
+        if (s.length > 0) {
+            [out addObject:s];
+        }
+    }
+    return out;
+}
+
 + (instancetype)shared {
     static VerificationRequest *instance = nil;
     static dispatch_once_t onceToken;
@@ -24,6 +48,15 @@
         instance = [[VerificationRequest alloc] init];
     });
     return instance;
+}
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _cachedHistory = @[];
+        _cachedProfessionalImageUrls = @[];
+    }
+    return self;
 }
 
 - (void)fetchStatusSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
@@ -96,7 +129,10 @@
         }
         return;
     }
-    NSDictionary *params = @{ @"imageUrls": urls };
+    NSDictionary *params = @{
+        @"workCertUrls": urls,
+        @"professionInfo": @""
+    };
     [[APIManager sharedManager] POST:APIPathValueVerificationProfessional parameters:params headers:nil
                              success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
@@ -120,7 +156,21 @@
     [[APIManager sharedManager] GET:APIPathValueVerificationRealnameInfo parameters:nil headers:nil
                             success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            responseObject.dataObject = responseObject.data;
+            PNRealnameInfo *info = [PNRealnameInfo yy_modelWithJSON:responseObject.data];
+            VerificationRequest *req = [VerificationRequest shared];
+            req.cachedRealnameInfo = info;
+            NSDictionary *raw = [responseObject.data isKindOfClass:NSDictionary.class] ? (NSDictionary *)responseObject.data : @{};
+            NSString *frontUrl = PNStringOrEmpty(raw[@"idCardFrontUrl"]);
+            if (frontUrl.length == 0) {
+                frontUrl = PNStringOrEmpty(raw[@"id_card_front_url"]);
+            }
+            NSString *backUrl = PNStringOrEmpty(raw[@"idCardBackUrl"]);
+            if (backUrl.length == 0) {
+                backUrl = PNStringOrEmpty(raw[@"id_card_back_url"]);
+            }
+            req.cachedRealnameFrontUrl = frontUrl;
+            req.cachedRealnameBackUrl = backUrl;
+            responseObject.dataObject = info ?: responseObject.data;
             if (success) success(responseObject);
         } else {
             if (failure) failure([APIError errorWithResponse:responseObject]);
@@ -141,7 +191,47 @@
     [[APIManager sharedManager] GET:APIPathValueVerificationHistory parameters:nil headers:nil
                             success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            responseObject.dataObject = responseObject.data;
+            VerificationRequest *req = [VerificationRequest shared];
+            NSArray *history = [NSArray yy_modelArrayWithClass:PNVerificationHistory.class json:responseObject.data];
+            req.cachedHistory = history ?: @[];
+
+            NSArray *rawList = [responseObject.data isKindOfClass:NSArray.class] ? (NSArray *)responseObject.data : @[];
+            NSMutableArray<NSString *> *professionalUrls = [NSMutableArray array];
+            NSString *frontUrl = req.cachedRealnameFrontUrl ?: @"";
+            NSString *backUrl = req.cachedRealnameBackUrl ?: @"";
+            for (id item in rawList) {
+                if (![item isKindOfClass:NSDictionary.class]) {
+                    continue;
+                }
+                NSDictionary *dict = (NSDictionary *)item;
+                NSString *type = [PNStringOrEmpty(dict[@"type"]) uppercaseString];
+                if ([type isEqualToString:@"PROFESSIONAL"]) {
+                    NSArray<NSString *> *urls = PNStringArray(dict[@"workCertUrls"]);
+                    if (urls.count == 0) urls = PNStringArray(dict[@"work_cert_urls"]);
+                    if (urls.count == 0) urls = PNStringArray(dict[@"imageUrls"]);
+                    if (urls.count == 0) urls = PNStringArray(dict[@"image_urls"]);
+                    if (urls.count > 0) {
+                        [professionalUrls addObjectsFromArray:urls];
+                    }
+                } else if ([type isEqualToString:@"REALNAME"]) {
+                    if (frontUrl.length == 0) {
+                        frontUrl = PNStringOrEmpty(dict[@"idCardFrontUrl"]);
+                    }
+                    if (frontUrl.length == 0) {
+                        frontUrl = PNStringOrEmpty(dict[@"id_card_front_url"]);
+                    }
+                    if (backUrl.length == 0) {
+                        backUrl = PNStringOrEmpty(dict[@"idCardBackUrl"]);
+                    }
+                    if (backUrl.length == 0) {
+                        backUrl = PNStringOrEmpty(dict[@"id_card_back_url"]);
+                    }
+                }
+            }
+            req.cachedProfessionalImageUrls = professionalUrls.copy;
+            req.cachedRealnameFrontUrl = frontUrl;
+            req.cachedRealnameBackUrl = backUrl;
+            responseObject.dataObject = history ?: responseObject.data;
             if (success) success(responseObject);
         } else {
             if (failure) failure([APIError errorWithResponse:responseObject]);

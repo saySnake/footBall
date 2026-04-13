@@ -4,8 +4,8 @@
 //
 
 #import "ProfessionalAuthViewController.h"
-#import "AuthStateStore.h"
 #import <Masonry/Masonry.h>
+#import <SDWebImage/SDWebImage.h>
 
 // Figma 1:6314「职业认证」
 #define kPANavBg       [UIColor colorWithRed:13/255.0 green:33/255.0 blue:34/255.0 alpha:1.0]   // #0d2122
@@ -75,8 +75,28 @@ static CGSize kPAGridCellSizeForScreen(void) {
     self.hidesBottomBarWhenPushed = YES;
     self.shouldShowNavigationBar = NO;
     self.view.backgroundColor = kPAPageBg;
-    self.completed = [AuthStateStore isProfessionalAuthCompleted];
-    self.uploadedImages = [NSMutableArray arrayWithArray:[AuthStateStore professionalImages]];
+    self.completed = NO;
+    self.uploadedImages = [NSMutableArray array];
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    __weak typeof(self) weakSelf = self;
+    [[VerificationRequest shared] fetchStatusSuccess:^(HTTPResponse * _Nullable responseObject) {
+        [[VerificationRequest shared] fetchHistorySuccess:^(HTTPResponse * _Nullable responseObject) {
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) return;
+            [self refreshState];
+        } failure:^(NSError * _Nonnull error) {
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) return;
+            [self refreshState];
+        }];
+    } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [self refreshState];
+    }];
 }
 
 - (void)setupUI {
@@ -314,8 +334,9 @@ static CGSize kPAGridCellSizeForScreen(void) {
 }
 
 - (void)refreshState {
-    self.completed = [AuthStateStore isProfessionalAuthCompleted];
-    [self.uploadedImages setArray:[AuthStateStore professionalImages]];
+    NSString *status = [VerificationRequest shared].cachedVerificationStatus.professionalStatus ?: @"";
+    BOOL approvedByAPI = [[status uppercaseString] isEqualToString:@"APPROVED"];
+    self.completed = approvedByAPI;
 
     BOOL showUnverified = !self.completed;
     self.hintLabel.hidden = !showUnverified;
@@ -330,8 +351,9 @@ static CGSize kPAGridCellSizeForScreen(void) {
     if (showUnverified) {
         [self.collectionView reloadData];
     } else {
-        NSArray<UIImage *> *imgs = [AuthStateStore professionalImages];
-        self.readOnlyImageView.image = imgs.firstObject;
+        NSString *urlString = [VerificationRequest shared].cachedProfessionalImageUrls.firstObject;
+        NSURL *url = urlString.length > 0 ? [NSURL URLWithString:urlString] : nil;
+        [self.readOnlyImageView sd_setImageWithURL:url placeholderImage:nil];
     }
 
     [self.content mas_remakeConstraints:^(MASConstraintMaker *make) {
@@ -439,20 +461,17 @@ static CGSize kPAGridCellSizeForScreen(void) {
             [[VerificationRequest shared] submitProfessionalWithImageUrls:[urls copy] success:^(HTTPResponse * _Nullable responseObject) {
                 __strong typeof(weakSelf) self2 = weakSelf;
                 if (!self2) return;
-                void (^applyLocalAndFinish)(void) = ^{
+                void (^finishFlow)(void) = ^{
                     [self2 hideLoading];
-                    [AuthStateStore saveProfessionalImages:[self2.uploadedImages copy]];
-                    [AuthStateStore setProfessionalAuthCompleted:YES];
                     [self2 showSuccess:NSLocalizedString(@"auth_professional_success", nil)];
-                    __weak typeof(self2) w = self2;
                     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                        [w refreshState];
+                        [self2.navigationController popViewControllerAnimated:YES];
                     });
                 };
-                [[UserRequest shared] getLoginUserInfoSuccess:^(HTTPResponse * _Nullable resp) {
-                    applyLocalAndFinish();
+                [[VerificationRequest shared] fetchStatusSuccess:^(HTTPResponse * _Nullable responseObject) {
+                    finishFlow();
                 } failure:^(NSError * _Nonnull error) {
-                    applyLocalAndFinish();
+                    finishFlow();
                 }];
             } failure:^(NSError * _Nonnull error) {
                 __strong typeof(weakSelf) self2 = weakSelf;

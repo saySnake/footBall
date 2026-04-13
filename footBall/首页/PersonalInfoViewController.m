@@ -163,7 +163,6 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
     self.birthDate = [NSDate date];
     self.firstMatchDate = [NSDate date];
     self.avatarNeedsUpload = NO;
-    [self loadLocalAvatar];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -634,8 +633,8 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
         UserProfile *p = [responseObject.dataObject isKindOfClass:[UserProfile class]] ? responseObject.dataObject : AuthManager.sharedManager.user.profile;
         [weakSelf applyUserProfile:p];
     } failure:^(NSError * _Nonnull error) {
-        UserProfile *p = AuthManager.sharedManager.user.profile;
-        if (p) [weakSelf applyUserProfile:p];
+        NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"profile_save_fail", nil);
+        [weakSelf showToast:msg];
     }];
 }
 
@@ -714,7 +713,10 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
             if (image) weakSelf.avatarNeedsUpload = NO;
         }];
     } else {
-        [self loadLocalAvatar];
+        if (@available(iOS 13.0, *)) {
+            self.avatarView.image = [UIImage systemImageNamed:@"person.crop.circle.fill"];
+            self.avatarView.tintColor = [UIColor colorWithWhite:0.6 alpha:1.0];
+        }
     }
 }
 
@@ -833,43 +835,10 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
 
     self.avatarView.image = image;
     self.avatarNeedsUpload = YES;
-    [self saveAvatarToLocal:image];
 }
 
 - (void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
     [picker dismissViewControllerAnimated:YES completion:nil];
-}
-
-- (NSString *)avatarLocalPath {
-    NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-    return [docs stringByAppendingPathComponent:@"user_avatar.jpg"];
-}
-
-- (void)saveAvatarToLocal:(UIImage *)image {
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        CGFloat maxSide = 512;
-        UIImage *resized = image;
-        if (image.size.width > maxSide || image.size.height > maxSide) {
-            CGFloat scale = maxSide / MAX(image.size.width, image.size.height);
-            CGSize newSize = CGSizeMake(image.size.width * scale, image.size.height * scale);
-            UIGraphicsBeginImageContextWithOptions(newSize, NO, 1.0);
-            [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
-            resized = UIGraphicsGetImageFromCurrentImageContext();
-            UIGraphicsEndImageContext();
-        }
-        NSData *data = UIImageJPEGRepresentation(resized, 0.85);
-        [data writeToFile:[self avatarLocalPath] atomically:YES];
-    });
-}
-
-- (void)loadLocalAvatar {
-    NSString *path = [self avatarLocalPath];
-    if ([[NSFileManager defaultManager] fileExistsAtPath:path]) {
-        UIImage *saved = [UIImage imageWithContentsOfFile:path];
-        if (saved) {
-            self.avatarView.image = saved;
-        }
-    }
 }
 
 - (void)onBack { [self.navigationController popViewControllerAnimated:YES]; }
@@ -915,14 +884,21 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
     };
 
     if (self.avatarNeedsUpload) {
-        NSData *jpeg = [NSData dataWithContentsOfFile:[self avatarLocalPath]];
+        NSData *jpeg = UIImageJPEGRepresentation(self.avatarView.image, 0.85);
         if (jpeg.length > 0) {
             [[FileRequest shared] uploadImage:jpeg type:ImageObjectTypeProfile success:^(HTTPResponse * _Nullable responseObject) {
                 NSString *url = [responseObject.dataObject isKindOfClass:[NSString class]] ? responseObject.dataObject : nil;
-                if (url.length > 0) p.avatar = url;
+                if (url.length == 0) {
+                    [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+                    [[LoadingManager sharedManager] showError:NSLocalizedString(@"profile_save_fail", nil) inView:weakSelf.view];
+                    return;
+                }
+                p.avatar = url;
                 putProfile();
             } failure:^(NSError * _Nonnull error) {
-                putProfile();
+                [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+                NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"profile_save_fail", nil);
+                [[LoadingManager sharedManager] showError:msg inView:weakSelf.view];
             }];
             return;
         }
