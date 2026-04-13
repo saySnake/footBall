@@ -590,13 +590,19 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
         }
         [weakSelf loadRemoteData];
     } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"community_search_failed", nil);
+        [self showError:msg];
     }];
 }
 
 - (FriendRequestStatus)statusForFriendRequest:(PNFriendRequest *)request {
-    NSString *status = request.status ?: @"PENDING";
-    if ([status isEqualToString:@"EXPIRED"]) return FriendRequestStatusExpired;
-    if ([status isEqualToString:@"ACCEPTED"]) return FriendRequestStatusAdded;
+    NSString *status = (request.status ?: @"PENDING").uppercaseString;
+    if ([status isEqualToString:@"EXPIRED"] || [status isEqualToString:@"REJECTED"] || [status isEqualToString:@"DECLINED"] || [status isEqualToString:@"REFUSED"]) {
+        return FriendRequestStatusExpired;
+    }
+    if ([status isEqualToString:@"ACCEPTED"] || [status isEqualToString:@"ADDED"]) return FriendRequestStatusAdded;
     return FriendRequestStatusPending;
 }
 
