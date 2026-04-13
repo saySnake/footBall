@@ -49,6 +49,58 @@ static void APIDebugPrintCurl(NSURLRequest *req, id parameters, NSString *method
     NSLog(@"\n📡 [API curl] ─────────────────────────────────────────\n%@\n────────────────────────────────────────────────────────\n", curl);
 }
 #endif
+
+static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
+    if (!error) return nil;
+    id rawData = error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey];
+    if (![rawData isKindOfClass:NSData.class] || [(NSData *)rawData length] == 0) {
+        rawData = error.userInfo[@"com.alamofire.serialization.response.error.data"];
+    }
+    if (![rawData isKindOfClass:NSData.class] || [(NSData *)rawData length] == 0) {
+        return nil;
+    }
+
+    NSError *jsonError = nil;
+    id json = [NSJSONSerialization JSONObjectWithData:(NSData *)rawData options:NSJSONReadingMutableContainers error:&jsonError];
+    if (jsonError || !json) {
+        return nil;
+    }
+
+    HTTPResponse *resp = [HTTPResponse yy_modelWithJSON:json];
+    if (![resp isKindOfClass:HTTPResponse.class]) {
+        return nil;
+    }
+
+    NSString *message = resp.errorMessage;
+    NSString *code = resp.errorCode;
+    if (message.length == 0) {
+        if ([json isKindOfClass:NSDictionary.class]) {
+            NSDictionary *dict = (NSDictionary *)json;
+            id msg = dict[@"errorMessage"] ?: dict[@"message"] ?: dict[@"msg"] ?: dict[@"errorMsg"];
+            if ([msg isKindOfClass:NSString.class]) {
+                message = (NSString *)msg;
+            } else if ([msg respondsToSelector:@selector(stringValue)]) {
+                message = [msg stringValue];
+            }
+            id c = dict[@"errorCode"] ?: dict[@"code"] ?: dict[@"status"] ?: dict[@"errCode"];
+            if ([c isKindOfClass:NSString.class]) {
+                code = (NSString *)c;
+            } else if ([c respondsToSelector:@selector(stringValue)]) {
+                code = [c stringValue];
+            }
+        }
+    }
+
+    if (message.length == 0 && code.length == 0) {
+        return nil;
+    }
+
+    APIError *apiError = [APIError errorWithBusinessCode:(code ?: @"")
+                                         businessMessage:(message.length > 0 ? message : error.localizedDescription)
+                                          underlyingError:error];
+    return apiError;
+}
+
 @interface APIManager ()
 
 @property (nonatomic, strong) AFHTTPSessionManager *sessionManager;
@@ -218,7 +270,10 @@ static void APIDebugPrintCurl(NSURLRequest *req, id parameters, NSString *method
     wrappedFailure = ^(NSURLSessionDataTask * task,NSError *error) {
 
         // 转换为APIError
-        APIError *apiError = [APIError errorFromNSError:error];
+        APIError *apiError = APIParseBusinessErrorFromNSError(error);
+        if (!apiError) {
+            apiError = [APIError errorFromNSError:error];
+        }
         apiError.requestPath = fullURL;
         apiError.maxRetryCount = weakSelf.maxRetryCount;
         apiError.retryInterval = weakSelf.retryInterval;

@@ -57,6 +57,9 @@ static char kRetryCountKey;
                            underlyingError:underlyingError];
     error.businessCode = businessCode;
     error.businessMessage = businessMessage;
+    if (businessMessage.length > 0) {
+        error.handlingStrategy = APIErrorHandlingStrategyShowAlert;
+    }
     
     return error;
 }

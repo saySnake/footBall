@@ -173,6 +173,7 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 @property (nonatomic, strong) AVCaptureSession *captureSession;
 @property (nonatomic, strong) AVCaptureVideoPreviewLayer *previewLayer;
 @property (nonatomic, assign) BOOL didHandleResult;
+@property (nonatomic, strong) dispatch_queue_t sessionQueue;
 @end
 
 @implementation ScanAddFriendViewController
@@ -180,6 +181,7 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = [UIColor blackColor];
+    self.sessionQueue = dispatch_queue_create("com.football.scan.capture.session", DISPATCH_QUEUE_SERIAL);
 
     UIButton *backBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     UIImage *backIcon = [UIImage imageNamed:@"ad_left"];
@@ -227,16 +229,12 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    if (self.captureSession && !self.captureSession.isRunning && !self.didHandleResult) {
-        [self.captureSession startRunning];
-    }
+    [self startCaptureSessionIfNeeded];
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
-    if (self.captureSession.isRunning) {
-        [self.captureSession stopRunning];
-    }
+    [self stopCaptureSessionIfNeeded];
 }
 
 - (void)onBack {
@@ -279,7 +277,7 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 
 - (void)setupAndStartCaptureSession {
     if (self.captureSession) {
-        if (!self.captureSession.isRunning) [self.captureSession startRunning];
+        [self startCaptureSessionIfNeeded];
         return;
     }
 
@@ -310,7 +308,7 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
     self.previewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
     self.previewLayer.frame = self.view.bounds;
     [self.view.layer insertSublayer:self.previewLayer atIndex:0];
-    [self.captureSession startRunning];
+    [self startCaptureSessionIfNeeded];
 }
 
 - (void)captureOutput:(AVCaptureOutput *)output didOutputMetadataObjects:(NSArray<__kindof AVMetadataObject *> *)metadataObjects fromConnection:(AVCaptureConnection *)connection {
@@ -320,13 +318,37 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
     NSString *content = obj.stringValue ?: @"";
     if (content.length == 0) return;
     self.didHandleResult = YES;
-    [self.captureSession stopRunning];
+    [self stopCaptureSessionIfNeeded];
     [self.navigationController popViewControllerAnimated:YES];
     if (self.onScanned) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             self.onScanned(content);
         });
     }
+}
+
+- (void)startCaptureSessionIfNeeded {
+    if (!self.captureSession || self.didHandleResult) return;
+    __weak typeof(self) weakSelf = self;
+    dispatch_async(self.sessionQueue, ^{
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self || !self.captureSession || self.didHandleResult) return;
+        if (!self.captureSession.isRunning) {
+            [self.captureSession startRunning];
+        }
+    });
+}
+
+- (void)stopCaptureSessionIfNeeded {
+    if (!self.captureSession) return;
+    __weak typeof(self) weakSelf = self;
+    dispatch_async(self.sessionQueue, ^{
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self || !self.captureSession) return;
+        if (self.captureSession.isRunning) {
+            [self.captureSession stopRunning];
+        }
+    });
 }
 
 @end
@@ -772,6 +794,43 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
     return @"";
 }
 
+- (NSString *)scanSuccessMessageFromResponse:(HTTPResponse *)responseObject {
+    if (![responseObject isKindOfClass:[HTTPResponse class]]) {
+        return NSLocalizedString(@"community_request_sent", nil);
+    }
+
+    NSMutableArray *candidates = [NSMutableArray array];
+    if (responseObject.errorMessage.length > 0) {
+        [candidates addObject:responseObject.errorMessage];
+    }
+
+    id payload = responseObject.dataObject ?: responseObject.data;
+    if ([payload isKindOfClass:[NSDictionary class]]) {
+        NSDictionary *dict = (NSDictionary *)payload;
+        for (NSString *key in @[@"message", @"msg", @"toast", @"tip", @"resultMessage"]) {
+            id value = dict[key];
+            if ([value isKindOfClass:[NSString class]] && ((NSString *)value).length > 0) {
+                [candidates addObject:value];
+            }
+        }
+        NSDictionary *inner = [dict[@"data"] isKindOfClass:[NSDictionary class]] ? dict[@"data"] : nil;
+        for (NSString *key in @[@"message", @"msg", @"toast", @"tip", @"resultMessage"]) {
+            id value = inner[key];
+            if ([value isKindOfClass:[NSString class]] && ((NSString *)value).length > 0) {
+                [candidates addObject:value];
+            }
+        }
+    }
+
+    for (NSString *candidate in candidates) {
+        NSString *trimmed = [candidate stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (trimmed.length > 0) {
+            return trimmed;
+        }
+    }
+    return NSLocalizedString(@"community_request_sent", nil);
+}
+
 - (void)sendScanAddFriendRequest:(NSString *)targetUserId {
     [self sendScanAddFriendRequestWithTargetUserId:targetUserId rawContent:nil allowFallback:NO];
 }
@@ -797,12 +856,12 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
         if (![self.activeScanRequestToken isEqualToString:requestToken]) return;
         self.activeScanRequestToken = nil;
         [self hideLoading];
-        [self showSuccess:NSLocalizedString(@"community_request_sent", nil)];
+        [self showSuccess:[self scanSuccessMessageFromResponse:responseObject]];
     } failure:^(NSError * _Nonnull error) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
         if (![self.activeScanRequestToken isEqualToString:requestToken]) return;
-        if (allowFallback && rawContent.length > 0) {
+        if (allowFallback && rawContent.length > 0 && [self shouldFallbackForScanError:error]) {
             self.activeScanRequestToken = nil;
             [self hideLoading];
             [self sendScanAddFriendRequestWithRawContent:rawContent];
@@ -813,6 +872,22 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
         NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"community_search_failed", nil);
         [self showError:msg];
     }];
+}
+
+- (BOOL)shouldFallbackForScanError:(NSError *)error {
+    NSString *msg = error.localizedDescription ?: @"";
+    if (msg.length == 0) {
+        return YES;
+    }
+    NSString *lower = msg.lowercaseString;
+    // 仅在明显是“入参不匹配/缺失”时才做回退，避免吞掉业务错误（如“请先完成实名认证”）。
+    NSArray<NSString *> *keywords = @[@"targetuserid", @"qrcodecontent", @"参数", @"param", @"field", @"missing", @"required"];
+    for (NSString *k in keywords) {
+        if ([lower containsString:k]) {
+            return YES;
+        }
+    }
+    return NO;
 }
 
 - (void)sendScanAddFriendRequestWithRawContent:(NSString *)rawContent {
@@ -843,7 +918,7 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
         if (![self.activeScanRequestToken isEqualToString:requestToken]) return;
         self.activeScanRequestToken = nil;
         [self hideLoading];
-        [self showSuccess:NSLocalizedString(@"community_request_sent", nil)];
+        [self showSuccess:[self scanSuccessMessageFromResponse:responseObject]];
     } failure:^(NSError * _Nonnull error) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;

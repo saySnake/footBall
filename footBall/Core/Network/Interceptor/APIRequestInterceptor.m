@@ -164,12 +164,15 @@
         }
         return nil;
     } else {
-        // 转换为APIError
-        APIError *apiError = [APIError errorFromNSError:error];
+        // 若上游已构造好业务错误，直接透传，避免丢失 businessCode / businessMessage。
+        APIError *apiError = [error isKindOfClass:APIError.class] ? (APIError *)error : [APIError errorFromNSError:error];
         
         // 调用错误处理回调
         if (self.errorHandler) {
             self.errorHandler(apiError);
+        }
+        if (apiError.businessMessage.length > 0) {
+            NSLog(@"❌ [API Business Error] code=%@ message=%@", apiError.businessCode ?: @"", apiError.businessMessage);
         }
         
         // 根据错误处理策略决定是否继续传播错误
