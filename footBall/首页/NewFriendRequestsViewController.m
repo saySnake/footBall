@@ -15,7 +15,6 @@
 #define kRequestPageBg   [UIColor colorWithRed:0.969 green:0.969 blue:0.969 alpha:1.0] // #F7F7F7
 static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 static NSString * const kCommunityPendingCountDidChangeNotification = @"community_pending_count_did_change";
-static NSString * const kCommunityAddedFriendsKey = @"community_added_friends";
 static NSString * const kCommunityFriendsDidChangeNotification = @"community_friends_did_change";
 
 typedef NS_ENUM(NSInteger, FriendRequestStatus) {
@@ -337,13 +336,7 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
         weakSelf.searchCandidates = @[];
     }];
 
-    [SocialRequest.shared getFriendRequestsPendingCountSuccess:^(HTTPResponse * _Nullable responseObject) {
-        NSInteger count = [responseObject.dataObject respondsToSelector:@selector(integerValue)] ? [responseObject.dataObject integerValue] : 0;
-        NSInteger actualPending = [weakSelf currentPendingRequestCount];
-        NSInteger finalCount = actualPending >= 0 ? actualPending : MAX(count, 0);
-        [weakSelf persistPendingCount:finalCount];
-    } failure:^(NSError * _Nonnull error) {
-    }];
+    [self refreshPendingCountFromServer];
 }
 
 - (NSInteger)currentPendingRequestCount {
@@ -373,6 +366,16 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
 
 - (void)syncPendingCountWithCurrentRequests {
     [self persistPendingCount:[self currentPendingRequestCount]];
+}
+
+- (void)refreshPendingCountFromServer {
+    __weak typeof(self) weakSelf = self;
+    [SocialRequest.shared getFriendRequestsPendingCountSuccess:^(HTTPResponse * _Nullable responseObject) {
+        NSInteger count = [responseObject.dataObject respondsToSelector:@selector(integerValue)] ? [responseObject.dataObject integerValue] : 0;
+        [weakSelf persistPendingCount:MAX(count, 0)];
+    } failure:^(NSError * _Nonnull error) {
+        [weakSelf syncPendingCountWithCurrentRequests];
+    }];
 }
 
 - (void)setupUI {
@@ -554,39 +557,15 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     if ([self statusForFriendRequest:request] != FriendRequestStatusPending) return;
     __weak typeof(self) weakSelf = self;
     [SocialRequest.shared processFriendRequest:request.requestId accept:accept success:^(HTTPResponse * _Nullable responseObject) {
-        if (accept) {
-            [weakSelf addFriendToCommunityList:request];
-        }
         [arr removeObjectAtIndex:row];
-        [weakSelf decreasePendingCountIfNeeded];
         [weakSelf.tableView reloadData];
+        [weakSelf refreshPendingCountFromServer];
+        if (accept) {
+            [[NSNotificationCenter defaultCenter] postNotificationName:kCommunityFriendsDidChangeNotification object:nil];
+        }
+        [weakSelf loadRemoteData];
     } failure:^(NSError * _Nonnull error) {
     }];
-}
-
-- (void)decreasePendingCountIfNeeded {
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    NSInteger count = [defaults integerForKey:kCommunityPendingCountKey];
-    if (count > 0) {
-        count -= 1;
-        [defaults setInteger:count forKey:kCommunityPendingCountKey];
-        [[NSNotificationCenter defaultCenter] postNotificationName:kCommunityPendingCountDidChangeNotification object:nil];
-    }
-}
-
-- (void)addFriendToCommunityList:(PNFriendRequest *)request {
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    NSArray *raw = [defaults arrayForKey:kCommunityAddedFriendsKey];
-    NSMutableArray *arr = raw ? [raw mutableCopy] : [NSMutableArray array];
-    NSDictionary *item = @{
-        @"name": request.fromUserNickname ?: NSLocalizedString(@"team_name_arsenal", nil),
-        @"odId": request.fromUserId ?: @"12653795",
-        @"statusText": NSLocalizedString(@"community_online_5m_ago", nil),
-        @"isOnline": @NO
-    };
-    [arr insertObject:item atIndex:0];
-    [defaults setObject:arr forKey:kCommunityAddedFriendsKey];
-    [[NSNotificationCenter defaultCenter] postNotificationName:kCommunityFriendsDidChangeNotification object:nil];
 }
 
 - (FriendRequestStatus)statusForFriendRequest:(PNFriendRequest *)request {

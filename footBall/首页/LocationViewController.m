@@ -6,16 +6,17 @@
 #import "LocationViewController.h"
 #import "AddFriendViewController.h"
 #import "MyQRCodeViewController.h"
+#import "CommunityRequest.h"
 #import <Masonry/Masonry.h>
 #import "ColorManager.h"
 #import <SDWebImage/SDWebImage.h>
+#import <YYModel/YYModel.h>
 
 #define kCommunityGreen    [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0] // #285D4B
 #define kCommunityHeaderBg [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0] // #0D2122
 #define kCommunityPageBg   [UIColor colorWithRed:0.976 green:0.980 blue:0.976 alpha:1.0] // #F9FAF9 设计稿内容区背景
 static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 static NSString * const kCommunityPendingCountDidChangeNotification = @"community_pending_count_did_change";
-static NSString * const kCommunityAddedFriendsKey = @"community_added_friends";
 static NSString * const kCommunityFriendsDidChangeNotification = @"community_friends_did_change";
 
 typedef NS_ENUM(NSInteger, CommunityRankType) {
@@ -274,6 +275,51 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
 @implementation LocationViewController
 
+- (NSArray<PNFriend *> *)pnFriendsFromCommunityData:(id)data {
+    if (!data || data == (id)kCFNull) {
+        return @[];
+    }
+    if ([data isKindOfClass:[NSArray class]]) {
+        return [self pnFriendsFromJSONArray:(NSArray *)data];
+    }
+    if ([data isKindOfClass:[NSDictionary class]]) {
+        NSDictionary *dict = (NSDictionary *)data;
+        for (NSString *key in @[@"list", @"records", @"items", @"rows", @"friends", @"content"]) {
+            id list = dict[key];
+            if ([list isKindOfClass:[NSArray class]]) {
+                return [self pnFriendsFromJSONArray:(NSArray *)list];
+            }
+        }
+        PNFriend *item = [PNFriend yy_modelWithJSON:dict];
+        if (item && (item.userId.length > 0 || item.nickname.length > 0)) {
+            return @[item];
+        }
+    }
+    return @[];
+}
+
+- (NSArray<PNFriend *> *)pnFriendsFromJSONArray:(NSArray *)raw {
+    NSMutableArray<PNFriend *> *out = [NSMutableArray array];
+    for (id item in raw) {
+        if ([item isKindOfClass:PNFriend.class]) {
+            PNFriend *f = (PNFriend *)item;
+            if (f.userId.length > 0 || f.nickname.length > 0) {
+                [out addObject:f];
+            }
+            continue;
+        }
+        if (![item isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        id payload = ((NSDictionary *)item)[@"friend"] ?: ((NSDictionary *)item)[@"user"] ?: item;
+        PNFriend *f = [PNFriend yy_modelWithJSON:payload];
+        if (f && (f.userId.length > 0 || f.nickname.length > 0)) {
+            [out addObject:f];
+        }
+    }
+    return out;
+}
+
 - (void)viewDidLoad {
     self.friends = @[];
     self.weekRanks = @[];
@@ -287,8 +333,10 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     [super viewDidLoad];
     self.view.backgroundColor = kCommunityPageBg;
     self.shouldShowNavigationBar = NO;
+    [self refreshPendingCountFromServer];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onPendingCountChanged) name:kCommunityPendingCountDidChangeNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onFriendsChanged) name:kCommunityFriendsDidChangeNotification object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onAppWillEnterForeground) name:UIApplicationWillEnterForegroundNotification object:nil];
 }
 
 - (void)viewDidLayoutSubviews {
@@ -303,6 +351,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     [super viewWillAppear:animated];
     self.pendingCount = [[NSUserDefaults standardUserDefaults] integerForKey:kCommunityPendingCountKey];
     [self loadRemoteFriends];
+    [self refreshPendingCountFromServer];
     [self.tableView reloadData];
     [self updateCommunityEmptyState];
     [self updatePendingBadge];
@@ -314,9 +363,9 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
 - (void)loadRemoteFriends {
     __weak typeof(self) weakSelf = self;
-    [SocialRequest.shared getFriendsSuccess:^(HTTPResponse * _Nullable responseObject) {
-        PNFriendPage *page = [responseObject.dataObject isKindOfClass:PNFriendPage.class] ? responseObject.dataObject : nil;
-        weakSelf.friends = page.list ?: @[];
+    [CommunityRequest.shared getCommunityFriendsWithPage:1 pageSize:50 success:^(HTTPResponse * _Nullable responseObject) {
+        id raw = responseObject.dataObject ?: responseObject.data;
+        weakSelf.friends = [weakSelf pnFriendsFromCommunityData:raw];
         [weakSelf.tableView reloadData];
         [weakSelf updateCommunityEmptyState];
     } failure:^(NSError * _Nonnull error) {
@@ -324,12 +373,17 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         [weakSelf.tableView reloadData];
         [weakSelf updateCommunityEmptyState];
     }];
+}
 
+- (void)refreshPendingCountFromServer {
+    __weak typeof(self) weakSelf = self;
     [SocialRequest.shared getFriendRequestsPendingCountSuccess:^(HTTPResponse * _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
         NSInteger count = [responseObject.dataObject respondsToSelector:@selector(integerValue)] ? [responseObject.dataObject integerValue] : 0;
-        weakSelf.pendingCount = MAX(count, 0);
-        [[NSUserDefaults standardUserDefaults] setInteger:weakSelf.pendingCount forKey:kCommunityPendingCountKey];
-        [weakSelf updatePendingBadge];
+        self.pendingCount = MAX(count, 0);
+        [[NSUserDefaults standardUserDefaults] setInteger:self.pendingCount forKey:kCommunityPendingCountKey];
+        [self updatePendingBadge];
     } failure:^(NSError * _Nonnull error) {
     }];
 }
@@ -619,12 +673,17 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 - (void)onPendingCountChanged {
     self.pendingCount = [[NSUserDefaults standardUserDefaults] integerForKey:kCommunityPendingCountKey];
     [self updatePendingBadge];
+    [self refreshPendingCountFromServer];
 }
 
 - (void)onFriendsChanged {
     [self loadRemoteFriends];
     [self.tableView reloadData];
     [self updateCommunityEmptyState];
+}
+
+- (void)onAppWillEnterForeground {
+    [self refreshPendingCountFromServer];
 }
 
 - (void)updatePendingBadge {
@@ -701,6 +760,12 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     if (self.isFriendsTab) {
         CommunityFriendCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CommunityFriendCell" forIndexPath:indexPath];
         [cell configureWithFriend:self.friends[indexPath.row]];
+        cell.stampBtn.tag = indexPath.row;
+        [cell.stampBtn removeTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];
+        [cell.stampBtn addTarget:self action:@selector(onFriendStampsTapped:) forControlEvents:UIControlEventTouchUpInside];
+        cell.dataBtn.tag = indexPath.row;
+        [cell.dataBtn removeTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];
+        [cell.dataBtn addTarget:self action:@selector(onFriendDataTapped:) forControlEvents:UIControlEventTouchUpInside];
         return cell;
     }
     CommunityRankCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CommunityRankCell" forIndexPath:indexPath];
@@ -746,6 +811,44 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         completion(board.list ?: @[]);
     } failure:^(NSError * _Nonnull error) {
         completion(@[]);
+    }];
+}
+
+- (void)onFriendStampsTapped:(UIButton *)sender {
+    if (sender.tag < 0 || sender.tag >= self.friends.count) return;
+    PNFriend *friend = self.friends[sender.tag];
+    if (friend.userId.length == 0) return;
+    [self showLoading];
+    __weak typeof(self) weakSelf = self;
+    [CommunityRequest.shared getFriendStamps:friend.userId success:^(HTTPResponse * _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [self hideLoading];
+    } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [self hideLoading];
+        NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"community_search_failed", nil);
+        [self showError:msg];
+    }];
+}
+
+- (void)onFriendDataTapped:(UIButton *)sender {
+    if (sender.tag < 0 || sender.tag >= self.friends.count) return;
+    PNFriend *friend = self.friends[sender.tag];
+    if (friend.userId.length == 0) return;
+    [self showLoading];
+    __weak typeof(self) weakSelf = self;
+    [CommunityRequest.shared getFriendData:friend.userId success:^(HTTPResponse * _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [self hideLoading];
+    } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [self hideLoading];
+        NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"community_search_failed", nil);
+        [self showError:msg];
     }];
 }
 

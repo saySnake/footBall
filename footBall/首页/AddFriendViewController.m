@@ -9,12 +9,12 @@
 #import "ColorManager.h"
 #import "SocialRequest.h"
 #import <SDWebImage/SDWebImage.h>
+#import <AVFoundation/AVFoundation.h>
 
 #define kAddFriendGreen    [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0] // #285D4B
 #define kAddFriendHeaderBg [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0] // #0D2122
 #define kAddFriendPageBg   [UIColor colorWithRed:0.969 green:0.969 blue:0.969 alpha:1.0] // #F7F7F7
 static NSString * const kCommunityPendingCountKey = @"community_pending_count";
-static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_search_friend_ids";
 
 @interface SearchResultCell : UITableViewCell
 @property (nonatomic, strong) UIView *cardView;
@@ -168,6 +168,167 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 }
 @end
 
+@interface ScanAddFriendViewController : UIViewController <AVCaptureMetadataOutputObjectsDelegate>
+@property (nonatomic, copy) void (^onScanned)(NSString *content);
+@property (nonatomic, strong) AVCaptureSession *captureSession;
+@property (nonatomic, strong) AVCaptureVideoPreviewLayer *previewLayer;
+@property (nonatomic, assign) BOOL didHandleResult;
+@end
+
+@implementation ScanAddFriendViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [UIColor blackColor];
+
+    UIButton *backBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    UIImage *backIcon = [UIImage imageNamed:@"ad_left"];
+    if (!backIcon && @available(iOS 13.0, *)) {
+        backIcon = [UIImage systemImageNamed:@"arrow.left"];
+    }
+    [backBtn setImage:backIcon forState:UIControlStateNormal];
+    backBtn.tintColor = [UIColor whiteColor];
+    [backBtn addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:backBtn];
+    [backBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.view).offset(16);
+        make.top.equalTo(self.view.mas_safeAreaLayoutGuideTop).offset(8);
+        make.size.mas_equalTo(CGSizeMake(32, 32));
+    }];
+
+    UILabel *tip = [UILabel new];
+    tip.textColor = [UIColor whiteColor];
+    tip.textAlignment = NSTextAlignmentCenter;
+    tip.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    tip.text = NSLocalizedString(@"community_scan_add_friend_subtitle", nil);
+    [self.view addSubview:tip];
+    [tip mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(self.view);
+        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-36);
+    }];
+
+    UIView *focus = [UIView new];
+    focus.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.9].CGColor;
+    focus.layer.borderWidth = 1.2;
+    focus.backgroundColor = [UIColor clearColor];
+    [self.view addSubview:focus];
+    [focus mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.center.equalTo(self.view);
+        make.size.mas_equalTo(CGSizeMake(230, 230));
+    }];
+
+    [self ensureCameraPermissionAndStart];
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    self.previewLayer.frame = self.view.bounds;
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    if (self.captureSession && !self.captureSession.isRunning && !self.didHandleResult) {
+        [self.captureSession startRunning];
+    }
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    if (self.captureSession.isRunning) {
+        [self.captureSession stopRunning];
+    }
+}
+
+- (void)onBack {
+    [self.navigationController popViewControllerAnimated:YES];
+}
+
+- (void)ensureCameraPermissionAndStart {
+    AVAuthorizationStatus status = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo];
+    if (status == AVAuthorizationStatusAuthorized) {
+        [self setupAndStartCaptureSession];
+        return;
+    }
+    if (status == AVAuthorizationStatusNotDetermined) {
+        __weak typeof(self) weakSelf = self;
+        [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo completionHandler:^(BOOL granted) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                __strong typeof(weakSelf) self = weakSelf;
+                if (!self) return;
+                if (granted) {
+                    [self setupAndStartCaptureSession];
+                } else {
+                    [self showPermissionAlert];
+                }
+            });
+        }];
+        return;
+    }
+    [self showPermissionAlert];
+}
+
+- (void)showPermissionAlert {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil
+                                                                   message:@"请在系统设置中开启相机权限后再扫码"
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"知道了" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        [self.navigationController popViewControllerAnimated:YES];
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)setupAndStartCaptureSession {
+    if (self.captureSession) {
+        if (!self.captureSession.isRunning) [self.captureSession startRunning];
+        return;
+    }
+
+    AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+    NSError *error = nil;
+    AVCaptureDeviceInput *input = [AVCaptureDeviceInput deviceInputWithDevice:device error:&error];
+    if (!input || error) {
+        [self showPermissionAlert];
+        return;
+    }
+
+    AVCaptureMetadataOutput *output = [[AVCaptureMetadataOutput alloc] init];
+    self.captureSession = [[AVCaptureSession alloc] init];
+    if ([self.captureSession canAddInput:input]) {
+        [self.captureSession addInput:input];
+    }
+    if ([self.captureSession canAddOutput:output]) {
+        [self.captureSession addOutput:output];
+    }
+    [output setMetadataObjectsDelegate:self queue:dispatch_get_main_queue()];
+    if ([output.availableMetadataObjectTypes containsObject:AVMetadataObjectTypeQRCode]) {
+        output.metadataObjectTypes = @[AVMetadataObjectTypeQRCode];
+    } else {
+        output.metadataObjectTypes = output.availableMetadataObjectTypes;
+    }
+
+    self.previewLayer = [AVCaptureVideoPreviewLayer layerWithSession:self.captureSession];
+    self.previewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
+    self.previewLayer.frame = self.view.bounds;
+    [self.view.layer insertSublayer:self.previewLayer atIndex:0];
+    [self.captureSession startRunning];
+}
+
+- (void)captureOutput:(AVCaptureOutput *)output didOutputMetadataObjects:(NSArray<__kindof AVMetadataObject *> *)metadataObjects fromConnection:(AVCaptureConnection *)connection {
+    if (self.didHandleResult) return;
+    AVMetadataMachineReadableCodeObject *obj = metadataObjects.firstObject;
+    if (![obj isKindOfClass:AVMetadataMachineReadableCodeObject.class]) return;
+    NSString *content = obj.stringValue ?: @"";
+    if (content.length == 0) return;
+    self.didHandleResult = YES;
+    [self.captureSession stopRunning];
+    if (self.onScanned) {
+        self.onScanned(content);
+    }
+    [self.navigationController popViewControllerAnimated:YES];
+}
+
+@end
+
 @interface AddFriendViewController () <UITableViewDataSource, UITableViewDelegate, UITextFieldDelegate>
 @property (nonatomic, strong) UIView *headerView;
 @property (nonatomic, strong) UILabel *titleLabel;
@@ -175,7 +336,6 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 @property (nonatomic, strong) UIButton *searchBtn;
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) NSArray<PNUser *> *searchResults;
-@property (nonatomic, strong) NSMutableSet<NSString *> *sentFriendIds;
 @property (nonatomic, strong) NSMutableSet<NSString *> *sendingFriendIds;
 @property (nonatomic, assign) BOOL isSearching;
 @property (nonatomic, assign) NSInteger pendingRequestCount;
@@ -201,8 +361,6 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     self.hidesBottomBarWhenPushed = YES;
     NSInteger storedCount = [[NSUserDefaults standardUserDefaults] integerForKey:kCommunityPendingCountKey];
     self.pendingRequestCount = MAX(0, storedCount);
-    NSArray *sentIds = [[NSUserDefaults standardUserDefaults] arrayForKey:kCommunitySentSearchFriendIdsKey];
-    self.sentFriendIds = [NSMutableSet setWithArray:(sentIds ?: @[])];
     self.sendingFriendIds = [NSMutableSet set];
     [super viewDidLoad];
     // 勿再次调用 setupUI / updateLocalizedStrings：QMBaseViewController.viewDidLoad 已调用，重复会导致头部与列表叠两层
@@ -434,14 +592,12 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
         SearchResultCell *cell = [tableView dequeueReusableCellWithIdentifier:@"SearchResultCell" forIndexPath:indexPath];
         PNUser *result = self.searchResults[indexPath.row];
         [cell configureWithResult:result];
-        BOOL sent = [self.sentFriendIds containsObject:result.userId];
         BOOL sending = [self.sendingFriendIds containsObject:result.userId];
-        NSString *title = sent ? NSLocalizedString(@"community_request_sent", nil) : NSLocalizedString(@"community_add_friend", nil);
-        [cell.addBtn setTitle:title forState:UIControlStateNormal];
-        UIColor *titleColor = (sent || sending) ? [UIColor grayColor] : [UIColor blackColor];
+        [cell.addBtn setTitle:NSLocalizedString(@"community_add_friend", nil) forState:UIControlStateNormal];
+        UIColor *titleColor = sending ? [UIColor grayColor] : [UIColor blackColor];
         [cell.addBtn setTitleColor:titleColor forState:UIControlStateNormal];
-        cell.addBtn.layer.borderColor = (sent || sending) ? [UIColor lightGrayColor].CGColor : [UIColor colorWithWhite:0.75 alpha:1.0].CGColor;
-        cell.addBtn.enabled = !sent && !sending;
+        cell.addBtn.layer.borderColor = sending ? [UIColor lightGrayColor].CGColor : [UIColor colorWithWhite:0.75 alpha:1.0].CGColor;
+        cell.addBtn.enabled = !sending;
         cell.addBtn.tag = indexPath.row;
         [cell.addBtn removeTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];
         [cell.addBtn addTarget:self action:@selector(onAddSearchFriendTapped:) forControlEvents:UIControlEventTouchUpInside];
@@ -481,6 +637,10 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     if (!self.isSearching && indexPath.row == 0) {
         NewFriendRequestsViewController *vc = [[NewFriendRequestsViewController alloc] init];
         [self.navigationController pushViewController:vc animated:YES];
+        return;
+    }
+    if (!self.isSearching && indexPath.row == 1) {
+        [self onScanAddFriend];
     }
 }
 
@@ -495,10 +655,6 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
 - (void)onAddSearchFriendTapped:(UIButton *)sender {
     if (sender.tag < 0 || sender.tag >= self.searchResults.count) return;
     PNUser *result = self.searchResults[sender.tag];
-    if ([self.sentFriendIds containsObject:result.userId]) {
-        [self showSuccess:NSLocalizedString(@"community_request_sent", nil)];
-        return;
-    }
     if (result.userId.length == 0) {
         [self showError:NSLocalizedString(@"community_search_failed", nil)];
         return;
@@ -518,14 +674,12 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
     [self.tableView reloadRowsAtIndexPaths:@[tappedIndexPath]
                           withRowAnimation:UITableViewRowAnimationNone];
 
-    NSDictionary *body = @{@"toUserId": @([result.userId longLongValue])};
+    NSDictionary *body = @{@"targetUserId": @([result.userId longLongValue])};
     __weak typeof(self) weakSelf = self;
     [SocialRequest.shared sendFriendRequestWithBody:body success:^(HTTPResponse * _Nullable responseObject) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
         [self.sendingFriendIds removeObject:result.userId];
-        [self.sentFriendIds addObject:result.userId];
-        [[NSUserDefaults standardUserDefaults] setObject:self.sentFriendIds.allObjects forKey:kCommunitySentSearchFriendIdsKey];
         NSUInteger idx = [self.searchResults indexOfObjectPassingTest:^BOOL(PNUser * _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
             return [obj.userId isEqualToString:result.userId];
         }];
@@ -553,6 +707,76 @@ static NSString * const kCommunitySentSearchFriendIdsKey = @"community_sent_sear
         } else {
             [self.tableView reloadData];
         }
+        NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"community_search_failed", nil);
+        [self showError:msg];
+    }];
+}
+
+- (void)onScanAddFriend {
+    ScanAddFriendViewController *scanVC = [ScanAddFriendViewController new];
+    scanVC.hidesBottomBarWhenPushed = YES;
+    __weak typeof(self) weakSelf = self;
+    scanVC.onScanned = ^(NSString * _Nonnull content) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        NSString *targetUserId = [self targetUserIdFromScanContent:content];
+        if (targetUserId.length == 0) {
+            [self showError:NSLocalizedString(@"community_search_failed", nil)];
+            return;
+        }
+        [self sendScanAddFriendRequest:targetUserId];
+    };
+    [self.navigationController pushViewController:scanVC animated:YES];
+}
+
+- (NSString *)targetUserIdFromScanContent:(NSString *)content {
+    NSString *trimmed = [content stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmed.length == 0) return @"";
+
+    NSCharacterSet *nonDigits = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
+    if ([trimmed rangeOfCharacterFromSet:nonDigits].location == NSNotFound) {
+        return trimmed;
+    }
+
+    NSURLComponents *components = [NSURLComponents componentsWithString:trimmed];
+    NSArray<NSString *> *queryKeys = @[@"targetUserId", @"userId", @"uid", @"id"];
+    for (NSString *key in queryKeys) {
+        NSString *value = [self queryValueForKey:key inComponents:components];
+        if (value.length > 0 && [value rangeOfCharacterFromSet:nonDigits].location == NSNotFound) {
+            return value;
+        }
+    }
+
+    NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@"(\\d{4,})" options:0 error:nil];
+    NSTextCheckingResult *match = [regex firstMatchInString:trimmed options:0 range:NSMakeRange(0, trimmed.length)];
+    if (match.numberOfRanges > 1) {
+        return [trimmed substringWithRange:[match rangeAtIndex:1]];
+    }
+    return @"";
+}
+
+- (NSString *)queryValueForKey:(NSString *)key inComponents:(NSURLComponents *)components {
+    for (NSURLQueryItem *item in components.queryItems) {
+        if ([item.name isEqualToString:key]) {
+            return item.value ?: @"";
+        }
+    }
+    return @"";
+}
+
+- (void)sendScanAddFriendRequest:(NSString *)targetUserId {
+    [self showLoading];
+    __weak typeof(self) weakSelf = self;
+    NSDictionary *payload = @{@"targetUserId": @([targetUserId longLongValue])};
+    [SocialRequest.shared scanAddFriendWithPayload:payload success:^(HTTPResponse * _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [self hideLoading];
+        [self showSuccess:NSLocalizedString(@"community_request_sent", nil)];
+    } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [self hideLoading];
         NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"community_search_failed", nil);
         [self showError:msg];
     }];
