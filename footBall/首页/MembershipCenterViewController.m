@@ -964,7 +964,7 @@
             make.leading.equalTo(originPrice).offset(-1);
             make.trailing.equalTo(originPrice).offset(1);
             make.centerY.equalTo(originPrice).offset(1);
-            make.height.mas_equalTo(large ? 2.0 : 1.2);
+            make.height.mas_equalTo(large ? 0.6 : 0.25);
         }];
     }
 
