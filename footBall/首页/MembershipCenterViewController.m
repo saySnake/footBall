@@ -706,21 +706,11 @@
     }];
 
     self.redeemHelpLabel = [UILabel new];
-    self.redeemHelpLabel.text = @"兑换失败  点此寻求帮助";
+    self.redeemHelpLabel.text = @"兑换失败  点击寻求帮助";
     self.redeemHelpLabel.textAlignment = NSTextAlignmentCenter;
     self.redeemHelpLabel.font = [UIFont systemFontOfSize:6 weight:UIFontWeightLight];
     self.redeemHelpLabel.hidden = YES;
-    NSMutableAttributedString *helpAttr = [[NSMutableAttributedString alloc] initWithString:self.redeemHelpLabel.text attributes:@{
-        NSForegroundColorAttributeName: [UIColor colorWithWhite:1 alpha:0.78]
-    }];
-    NSRange failRange = [self.redeemHelpLabel.text rangeOfString:@"兑换失败"];
-    if (failRange.location != NSNotFound) {
-        [helpAttr addAttributes:@{
-            NSForegroundColorAttributeName: [UIColor colorWithRed:147/255.0 green:205/255.0 blue:1.0 alpha:1.0],
-            NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle)
-        } range:failRange];
-    }
-    self.redeemHelpLabel.attributedText = helpAttr;
+    [self applyRedeemHelpLabelStyle];
     [self.redeemDialogView addSubview:self.redeemHelpLabel];
     [self.redeemHelpLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.redeemInputWrapView.mas_bottom).offset(12);
@@ -1351,8 +1341,33 @@
 - (void)updateRedeemDialogForInput {
     NSString *code = self.redeemInputField.text ?: @"";
     BOOL hasInput = code.length > 0;
+    [self applyRedeemHelpLabelStyle];
     self.redeemHelpLabel.hidden = !hasInput;
     self.redeemConfirmBtn.alpha = code.length == 5 ? 1.0 : 0.88;
+}
+
+- (void)applyRedeemHelpLabelStyle {
+    NSString *text = self.redeemHelpLabel.text ?: @"";
+    NSMutableAttributedString *helpAttr = [[NSMutableAttributedString alloc] initWithString:text attributes:@{
+        NSForegroundColorAttributeName: [UIColor colorWithRed:219/255.0 green:219/255.0 blue:219/255.0 alpha:1.0] // #DBDBDB
+    }];
+    NSRange failRange = [text rangeOfString:@"兑换失败"];
+    if (failRange.location != NSNotFound) {
+        [helpAttr addAttributes:@{
+            NSForegroundColorAttributeName: [UIColor colorWithRed:147/255.0 green:205/255.0 blue:1.0 alpha:1.0], // #93CDFF
+            NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle)
+        } range:failRange];
+    }
+    NSRange helpRange = [text rangeOfString:@"点击寻求帮助"];
+    if (helpRange.location == NSNotFound) {
+        helpRange = [text rangeOfString:@"点此寻求帮助"];
+    }
+    if (helpRange.location != NSNotFound) {
+        [helpAttr addAttribute:NSForegroundColorAttributeName
+                         value:[UIColor colorWithRed:219/255.0 green:219/255.0 blue:219/255.0 alpha:1.0] // #DBDBDB
+                         range:helpRange];
+    }
+    self.redeemHelpLabel.attributedText = helpAttr;
 }
 
 - (void)onTapRedeemDialogConfirm {
