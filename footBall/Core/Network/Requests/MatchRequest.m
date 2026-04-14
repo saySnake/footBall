@@ -35,6 +35,29 @@ static NSArray *PNMatchJSONArrayFromPageData(id data) {
     return nil;
 }
 
+/// /matches/my-team 可能返回 list，或拆分为 upcoming/finished 两段，统一拍平成数组。
+static NSArray *PNMatchJSONArrayFromMyTeamData(id data) {
+    NSArray *list = PNMatchJSONArrayFromPageData(data);
+    if (list) return list;
+    if (![data isKindOfClass:NSDictionary.class]) return nil;
+    NSDictionary *d = (NSDictionary *)data;
+    NSMutableArray *merged = [NSMutableArray array];
+    NSArray<NSString *> *keys = @[
+        @"upcoming", @"upcomingMatches", @"futureMatches", @"notStartedMatches",
+        @"finished", @"finishedMatches", @"pastMatches", @"endedMatches"
+    ];
+    for (NSString *k in keys) {
+        id arr = d[k];
+        if ([arr isKindOfClass:NSArray.class]) {
+            [merged addObjectsFromArray:(NSArray *)arr];
+        } else if ([arr isKindOfClass:NSDictionary.class]) {
+            NSArray *inner = PNMatchJSONArrayFromPageData(arr);
+            if (inner.count > 0) [merged addObjectsFromArray:inner];
+        }
+    }
+    return merged.count > 0 ? merged : nil;
+}
+
 @implementation MatchRequest
 
 + (instancetype)shared {
@@ -189,7 +212,7 @@ static NSArray *PNMatchJSONArrayFromPageData(id data) {
     NSDictionary *params = @{ @"pageNum": @(MAX(page, 1)), @"pageSize": @(MAX(pageSize, 1)) };
     [[APIManager sharedManager] GET:APIPathValueMatchMyTeams parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            NSArray *list = PNMatchJSONArrayFromPageData(responseObject.data);
+            NSArray *list = PNMatchJSONArrayFromMyTeamData(responseObject.data);
             if (!list) {
                 list = @[];
             }

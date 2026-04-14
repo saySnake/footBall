@@ -1001,6 +1001,12 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
 - (BOOL)isMatchFinished:(Match *)match {
     NSString *st = match.matchStatus.uppercaseString;
     if (st.length > 0) {
+        if ([st isEqualToString:@"0"] || [st isEqualToString:@"1"]) {
+            return NO;
+        }
+        if ([st isEqualToString:@"2"] || [st isEqualToString:@"3"]) {
+            return YES;
+        }
         if ([st containsString:@"FINISH"] || [st containsString:@"COMPLETE"] || [st isEqualToString:@"FT"] || [st containsString:@"ENDED"]) {
             return YES;
         }
@@ -1010,13 +1016,25 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
         if ([st containsString:@"SCHEDULE"] || [st containsString:@"UPCOM"] || [st isEqualToString:@"NS"] || [st containsString:@"LIVE"]) {
             return NO;
         }
-        if ([st containsString:@"未开始"] || [st containsString:@"未赛"] || [st containsString:@"待定"]) {
+        if ([st containsString:@"NOT_START"] || [st containsString:@"NOTSTART"] || [st containsString:@"PENDING"] || [st containsString:@"POSTPON"] || [st containsString:@"DELAY"]) {
+            return NO;
+        }
+        if ([st containsString:@"未开始"] || [st containsString:@"未赛"] || [st containsString:@"待定"] || [st containsString:@"延期"]) {
             return NO;
         }
     }
     NSDate *kickoff = [self dateFromRaw:match.matchDate];
     if (!kickoff) {
         return NO;
+    }
+    // 仅有日期（无具体时分）时，默认按当天未开赛处理，避免被误判进“已经观赛”。
+    NSString *raw = [match.matchDate stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    BOOL dateOnly = (raw.length > 0 && [raw rangeOfString:@":"].location == NSNotFound && [raw rangeOfString:@"T"].location == NSNotFound);
+    if (dateOnly) {
+        NSCalendar *cal = [NSCalendar currentCalendar];
+        if ([cal isDate:kickoff inSameDayAsDate:[NSDate date]]) {
+            return NO;
+        }
     }
     return [kickoff compare:[NSDate date]] == NSOrderedAscending;
 }
