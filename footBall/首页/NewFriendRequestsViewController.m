@@ -58,6 +58,8 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
         _avatarView = [UIImageView new];
         _avatarView.layer.cornerRadius = 27;
         _avatarView.clipsToBounds = YES;
+        _avatarView.layer.borderWidth = 0.5;
+        _avatarView.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.9].CGColor;
 
         _nameLabel = [UILabel new];
         _nameLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
@@ -69,6 +71,8 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
 
         _statusDot = [UIView new];
         _statusDot.layer.cornerRadius = 4;
+        _statusDot.layer.borderWidth = 1.5;
+        _statusDot.layer.borderColor = [UIColor whiteColor].CGColor;
         _statusDot.hidden = YES;
 
         _statusLabel = [UILabel new];
@@ -155,8 +159,8 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
             make.trailing.lessThanOrEqualTo(_acceptBtn.mas_leading).offset(-8);
         }];
         [_statusDot mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_nameLabel);
-            make.top.equalTo(_idLabel.mas_bottom).offset(6);
+            make.leading.equalTo(_avatarView.mas_trailing).offset(-11);
+            make.top.equalTo(_avatarView.mas_bottom).offset(-11);
             make.size.mas_equalTo(CGSizeMake(8, 8));
         }];
         [_statusLabel mas_makeConstraints:^(MASConstraintMaker *make) {

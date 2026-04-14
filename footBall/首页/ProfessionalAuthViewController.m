@@ -19,7 +19,7 @@
 static CGFloat const kPAHeaderHeight = 240.f;
 static CGFloat const kPAWorkCardTop = 176.f;
 static CGFloat const kPAWorkCardSideInset = 16.f;
-static CGFloat const kPAWorkCardInnerInset = 13.f;
+static CGFloat const kPAWorkCardInnerInset = 14.f;
 static CGFloat const kPAGridInteritem = 15.f;
 static CGFloat const kPAGridLineSpacing = 18.f;
 /// 稿中单元约 150×206
@@ -39,12 +39,7 @@ static CGFloat const kPAVerifiedCardBottomInset = 23.f;  // 685−662
 static const NSInteger kMaxProfessionalImages = 4;
 
 static CGSize kPAGridCellSizeForScreen(void) {
-    CGFloat screenW = CGRectGetWidth([UIScreen mainScreen].bounds);
-    CGFloat cardW = screenW - kPAWorkCardSideInset * 2;
-    CGFloat inner = cardW - kPAWorkCardInnerInset * 2 - kPAGridInteritem;
-    CGFloat cellW = inner / 2.0;
-    CGFloat cellH = cellW * kPACellRefH / kPACellRefW;
-    return CGSizeMake(cellW, cellH);
+    return CGSizeMake(kPACellRefW, kPACellRefH);
 }
 
 @interface ProfessionalAuthViewController () <UIImagePickerControllerDelegate, UINavigationControllerDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout>
@@ -137,20 +132,15 @@ static CGSize kPAGridCellSizeForScreen(void) {
     backBtn.adjustsImageWhenHighlighted = NO;
     [backBtn addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
     [self.headerView addSubview:backBtn];
-    static CGFloat const kBackHit = 44.f;
-    static CGFloat const kBackVisual = 24.f;
-    CGFloat backInset = (kBackHit - kBackVisual) / 2.f;
-    backBtn.imageEdgeInsets = UIEdgeInsetsMake(backInset, 0, backInset, 0);
-    backBtn.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
     [backBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         if (@available(iOS 11.0, *)) {
-            make.left.equalTo(self.view.mas_safeAreaLayoutGuideLeft).offset(14);
+            make.left.equalTo(self.view.mas_safeAreaLayoutGuideLeft).offset(16);
             make.top.equalTo(self.view.mas_safeAreaLayoutGuideTop).offset(17);
         } else {
-            make.left.equalTo(self.headerView).offset(14);
+            make.left.equalTo(self.headerView).offset(16);
             make.top.equalTo(self.mas_topLayoutGuide).offset(17);
         }
-        make.size.mas_equalTo(CGSizeMake(kBackHit, kBackHit));
+        make.size.mas_equalTo(CGSizeMake(24, 24));
     }];
 
     UILabel *navTitle = [UILabel new];
@@ -170,7 +160,7 @@ static CGSize kPAGridCellSizeForScreen(void) {
     self.hintLabel.numberOfLines = 0;
     [self.headerView addSubview:self.hintLabel];
     [self.hintLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(backBtn.mas_bottom).offset(23);
+        make.top.equalTo(backBtn.mas_bottom).offset(22);
         if (@available(iOS 11.0, *)) {
             make.left.equalTo(self.view.mas_safeAreaLayoutGuideLeft).offset(14);
             make.right.equalTo(self.view.mas_safeAreaLayoutGuideRight).offset(-14);
@@ -187,7 +177,7 @@ static CGSize kPAGridCellSizeForScreen(void) {
     self.subHintLabel.numberOfLines = 0;
     [self.headerView addSubview:self.subHintLabel];
     [self.subHintLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.hintLabel.mas_bottom).offset(9);
+        make.top.equalTo(self.hintLabel.mas_bottom).offset(5);
         if (@available(iOS 11.0, *)) {
             make.left.equalTo(self.view.mas_safeAreaLayoutGuideLeft).offset(14);
             make.right.equalTo(self.view.mas_safeAreaLayoutGuideRight).offset(-14);
@@ -263,11 +253,11 @@ static CGSize kPAGridCellSizeForScreen(void) {
     [self.collectionView registerClass:[UICollectionViewCell class] forCellWithReuseIdentifier:@"cell"];
     [self.workCard addSubview:self.collectionView];
     [self.collectionView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.workTitleLabel.mas_bottom).offset(12);
+        make.top.equalTo(self.workTitleLabel.mas_bottom).offset(18);
         make.leading.equalTo(self.workCard).offset(kPAWorkCardInnerInset);
         make.trailing.equalTo(self.workCard).offset(-kPAWorkCardInnerInset);
         make.height.mas_equalTo(gridH);
-        make.bottom.equalTo(self.workCard).offset(-20);
+        make.bottom.equalTo(self.workCard).offset(-21);
     }];
 
     self.submitBtn = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -283,7 +273,7 @@ static CGSize kPAGridCellSizeForScreen(void) {
     [self.submitBtn addTarget:self action:@selector(onSubmit) forControlEvents:UIControlEventTouchUpInside];
     [self.content addSubview:self.submitBtn];
     [self.submitBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.workCard.mas_bottom).offset(24);
+        make.top.equalTo(self.workCard.mas_bottom).offset(43);
         make.leading.equalTo(self.content).offset(24);
         make.trailing.equalTo(self.content).offset(-24);
         make.height.mas_equalTo(52);
