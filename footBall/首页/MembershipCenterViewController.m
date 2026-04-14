@@ -13,6 +13,8 @@
 #define kMCPageBg [UIColor colorWithRed:13/255.0 green:33/255.0 blue:34/255.0 alpha:1.0]
 #define kMCMint [UIColor colorWithRed:83/255.0 green:204/255.0 blue:158/255.0 alpha:1.0]
 #define kMCMintBorder [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:0.90]
+#define kMCDiscountMint [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0]
+#define kMCDiscountHintGray [UIColor colorWithRed:203/255.0 green:203/255.0 blue:203/255.0 alpha:1.0]
 
 @interface MCPlan : NSObject
 @property (nonatomic, copy) NSString *title;
@@ -257,7 +259,7 @@
     }];
     self.bannerSubLabel = [UILabel new];
     self.bannerSubLabel.text = @"限时兑换码";
-    self.bannerSubLabel.textColor = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
+    self.bannerSubLabel.textColor = kMCDiscountMint;
     self.bannerSubLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
     [self.bannerCard addSubview:self.bannerSubLabel];
     [self.bannerSubLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -266,7 +268,7 @@
     }];
     self.bannerHintLabel = [UILabel new];
     self.bannerHintLabel.text = @"使用限时兑换码，解锁专属会员优惠";
-    self.bannerHintLabel.textColor = [UIColor colorWithWhite:1 alpha:0.5];
+    self.bannerHintLabel.textColor = kMCDiscountHintGray;
     self.bannerHintLabel.font = [UIFont systemFontOfSize:8 weight:UIFontWeightLight];
     [self.bannerCard addSubview:self.bannerHintLabel];
     [self.bannerHintLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -572,6 +574,7 @@
 
     self.agreementCheckBtn.selected = NO;
     [self.agreementCheckBtn setTitle:@"" forState:UIControlStateNormal];
+    [self refreshRedeemBannerState];
     [self applyPlanAtIndex:self.currentIndex animated:NO];
     [self updatePayButtonState];
     [self switchToGiftMode:NO];
@@ -924,8 +927,15 @@
     UILabel *hint = [UILabel new];
     hint.text = hintText.length ? hintText : nil;
     hint.hidden = hintText.length == 0;
-    hint.textColor = [UIColor colorWithRed:147/255.0 green:221/255.0 blue:196/255.0 alpha:1.0];
-    hint.font = [UIFont systemFontOfSize:isLargeFounderPlan ? 9.2 : 6.9];
+    hint.textColor = [UIColor colorWithRed:147/255.0 green:221/255.0 blue:196/255.0 alpha:1.0]; // #93DDC4
+    CGFloat hintSize = 6.9;
+    if (isLargeFounderPlan) {
+        hintSize = 9.2;
+    } else if (large && isMonthlyPlan) {
+        // Figma 兑换后「限时优惠」在月卡上字号更大。
+        hintSize = 9.248;
+    }
+    hint.font = [UIFont systemFontOfSize:hintSize];
     hint.textAlignment = NSTextAlignmentRight;
     [card addSubview:hint];
 
@@ -933,6 +943,7 @@
     UILabel *originPrice = [UILabel new];
     originPrice.hidden = originalPriceText.length == 0;
     originPrice.attributedText = [self cardOriginalPriceAttrTextForPlan:plan large:large];
+    originPrice.textColor = kMCDiscountHintGray;
     originPrice.textAlignment = NSTextAlignmentRight;
     [card addSubview:originPrice];
     [originPrice mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -945,6 +956,17 @@
             make.bottom.equalTo(card).offset(large ? -79 : -58);
         }
     }];
+    if (!originPrice.hidden) {
+        UIView *strikeLine = [UIView new];
+        strikeLine.backgroundColor = kMCDiscountHintGray;
+        [card addSubview:strikeLine];
+        [strikeLine mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(originPrice).offset(-1);
+            make.trailing.equalTo(originPrice).offset(1);
+            make.centerY.equalTo(originPrice).offset(1);
+            make.height.mas_equalTo(large ? 2.0 : 1.2);
+        }];
+    }
 
     [hint mas_makeConstraints:^(MASConstraintMaker *make) {
         if (large && isMonthlyPlan && !originPrice.hidden) {
@@ -1109,15 +1131,27 @@
     CGFloat numberSize = large ? 16.0 : 13.0;
     CGFloat unitSize = large ? 8.0 : 6.5;
     NSMutableAttributedString *attr = [[NSMutableAttributedString alloc] initWithString:full attributes:@{
-        NSForegroundColorAttributeName: [UIColor colorWithRed:203/255.0 green:203/255.0 blue:203/255.0 alpha:1.0],
-        NSFontAttributeName: [UIFont systemFontOfSize:numberSize weight:UIFontWeightRegular]
+        NSForegroundColorAttributeName: kMCDiscountHintGray,
+        NSFontAttributeName: [self membershipNeueFontOfSize:numberSize fallbackWeight:UIFontWeightRegular]
     }];
-    [attr addAttribute:NSFontAttributeName value:[UIFont systemFontOfSize:unitSize weight:UIFontWeightRegular] range:NSMakeRange(0, 1)];
-    [attr addAttributes:@{
-        NSStrikethroughStyleAttributeName: @(NSUnderlineStyleSingle),
-        NSStrikethroughColorAttributeName: [UIColor colorWithRed:203/255.0 green:203/255.0 blue:203/255.0 alpha:1.0]
-    } range:NSMakeRange(0, full.length)];
+    [attr addAttribute:NSFontAttributeName value:[self membershipNeueFontOfSize:unitSize fallbackWeight:UIFontWeightRegular] range:NSMakeRange(0, 1)];
+    // 再次全量写死前景色，避免后续属性覆盖导致显示偏白。
+    [attr addAttribute:NSForegroundColorAttributeName value:kMCDiscountHintGray range:NSMakeRange(0, full.length)];
     return attr;
+}
+
+- (void)refreshRedeemBannerState {
+    if (self.hasAppliedRedeemDiscount) {
+        self.bannerSubLabel.text = @"限时折扣码";
+        self.bannerHintLabel.text = @"使用限时折扣码，解锁专属会员优惠";
+        [self.redeemBtn setTitle:@"去兑换" forState:UIControlStateNormal];
+    } else {
+        self.bannerSubLabel.text = @"限时兑换码";
+        self.bannerHintLabel.text = @"使用限时兑换码，解锁专属会员优惠";
+        [self.redeemBtn setTitle:@"去兑换" forState:UIControlStateNormal];
+    }
+    self.bannerSubLabel.textColor = kMCDiscountMint;
+    self.bannerHintLabel.textColor = kMCDiscountHintGray;
 }
 
 - (NSAttributedString *)agreementAttrText {
@@ -1334,6 +1368,13 @@
     self.redeemSuccessTitleLabel.hidden = NO;
     self.redeemSuccessDescLabel.hidden = NO;
     [self reloadPlanCardsPreservingIndex];
+    [self refreshRedeemBannerState];
+    [self switchToGiftMode:NO];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.85 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (self.redeemDialogShowingSuccess) {
+            [self hideRedeemDialog];
+        }
+    });
 }
 
 - (void)switchToGiftMode:(BOOL)giftMode {
