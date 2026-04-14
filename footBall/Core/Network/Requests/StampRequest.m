@@ -21,11 +21,27 @@
     });
     return instance;
 }
-
+- (void)getStampListSuccess:(nullable APISuccessBlock)success
+                    failure:(nullable APIFailureBlock)failure {
+    [[APIManager sharedManager] GET:APIPathValueStampsList parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            id data = responseObject.data;
+            id objs = data;
+            if ([data isKindOfClass:NSArray.class]) {
+                objs = [NSArray yy_modelArrayWithClass:PNStampAlbumItem.class json:data] ?: @[];
+            }
+            responseObject.dataObject = objs;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
 - (void)getStampCollectionSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     [[APIManager sharedManager] GET:APIPathValueStampsCollection parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            // data: { categories: [ { categoryId, name, icon, totalCount, collectedCount, stamps: [...] } ] }
             PNStampCollection *collection = nil;
             if ([responseObject.data isKindOfClass:NSDictionary.class]) {
                 collection = [PNStampCollection yy_modelWithJSON:responseObject.data];

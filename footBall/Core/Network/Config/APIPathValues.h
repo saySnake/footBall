@@ -118,6 +118,8 @@ FOUNDATION_EXPORT NSString * const APIPathValueMatchInteractionsView(NSString *m
 FOUNDATION_EXPORT NSString * const APIPathValueMatchRecordVerify(NSString *recordId);
 
 #pragma mark - 邮票模块
+/// 邮票主页
+FOUNDATION_EXPORT NSString * const APIPathValueStampsList;
 /// 邮票夹主页 - 按分类组织，每分类max10个，含锁定邮票+解锁进度+新标记
 FOUNDATION_EXPORT NSString * const APIPathValueStampsCollection;
 /// 获取邮票动态分类列表

@@ -12,6 +12,10 @@ NS_ASSUME_NONNULL_BEGIN
 @interface StampRequest : NSObject
 
 + (instancetype)shared;
+/// GET `/api/v1/stamps/list` 主页邮票列表 （新），所有已添加到主页的邮票列表
+- (void)getStampListSuccess:(nullable APISuccessBlock)success
+                          failure:(nullable APIFailureBlock)failure;
+
 
 /// GET `/api/v1/stamps/collection` — 邮票夹主页（分类+预览等）；`dataObject` 为原始 `data`
 - (void)getStampCollectionSuccess:(nullable APISuccessBlock)success

@@ -10,7 +10,7 @@
 #import "PNMatchVerifyViewController.h"
 #import "ConsumptionRecordViewController.h"
 #import "PassportViewController.h"
-#import "StampAlbumViewController.h"
+#import "PassportSheetsViewController.h"
 #import "PNMatchDetailViewController.h"
 #import "PNMatchInfoInputViewController.h"
 #import "AuthManager.h"
@@ -1113,7 +1113,7 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
 }
 
 - (void)onStampAlbumTapped {
-    StampAlbumViewController *vc = [[StampAlbumViewController alloc] init];
+    PassportSheetsViewController *vc = [[PassportSheetsViewController alloc] init];
     vc.hidesBottomBarWhenPushed = YES;
     [self.navigationController pushViewController:vc animated:YES];
 }

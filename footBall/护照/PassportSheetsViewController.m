@@ -13,6 +13,7 @@
 #import <SDWebImage/SDWebImage.h>
 #import "StampRequest.h"
 #import "StampModels.h"
+#import "StampAlbumViewController.h"
 #define STAMP_SECTION_COUNT  1000
 #define STAMP_SECTION_ITEMS  15
 #define STAMP_ITEAM_FREE  5
@@ -56,19 +57,34 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     }
     return self;
 }
+- (void)longPressAction:(UILongPressGestureRecognizer *)gesture {
+    if (self.stampState == PassportStampGridItemViewStateUpdate) {
+        self.stampState = PassportStampGridItemViewStateDelete;
+    }
+}
+- (void)endTrackingWithTouch:(UITouch *)touch withEvent:(UIEvent *)event {
+    [super endTrackingWithTouch:touch withEvent:event];
+    if (self.stampState == PassportStampGridItemViewStateDelete) {
+        self.stampState = PassportStampGridItemViewStateUpdate;
+    }
+}
 - (void)setItem:(PassportStampGridItem *)item {
     _item = item;
     if (item.unlocked) {
         self.backgroundColor = [UIColor colorWithHexString:@"#9C9C9C"];
         self.lockView.image = [UIImage imageNamed:@"stamp_add"];
-        self.lockView.hidden = (item.stamp != nil);
         if (item.stamp) {
+            self.stampState = PassportStampGridItemViewStateUpdate;
+            self.lockView.hidden = YES;
             [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
         } else {
+            self.stampState = PassportStampGridItemViewStateAdd;
+            self.lockView.hidden = NO;
             [self sd_cancelImageLoadForState:UIControlStateNormal];
             [self setImage:nil forState:UIControlStateNormal];
         }
     } else {
+        self.stampState = PassportStampGridItemViewStateUnlock;
         self.backgroundColor = [UIColor colorWithHexString:@"#E9E9E9"];
         self.lockView.image = [UIImage imageNamed:@"lock_icon"];
         self.lockView.hidden = NO;
@@ -79,7 +95,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 @interface PassportStampSheetGridView : UIView
 @property (nonatomic, copy) NSArray<PassportStampGridItem *> *items;
 @property (nonatomic, copy) void (^onClickAdd)(NSInteger index,PassportStampGridItem *item);
-@property (nonatomic, copy) void (^onClickLock)(NSInteger index,PassportStampGridItem *item);
+@property (nonatomic, copy) void (^onClickUnLock)(NSInteger index,PassportStampGridItem *item);
 @property (nonatomic, copy) void (^onClickStamp)(NSInteger index,PassportStampGridItem *item);
 @property (nonatomic, copy) void (^onClickDelete)(NSInteger index,PassportStampGridItem *item);
 
@@ -99,7 +115,18 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
             item.layer.cornerRadius = 25;
             item.clipsToBounds = YES;
             [item addTarget:self action:@selector(onClick:) forControlEvents:UIControlEventTouchUpInside];
+            [item addGestureRecognizer:[UILongPressGestureRecognizer.alloc initWithTarget:self action:@selector(itemLongPressAction:)]];
             [self addSubview:item];
+            UIButton *deleteBtn = [[UIButton alloc] init];
+            deleteBtn.tag = 0xF + i;
+//            deleteBtn.hidden = YES;
+            [deleteBtn setImage:[UIImage imageNamed:@"red_delete_icon"] forState:UIControlStateNormal];
+            [deleteBtn addTarget:self action:@selector(deleteAction:) forControlEvents:UIControlEventTouchUpInside];
+            [self addSubview:deleteBtn];
+            [deleteBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.right.equalTo(item).offset(5);
+                make.top.equalTo(item).offset(-5);
+            }];
             [item mas_makeConstraints:^(MASConstraintMaker *make) {
                 make.width.height.equalTo(@50);
                 if (preItem == nil) {
@@ -126,7 +153,44 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     return self;
 }
 - (void)onClick:(PassportStampGridItemView *)sender {
-    
+    NSInteger idx = sender.tag - 0x900;
+    if (sender.stampState == PassportStampGridItemViewStateDelete) {
+        sender.stampState = PassportStampGridItemViewStateUpdate;
+        UIButton *btn = (UIButton *)[self viewWithTag:0xF+idx];
+        btn.hidden = YES;
+    } else if (sender.stampState == PassportStampGridItemViewStateUpdate) {
+        if (self.onClickStamp) {
+            self.onClickStamp(idx, sender.item);
+        }
+    } else if (sender.stampState == PassportStampGridItemViewStateAdd) {
+        if (self.onClickAdd) {
+            self.onClickAdd(idx, sender.item);
+        }
+    } else if (sender.stampState == PassportStampGridItemViewStateUnlock) {
+        if (self.onClickUnLock) {
+            self.onClickUnLock(idx, sender.item);
+        }
+    }
+}
+- (void)deleteAction:(UIButton *)sender {
+    sender.hidden = YES;
+    NSInteger idx = sender.tag - 0xF;
+    PassportStampGridItemView *itemView = (PassportStampGridItemView *)[self viewWithTag:0x900+idx];
+    itemView.item.stamp = nil;
+    [itemView setItem:itemView.item];
+    if (self.onClickDelete) {
+        self.onClickDelete(idx, itemView.item);
+    }
+}
+- (void)itemLongPressAction:(UILongPressGestureRecognizer *)sender {
+    PassportStampGridItemView *itemView = (PassportStampGridItemView *)sender.view;
+    if (itemView.stampState == PassportStampGridItemViewStateUpdate) {
+        itemView.stampState = PassportStampGridItemViewStateDelete;
+        NSInteger idx = itemView.tag - 0x900;
+        UIButton *btn = (UIButton *)[self viewWithTag:0xF+idx];
+        btn.hidden = NO;
+    }
+
 }
 - (void)configureWithItems:(NSArray<PassportStampGridItem *> *)items {
     self.items = items ?: @[];
@@ -329,7 +393,13 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 @end
 
 @implementation PassportSheetsViewController
-
+- (instancetype)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil {
+    if (self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil]) {
+        NSCalendar *cal = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
+        _year = [cal component:NSCalendarUnitYear fromDate:[NSDate date]];
+    }
+    return self;
+}
 - (instancetype)initWithViewModel:(PassportViewModel *)viewModel year:(NSInteger)year {
     if (self = [super init]) {
         _viewModel = viewModel;
@@ -346,6 +416,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 
     [self buildTopBar];
     [self buildTable];
+    if (_viewModel == nil) {
+        [self loadPassportData];
+    }
     [self reloadStamps:@[]];
     [self loadStampCollection];
 }
@@ -416,6 +489,21 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 
     PassportHeader2Card *header = [PassportHeader2Card.alloc initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH, 516)];
     [header configureWithModel:self.viewModel];
+    __weak typeof(self) weakSelf = self;
+    header.bottomGridView.onClickAdd = ^(NSInteger index, PassportStampGridItem *item) {
+        StampAlbumViewController *album = StampAlbumViewController.alloc.init;
+        [weakSelf.navigationController pushViewController:album animated:YES];
+    };
+    header.bottomGridView.onClickStamp = ^(NSInteger index, PassportStampGridItem *item) {
+        StampAlbumViewController *album = StampAlbumViewController.alloc.init;
+        [weakSelf.navigationController pushViewController:album animated:YES];
+    };
+    header.bottomGridView.onClickUnLock = ^(NSInteger index, PassportStampGridItem *item) {
+        
+    };
+    header.bottomGridView.onClickDelete = ^(NSInteger index, PassportStampGridItem *item) {
+        
+    };
     self.headerCard = header;
     self.tableView.tableHeaderView = header;
     
@@ -485,16 +573,30 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     }
     [self.tableView reloadData];
 }
-
+// 获取自己已添加到主页的邮票
 - (void)loadStampCollection {
     __weak typeof(self) weakSelf = self;
-    [[StampRequest shared] getStampCollectionSuccess:^(HTTPResponse * _Nullable responseObject) {
-        PNStampCollection *c = (PNStampCollection *)responseObject.dataObject;
-
-        [weakSelf reloadStamps:@[]];
+    [StampRequest.shared getStampListSuccess:^(HTTPResponse * _Nullable responseObject) {
+        [weakSelf reloadStamps:responseObject.dataObject];
     } failure:^(NSError * _Nonnull error) {
-        // 页面不阻塞：保持空列表即可
-        [QMUITips showError:error.localizedDescription];
+        [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
+    }];
+}
+- (void)loadPassportData {
+    __weak typeof(self) weakSelf = self;
+    [self showLoading];
+    NSString *y = [NSString stringWithFormat:@"%ld", (long)self.year];
+    [[ProfileRequest shared] getMyPassportWithYear:y success:^(HTTPResponse * _Nullable responseObject) {
+        [weakSelf hideLoading];
+        PNPassport *p = responseObject.dataObject;
+        weakSelf.viewModel = [PassportViewModel viewModelWithPassport:p year:weakSelf.year];
+        [weakSelf.headerCard configureWithModel:weakSelf.viewModel];
+        [weakSelf.tableView reloadData];
+        [weakSelf.view setNeedsLayout];
+    } failure:^(NSError * _Nonnull error) {
+        [weakSelf hideLoading];
+        [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
+        weakSelf.viewModel = [PassportViewModel viewModelWithPassport:nil year:weakSelf.year];
     }];
 }
 // 分享
