@@ -27,7 +27,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) NSString *unlockCondition;
 /// 获取时间
 @property (nonatomic, copy, nullable) NSString *acquiredTime;
-
+/// 在主页的坐标 e.g "1,5"
 @property (nonatomic, copy) NSString *position;
 @end
 

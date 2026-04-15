@@ -12,12 +12,33 @@ NS_ASSUME_NONNULL_BEGIN
 @interface StampRequest : NSObject
 
 + (instancetype)shared;
+/// TODO: 等后端实现后再对齐，替换为真实path
 /// GET `/api/v1/stamps/list` 主页邮票列表 （新），所有已添加到主页的邮票列表
 - (void)getStampListSuccess:(nullable APISuccessBlock)success
                           failure:(nullable APIFailureBlock)failure;
 
+/// TODO: 等后端实现后再对齐，替换为真实path
+/// POST  `/api/v1/stamps/{stampId}` 添加主页邮票
+- (void)addStamp:(NSString *)stampId position:(NSString *)position
+            success:(nullable APISuccessBlock)success
+            failure:(nullable APIFailureBlock)failure;
 
-/// GET `/api/v1/stamps/collection` — 邮票夹主页（分类+预览等）；`dataObject` 为原始 `data`
+/// TODO: 等后端实现后再对齐，替换为真实path
+/// PUT  `/api/v1/stamps/{stampId}` 更新主页邮票
+- (void)updateOldStamp:(NSString *)stampId newStamp:(NSString *)newStampId
+            success:(nullable APISuccessBlock)success
+            failure:(nullable APIFailureBlock)failure;
+
+/// TODO: 等后端实现后再对齐，替换为真实path
+/// DELETE `/api/v1/stamps/{stampId}` 添加/删除主页邮票
+- (void)deleteStamp:(NSString *)stampId
+            success:(nullable APISuccessBlock)success
+            failure:(nullable APIFailureBlock)failure;
+
+
+
+
+///已弃用  GET `/api/v1/stamps/collection` — 邮票夹主页（分类+预览等）；`dataObject` 为原始 `data`
 - (void)getStampCollectionSuccess:(nullable APISuccessBlock)success
                           failure:(nullable APIFailureBlock)failure;
 
@@ -32,12 +53,12 @@ NS_ASSUME_NONNULL_BEGIN
                        success:(nullable APISuccessBlock)success
                        failure:(nullable APIFailureBlock)failure;
 
-/// GET `/api/v1/stamps/{stampId}` — 邮票详情
+///弃用  GET `/api/v1/stamps/{stampId}` — 邮票详情
 - (void)getStampDetail:(NSString *)stampId
                success:(nullable APISuccessBlock)success
                failure:(nullable APIFailureBlock)failure;
 
-/// PUT `/api/v1/stamps/display` — 更新展示位置（长按编辑等）；body 与后端约定一致
+///弃用  PUT `/api/v1/stamps/display` — 更新展示位置（长按编辑等）；body 与后端约定一致
 - (void)updateStampDisplayWithBody:(NSDictionary *)body
                            success:(nullable APISuccessBlock)success
                            failure:(nullable APIFailureBlock)failure;

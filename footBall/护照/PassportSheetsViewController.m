@@ -94,9 +94,13 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 @end
 @interface PassportStampSheetGridView : UIView
 @property (nonatomic, copy) NSArray<PassportStampGridItem *> *items;
+//添加
 @property (nonatomic, copy) void (^onClickAdd)(NSInteger index,PassportStampGridItem *item);
+//解锁
 @property (nonatomic, copy) void (^onClickUnLock)(NSInteger index,PassportStampGridItem *item);
+//更新
 @property (nonatomic, copy) void (^onClickStamp)(NSInteger index,PassportStampGridItem *item);
+//删除
 @property (nonatomic, copy) void (^onClickDelete)(NSInteger index,PassportStampGridItem *item);
 
 - (void)configureWithItems:(NSArray<PassportStampGridItem *> *)items;
@@ -492,17 +496,38 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     __weak typeof(self) weakSelf = self;
     header.bottomGridView.onClickAdd = ^(NSInteger index, PassportStampGridItem *item) {
         StampAlbumViewController *album = StampAlbumViewController.alloc.init;
+        album.didSelected = ^(PNStampAlbumItem * _Nonnull stamp) {
+            //header只有一组,坐标分组从1开始
+            NSString *position = [NSString stringWithFormat:@"1,%ld",index];
+            [StampRequest.shared addStamp:stamp.stampId position:position success:^(HTTPResponse * _Nullable responseObject) {
+                            
+            } failure:^(NSError * _Nonnull error) {
+                
+            }];
+        };
         [weakSelf.navigationController pushViewController:album animated:YES];
     };
     header.bottomGridView.onClickStamp = ^(NSInteger index, PassportStampGridItem *item) {
         StampAlbumViewController *album = StampAlbumViewController.alloc.init;
+        album.didSelected = ^(PNStampAlbumItem * _Nonnull stamp) {
+            [StampRequest.shared updateOldStamp:item.stamp.stampId newStamp:stamp.stampId success:^(HTTPResponse * _Nullable responseObject) {
+                
+            } failure:^(NSError * _Nonnull error) {
+                
+            }];
+        };
         [weakSelf.navigationController pushViewController:album animated:YES];
     };
     header.bottomGridView.onClickUnLock = ^(NSInteger index, PassportStampGridItem *item) {
-        
+        // 跳转至开通会员
     };
     header.bottomGridView.onClickDelete = ^(NSInteger index, PassportStampGridItem *item) {
-        
+        // 删除
+        [StampRequest.shared deleteStamp:item.stamp.stampId success:^(HTTPResponse * _Nullable responseObject) {
+                    
+        } failure:^(NSError * _Nonnull error) {
+            
+        }];
     };
     self.headerCard = header;
     self.tableView.tableHeaderView = header;
@@ -546,7 +571,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     }
     self.items = array.copy;
     
-    //e.g stamp position = "3,10"
+    //e.g stamp position = "3,10" 坐标分组从1开始
     // row 0 => section 2 & 3
     // row 1 => section 4 & 5
     // row 2 => section 6 & 7
@@ -616,6 +641,35 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     PassportStampSheetCardCell *c = [tableView dequeueReusableCellWithIdentifier:@"stamp" forIndexPath:indexPath];
+    __weak typeof(self) weakSelf = self;
+    c.topGridView.onClickAdd = ^(NSInteger index, PassportStampGridItem *item) {
+        StampAlbumViewController *album = StampAlbumViewController.alloc.init;
+        album.didSelected = ^(PNStampAlbumItem * _Nonnull stamp) {
+            // NSInteger section = row * 2 + 2 + (0 or 1) 坐标分组从1开始
+            NSInteger section = indexPath.row*2 + 2;
+            NSString *position = [NSString stringWithFormat:@"%ld,%ld",section,index];
+            [StampRequest.shared addStamp:stamp.stampId position:position success:^(HTTPResponse * _Nullable responseObject) {
+                            
+            } failure:^(NSError * _Nonnull error) {
+                
+            }];
+        };
+        [weakSelf.navigationController pushViewController:album animated:YES];
+    };
+    c.bottomGridView.onClickAdd = ^(NSInteger index, PassportStampGridItem *item) {
+        StampAlbumViewController *album = StampAlbumViewController.alloc.init;
+        album.didSelected = ^(PNStampAlbumItem * _Nonnull stamp) {
+            // NSInteger section = row * 2 + 2 + (0 or 1) 坐标分组从1开始
+            NSInteger section = indexPath.row*2 + 2 + 1;
+            NSString *position = [NSString stringWithFormat:@"%ld,%ld",section,index];
+            [StampRequest.shared addStamp:stamp.stampId position:position success:^(HTTPResponse * _Nullable responseObject) {
+                            
+            } failure:^(NSError * _Nonnull error) {
+                
+            }];
+        };
+        [weakSelf.navigationController pushViewController:album animated:YES];
+    };
     [c configureWithSectionItem:self.items[indexPath.row]];
     return c;
 }

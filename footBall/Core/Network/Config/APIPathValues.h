@@ -120,6 +120,11 @@ FOUNDATION_EXPORT NSString * const APIPathValueMatchRecordVerify(NSString *recor
 #pragma mark - 邮票模块
 /// 邮票主页
 FOUNDATION_EXPORT NSString * const APIPathValueStampsList;
+/// PUT 更新主页邮票
+FOUNDATION_EXPORT NSString * const APIPathValueUpdateStamps(NSString *stampId);
+/// DELETE 删除主页邮票
+FOUNDATION_EXPORT NSString * const APIPathValueDeleteStamps(NSString *stampId);
+
 /// 邮票夹主页 - 按分类组织，每分类max10个，含锁定邮票+解锁进度+新标记
 FOUNDATION_EXPORT NSString * const APIPathValueStampsCollection;
 /// 获取邮票动态分类列表

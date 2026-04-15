@@ -139,6 +139,12 @@ NSString * const APIPathValueMatchRecordVerify(NSString *recordId) {
 
 #pragma mark - 邮票模块
 NSString * const APIPathValueStampsList = @"/api/v1/stamps/list";
+NSString * const APIPathValueUpdateStamps(NSString *stampId) {
+    return [NSString stringWithFormat:@"/api/v1/stamps/%@",stampId];
+}
+NSString * const APIPathValueDeleteStamps(NSString *stampId) {
+    return [NSString stringWithFormat:@"/api/v1/stamps/%@",stampId];
+}
 NSString * const APIPathValueStampsCollection = @"/api/v1/stamps/collection";
 NSString * const APIPathValueStampsCategories = @"/api/v1/stamps/categories";
 NSString * const APIPathValueStampsCategoryAll(NSString *categoryId) {

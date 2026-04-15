@@ -158,7 +158,6 @@ static NSString *StampAlbumNormalizedCategoryTitle(NSString *rawTitle, NSInteger
     self.shouldShowNavigationBar = NO;
     self.view.backgroundColor = [UIColor colorWithWhite:0.96 alpha:1.0];
     self.tableLayoutWidth = CGRectGetWidth(self.view.bounds);
-    [self buildMockSections];
     [self buildTopBar];
     [self buildTable];
     [self buildFilterDropdownUI];
@@ -174,77 +173,7 @@ static NSString *StampAlbumNormalizedCategoryTitle(NSString *rawTitle, NSInteger
     }
 }
 
-- (void)buildMockSections {
-    NSArray<UIColor *> *palette = @[
-        [UIColor colorWithRed:0.85 green:0.65 blue:0.68 alpha:1.0],
-        [UIColor colorWithRed:0.78 green:0.45 blue:0.38 alpha:1.0],
-        [UIColor colorWithRed:0.45 green:0.55 blue:0.62 alpha:1.0],
-        [UIColor colorWithRed:0.55 green:0.62 blue:0.45 alpha:1.0],
-        [UIColor colorWithRed:0.55 green:0.42 blue:0.35 alpha:1.0],
-        [UIColor colorWithRed:0.35 green:0.48 blue:0.72 alpha:1.0],
-        [UIColor colorWithRed:0.42 green:0.58 blue:0.48 alpha:1.0],
-    ];
-    NSMutableArray<StampAlbumSectionModel *> *sec = [NSMutableArray array];
-    NSArray<NSString *> *titles = StampAlbumCanonicalTitles();
-    // 球场：10 枚已解锁
-    StampAlbumSectionModel *s1 = [[StampAlbumSectionModel alloc] init];
-    s1.title = titles[0];
-    NSMutableArray *i1 = [NSMutableArray array];
-    for (NSInteger k = 0; k < 10; k++) {
-        StampAlbumItem *it = [[StampAlbumItem alloc] init];
-        it.unlocked = YES;
-        it.circleColor = palette[k % palette.count];
-        [i1 addObject:it];
-    }
-    s1.items = [i1 copy];
-    [sec addObject:s1];
-    // 奖杯：上排 5 蓝，下排 5 空
-    StampAlbumSectionModel *s2 = [[StampAlbumSectionModel alloc] init];
-    s2.title = titles[1];
-    NSMutableArray *i2 = [NSMutableArray array];
-    for (NSInteger k = 0; k < 5; k++) {
-        StampAlbumItem *it = [[StampAlbumItem alloc] init];
-        it.unlocked = YES;
-        it.circleColor = [UIColor colorWithRed:0.35 green:0.48 blue:0.72 alpha:1.0];
-        [i2 addObject:it];
-    }
-    for (NSInteger k = 0; k < 5; k++) {
-        StampAlbumItem *it = [[StampAlbumItem alloc] init];
-        it.unlocked = NO;
-        [i2 addObject:it];
-    }
-    s2.items = [i2 copy];
-    [sec addObject:s2];
-    // 事件：10 枚已解锁
-    StampAlbumSectionModel *s3 = [[StampAlbumSectionModel alloc] init];
-    s3.title = titles[2];
-    NSMutableArray *i3 = [NSMutableArray array];
-    for (NSInteger k = 0; k < 10; k++) {
-        StampAlbumItem *it = [[StampAlbumItem alloc] init];
-        it.unlocked = YES;
-        it.circleColor = (k < 5) ? [UIColor colorWithRed:0.42 green:0.58 blue:0.48 alpha:1.0] : [UIColor colorWithRed:0.35 green:0.48 blue:0.72 alpha:1.0];
-        [i3 addObject:it];
-    }
-    s3.items = [i3 copy];
-    [sec addObject:s3];
 
-    // 身份：10 枚已解锁
-    StampAlbumSectionModel *s4 = [[StampAlbumSectionModel alloc] init];
-    s4.title = titles[3];
-    NSMutableArray *i4 = [NSMutableArray array];
-    for (NSInteger k = 0; k < 10; k++) {
-        StampAlbumItem *it = [[StampAlbumItem alloc] init];
-        it.unlocked = YES;
-        it.circleColor = (k < 5) ? [UIColor colorWithRed:0.55 green:0.62 blue:0.45 alpha:1.0] : [UIColor colorWithRed:0.55 green:0.42 blue:0.35 alpha:1.0];
-        [i4 addObject:it];
-    }
-    s4.items = [i4 copy];
-    [sec addObject:s4];
-
-    self.allSections = [sec copy];
-    self.sections = self.allSections;
-    [self setupFilterOptions];
-}
 
 static UIColor *StampAlbumRarityColor(NSString *rarity) {
     NSString *r = [rarity isKindOfClass:NSString.class] ? [(NSString *)rarity uppercaseString] : @"";

@@ -39,6 +39,47 @@
         if (failure) failure(error);
     }];
 }
+- (void)addStamp:(NSString *)stampId position:(NSString *)position success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    [[APIManager sharedManager] POST:APIPathValueDeleteStamps(stampId) parameters:@{@"position":position} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            responseObject.dataObject = responseObject.data;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
+-(void)updateOldStamp:(NSString *)stampId newStamp:(NSString *)newStampId success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    if (!stampId || !newStampId) {
+        if (failure) failure([NSError errorWithDomain:@"StampRequestErrorDomain" code:-1 userInfo:@{ NSLocalizedDescriptionKey: @"无效的邮票" }]);
+        return;
+    }
+    [[APIManager sharedManager] PUT:APIPathValueUpdateStamps(stampId) parameters:@{@"newStampId":newStampId} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            responseObject.dataObject = responseObject.data;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+
+}
+- (void)deleteStamp:(NSString *)stampId success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    [[APIManager sharedManager] DELETE:APIPathValueDeleteStamps(stampId) parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            responseObject.dataObject = responseObject.data;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
 - (void)getStampCollectionSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     [[APIManager sharedManager] GET:APIPathValueStampsCollection parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
