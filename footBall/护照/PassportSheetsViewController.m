@@ -180,11 +180,11 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     sender.hidden = YES;
     NSInteger idx = sender.tag - 0xF;
     PassportStampGridItemView *itemView = (PassportStampGridItemView *)[self viewWithTag:0x900+idx];
-    itemView.item.stamp = nil;
-    [itemView setItem:itemView.item];
     if (self.onClickDelete) {
         self.onClickDelete(idx, itemView.item);
     }
+    itemView.item.stamp = nil;
+    [itemView setItem:itemView.item];
 }
 - (void)itemLongPressAction:(UILongPressGestureRecognizer *)sender {
     PassportStampGridItemView *itemView = (PassportStampGridItemView *)sender.view;
@@ -656,6 +656,36 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         };
         [weakSelf.navigationController pushViewController:album animated:YES];
     };
+    c.topGridView.onClickStamp = ^(NSInteger index, PassportStampGridItem *item) {
+        StampAlbumViewController *album = StampAlbumViewController.alloc.init;
+        album.didSelected = ^(PNStampAlbumItem * _Nonnull stamp) {
+            NSString *oldId = item.stamp.stampId ?: @"";
+            NSString *newId = stamp.stampId ?: @"";
+            if (oldId.length == 0 || newId.length == 0) {
+                return;
+            }
+            [StampRequest.shared updateOldStamp:oldId newStamp:newId success:^(HTTPResponse * _Nullable responseObject) {
+                
+            } failure:^(NSError * _Nonnull error) {
+                
+            }];
+        };
+        [weakSelf.navigationController pushViewController:album animated:YES];
+    };
+    c.topGridView.onClickUnLock = ^(NSInteger index, PassportStampGridItem *item) {
+        // 跳转至开通会员
+    };
+    c.topGridView.onClickDelete = ^(NSInteger index, PassportStampGridItem *item) {
+        NSString *sid = item.stamp.stampId ?: @"";
+        if (sid.length == 0) {
+            return;
+        }
+        [StampRequest.shared deleteStamp:sid success:^(HTTPResponse * _Nullable responseObject) {
+            
+        } failure:^(NSError * _Nonnull error) {
+            
+        }];
+    };
     c.bottomGridView.onClickAdd = ^(NSInteger index, PassportStampGridItem *item) {
         StampAlbumViewController *album = StampAlbumViewController.alloc.init;
         album.didSelected = ^(PNStampAlbumItem * _Nonnull stamp) {
@@ -669,6 +699,36 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
             }];
         };
         [weakSelf.navigationController pushViewController:album animated:YES];
+    };
+    c.bottomGridView.onClickStamp = ^(NSInteger index, PassportStampGridItem *item) {
+        StampAlbumViewController *album = StampAlbumViewController.alloc.init;
+        album.didSelected = ^(PNStampAlbumItem * _Nonnull stamp) {
+            NSString *oldId = item.stamp.stampId ?: @"";
+            NSString *newId = stamp.stampId ?: @"";
+            if (oldId.length == 0 || newId.length == 0) {
+                return;
+            }
+            [StampRequest.shared updateOldStamp:oldId newStamp:newId success:^(HTTPResponse * _Nullable responseObject) {
+                
+            } failure:^(NSError * _Nonnull error) {
+                
+            }];
+        };
+        [weakSelf.navigationController pushViewController:album animated:YES];
+    };
+    c.bottomGridView.onClickUnLock = ^(NSInteger index, PassportStampGridItem *item) {
+        // 跳转至开通会员
+    };
+    c.bottomGridView.onClickDelete = ^(NSInteger index, PassportStampGridItem *item) {
+        NSString *sid = item.stamp.stampId ?: @"";
+        if (sid.length == 0) {
+            return;
+        }
+        [StampRequest.shared deleteStamp:sid success:^(HTTPResponse * _Nullable responseObject) {
+            
+        } failure:^(NSError * _Nonnull error) {
+            
+        }];
     };
     [c configureWithSectionItem:self.items[indexPath.row]];
     return c;
