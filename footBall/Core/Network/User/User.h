@@ -47,6 +47,8 @@ typedef NS_ENUM(NSUInteger, UserGender) {
 @property (nonatomic, strong) NSString *birthDate;
 /// 星座（自动计算）
 @property (nonatomic, strong) NSString *zodiac;
+/// 星座别名（与后端 constellation 字段对应，如"天蝎座"）
+@property (nonatomic, strong, nullable) NSString *constellation;
 /// 世代标签（60后/70后/80后/90后/95后/00后/05后）
 @property (nonatomic, strong) NSString *generationTag;
 /// 个人简介

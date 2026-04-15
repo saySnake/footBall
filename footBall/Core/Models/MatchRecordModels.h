@@ -34,7 +34,11 @@ NS_ASSUME_NONNULL_BEGIN
 /// 线上观赛方式
 @property (nonatomic, strong) NSArray<NSString *> *onlineViewingMethods;
 @property (nonatomic, copy, nullable) NSString *watchReason;
-/// 认证状态：UNVERIFIED / PENDING / VERIFIED
+/// 售票价格（元），对应后端 ticketPrice
+@property (nonatomic, copy, nullable) NSString *ticketPrice;
+/// 用户填写的比赛日期时间，对应后端 matchDateTime（ISO 8601 字符串）
+@property (nonatomic, copy, nullable) NSString *matchDateTime;
+/// 认证状态：UNVERIFIED / PENDING / VERIFIED / REJECTED
 @property (nonatomic, copy, nullable) NSString *verificationStatus;
 @property (nonatomic, copy, nullable) NSString *createTime;
 @end
@@ -56,6 +60,10 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) NSString *postMatchEmotion;
 @property (nonatomic, strong) NSArray<NSString *> *onlineViewingMethods;
 @property (nonatomic, copy, nullable) NSString *watchReason;
+/// 售票价格（元），对应后端 ticketPrice
+@property (nonatomic, copy, nullable) NSString *ticketPrice;
+/// 用户填写的比赛日期时间，对应后端 matchDateTime（ISO 8601 字符串）
+@property (nonatomic, copy, nullable) NSString *matchDateTime;
 @property (nonatomic, copy, nullable) NSString *verificationStatus;
 /// 审核拒绝原因
 @property (nonatomic, copy, nullable) NSString *rejectReason;

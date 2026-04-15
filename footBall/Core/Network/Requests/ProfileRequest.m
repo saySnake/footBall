@@ -24,8 +24,9 @@
     }
     [[APIManager sharedManager] GET:APIPathValuePassportMe parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
+            // PassportVO 已重构为轻量版（userId + categories），统计数据在 StatisticsVO
             PNPassport *passport = [PNPassport yy_modelWithJSON:responseObject.data];
-            responseObject.dataObject = passport;
+            responseObject.dataObject = passport ?: responseObject.data;
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);
@@ -46,6 +47,7 @@
     }
     [[APIManager sharedManager] GET:APIPathValuePassportUser(userId) parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
+            // PassportVO 已重构为轻量版（userId + categories）
             PNPassport *passport = [PNPassport yy_modelWithJSON:responseObject.data];
             responseObject.dataObject = passport ?: responseObject.data;
             if (success) success(responseObject);
@@ -57,8 +59,25 @@
     }];
 }
 
-- (void)getMyPassportMatchRecordsWithPage:(NSInteger)page pageSize:(NSInteger)pageSize success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
-    NSDictionary *params = @{ @"pageNum": @(MAX(page, 1)), @"pageSize": @(MAX(pageSize, 1)) };
+- (void)getMyPassportMatchRecordsWithYear:(nullable NSString *)year
+                                      tab:(nullable NSString *)tab
+                                   status:(nullable NSString *)status
+                                     page:(NSInteger)page
+                                 pageSize:(NSInteger)pageSize
+                                  success:(APISuccessBlock)success
+                                  failure:(APIFailureBlock)failure {
+    NSMutableDictionary *params = [NSMutableDictionary dictionary];
+    if (year.length > 0) {
+        params[@"year"] = year;
+    }
+    if (tab.length > 0) {
+        params[@"tab"] = tab;
+    }
+    if (status.length > 0) {
+        params[@"status"] = status;
+    }
+    params[@"pageNum"] = @(MAX(page, 1));
+    params[@"pageSize"] = @(MAX(pageSize, 1));
     [[APIManager sharedManager] GET:APIPathValuePassportMeRecords parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
             responseObject.dataObject = responseObject.data;

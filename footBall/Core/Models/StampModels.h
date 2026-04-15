@@ -51,6 +51,8 @@ NS_ASSUME_NONNULL_BEGIN
 @interface PNStampCollection : NSObject <YYModel>
 /// 按分类组织的列表
 @property (nonatomic, strong) NSArray<PNStampCategorySection *> *categories;
+/// 是否会员（非会员限制显示5个邮票）
+@property (nonatomic, assign) BOOL isMember;
 @end
 
 /// StampCategoryVO — 动态分类列表单项

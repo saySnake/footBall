@@ -24,8 +24,15 @@ NS_ASSUME_NONNULL_BEGIN
                      success:(nullable APISuccessBlock)success
                      failure:(nullable APIFailureBlock)failure;
 
-/// GET `/api/v1/passport/me/records` — 我的观赛记录列表分页；`dataObject` 为原始 `data`（便于后续接 VO）
-- (void)getMyPassportMatchRecordsWithPage:(NSInteger)page
+/// GET `/api/v1/passport/me/records` — 我的观赛记录列表分页
+/// @param year   年份，nil 时后端默认当前年份
+/// @param tab    标签筛选：`future`（未来）/ `past`（过去），nil 不筛选
+/// @param status 状态筛选：`ALL` / `UNVERIFIED` / `PENDING` / `VERIFIED` / `FUTURE`，nil 不筛选
+/// `dataObject` 为原始 `data`（便于后续接 VO）
+- (void)getMyPassportMatchRecordsWithYear:(nullable NSString *)year
+                                      tab:(nullable NSString *)tab
+                                   status:(nullable NSString *)status
+                                     page:(NSInteger)page
                                  pageSize:(NSInteger)pageSize
                                   success:(nullable APISuccessBlock)success
                                   failure:(nullable APIFailureBlock)failure;
