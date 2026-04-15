@@ -61,6 +61,7 @@ static NSString *StampAlbumNormalizedCategoryTitle(NSString *rawTitle, NSInteger
 @property (nonatomic, copy) NSArray<StampAlbumItem *> *items;
 @property (nonatomic, strong) UICollectionView *collectionView;
 @property (nonatomic, assign) CGFloat itemSide;
+@property (nonatomic, copy, nullable) void (^onSelectItem)(StampAlbumItem *item);
 @end
 
 @implementation StampAlbumGridTableCell
@@ -117,6 +118,19 @@ static NSString *StampAlbumNormalizedCategoryTitle(NSString *rawTitle, NSInteger
     StampAlbumStampCell *c = [collectionView dequeueReusableCellWithReuseIdentifier:@"StampAlbumStampCell" forIndexPath:indexPath];
     [c configureWithItem:self.items[indexPath.item] indexPath:indexPath totalCount:self.items.count columnCount:5];
     return c;
+}
+
+- (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
+    if (indexPath.item < 0 || indexPath.item >= (NSInteger)self.items.count) {
+        return;
+    }
+    StampAlbumItem *it = self.items[indexPath.item];
+    if (!it.unlocked) {
+        return;
+    }
+    if (self.onSelectItem) {
+        self.onSelectItem(it);
+    }
 }
 
 - (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
@@ -205,6 +219,7 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
                 it.imageURL = st.image;
                 it.rarity = st.rarity;
                 it.circleColor = StampAlbumRarityColor(st.rarity);
+                it.rawStamp = st;
                 [items addObject:it];
             }
             s.items = [items copy];
@@ -523,6 +538,16 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
         w = CGRectGetWidth(self.view.bounds);
     }
     [c configureWithItems:sec.items tableWidth:w];
+    __weak typeof(self) weakSelf = self;
+    c.onSelectItem = ^(StampAlbumItem *item) {
+        if (!weakSelf) return;
+        if (!item.unlocked) return;
+        PNStampAlbumItem *raw = item.rawStamp;
+        if (raw && weakSelf.didSelected) {
+            weakSelf.didSelected(raw);
+            [weakSelf.navigationController popViewControllerAnimated:YES];
+        }
+    };
     return c;
 }
 
@@ -626,6 +651,14 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
     } else {
         vc = [[StampAlbumCategoryViewController alloc] initWithItems:sec.items];
     }
+    __weak typeof(self) weakSelf = self;
+    vc.didSelected = ^(PNStampAlbumItem *stamp) {
+        if (!weakSelf) return;
+        if (weakSelf.didSelected) {
+            weakSelf.didSelected(stamp);
+            [weakSelf.navigationController popViewControllerAnimated:YES];
+        }
+    };
     vc.hidesBottomBarWhenPushed = YES;
     [self.navigationController pushViewController:vc animated:YES];
 }

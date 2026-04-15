@@ -261,6 +261,45 @@ static inline UIEdgeInsets StampCategorySectionInset(void) {
     return c;
 }
 
+- (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
+    if (self.categoryId.length) {
+        if (indexPath.item < 0 || indexPath.item >= (NSInteger)self.apiDisplayItems.count) {
+            return;
+        }
+        PNStampGridItem *it = self.apiDisplayItems[indexPath.item];
+        if (!it.unlocked || it.stampId.length == 0) {
+            return;
+        }
+        if (self.didSelected) {
+            PNStampAlbumItem *out = [[PNStampAlbumItem alloc] init];
+            out.stampId = it.stampId;
+            out.name = it.name ?: @"";
+            out.image = it.image;
+            out.rarity = it.rarity;
+            out.unlocked = it.unlocked;
+            out.isNew = it.isNew;
+            out.unlockCondition = it.unlockCondition;
+            out.acquiredTime = it.acquiredTime;
+            out.position = @""; // 选择页不关心 position，由护照页自行填
+            self.didSelected(out);
+            [self.navigationController popViewControllerAnimated:YES];
+        }
+        return;
+    }
+
+    if (indexPath.item < 0 || indexPath.item >= (NSInteger)self.displayItems.count) {
+        return;
+    }
+    StampAlbumItem *it = self.displayItems[indexPath.item];
+    if (!it.unlocked || !it.rawStamp) {
+        return;
+    }
+    if (self.didSelected) {
+        self.didSelected(it.rawStamp);
+        [self.navigationController popViewControllerAnimated:YES];
+    }
+}
+
 - (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
     CGFloat w = CGRectGetWidth(collectionView.bounds);
     if (w < 1) {
