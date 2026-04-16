@@ -123,7 +123,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
             [self addSubview:item];
             UIButton *deleteBtn = [[UIButton alloc] init];
             deleteBtn.tag = 0xF + i;
-//            deleteBtn.hidden = YES;
+            deleteBtn.hidden = YES;
             [deleteBtn setImage:[UIImage imageNamed:@"red_delete_icon"] forState:UIControlStateNormal];
             [deleteBtn addTarget:self action:@selector(deleteAction:) forControlEvents:UIControlEventTouchUpInside];
             [self addSubview:deleteBtn];

@@ -55,6 +55,8 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
 @property (nonatomic, strong) UIView *dimmingView;
 @property (nonatomic, strong) UIView *cardView;
 
+@property (nonatomic, assign) CGFloat cardDismissThreshold;
+
 @property (nonatomic, strong) UILabel *uploadCountLabel;
 @property (nonatomic, strong) UICollectionView *photoCollectionView;
 @property (nonatomic, strong) NSMutableArray<UIImage *> *photos;
@@ -90,7 +92,6 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
     [dim mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
     }];
-    [dim addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onDismiss)]];
 
     UIView *card = [[UIView alloc] init];
     card.backgroundColor = [UIColor whiteColor];
@@ -103,6 +104,10 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
         make.leading.trailing.equalTo(self.view);
         make.bottom.equalTo(self.view);
     }];
+
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(onCardPan:)];
+    pan.maximumNumberOfTouches = 1;
+    [card addGestureRecognizer:pan];
 
     UIView *handle = [[UIView alloc] init];
     handle.backgroundColor = [UIColor colorWithWhite:0.85 alpha:1.0];
@@ -233,6 +238,59 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
 
     [self updateUploadCountLabel];
     [self updateConfirmButtonState];
+}
+
+- (void)onCardPan:(UIPanGestureRecognizer *)gr {
+    UIView *card = self.cardView;
+    if (!card) {
+        return;
+    }
+    CGPoint t = [gr translationInView:self.view];
+    CGFloat dy = MAX(0, t.y); // 仅向下拖动
+
+    if (gr.state == UIGestureRecognizerStateBegan) {
+        CGFloat h = CGRectGetHeight(card.bounds);
+        if (h < 1) {
+            [card layoutIfNeeded];
+            h = CGRectGetHeight(card.bounds);
+        }
+        if (h < 1) {
+            h = 300;
+        }
+        self.cardDismissThreshold = h * 0.5;
+    }
+
+    if (gr.state == UIGestureRecognizerStateChanged) {
+        card.transform = CGAffineTransformMakeTranslation(0, dy);
+        CGFloat baseAlpha = 0.35;
+        CGFloat p = self.cardDismissThreshold > 0 ? MIN(1, dy / self.cardDismissThreshold) : 0;
+        self.dimmingView.alpha = baseAlpha * (1 - 0.9 * p);
+        return;
+    }
+
+    if (gr.state == UIGestureRecognizerStateEnded || gr.state == UIGestureRecognizerStateCancelled) {
+        BOOL shouldDismiss = (dy > self.cardDismissThreshold);
+        if (shouldDismiss) {
+            CGFloat h = CGRectGetHeight(card.bounds);
+            if (h < 1) h = 600;
+            [UIView animateWithDuration:0.18 animations:^{
+                card.transform = CGAffineTransformMakeTranslation(0, h + 40);
+                self.dimmingView.alpha = 0;
+            } completion:^(BOOL finished) {
+                [self dismissViewControllerAnimated:NO completion:nil];
+            }];
+        } else {
+            [UIView animateWithDuration:0.2
+                                  delay:0
+                 usingSpringWithDamping:0.9
+                  initialSpringVelocity:0
+                                options:UIViewAnimationOptionCurveEaseOut
+                             animations:^{
+                card.transform = CGAffineTransformIdentity;
+                self.dimmingView.alpha = 1.0;
+            } completion:nil];
+        }
+    }
 }
 
 - (void)onDismiss {
@@ -416,10 +474,25 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
 
 - (void)onConfirm {
     // 提交逻辑留给后端集成，这里先回调上层并关闭弹层
-    if (self.completion) {
-        self.completion();
+    // 把所有image转成data上传至oss，把返回的所有oss的objectKey上传至自己后端
+    dispatch_group_t group = dispatch_group_create();
+    for (int i=0; i<_photos.count; i++) {
+        NSData *data = UIImageJPEGRepresentation(_photos[i], 0.5);
+        dispatch_group_enter(group);
+        [FileRequest.shared uploadImage:data type:ImageObjectTypeMatch success:^(HTTPResponse * _Nullable responseObject) {
+            dispatch_group_leave(group);
+        } failure:^(NSError * _Nonnull error) {
+            dispatch_group_leave(group);
+        }];
     }
-    [self dismissViewControllerAnimated:NO completion:nil];
+    dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+       //调用比赛认证接口上传所有path至服务器
+        
+        if (self.completion) {
+            self.completion();
+        }
+        [self dismissViewControllerAnimated:NO completion:nil];
+    });
 }
 
 @end

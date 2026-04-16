@@ -198,41 +198,46 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
 
 - (void)loadStampCollection {
     __weak typeof(self) weakSelf = self;
-    [[StampRequest shared] getStampCollectionSuccess:^(HTTPResponse * _Nullable responseObject) {
-        PNStampCollection *c = (PNStampCollection *)responseObject.dataObject;
-        weakSelf.apiCategories = c.categories ?: @[];
-
-        NSMutableArray<StampAlbumSectionModel *> *sec = [NSMutableArray array];
-        [weakSelf.apiCategories enumerateObjectsUsingBlock:^(PNStampCategorySection * _Nonnull cat, NSUInteger idx, BOOL * _Nonnull stop) {
-            NSString *displayTitle = StampAlbumNormalizedCategoryTitle(cat.name, (NSInteger)idx);
-            if (displayTitle.length == 0) {
-                return;
-            }
-            StampAlbumSectionModel *s = [[StampAlbumSectionModel alloc] init];
-            s.title = displayTitle;
-            NSMutableArray<StampAlbumItem *> *items = [NSMutableArray array];
-            for (PNStampAlbumItem *st in (cat.stamps ?: @[])) {
-                StampAlbumItem *it = [[StampAlbumItem alloc] init];
-                it.unlocked = st.unlocked;
-                it.isNew = st.isNew;
-                it.imageURL = st.image;
-                it.rarity = st.rarity;
-                it.circleColor = StampAlbumRarityColor(st.rarity);
-                it.rawStamp = st;
-                [items addObject:it];
-            }
-            s.items = [items copy];
-            [sec addObject:s];
-        }];
-
-        weakSelf.allSections = [sec copy];
-        weakSelf.sections = weakSelf.allSections;
-        [weakSelf setupFilterOptions];
-        [weakSelf.tableView reloadData];
-        [weakSelf.filterTableView reloadData];
+    [[StampRequest shared] getStampsCategoriesSuccess:^(HTTPResponse * _Nullable responseObject) {
+            
     } failure:^(NSError * _Nonnull error) {
-        [QMUITips showError:error.localizedDescription];
+        
     }];
+//    [[StampRequest shared] getStampCollectionSuccess:^(HTTPResponse * _Nullable responseObject) {
+//        PNStampCollection *c = (PNStampCollection *)responseObject.dataObject;
+//        weakSelf.apiCategories = c.categories ?: @[];
+//
+//        NSMutableArray<StampAlbumSectionModel *> *sec = [NSMutableArray array];
+//        [weakSelf.apiCategories enumerateObjectsUsingBlock:^(PNStampCategorySection * _Nonnull cat, NSUInteger idx, BOOL * _Nonnull stop) {
+//            NSString *displayTitle = StampAlbumNormalizedCategoryTitle(cat.name, (NSInteger)idx);
+//            if (displayTitle.length == 0) {
+//                return;
+//            }
+//            StampAlbumSectionModel *s = [[StampAlbumSectionModel alloc] init];
+//            s.title = displayTitle;
+//            NSMutableArray<StampAlbumItem *> *items = [NSMutableArray array];
+//            for (PNStampAlbumItem *st in (cat.stamps ?: @[])) {
+//                StampAlbumItem *it = [[StampAlbumItem alloc] init];
+//                it.unlocked = st.unlocked;
+//                it.isNew = st.isNew;
+//                it.imageURL = st.image;
+//                it.rarity = st.rarity;
+//                it.circleColor = StampAlbumRarityColor(st.rarity);
+//                it.rawStamp = st;
+//                [items addObject:it];
+//            }
+//            s.items = [items copy];
+//            [sec addObject:s];
+//        }];
+//
+//        weakSelf.allSections = [sec copy];
+//        weakSelf.sections = weakSelf.allSections;
+//        [weakSelf setupFilterOptions];
+//        [weakSelf.tableView reloadData];
+//        [weakSelf.filterTableView reloadData];
+//    } failure:^(NSError * _Nonnull error) {
+//        [QMUITips showError:error.localizedDescription];
+//    }];
 }
 
 - (void)setupFilterOptions {

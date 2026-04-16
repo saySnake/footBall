@@ -124,17 +124,10 @@ FOUNDATION_EXPORT NSString * const APIPathValueStampsList;
 FOUNDATION_EXPORT NSString * const APIPathValueUpdateStamps(NSString *stampId);
 /// DELETE 删除主页邮票
 FOUNDATION_EXPORT NSString * const APIPathValueDeleteStamps(NSString *stampId);
-
-/// 邮票夹主页 - 按分类组织，每分类max10个，含锁定邮票+解锁进度+新标记
-FOUNDATION_EXPORT NSString * const APIPathValueStampsCollection;
 /// 获取邮票动态分类列表
 FOUNDATION_EXPORT NSString * const APIPathValueStampsCategories;
 /// 查看指定分类全部邮票（网格布局）
 FOUNDATION_EXPORT NSString * const APIPathValueStampsCategoryAll(NSString *categoryId);
-/// 获取邮票详情
-FOUNDATION_EXPORT NSString * const APIPathValueStampsDetail(NSString *stampId);
-/// 更新邮票展示位置（长按编辑）
-FOUNDATION_EXPORT NSString * const APIPathValueStampsDisplay;
 #pragma mark - 关注模块
 /// POST关注用户 / DELETE取消关注用户
 FOUNDATION_EXPORT NSString * const APIPathValueFollowsUser(NSString *userId);

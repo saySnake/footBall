@@ -146,9 +146,9 @@ NSString * const APIPathValueDeleteStamps(NSString *stampId) {
     return [NSString stringWithFormat:@"/api/v1/stamps/%@",stampId];
 }
 NSString * const APIPathValueStampsCollection = @"/api/v1/stamps/collection";
-NSString * const APIPathValueStampsCategories = @"/api/v1/stamps/categories";
+NSString * const APIPathValueStampsCategories = @"/api/v1/stamps/my-stamps";
 NSString * const APIPathValueStampsCategoryAll(NSString *categoryId) {
-    return [NSString stringWithFormat:@"/api/v1/stamps/categories/%@/all",categoryId];
+    return [NSString stringWithFormat:@"/api/v1/stamps/categories/%@/stamps",categoryId];
 }
 NSString * const APIPathValueStampsDetail(NSString *stampId) {
     return [NSString stringWithFormat:@"/api/v1/stamps/%@",stampId];
