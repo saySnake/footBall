@@ -34,16 +34,19 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)deleteStamp:(NSString *)stampId
             success:(nullable APISuccessBlock)success
             failure:(nullable APIFailureBlock)failure;
-/// TODO: 等后端实现
-/// GET  `/api/v1/stamps/categories`  获取已认证的邮票分类，每个分类返回最多10个邮票
-- (void)getStampsCategoriesSuccess:(nullable APISuccessBlock)success
-                           failure:(nullable APIFailureBlock)failure;
+/// GET `/api/v1/stamps/my-stamps` 已认证邮票（每分类最多10个）；`dataObject` 为 `NSArray<PNStampCategory *>`
+- (void)getMyStampsSuccess:(nullable APISuccessBlock)success
+                   failure:(nullable APIFailureBlock)failure;
 
-/// TODO: 等后端实现
-/// GET  `/api/v1/stamps/categories/{categoryId}/all`  获取已认证的邮票分类，每个分类返回最多10个邮票
+/// GET `/api/v1/stamps/categories/{categoryId}/stamps` 获取某分类下已认证邮票（全量）；`dataObject` 为 `NSArray<PNStampAlbumItem *>`
 - (void)getAllStampsInCategory:(NSString *)categoryId
                        success:(nullable APISuccessBlock)success
                        failure:(nullable APIFailureBlock)failure;
+
+/// GET `/api/v1/stamps/selectable` 可选择邮票（按分类分组）；`dataObject` 为 `NSArray<PNStampCategory *>`
+- (void)getSelectableStampsSuccess:(nullable APISuccessBlock)success
+                           failure:(nullable APIFailureBlock)failure;
+
 
 @end
 

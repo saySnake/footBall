@@ -139,21 +139,17 @@ NSString * const APIPathValueMatchRecordVerify(NSString *recordId) {
 
 #pragma mark - 邮票模块
 NSString * const APIPathValueStampsList = @"/api/v1/stamps/list";
+NSString * const APIPathValueStampsSelectable = @"/api/v1/stamps/selectable";
 NSString * const APIPathValueUpdateStamps(NSString *stampId) {
     return [NSString stringWithFormat:@"/api/v1/stamps/%@",stampId];
 }
 NSString * const APIPathValueDeleteStamps(NSString *stampId) {
     return [NSString stringWithFormat:@"/api/v1/stamps/%@",stampId];
 }
-NSString * const APIPathValueStampsCollection = @"/api/v1/stamps/collection";
 NSString * const APIPathValueStampsCategories = @"/api/v1/stamps/my-stamps";
 NSString * const APIPathValueStampsCategoryAll(NSString *categoryId) {
     return [NSString stringWithFormat:@"/api/v1/stamps/categories/%@/stamps",categoryId];
 }
-NSString * const APIPathValueStampsDetail(NSString *stampId) {
-    return [NSString stringWithFormat:@"/api/v1/stamps/%@",stampId];
-}
-NSString * const APIPathValueStampsDisplay = @"/api/v1/stamps/display";
 
 #pragma mark - 关注模块
 NSString * const APIPathValueFollowsUser(NSString *userId) {

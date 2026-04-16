@@ -81,10 +81,17 @@
     }];
 }
 
-- (void)getStampCategoriesSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+- (void)getMyStampsSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     [[APIManager sharedManager] GET:APIPathValueStampsCategories parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            responseObject.dataObject = responseObject.data;
+            NSArray<PNStampCategory *> *cats = @[];
+            if ([responseObject.data isKindOfClass:NSDictionary.class]) {
+                id arr = ((NSDictionary *)responseObject.data)[@"categories"];
+                if ([arr isKindOfClass:NSArray.class]) {
+                    cats = [NSArray yy_modelArrayWithClass:PNStampCategory.class json:arr] ?: @[];
+                }
+            }
+            responseObject.dataObject = cats;
             if (success) success(responseObject);
         } else {
             if (failure) failure([APIError errorWithResponse:responseObject]);
@@ -107,6 +114,26 @@
                 objs = [NSArray yy_modelArrayWithClass:PNStampAlbumItem.class json:data] ?: @[];
             }
             responseObject.dataObject = objs;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
+
+- (void)getSelectableStampsSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    [[APIManager sharedManager] GET:APIPathValueStampsSelectable parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            NSArray<PNStampCategory *> *cats = @[];
+            if ([responseObject.data isKindOfClass:NSDictionary.class]) {
+                id arr = ((NSDictionary *)responseObject.data)[@"categories"];
+                if ([arr isKindOfClass:NSArray.class]) {
+                    cats = [NSArray yy_modelArrayWithClass:PNStampCategory.class json:arr] ?: @[];
+                }
+            }
+            responseObject.dataObject = cats;
             if (success) success(responseObject);
         } else {
             if (failure) failure([APIError errorWithResponse:responseObject]);

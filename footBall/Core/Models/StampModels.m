@@ -22,16 +22,18 @@
 }
 @end
 
-@implementation PNStampCategorySection
+@implementation PNStampCategory
 + (NSDictionary<NSString *, id> *)modelContainerPropertyGenericClass {
     return @{ @"stamps": PNStampAlbumItem.class };
 }
 + (NSDictionary<NSString *, id> *)modelCustomPropertyMapper {
-    return @{ @"categoryId": @[ @"categoryId", @"id" ] };
+    return @{
+        @"categoryId": @[ @"categoryId", @"id" ],
+        @"categoryName": @[ @"categoryName", @"categoryName", @"name" ],
+        @"categoryIcon": @[ @"categoryIcon", @"categoryIcon", @"icon" ],
+    };
 }
-
- -(BOOL)modelCustomTransformFromDictionary:(NSDictionary *)dic {
-    // categoryId 可能为 number，统一转为 string
+-(BOOL)modelCustomTransformFromDictionary:(NSDictionary *)dic {
     id v = dic[@"categoryId"] ?: dic[@"id"];
     if ([v isKindOfClass:NSNumber.class]) {
         self.categoryId = [(NSNumber *)v stringValue];

@@ -120,6 +120,8 @@ FOUNDATION_EXPORT NSString * const APIPathValueMatchRecordVerify(NSString *recor
 #pragma mark - 邮票模块
 /// 邮票主页
 FOUNDATION_EXPORT NSString * const APIPathValueStampsList;
+/// 可选择邮票（按分类分组）
+FOUNDATION_EXPORT NSString * const APIPathValueStampsSelectable;
 /// PUT 更新主页邮票
 FOUNDATION_EXPORT NSString * const APIPathValueUpdateStamps(NSString *stampId);
 /// DELETE 删除主页邮票

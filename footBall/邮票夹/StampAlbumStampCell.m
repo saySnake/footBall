@@ -4,7 +4,6 @@
 //
 
 #import "StampAlbumStampCell.h"
-#import "StampAlbumModels.h"
 #import "StampModels.h"
 #import <SDWebImage/SDWebImage.h>
 
@@ -59,7 +58,7 @@ static const CGFloat kStampCircleIconDiameterDelta = 20;
     _lineBottom.frame = CGRectMake(0, h - 0.5, w, 0.5);
 }
 
-- (void)configureWithItem:(StampAlbumItem *)item
+- (void)configureWithStampItem:(PNStampAlbumItem *)item
               indexPath:(NSIndexPath *)indexPath
              totalCount:(NSInteger)total
             columnCount:(NSInteger)columns {
@@ -76,31 +75,21 @@ static const CGFloat kStampCircleIconDiameterDelta = 20;
     NSInteger rows = total > 0 ? (total + cols - 1) / cols : 0;
     _lineRight.hidden = (col == cols - 1);
     _lineBottom.hidden = (rows > 0 && row == rows - 1);
-    if (item.unlocked) {
-        _circleView.backgroundColor = item.circleColor ?: [UIColor colorWithWhite:0.75 alpha:1.0];
-        _circleView.layer.borderWidth = 1;
-        _circleView.layer.borderColor = [UIColor colorWithWhite:0.35 alpha:0.35].CGColor;
-        _iconView.hidden = NO;
-        if (item.imageURL.length > 0) {
-            _iconView.contentMode = UIViewContentModeScaleAspectFill;
-            [_iconView sd_setImageWithURL:[NSURL URLWithString:item.imageURL] placeholderImage:nil];
-        } else {
-            _iconView.contentMode = UIViewContentModeScaleAspectFit;
-            if (@available(iOS 15.0, *)) {
-                UIImage *img = [UIImage systemImageNamed:@"sportscourt.fill"];
-                _iconView.image = [img imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-            } else {
-                UIImage *img = [UIImage systemImageNamed:@"building.2.fill"];
-                _iconView.image = [img imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-            }
-        }
+    _circleView.backgroundColor = StampRarityColor(item.rarity);
+    _circleView.layer.borderWidth = 1;
+    _circleView.layer.borderColor = [UIColor colorWithWhite:0.35 alpha:0.35].CGColor;
+    _iconView.hidden = NO;
+    if (item.image.length > 0) {
+        _iconView.contentMode = UIViewContentModeScaleAspectFill;
+        [_iconView sd_setImageWithURL:[NSURL URLWithString:item.image] placeholderImage:nil];
     } else {
-        _circleView.backgroundColor = [UIColor whiteColor];
-        _circleView.layer.borderWidth = 1.5;
-        _circleView.layer.borderColor = [UIColor colorWithWhite:0.82 alpha:1.0].CGColor;
-        _iconView.hidden = YES;
-        [_iconView sd_cancelCurrentImageLoad];
-        _iconView.image = nil;
+        _iconView.contentMode = UIViewContentModeScaleAspectFit;
+        if (@available(iOS 15.0, *)) {
+            UIImage *img = [UIImage systemImageNamed:@"photo"];
+            _iconView.image = [img imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+        } else {
+            _iconView.image = nil;
+        }
     }
 }
 
@@ -110,54 +99,6 @@ static UIColor *StampRarityColor(NSString *rarity) {
     if ([r isEqualToString:@"EPIC"]) return [UIColor colorWithHexString:@"#8E62D9"];
     if ([r isEqualToString:@"RARE"]) return [UIColor colorWithHexString:@"#3C6FD9"];
     return [UIColor colorWithHexString:@"#7C9A8B"]; // COMMON / fallback
-}
-
-- (void)configureWithStamp:(PNStampGridItem *)stamp
-                 indexPath:(NSIndexPath *)indexPath
-                totalCount:(NSInteger)total
-               columnCount:(NSInteger)columns {
-    if (!stamp) {
-        _lineRight.hidden = YES;
-        _lineBottom.hidden = YES;
-        _circleView.backgroundColor = [UIColor whiteColor];
-        _circleView.layer.borderWidth = 0;
-        _iconView.hidden = YES;
-        [_iconView sd_cancelCurrentImageLoad];
-        _iconView.image = nil;
-        return;
-    }
-
-    NSInteger cols = MAX(1, columns);
-    NSInteger col = indexPath.item % cols;
-    NSInteger row = indexPath.item / cols;
-    NSInteger rows = total > 0 ? (total + cols - 1) / cols : 0;
-    _lineRight.hidden = (col == cols - 1);
-    _lineBottom.hidden = (rows > 0 && row == rows - 1);
-
-    BOOL unlocked = stamp.unlocked;
-    if (unlocked) {
-        _circleView.backgroundColor = StampRarityColor(stamp.rarity);
-        _circleView.layer.borderWidth = 1;
-        _circleView.layer.borderColor = [UIColor colorWithWhite:0.25 alpha:0.25].CGColor;
-        _iconView.hidden = NO;
-        _iconView.tintColor = [UIColor clearColor];
-        _iconView.contentMode = UIViewContentModeScaleAspectFill;
-        if (stamp.image.length > 0) {
-            [_iconView sd_setImageWithURL:[NSURL URLWithString:stamp.image] placeholderImage:nil];
-        } else {
-            [_iconView sd_cancelCurrentImageLoad];
-            _iconView.image = nil;
-        }
-        self.contentView.alpha = 1.0;
-    } else {
-        _circleView.backgroundColor = [UIColor whiteColor];
-        _circleView.layer.borderWidth = 1.5;
-        _circleView.layer.borderColor = [UIColor colorWithWhite:0.82 alpha:1.0].CGColor;
-        _iconView.hidden = YES;
-        [_iconView sd_cancelCurrentImageLoad];
-        _iconView.image = nil;
-        self.contentView.alpha = 1.0;
-    }
 }
 
 @end

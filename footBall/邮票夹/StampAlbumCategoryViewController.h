@@ -5,8 +5,6 @@
 
 #import "QMBaseViewController.h"
 
-@class StampAlbumItem;
-
 NS_ASSUME_NONNULL_BEGIN
 
 /// 邮票夹某分类「查看更多」：3 列网格全屏页（顶栏标题与邮票夹主页一致）
@@ -14,9 +12,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, copy) void (^didSelected)(PNStampAlbumItem *stamp);
 
-- (instancetype)initWithItems:(NSArray<StampAlbumItem *> *)items;
-
-/// 某分类下全部邮票（接口：`/api/v1/stamps/categories/{categoryId}/all`）
+/// 某分类下全部邮票（接口：`/api/v1/stamps/categories/{categoryId}/stamps`）
 - (instancetype)initWithCategoryId:(NSString *)categoryId categoryName:(nullable NSString *)categoryName;
 
 @end

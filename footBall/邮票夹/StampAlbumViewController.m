@@ -4,7 +4,6 @@
 //
 
 #import "StampAlbumViewController.h"
-#import "StampAlbumModels.h"
 #import "StampAlbumStampCell.h"
 #import "StampAlbumCategoryViewController.h"
 #import "StampRequest.h"
@@ -58,10 +57,10 @@ static NSString *StampAlbumNormalizedCategoryTitle(NSString *rawTitle, NSInteger
 #pragma mark - Grid table cell
 
 @interface StampAlbumGridTableCell : UITableViewCell <UICollectionViewDataSource, UICollectionViewDelegateFlowLayout>
-@property (nonatomic, copy) NSArray<StampAlbumItem *> *items;
+@property (nonatomic, copy) NSArray<PNStampAlbumItem *> *items;
 @property (nonatomic, strong) UICollectionView *collectionView;
 @property (nonatomic, assign) CGFloat itemSide;
-@property (nonatomic, copy, nullable) void (^onSelectItem)(StampAlbumItem *item);
+@property (nonatomic, copy, nullable) void (^onSelectItem)(PNStampAlbumItem *item);
 @end
 
 @implementation StampAlbumGridTableCell
@@ -98,7 +97,7 @@ static NSString *StampAlbumNormalizedCategoryTitle(NSString *rawTitle, NSInteger
     return self;
 }
 
-- (void)configureWithItems:(NSArray<StampAlbumItem *> *)items tableWidth:(CGFloat)tableWidth {
+- (void)configureWithItems:(NSArray<PNStampAlbumItem *> *)items tableWidth:(CGFloat)tableWidth {
     self.items = items ?: @[];
     CGFloat inner = MAX(0, tableWidth - 32);
     self.itemSide = inner > 0 ? floor(inner / 5.0) : 0;
@@ -118,7 +117,7 @@ static NSString *StampAlbumNormalizedCategoryTitle(NSString *rawTitle, NSInteger
 
 - (__kindof UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
     StampAlbumStampCell *c = [collectionView dequeueReusableCellWithReuseIdentifier:@"StampAlbumStampCell" forIndexPath:indexPath];
-    [c configureWithItem:self.items[indexPath.item] indexPath:indexPath totalCount:self.items.count columnCount:5];
+    [c configureWithStampItem:self.items[indexPath.item] indexPath:indexPath totalCount:self.items.count columnCount:5];
     return c;
 }
 
@@ -126,7 +125,7 @@ static NSString *StampAlbumNormalizedCategoryTitle(NSString *rawTitle, NSInteger
     if (indexPath.item < 0 || indexPath.item >= (NSInteger)self.items.count) {
         return;
     }
-    StampAlbumItem *it = self.items[indexPath.item];
+    PNStampAlbumItem *it = self.items[indexPath.item];
     if (self.onSelectItem) {
         self.onSelectItem(it);
     }
@@ -146,14 +145,12 @@ static NSString *StampAlbumNormalizedCategoryTitle(NSString *rawTitle, NSInteger
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UIButton *filterButton;
 @property (nonatomic, strong) UITableView *tableView;
-@property (nonatomic, copy) NSArray<StampAlbumSectionModel *> *allSections;
-@property (nonatomic, copy) NSArray<StampAlbumSectionModel *> *sections;
-@property (nonatomic, copy) NSArray<PNStampCategorySection *> *apiCategories;
+@property (nonatomic, copy) NSArray<PNStampCategory *> *allCategories;
+@property (nonatomic, copy) NSArray<PNStampCategory *> *categories;
 @property (nonatomic, assign) CGFloat tableLayoutWidth;
 
 // Filter dropdown
 @property (nonatomic, copy) NSArray<NSString *> *filterOptions; // e.g. 球场分类/分类二/分类三
-@property (nonatomic, strong) NSArray<NSArray<StampAlbumSectionModel *> *> *filterOptionSections;
 @property (nonatomic, assign) BOOL filterApplied;
 @property (nonatomic, assign) NSInteger selectedFilterIndex;
 @property (nonatomic, copy) NSString *filterBaseTitle;
@@ -198,10 +195,15 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
 
 - (void)loadStampCollection {
     __weak typeof(self) weakSelf = self;
-    [[StampRequest shared] getStampsCategoriesSuccess:^(HTTPResponse * _Nullable responseObject) {
-            
+    [[StampRequest shared] getSelectableStampsSuccess:^(HTTPResponse * _Nullable responseObject) {
+        NSArray<PNStampCategory *> *cats = [responseObject.dataObject isKindOfClass:NSArray.class] ? (NSArray<PNStampCategory *> *)responseObject.dataObject : @[];
+        weakSelf.allCategories = cats ?: @[];
+        weakSelf.categories = weakSelf.allCategories;
+        [weakSelf setupFilterOptions];
+        [weakSelf.tableView reloadData];
+        [weakSelf.filterTableView reloadData];
     } failure:^(NSError * _Nonnull error) {
-        
+        [QMUITips showError:error.localizedDescription];
     }];
 //    [[StampRequest shared] getStampCollectionSuccess:^(HTTPResponse * _Nullable responseObject) {
 //        PNStampCollection *c = (PNStampCollection *)responseObject.dataObject;
@@ -241,28 +243,17 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
 }
 
 - (void)setupFilterOptions {
-    // 分类名：按 allSections 出现顺序去重（不含「全部」）
+    // 分类名：按 allCategories 出现顺序去重（不含「全部」）
     NSMutableArray<NSString *> *categoryTitles = [NSMutableArray array];
-    for (StampAlbumSectionModel *m in self.allSections) {
-        if (!m.title.length) continue;
+    for (PNStampCategory *c in self.allCategories) {
+        NSString *t = c.categoryName ?: @"";
+        if (!t.length) continue;
         BOOL exists = NO;
-        for (NSString *t in categoryTitles) {
-            if ([t isEqualToString:m.title]) { exists = YES; break; }
+        for (NSString *x in categoryTitles) {
+            if ([x isEqualToString:t]) { exists = YES; break; }
         }
-        if (!exists) [categoryTitles addObject:m.title];
+        if (!exists) [categoryTitles addObject:t];
     }
-
-    NSMutableArray *optSections = [NSMutableArray array];
-    for (NSString *t in categoryTitles) {
-        NSMutableArray *arr = [NSMutableArray array];
-        for (StampAlbumSectionModel *m in self.allSections) {
-            if ([m.title isEqualToString:t]) {
-                [arr addObject:m];
-            }
-        }
-        [optSections addObject:[arr copy]];
-    }
-    self.filterOptionSections = [optSections copy];
 
     NSMutableArray *uiTitles = [NSMutableArray array];
     [uiTitles addObject:NSLocalizedString(@"stamp_album_filter_all", nil) ?: @"全部"];
@@ -499,7 +490,7 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
     if (tableView == self.filterTableView) return 1;
-    return self.sections.count;
+    return self.categories.count;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
@@ -536,18 +527,17 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
     }
 
     StampAlbumGridTableCell *c = [tableView dequeueReusableCellWithIdentifier:@"StampAlbumGridTableCell" forIndexPath:indexPath];
-    StampAlbumSectionModel *sec = self.sections[indexPath.section];
+    PNStampCategory *sec = self.categories[indexPath.section];
     CGFloat w = CGRectGetWidth(tableView.bounds);
     if (w < 1) {
         w = CGRectGetWidth(self.view.bounds);
     }
-    [c configureWithItems:sec.items tableWidth:w];
+    [c configureWithItems:sec.stamps tableWidth:w];
     __weak typeof(self) weakSelf = self;
-    c.onSelectItem = ^(StampAlbumItem *item) {
+    c.onSelectItem = ^(PNStampAlbumItem *item) {
         if (!weakSelf) return;
-        PNStampAlbumItem *raw = item.rawStamp;
-        if (raw && weakSelf.didSelected) {
-            weakSelf.didSelected(raw);
+        if (item && weakSelf.didSelected) {
+            weakSelf.didSelected(item);
             [weakSelf.navigationController popViewControllerAnimated:YES];
         }
     };
@@ -556,13 +546,13 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
 
 - (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
     if (tableView == self.filterTableView) return nil;
-    StampAlbumSectionModel *m = self.sections[section];
+    PNStampCategory *m = self.categories[section];
     UIView *wrap = [[UIView alloc] init];
     wrap.backgroundColor = [UIColor clearColor];
     UILabel *title = [[UILabel alloc] init];
     title.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
     title.textColor = [UIColor colorWithWhite:0.12 alpha:1.0];
-    title.text = m.title;
+    title.text = m.categoryName;
     UIButton *more = [UIButton buttonWithType:UIButtonTypeSystem];
     [more setTitle:NSLocalizedString(@"stamp_album_view_more", nil) ?: @"查看更多" forState:UIControlStateNormal];
     more.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightRegular];
@@ -609,21 +599,26 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
     if (idx == 0) {
         self.filterApplied = NO;
         self.selectedFilterIndex = -1;
-        self.sections = self.allSections ?: @[];
+        self.categories = self.allCategories ?: @[];
         [self.filterButton setTitle:[NSString stringWithFormat:@"%@ ▼", base] forState:UIControlStateNormal];
     } else if (self.filterApplied && idx == self.selectedFilterIndex) {
         // 再次点当前分类：取消筛选（与「全部」同效）
         self.filterApplied = NO;
         self.selectedFilterIndex = -1;
-        self.sections = self.allSections ?: @[];
+        self.categories = self.allCategories ?: @[];
         [self.filterButton setTitle:[NSString stringWithFormat:@"%@ ▼", base] forState:UIControlStateNormal];
     } else {
         self.filterApplied = YES;
         self.selectedFilterIndex = idx;
-        NSInteger catIdx = idx - 1;
-        NSArray<StampAlbumSectionModel *> *sub = (catIdx >= 0 && catIdx < (NSInteger)self.filterOptionSections.count) ? self.filterOptionSections[catIdx] : @[];
-        self.sections = sub;
         NSString *opt = self.filterOptions[idx] ?: @"";
+        NSMutableArray<PNStampCategory *> *sub = [NSMutableArray array];
+        for (PNStampCategory *c in (self.allCategories ?: @[])) {
+            NSString *name = [c.categoryName isKindOfClass:NSString.class] ? c.categoryName : @"";
+            if (name.length && [name isEqualToString:opt]) {
+                [sub addObject:c];
+            }
+        }
+        self.categories = [sub copy];
         [self.filterButton setTitle:[NSString stringWithFormat:@"%@ ▼", opt] forState:UIControlStateNormal];
     }
 
@@ -634,26 +629,14 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
 
 - (void)onViewMore:(UIButton *)sender {
     NSInteger section = sender.tag;
-    if (section < 0 || section >= (NSInteger)self.sections.count) {
+    if (section < 0 || section >= (NSInteger)self.categories.count) {
         return;
     }
-    StampAlbumSectionModel *sec = self.sections[section];
-    // 尝试从接口 categories 找到对应分类并传 categoryId（若当前是筛选后的 sections，同名可能重复，以 first match 为准）
-    __block NSString *catId = nil;
-    NSString *catName = sec.title;
-    [self.apiCategories enumerateObjectsUsingBlock:^(PNStampCategorySection * _Nonnull c, NSUInteger idx, BOOL * _Nonnull stop) {
-        NSString *displayTitle = StampAlbumNormalizedCategoryTitle(c.name, (NSInteger)idx);
-        if (catName.length && [displayTitle isEqualToString:catName] && c.categoryId.length) {
-            catId = c.categoryId;
-            *stop = YES;
-        }
-    }];
+    PNStampCategory *sec = self.categories[section];
+    NSString *catId = sec.categoryId;
+    NSString *catName = sec.categoryName;
     StampAlbumCategoryViewController *vc = nil;
-    if (catId.length) {
-        vc = [[StampAlbumCategoryViewController alloc] initWithCategoryId:catId categoryName:catName];
-    } else {
-        vc = [[StampAlbumCategoryViewController alloc] initWithItems:sec.items];
-    }
+    vc = [[StampAlbumCategoryViewController alloc] initWithCategoryId:catId categoryName:catName];
     __weak typeof(self) weakSelf = self;
     vc.didSelected = ^(PNStampAlbumItem *stamp) {
         if (!weakSelf) return;
