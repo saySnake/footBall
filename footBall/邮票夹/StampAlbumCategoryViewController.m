@@ -267,7 +267,7 @@ static inline UIEdgeInsets StampCategorySectionInset(void) {
             return;
         }
         PNStampGridItem *it = self.apiDisplayItems[indexPath.item];
-        if (!it.unlocked || it.stampId.length == 0) {
+        if (it.stampId.length == 0) {
             return;
         }
         if (self.didSelected) {
@@ -291,7 +291,7 @@ static inline UIEdgeInsets StampCategorySectionInset(void) {
         return;
     }
     StampAlbumItem *it = self.displayItems[indexPath.item];
-    if (!it.unlocked || !it.rawStamp) {
+    if (!it.rawStamp) {
         return;
     }
     if (self.didSelected) {

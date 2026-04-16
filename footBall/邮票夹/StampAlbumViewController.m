@@ -83,6 +83,8 @@ static NSString *StampAlbumNormalizedCategoryTitle(NSString *rawTitle, NSInteger
         _collectionView.dataSource = self;
         _collectionView.delegate = self;
         _collectionView.scrollEnabled = NO;
+        _collectionView.userInteractionEnabled = YES;
+        _collectionView.allowsSelection = YES;
         [_collectionView registerClass:[StampAlbumStampCell class] forCellWithReuseIdentifier:@"StampAlbumStampCell"];
         [self.contentView addSubview:_collectionView];
         [_collectionView mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -125,9 +127,6 @@ static NSString *StampAlbumNormalizedCategoryTitle(NSString *rawTitle, NSInteger
         return;
     }
     StampAlbumItem *it = self.items[indexPath.item];
-    if (!it.unlocked) {
-        return;
-    }
     if (self.onSelectItem) {
         self.onSelectItem(it);
     }
@@ -541,7 +540,6 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
     __weak typeof(self) weakSelf = self;
     c.onSelectItem = ^(StampAlbumItem *item) {
         if (!weakSelf) return;
-        if (!item.unlocked) return;
         PNStampAlbumItem *raw = item.rawStamp;
         if (raw && weakSelf.didSelected) {
             weakSelf.didSelected(raw);

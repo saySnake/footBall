@@ -38,7 +38,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 
 
-///已弃用  GET `/api/v1/stamps/collection` — 邮票夹主页（分类+预览等）；`dataObject` 为原始 `data`
+/// GET `/api/v1/stamps/collection` — 邮票夹主页（分类+预览等）；`dataObject` 为原始 `data`
 - (void)getStampCollectionSuccess:(nullable APISuccessBlock)success
                           failure:(nullable APIFailureBlock)failure;
 
