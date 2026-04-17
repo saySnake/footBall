@@ -257,7 +257,7 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
         if (h < 1) {
             h = 300;
         }
-        self.cardDismissThreshold = h * 0.5;
+                self.cardDismissThreshold = h / 3.0;
     }
 
     if (gr.state == UIGestureRecognizerStateChanged) {

@@ -29,6 +29,10 @@ static UIColor *kAddConsumePlaceholder(void) {
 @property (nonatomic, strong) UIView *cardView;
 @property (nonatomic, strong) UIButton *confirmButton;
 @property (nonatomic, assign) BOOL submitting;
+@property (nonatomic, assign) CGFloat cardDismissThreshold;
+@property (nonatomic, assign) BOOL didPrepareInitialOffscreen;
+@property (nonatomic, assign) BOOL didSchedulePresentAnimation;
+@property (nonatomic, assign) BOOL didRunPresentAnimation;
 
 @property (nonatomic, strong) UIImageView *photoPreview;
 @property (nonatomic, strong) UIButton *photoBtn;
@@ -51,10 +55,12 @@ static UIColor *kAddConsumePlaceholder(void) {
 
     UIView *dim = [[UIView alloc] init];
     dim.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.5];
+    dim.alpha = 0.0;
+    // alpha=0 时也必须不拦截触摸，否则会出现“卡片没弹出来但全屏点不了”
+    dim.userInteractionEnabled = NO;
     [self.view addSubview:dim];
     self.dimmingView = dim;
     [dim mas_makeConstraints:^(MASConstraintMaker *make) { make.edges.equalTo(self.view); }];
-    [dim addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onDismiss)]];
 
     UIView *card = [[UIView alloc] init];
     card.backgroundColor = [UIColor whiteColor];
@@ -69,6 +75,10 @@ static UIColor *kAddConsumePlaceholder(void) {
         // 底部贴紧屏幕（与原型一致，底部距离为 0）
         make.bottom.equalTo(self.view);
     }];
+
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(onCardPan:)];
+    pan.maximumNumberOfTouches = 1;
+    [card addGestureRecognizer:pan];
 
     // 顶部拖拽条（Figma #D4D4D4，约 22% 屏宽）
     UIView *handle = [[UIView alloc] init];
@@ -281,6 +291,54 @@ static UIColor *kAddConsumePlaceholder(void) {
     [self refreshDateTimeButtons];
 }
 
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    if (self.didRunPresentAnimation) {
+        return;
+    }
+    if (!self.cardView || !self.dimmingView) {
+        return;
+    }
+    // 第一次 layout 完成后再把卡片放到屏幕外，避免首帧“先出现再跳”的闪烁。
+    if (!self.didPrepareInitialOffscreen) {
+        self.didPrepareInitialOffscreen = YES;
+        [self.view layoutIfNeeded];
+        CGFloat h = CGRectGetHeight(self.cardView.bounds);
+        if (h < 1) {
+            h = 520;
+        }
+        self.cardView.transform = CGAffineTransformMakeTranslation(0, h + 40);
+        self.dimmingView.alpha = 0.0;
+        self.dimmingView.userInteractionEnabled = NO;
+
+        // 不依赖“第二次 layout”：下一轮 runloop 直接播放入场动画
+        __weak typeof(self) weakSelf = self;
+        if (self.didSchedulePresentAnimation) {
+            return;
+        }
+        self.didSchedulePresentAnimation = YES;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self || self.didRunPresentAnimation) {
+                return;
+            }
+            self.didRunPresentAnimation = YES;
+            [UIView animateWithDuration:0.26
+                                  delay:0
+                 usingSpringWithDamping:0.9
+                  initialSpringVelocity:0.6
+                                options:UIViewAnimationOptionCurveEaseOut
+                             animations:^{
+                self.cardView.transform = CGAffineTransformIdentity;
+                self.dimmingView.alpha = 1.0;
+            } completion:^(BOOL finished) {
+                self.dimmingView.userInteractionEnabled = YES;
+            }];
+        });
+        return;
+    }
+}
+
 - (void)refreshDateTimeButtons {
     NSCalendar *cal = [[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian];
     cal.timeZone = [NSTimeZone localTimeZone];
@@ -292,7 +350,73 @@ static UIColor *kAddConsumePlaceholder(void) {
 }
 
 - (void)onDismiss {
-    [self dismissViewControllerAnimated:YES completion:nil];
+    [self dismissWithCardAnimation];
+}
+
+- (void)dismissWithCardAnimation {
+    UIView *card = self.cardView;
+    if (!card) {
+        [self dismissViewControllerAnimated:NO completion:nil];
+        return;
+    }
+    self.dimmingView.userInteractionEnabled = NO;
+    [self.view layoutIfNeeded];
+    CGFloat h = CGRectGetHeight(card.bounds);
+    if (h < 1) {
+        h = 520;
+    }
+    [UIView animateWithDuration:0.18 animations:^{
+        card.transform = CGAffineTransformMakeTranslation(0, h + 40);
+        self.dimmingView.alpha = 0.0;
+    } completion:^(BOOL finished) {
+        [self dismissViewControllerAnimated:NO completion:nil];
+    }];
+}
+
+- (void)onCardPan:(UIPanGestureRecognizer *)gr {
+    UIView *card = self.cardView;
+    if (!card) { return; }
+
+    CGPoint t = [gr translationInView:self.view];
+    CGFloat dy = MAX(0, t.y); // 只允许向下拖动
+
+    if (gr.state == UIGestureRecognizerStateBegan) {
+        [self.view layoutIfNeeded];
+        CGFloat h = CGRectGetHeight(card.bounds);
+        if (h < 1) {
+            h = 520;
+        }
+        self.cardDismissThreshold = h / 3.0;
+    }
+
+    if (gr.state == UIGestureRecognizerStateChanged) {
+        card.transform = CGAffineTransformMakeTranslation(0, dy);
+        CGFloat baseAlpha = 0.5;
+        CGFloat p = self.cardDismissThreshold > 0 ? MIN(1, dy / self.cardDismissThreshold) : 0;
+        CGFloat a = baseAlpha * (1 - 0.9 * p);
+        self.dimmingView.alpha = a;
+        self.dimmingView.userInteractionEnabled = (a > 0.02);
+        return;
+    }
+
+    if (gr.state == UIGestureRecognizerStateEnded || gr.state == UIGestureRecognizerStateCancelled) {
+        BOOL shouldDismiss = (dy > self.cardDismissThreshold);
+        if (shouldDismiss) {
+            [self dismissWithCardAnimation];
+        } else {
+            [UIView animateWithDuration:0.22
+                                  delay:0
+                 usingSpringWithDamping:0.92
+                  initialSpringVelocity:0.0
+                                options:UIViewAnimationOptionCurveEaseOut
+                             animations:^{
+                card.transform = CGAffineTransformIdentity;
+                self.dimmingView.alpha = 1.0;
+            } completion:^(BOOL finished) {
+                self.dimmingView.userInteractionEnabled = YES;
+            }];
+        }
+    }
 }
 
 - (void)onPickPhoto {

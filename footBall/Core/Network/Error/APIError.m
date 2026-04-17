@@ -122,6 +122,11 @@ static char kRetryCountKey;
             return APIErrorCodeTimeout;
         case NSURLErrorCancelled:
             return APIErrorCodeCancelled;
+        case NSURLErrorBadServerResponse:
+            // 常见于 4xx/5xx（例如网关 502/503）且响应体无法按 JSON 解析时，
+            // AFNetworking 会走 failure 并给出 -1011。这里统一按服务器错误处理，
+            // 避免被默认 Silent 策略吞掉，导致上层 failure 不回调、loading 卡住。
+            return APIErrorCodeServerError;
         default:
             return APIErrorCodeUnknown;
     }

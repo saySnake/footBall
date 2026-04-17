@@ -308,16 +308,34 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
                     }
                 }];
                 if (!interceptedError) {
-                    // 错误已被处理，不继续传播
+                    // 错误已被拦截器处理：
+                    // - 401 刷新 token：拦截器会异步触发 tokenRefreshed 回调，此处应直接 return（避免提前回调 failure）
+                    // - 其他错误：即使拦截器选择静默处理，也必须回调 failure，避免上层 loading 卡死
                     [weakSelf.retryCountMap removeObjectForKey:requestKey]; // 清理重试计数
+                    NSHTTPURLResponse *httpResp = (NSHTTPURLResponse *)task.response;
+                    NSInteger status = [httpResp isKindOfClass:NSHTTPURLResponse.class] ? httpResp.statusCode : 0;
+                    if (status == 401) {
+                        return;
+                    }
+                    if (failure) {
+                        failure(task, finalError);
+                    }
                     return;
                 }
                 finalError = interceptedError;
             } else if ([interceptor respondsToSelector:@selector(interceptError:task:)]) {
                 NSError *interceptedError = [interceptor interceptError:finalError task:task];
                 if (!interceptedError) {
-                    // 错误已被处理，不继续传播
+                    // 同上：仅允许 401 刷新 token 不回调 failure，其余情况必须回调 failure
                     [weakSelf.retryCountMap removeObjectForKey:requestKey]; // 清理重试计数
+                    NSHTTPURLResponse *httpResp = (NSHTTPURLResponse *)task.response;
+                    NSInteger status = [httpResp isKindOfClass:NSHTTPURLResponse.class] ? httpResp.statusCode : 0;
+                    if (status == 401) {
+                        return;
+                    }
+                    if (failure) {
+                        failure(task, finalError);
+                    }
                     return;
                 }
                 finalError = interceptedError;
