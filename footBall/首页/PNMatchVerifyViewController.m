@@ -56,6 +56,9 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
 @property (nonatomic, strong) UIView *cardView;
 
 @property (nonatomic, assign) CGFloat cardDismissThreshold;
+@property (nonatomic, assign) BOOL didPrepareInitialOffscreen;
+@property (nonatomic, assign) BOOL didSchedulePresentAnimation;
+@property (nonatomic, assign) BOOL didRunPresentAnimation;
 
 @property (nonatomic, strong) UILabel *uploadCountLabel;
 @property (nonatomic, strong) UICollectionView *photoCollectionView;
@@ -71,6 +74,10 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
 
 @implementation PNMatchVerifyViewController
 
+static CGFloat PNMatchVerifyDimBaseAlpha(void) {
+    return 0.35;
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = [UIColor clearColor];
@@ -80,6 +87,54 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
     [self startLocate];
 }
 
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    if (self.didRunPresentAnimation) {
+        return;
+    }
+    if (!self.cardView || !self.dimmingView) {
+        return;
+    }
+
+    if (!self.didPrepareInitialOffscreen) {
+        self.didPrepareInitialOffscreen = YES;
+        [self.view layoutIfNeeded];
+
+        CGFloat h = CGRectGetHeight(self.cardView.bounds);
+        if (h < 1) {
+            h = 520;
+        }
+        self.cardView.transform = CGAffineTransformMakeTranslation(0, h + 40);
+        self.dimmingView.alpha = 0.0;
+        self.dimmingView.userInteractionEnabled = NO;
+
+        __weak typeof(self) weakSelf = self;
+        if (self.didSchedulePresentAnimation) {
+            return;
+        }
+        self.didSchedulePresentAnimation = YES;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self || self.didRunPresentAnimation) {
+                return;
+            }
+            self.didRunPresentAnimation = YES;
+            [UIView animateWithDuration:0.26
+                                  delay:0
+                 usingSpringWithDamping:0.9
+                  initialSpringVelocity:0.6
+                                options:UIViewAnimationOptionCurveEaseOut
+                             animations:^{
+                self.cardView.transform = CGAffineTransformIdentity;
+                self.dimmingView.alpha = PNMatchVerifyDimBaseAlpha();
+            } completion:^(BOOL finished) {
+                self.dimmingView.userInteractionEnabled = YES;
+            }];
+        });
+        return;
+    }
+}
+
 - (void)dealloc {
     _locationManager.delegate = nil;
 }
@@ -87,6 +142,8 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
 - (void)buildUI {
     UIView *dim = [[UIView alloc] init];
     dim.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.35];
+    dim.alpha = 0.0;
+    dim.userInteractionEnabled = NO;
     [self.view addSubview:dim];
     self.dimmingView = dim;
     [dim mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -240,6 +297,26 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
     [self updateConfirmButtonState];
 }
 
+- (void)dismissWithCardAnimation {
+    UIView *card = self.cardView;
+    if (!card) {
+        [self dismissViewControllerAnimated:NO completion:nil];
+        return;
+    }
+    self.dimmingView.userInteractionEnabled = NO;
+    [self.view layoutIfNeeded];
+    CGFloat h = CGRectGetHeight(card.bounds);
+    if (h < 1) {
+        h = 600;
+    }
+    [UIView animateWithDuration:0.18 animations:^{
+        card.transform = CGAffineTransformMakeTranslation(0, h + 40);
+        self.dimmingView.alpha = 0.0;
+    } completion:^(BOOL finished) {
+        [self dismissViewControllerAnimated:NO completion:nil];
+    }];
+}
+
 - (void)onCardPan:(UIPanGestureRecognizer *)gr {
     UIView *card = self.cardView;
     if (!card) {
@@ -257,28 +334,23 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
         if (h < 1) {
             h = 300;
         }
-                self.cardDismissThreshold = h / 3.0;
+        self.cardDismissThreshold = h / 3.0;
     }
 
     if (gr.state == UIGestureRecognizerStateChanged) {
         card.transform = CGAffineTransformMakeTranslation(0, dy);
-        CGFloat baseAlpha = 0.35;
+        CGFloat baseAlpha = PNMatchVerifyDimBaseAlpha();
         CGFloat p = self.cardDismissThreshold > 0 ? MIN(1, dy / self.cardDismissThreshold) : 0;
-        self.dimmingView.alpha = baseAlpha * (1 - 0.9 * p);
+        CGFloat a = baseAlpha * (1 - 0.9 * p);
+        self.dimmingView.alpha = a;
+        self.dimmingView.userInteractionEnabled = (a > 0.02);
         return;
     }
 
     if (gr.state == UIGestureRecognizerStateEnded || gr.state == UIGestureRecognizerStateCancelled) {
         BOOL shouldDismiss = (dy > self.cardDismissThreshold);
         if (shouldDismiss) {
-            CGFloat h = CGRectGetHeight(card.bounds);
-            if (h < 1) h = 600;
-            [UIView animateWithDuration:0.18 animations:^{
-                card.transform = CGAffineTransformMakeTranslation(0, h + 40);
-                self.dimmingView.alpha = 0;
-            } completion:^(BOOL finished) {
-                [self dismissViewControllerAnimated:NO completion:nil];
-            }];
+            [self dismissWithCardAnimation];
         } else {
             [UIView animateWithDuration:0.2
                                   delay:0
@@ -287,14 +359,16 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
                                 options:UIViewAnimationOptionCurveEaseOut
                              animations:^{
                 card.transform = CGAffineTransformIdentity;
-                self.dimmingView.alpha = 1.0;
-            } completion:nil];
+                self.dimmingView.alpha = PNMatchVerifyDimBaseAlpha();
+            } completion:^(BOOL finished) {
+                self.dimmingView.userInteractionEnabled = YES;
+            }];
         }
     }
 }
 
 - (void)onDismiss {
-    [self dismissViewControllerAnimated:NO completion:nil];
+    [self dismissWithCardAnimation];
 }
 
 #pragma mark - Photos
@@ -491,7 +565,7 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
         if (self.completion) {
             self.completion();
         }
-        [self dismissViewControllerAnimated:NO completion:nil];
+        [self dismissWithCardAnimation];
     });
 }
 
