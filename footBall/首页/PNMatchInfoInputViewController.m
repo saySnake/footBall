@@ -33,7 +33,13 @@ static CGFloat PNInputSectionSpacing(void) {
 @interface PNMatchInfoInputViewController () <UITextViewDelegate, UITextFieldDelegate>
 @property (nonatomic, strong) UIView *dimmingView;
 @property (nonatomic, strong) UIView *cardView;
+@property (nonatomic, strong) UIView *dragHandleView;
 @property (nonatomic, strong) UIScrollView *scrollView;
+
+@property (nonatomic, assign) CGFloat cardDismissThreshold;
+@property (nonatomic, assign) BOOL didPrepareInitialOffscreen;
+@property (nonatomic, assign) BOOL didSchedulePresentAnimation;
+@property (nonatomic, assign) BOOL didRunPresentAnimation;
 
 @property (nonatomic, strong) UIButton *emotionButton;
 @property (nonatomic, strong) UIView *emotionPanel;
@@ -66,6 +72,10 @@ static CGFloat PNInputSectionSpacing(void) {
 
 @implementation PNMatchInfoInputViewController
 
+static CGFloat PNMatchInfoDimBaseAlpha(void) {
+    return 1.0;
+}
+
 - (void)pn_applyPillButton:(UIButton *)button selected:(BOOL)selected {
     button.selected = selected;
     button.layer.borderWidth = selected ? 1 : 0;
@@ -83,6 +93,77 @@ static CGFloat PNInputSectionSpacing(void) {
     [self buildUI];
     [self fillDefaultValues];
     [self.emotionButton setTitle:@"选择情绪" forState:UIControlStateNormal];
+}
+
+- (void)dismissWithCardAnimation {
+    UIView *card = self.cardView;
+    if (!card) {
+        [self dismissViewControllerAnimated:NO completion:nil];
+        return;
+    }
+    [self.view endEditing:YES];
+    self.dimmingView.userInteractionEnabled = NO;
+    [self.view layoutIfNeeded];
+    CGFloat h = CGRectGetHeight(card.bounds);
+    if (h < 1) {
+        h = 600;
+    }
+    [UIView animateWithDuration:0.18 animations:^{
+        card.transform = CGAffineTransformMakeTranslation(0, h + 40);
+        self.dimmingView.alpha = 0.0;
+    } completion:^(BOOL finished) {
+        [self dismissViewControllerAnimated:NO completion:nil];
+    }];
+}
+
+- (void)onCardPan:(UIPanGestureRecognizer *)gr {
+    UIView *card = self.cardView;
+    if (!card) { return; }
+
+    CGPoint t = [gr translationInView:self.view];
+    CGFloat dy = MAX(0, t.y);
+
+    if (gr.state == UIGestureRecognizerStateBegan) {
+        [self.view endEditing:YES];
+        CGFloat h = CGRectGetHeight(card.bounds);
+        if (h < 1) {
+            [card layoutIfNeeded];
+            h = CGRectGetHeight(card.bounds);
+        }
+        if (h < 1) {
+            h = 520;
+        }
+        self.cardDismissThreshold = h / 3.0;
+    }
+
+    if (gr.state == UIGestureRecognizerStateChanged) {
+        card.transform = CGAffineTransformMakeTranslation(0, dy);
+        CGFloat baseAlpha = PNMatchInfoDimBaseAlpha();
+        CGFloat p = self.cardDismissThreshold > 0 ? MIN(1, dy / self.cardDismissThreshold) : 0;
+        CGFloat a = baseAlpha * (1 - 0.9 * p);
+        self.dimmingView.alpha = a;
+        self.dimmingView.userInteractionEnabled = (a > 0.02);
+        return;
+    }
+
+    if (gr.state == UIGestureRecognizerStateEnded || gr.state == UIGestureRecognizerStateCancelled) {
+        BOOL shouldDismiss = (dy > self.cardDismissThreshold);
+        if (shouldDismiss) {
+            [self dismissWithCardAnimation];
+        } else {
+            [UIView animateWithDuration:0.22
+                                  delay:0
+                 usingSpringWithDamping:0.92
+                  initialSpringVelocity:0.0
+                                options:UIViewAnimationOptionCurveEaseOut
+                             animations:^{
+                card.transform = CGAffineTransformIdentity;
+                self.dimmingView.alpha = PNMatchInfoDimBaseAlpha();
+            } completion:^(BOOL finished) {
+                self.dimmingView.userInteractionEnabled = YES;
+            }];
+        }
+    }
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -119,6 +200,46 @@ static CGFloat PNInputSectionSpacing(void) {
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
+
+    // 入场动画：首次 layout 后把卡片放到屏幕外，再下一轮 runloop 上弹，避免首帧闪烁/透明遮罩挡触摸
+    if (!self.didRunPresentAnimation && self.cardView && self.dimmingView && self.scrollView) {
+        if (!self.didPrepareInitialOffscreen) {
+            self.didPrepareInitialOffscreen = YES;
+            [self.view layoutIfNeeded];
+
+            CGFloat h = CGRectGetHeight(self.cardView.bounds);
+            if (h < 1) {
+                h = 520;
+            }
+            self.cardView.transform = CGAffineTransformMakeTranslation(0, h + 40);
+            self.dimmingView.alpha = 0.0;
+            self.dimmingView.userInteractionEnabled = NO;
+
+            __weak typeof(self) weakSelf = self;
+            if (!self.didSchedulePresentAnimation) {
+                self.didSchedulePresentAnimation = YES;
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    __strong typeof(weakSelf) self = weakSelf;
+                    if (!self || self.didRunPresentAnimation) {
+                        return;
+                    }
+                    self.didRunPresentAnimation = YES;
+                    [UIView animateWithDuration:0.26
+                                          delay:0
+                         usingSpringWithDamping:0.9
+                          initialSpringVelocity:0.6
+                                        options:UIViewAnimationOptionCurveEaseOut
+                                     animations:^{
+                        self.cardView.transform = CGAffineTransformIdentity;
+                        self.dimmingView.alpha = PNMatchInfoDimBaseAlpha();
+                    } completion:^(BOOL finished) {
+                        self.dimmingView.userInteractionEnabled = YES;
+                    }];
+                });
+            }
+        }
+    }
+
     // 默认不留额外安全区域，键盘出现时会在监听回调里动态修改 bottomInset
     UIEdgeInsets inset = self.scrollView.contentInset;
     inset.top = 0;
@@ -130,12 +251,13 @@ static CGFloat PNInputSectionSpacing(void) {
 - (void)buildUI {
     UIView *dim = [[UIView alloc] init];
     dim.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.5];
+    dim.alpha = 0.0;
+    dim.userInteractionEnabled = NO;
     [self.view addSubview:dim];
     self.dimmingView = dim;
     [dim mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
     }];
-    [dim addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onDismiss)]];
     
     UIView *card = [[UIView alloc] init];
     card.backgroundColor = [UIColor whiteColor];
@@ -161,8 +283,14 @@ static CGFloat PNInputSectionSpacing(void) {
         make.top.equalTo(card).offset(8);
         make.centerX.equalTo(card);
         make.width.mas_equalTo(84);
-        make.height.mas_equalTo(5);
+        // 手势命中区域需要足够大，否则 5pt 高度很难拖动
+        make.height.mas_equalTo(28);
     }];
+    self.dragHandleView = handle;
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(onCardPan:)];
+    pan.maximumNumberOfTouches = 1;
+    // 仅挂在拖拽条上，避免与内部 UIScrollView 的纵向滚动手势冲突
+    [handle addGestureRecognizer:pan];
     
     UILabel *title = [[UILabel alloc] init];
     title.text = @"输入信息";
@@ -712,7 +840,7 @@ static CGFloat PNInputSectionSpacing(void) {
 }
 
 - (void)onDismiss {
-    [self dismissViewControllerAnimated:NO completion:nil];
+    [self dismissWithCardAnimation];
 }
 
 - (void)onEmotionButtonTapped {
@@ -877,7 +1005,7 @@ shouldChangeTextInRange:(NSRange)range
     if (self.completion) {
         self.completion();
     }
-    [self dismissViewControllerAnimated:NO completion:nil];
+    [self dismissWithCardAnimation];
 }
 
 @end
