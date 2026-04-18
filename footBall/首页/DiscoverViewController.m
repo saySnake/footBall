@@ -395,7 +395,7 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     [self refreshDiscoverHeader];
-    /// 每次进入发现页拉取关注球队比赛，保证「未来观赛 / 已经观赛」与后端一致（如刚关注球队后返回）
+    /// 每次进入发现页并行拉取 upcoming / finished，保证列表与后端筛选排序一致（如刚关注球队后返回）
     [self loadRemoteData];
 }
 
@@ -941,102 +941,37 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
         [self applyStatistics:nil];
         return;
     }
-    /// 接口：`/api/v1/matches/my-team` 返回关注球队相关比赛；客户端按 `matchStatus` / 开赛时间拆成「未来观赛」「已经观赛」
-    [[MatchRequest shared] getMyTeamMatchesWithPage:1 pageSize:50 success:^(HTTPResponse * _Nullable responseObject) {
-        NSArray *matches = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
-        NSMutableArray<Match *> *upList = [NSMutableArray array];
-        NSMutableArray<Match *> *finList = [NSMutableArray array];
-        for (Match *m in matches) {
-            if ([weakSelf isMatchFinished:m]) {
-                [finList addObject:m];
-            } else {
-                [upList addObject:m];
-            }
-        }
-        [upList sortUsingComparator:^NSComparisonResult(Match *a, Match *b) {
-            NSDate *da = [weakSelf dateFromRaw:a.matchDate];
-            NSDate *db = [weakSelf dateFromRaw:b.matchDate];
-            if (!da && !db) {
-                return NSOrderedSame;
-            }
-            if (!da) {
-                return NSOrderedDescending;
-            }
-            if (!db) {
-                return NSOrderedAscending;
-            }
-            return [da compare:db];
-        }];
-        [finList sortUsingComparator:^NSComparisonResult(Match *a, Match *b) {
-            NSDate *da = [weakSelf dateFromRaw:a.matchDate];
-            NSDate *db = [weakSelf dateFromRaw:b.matchDate];
-            if (!da && !db) {
-                return NSOrderedSame;
-            }
-            if (!da) {
-                return NSOrderedAscending;
-            }
-            if (!db) {
-                return NSOrderedDescending;
-            }
-            return [db compare:da];
-        }];
+    /// 接口：`/matches/my-team/upcoming` 与 `/matches/my-team/finished` 由服务端筛选排序；客户端只做 VO → DiscoverCell 映射
+    dispatch_group_t group = dispatch_group_create();
+    __block NSArray<Match *> *upList = @[];
+    __block NSArray<Match *> *finList = @[];
+    dispatch_group_enter(group);
+    [[MatchRequest shared] getMyTeamUpcomingMatchesWithPage:1 pageSize:50 success:^(HTTPResponse * _Nullable responseObject) {
+        NSArray *rows = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+        upList = rows;
+        dispatch_group_leave(group);
+    } failure:^(NSError * _Nonnull error) {
+        dispatch_group_leave(group);
+    }];
+    dispatch_group_enter(group);
+    [[MatchRequest shared] getMyTeamFinishedMatchesWithPage:1 pageSize:50 success:^(HTTPResponse * _Nullable responseObject) {
+        NSArray *rows = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+        finList = rows;
+        dispatch_group_leave(group);
+    } failure:^(NSError * _Nonnull error) {
+        dispatch_group_leave(group);
+    }];
+    dispatch_group_notify(group, dispatch_get_main_queue(), ^{
         weakSelf.upcomingMatches = [weakSelf discoverMatchesFrom:upList type:DiscoverMatchTypeUpcoming];
         weakSelf.finishedMatches = [weakSelf discoverMatchesFrom:finList type:DiscoverMatchTypeFinished];
         [weakSelf refreshTabs];
-    } failure:^(NSError * _Nonnull error) {
-        weakSelf.upcomingMatches = @[];
-        weakSelf.finishedMatches = @[];
-        [weakSelf refreshTabs];
-    }];
+    });
     [[ProfileRequest shared] getMyStatisticsWithPeriod:@"all" success:^(HTTPResponse * _Nullable responseObject) {
         PNStatistics *statistics = [responseObject.dataObject isKindOfClass:PNStatistics.class] ? responseObject.dataObject : nil;
         [weakSelf applyStatistics:statistics];
     } failure:^(NSError * _Nonnull error) {
         [weakSelf applyStatistics:nil];
     }];
-}
-
-/// 已结束：优先读 `matchStatus`（FINISHED 等），否则用开赛时间与当前时间比较
-- (BOOL)isMatchFinished:(Match *)match {
-    NSString *st = match.matchStatus.uppercaseString;
-    if (st.length > 0) {
-        if ([st isEqualToString:@"0"] || [st isEqualToString:@"1"]) {
-            return NO;
-        }
-        if ([st isEqualToString:@"2"] || [st isEqualToString:@"3"]) {
-            return YES;
-        }
-        if ([st containsString:@"FINISH"] || [st containsString:@"COMPLETE"] || [st isEqualToString:@"FT"] || [st containsString:@"ENDED"]) {
-            return YES;
-        }
-        if ([st containsString:@"已结束"] || [st containsString:@"完赛"] || [st containsString:@"已完"]) {
-            return YES;
-        }
-        if ([st containsString:@"SCHEDULE"] || [st containsString:@"UPCOM"] || [st isEqualToString:@"NS"] || [st containsString:@"LIVE"]) {
-            return NO;
-        }
-        if ([st containsString:@"NOT_START"] || [st containsString:@"NOTSTART"] || [st containsString:@"PENDING"] || [st containsString:@"POSTPON"] || [st containsString:@"DELAY"]) {
-            return NO;
-        }
-        if ([st containsString:@"未开始"] || [st containsString:@"未赛"] || [st containsString:@"待定"] || [st containsString:@"延期"]) {
-            return NO;
-        }
-    }
-    NSDate *kickoff = [self dateFromRaw:match.matchDate];
-    if (!kickoff) {
-        return NO;
-    }
-    // 仅有日期（无具体时分）时，默认按当天未开赛处理，避免被误判进“已经观赛”。
-    NSString *raw = [match.matchDate stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    BOOL dateOnly = (raw.length > 0 && [raw rangeOfString:@":"].location == NSNotFound && [raw rangeOfString:@"T"].location == NSNotFound);
-    if (dateOnly) {
-        NSCalendar *cal = [NSCalendar currentCalendar];
-        if ([cal isDate:kickoff inSameDayAsDate:[NSDate date]]) {
-            return NO;
-        }
-    }
-    return [kickoff compare:[NSDate date]] == NSOrderedAscending;
 }
 
 - (NSArray<DiscoverMatch *> *)discoverMatchesFrom:(NSArray<Match *> *)matches type:(DiscoverMatchType)type {

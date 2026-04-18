@@ -61,11 +61,23 @@ NS_ASSUME_NONNULL_BEGIN
                success:(nullable APISuccessBlock)success
                failure:(nullable APIFailureBlock)failure;
 
-/// GET `/api/v1/matches/my-team` — 关注球队的比赛列表
+/// GET `/api/v1/matches/my-team` — 关注球队比赛（历史聚合列表，兼容旧版；Discover 等请用 upcoming / finished）
 - (void)getMyTeamMatchesWithPage:(NSInteger)page
                         pageSize:(NSInteger)pageSize
                          success:(nullable APISuccessBlock)success
                          failure:(nullable APIFailureBlock)failure;
+
+/// GET `/api/v1/matches/my-team/upcoming` — 未来观赛；`dataObject` 为 `Match` 数组（服务端已排序）
+- (void)getMyTeamUpcomingMatchesWithPage:(NSInteger)page
+                                pageSize:(NSInteger)pageSize
+                                 success:(nullable APISuccessBlock)success
+                                 failure:(nullable APIFailureBlock)failure;
+
+/// GET `/api/v1/matches/my-team/finished` — 已经观赛；`dataObject` 为 `Match` 数组（服务端已排序）
+- (void)getMyTeamFinishedMatchesWithPage:(NSInteger)page
+                                pageSize:(NSInteger)pageSize
+                                 success:(nullable APISuccessBlock)success
+                                 failure:(nullable APIFailureBlock)failure;
 
 /// POST `/api/v1/matches/{matchId}/favorite` — 收藏比赛
 - (void)favoriteMatch:(NSString *)matchId

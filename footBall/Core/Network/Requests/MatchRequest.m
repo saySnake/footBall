@@ -58,6 +58,32 @@ static NSArray *PNMatchJSONArrayFromMyTeamData(id data) {
     return merged.count > 0 ? merged : nil;
 }
 
+/// upcoming / finished 独立接口：`data` 与分页列表一致，按 `list` 等键解析（不做 upcoming+finished 合并）
+static void PNMatchRequestGETMyTeamSegment(NSString *path, NSInteger page, NSInteger pageSize, APISuccessBlock success, APIFailureBlock failure) {
+    NSDictionary *params = @{ @"pageNum": @(MAX(page, 1)), @"pageSize": @(MAX(pageSize, 1)) };
+    [[APIManager sharedManager] GET:path parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            NSArray *list = PNMatchJSONArrayFromPageData(responseObject.data);
+            if (!list) {
+                list = @[];
+            }
+            NSArray *matches = [NSArray yy_modelArrayWithClass:Match.class json:list];
+            responseObject.dataObject = matches;
+            if (success) {
+                success(responseObject);
+            }
+        } else {
+            if (failure) {
+                failure([APIError errorWithResponse:responseObject]);
+            }
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) {
+            failure(error);
+        }
+    }];
+}
+
 @implementation MatchRequest
 
 + (instancetype)shared {
@@ -225,6 +251,14 @@ static NSArray *PNMatchJSONArrayFromMyTeamData(id data) {
     } failure:^(NSError * _Nonnull error) {
         if (failure) failure(error);
     }];
+}
+
+- (void)getMyTeamUpcomingMatchesWithPage:(NSInteger)page pageSize:(NSInteger)pageSize success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    PNMatchRequestGETMyTeamSegment(APIPathValueMatchMyTeamUpcoming, page, pageSize, success, failure);
+}
+
+- (void)getMyTeamFinishedMatchesWithPage:(NSInteger)page pageSize:(NSInteger)pageSize success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    PNMatchRequestGETMyTeamSegment(APIPathValueMatchMyTeamFinished, page, pageSize, success, failure);
 }
 
 - (void)favoriteMatch:(NSString *)matchId success:(APISuccessBlock)success failure:(APIFailureBlock)failure {

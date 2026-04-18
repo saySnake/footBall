@@ -100,6 +100,10 @@ FOUNDATION_EXPORT NSString * const APIPathValueMatchDetail(NSString *matchId);
 FOUNDATION_EXPORT NSString * const APIPathValueMatchCalendar;
 /// 获取关注球队的比赛列表
 FOUNDATION_EXPORT NSString * const APIPathValueMatchMyTeams;
+/// 关注球队 — 未来观赛（服务端筛选、排序）
+FOUNDATION_EXPORT NSString * const APIPathValueMatchMyTeamUpcoming;
+/// 关注球队 — 已经观赛（服务端筛选、排序）
+FOUNDATION_EXPORT NSString * const APIPathValueMatchMyTeamFinished;
 /// POST收藏比赛 / DELETE取消收藏比赛
 FOUNDATION_EXPORT NSString * const APIPathValueMatchFavorite(NSString *matchId);
 /// 获取收藏的比赛列表

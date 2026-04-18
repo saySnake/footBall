@@ -108,6 +108,8 @@ NSString * const APIPathValueMatchDetail(NSString *matchId) {
 NSString * const APIPathValueMatchCalendar = @"/api/v1/matches/calendar";
 /// 获取关注球队的比赛列表
 NSString * const APIPathValueMatchMyTeams = @"/api/v1/matches/my-team";
+NSString * const APIPathValueMatchMyTeamUpcoming = @"/api/v1/matches/my-team/upcoming";
+NSString * const APIPathValueMatchMyTeamFinished = @"/api/v1/matches/my-team/finished";
 /// POST收藏比赛 / DELETE取消收藏比赛
 NSString * const APIPathValueMatchFavorite(NSString *matchId) {
     return [NSString stringWithFormat:@"/api/v1/matches/%@/favorite",matchId];
