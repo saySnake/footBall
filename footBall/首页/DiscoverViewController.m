@@ -1304,6 +1304,7 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
 
 - (void)presentMatchVerifyForMatch:(DiscoverMatch *)match {
     PNMatchVerifyViewController *vc = [[PNMatchVerifyViewController alloc] init];
+    vc.recordId = match.matchId;
     vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
     __weak typeof(self) weakSelf = self;
     vc.completion = ^{

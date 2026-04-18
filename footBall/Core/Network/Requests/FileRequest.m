@@ -154,6 +154,7 @@ static NSString *const AliYunHost = @"oss-cn-beijing.aliyuncs.com";
 //                    NSString *urlStr = [NSString stringWithFormat:@"https://%@.%@/%@", bucket, region, objectKey];
                     HTTPResponse *resp = [[HTTPResponse alloc] init];
                     resp.success = YES;
+                    resp.data = objectKey;
                     resp.dataObject = objectKey;
                     if (success) success(resp);
                 }

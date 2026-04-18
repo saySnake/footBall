@@ -67,6 +67,7 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
 @property (nonatomic, strong) UILabel *locationLabel;
 @property (nonatomic, strong) CLLocationManager *locationManager;
 @property (nonatomic, copy) NSString *currentAddress;
+@property (nonatomic, assign) CLLocationCoordinate2D coordinate;
 
 @property (nonatomic, strong) UIButton *confirmButton;
 
@@ -499,6 +500,7 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
     
     CLGeocoder *geocoder = [[CLGeocoder alloc] init];
     __weak typeof(self) weakSelf = self;
+    self.coordinate=location.coordinate;
     [geocoder reverseGeocodeLocation:location completionHandler:^(NSArray<CLPlacemark *> * _Nullable placemarks, NSError * _Nullable error) {
         dispatch_async(dispatch_get_main_queue(), ^{
             if (error || placemarks.count == 0) {
@@ -549,11 +551,13 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
 - (void)onConfirm {
     // 提交逻辑留给后端集成，这里先回调上层并关闭弹层
     // 把所有image转成data上传至oss，把返回的所有oss的objectKey上传至自己后端
+    NSMutableArray *urls = [NSMutableArray arrayWithCapacity:_photos.count];
     dispatch_group_t group = dispatch_group_create();
     for (int i=0; i<_photos.count; i++) {
         NSData *data = UIImageJPEGRepresentation(_photos[i], 0.5);
         dispatch_group_enter(group);
         [FileRequest.shared uploadImage:data type:ImageObjectTypeMatch success:^(HTTPResponse * _Nullable responseObject) {
+            [urls addObject:responseObject.dataObject];
             dispatch_group_leave(group);
         } failure:^(NSError * _Nonnull error) {
             dispatch_group_leave(group);
@@ -561,11 +565,14 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
     }
     dispatch_group_notify(group, dispatch_get_main_queue(), ^{
        //调用比赛认证接口上传所有path至服务器
-        
-        if (self.completion) {
-            self.completion();
-        }
-        [self dismissWithCardAnimation];
+        [MatchRequest.shared verifyMatchRecord:self.recordId body:@{@"photoUrls":urls,@"latitude":@(self.coordinate.latitude),@"longitude":@(self.coordinate.longitude)} success:^(HTTPResponse * _Nullable responseObject) {
+            if (self.completion) {
+                self.completion();
+            }
+            [self dismissWithCardAnimation];
+        } failure:^(NSError * _Nonnull error) {
+            [QMUITips showError:error.localizedDescription];
+        }];
     });
 }
 

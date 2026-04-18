@@ -30,10 +30,10 @@ static CGFloat PNInputSectionSpacing(void) {
     return 20.0;
 }
 
-@interface PNMatchInfoInputViewController () <UITextViewDelegate, UITextFieldDelegate>
+@interface PNMatchInfoInputViewController () <UITextViewDelegate, UITextFieldDelegate, UIGestureRecognizerDelegate>
 @property (nonatomic, strong) UIView *dimmingView;
 @property (nonatomic, strong) UIView *cardView;
-@property (nonatomic, strong) UIView *dragHandleView;
+@property (nonatomic, strong) UIView *dragDismissHitArea;
 @property (nonatomic, strong) UIScrollView *scrollView;
 
 @property (nonatomic, assign) CGFloat cardDismissThreshold;
@@ -166,6 +166,17 @@ static CGFloat PNMatchInfoDimBaseAlpha(void) {
     }
 }
 
+#pragma mark - UIGestureRecognizerDelegate
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
+shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
+    // 顶部小拖动条区域需要和 scrollView 的纵向滚动手势共存
+    if (otherGestureRecognizer == self.scrollView.panGestureRecognizer) {
+        return YES;
+    }
+    return NO;
+}
+
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     // 关闭 IQKeyboardManager 对本页面的自动滚动和工具条干预
@@ -283,14 +294,14 @@ static CGFloat PNMatchInfoDimBaseAlpha(void) {
         make.top.equalTo(card).offset(8);
         make.centerX.equalTo(card);
         make.width.mas_equalTo(84);
-        // 手势命中区域需要足够大，否则 5pt 高度很难拖动
-        make.height.mas_equalTo(28);
+        make.height.mas_equalTo(5);
     }];
-    self.dragHandleView = handle;
-    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(onCardPan:)];
-    pan.maximumNumberOfTouches = 1;
-    // 仅挂在拖拽条上，避免与内部 UIScrollView 的纵向滚动手势冲突
-    [handle addGestureRecognizer:pan];
+    {
+        UIPanGestureRecognizer *handlePan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(onCardPan:)];
+        handlePan.maximumNumberOfTouches = 1;
+        handlePan.delegate = self;
+        [handle addGestureRecognizer:handlePan];
+    }
     
     UILabel *title = [[UILabel alloc] init];
     title.text = @"输入信息";
@@ -399,6 +410,25 @@ static CGFloat PNMatchInfoDimBaseAlpha(void) {
     [emotionPanel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.bottom.equalTo(lastEmotionBtn.mas_bottom).offset(12);
     }];
+
+    // 底部透明手势区：保持顶部拖动条视觉尺寸不变，用底部区域承接下拉关闭手势，避免与 scrollView 抢手势
+    UIView *hit = [[UIView alloc] init];
+    hit.backgroundColor = UIColor.clearColor;
+    [card addSubview:hit];
+    self.dragDismissHitArea = hit;
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(onCardPan:)];
+    pan.maximumNumberOfTouches = 1;
+    pan.delegate = self;
+    [hit addGestureRecognizer:pan];
+    [hit mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.trailing.equalTo(card);
+        make.height.mas_equalTo(44);
+        if (@available(iOS 11.0, *)) {
+            make.bottom.equalTo(card.mas_safeAreaLayoutGuideBottom);
+        } else {
+            make.bottom.equalTo(card);
+        }
+    }];
     
     // scroll 在 emotionPanel 之后添加，位于上层，保证默认可滑动
     UIScrollView *scroll = [[UIScrollView alloc] init];
@@ -413,13 +443,9 @@ static CGFloat PNMatchInfoDimBaseAlpha(void) {
     [scroll mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(title.mas_bottom).offset(14);
         make.leading.trailing.equalTo(card);
-        // 设计要求底部完全贴合，不再预留额外白色区域
-        if (@available(iOS 11.0, *)) {
-            make.bottom.equalTo(card.mas_bottom);
-        } else {
-            make.bottom.equalTo(card);
-        }
+        make.bottom.equalTo(hit.mas_top);
     }];
+    [card bringSubviewToFront:hit];
     
     UIView *content = [[UIView alloc] init];
     [scroll addSubview:content];
@@ -847,6 +873,10 @@ static CGFloat PNMatchInfoDimBaseAlpha(void) {
     self.emotionPanel.hidden = !self.emotionPanel.hidden;
     if (!self.emotionPanel.hidden) {
         [self.cardView bringSubviewToFront:self.emotionPanel];
+        // 情绪面板会盖住底部透明手势区，需把底部条重新提到最前才能继续下拉关闭
+        if (self.dragDismissHitArea) {
+            [self.cardView bringSubviewToFront:self.dragDismissHitArea];
+        }
     }
 }
 
