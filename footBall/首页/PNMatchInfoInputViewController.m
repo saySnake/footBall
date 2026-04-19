@@ -1032,6 +1032,7 @@ shouldChangeTextInRange:(NSRange)range
 
 - (void)onConfirmTapped {
     // 当前仅回传完成状态，具体字段提交由上层接口接入时处理
+    
     if (self.completion) {
         self.completion();
     }

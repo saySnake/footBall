@@ -119,7 +119,7 @@ FOUNDATION_EXPORT NSString * const APIPathValueMatchInteractionsLike(NSString *m
 /// 记录比赛浏览量
 FOUNDATION_EXPORT NSString * const APIPathValueMatchInteractionsView(NSString *matchId);
 /// 提交比赛认证（打卡）
-FOUNDATION_EXPORT NSString * const APIPathValueMatchRecordVerify(NSString *recordId);
+FOUNDATION_EXPORT NSString * const APIPathValueMatchVerify(NSString *matchId);
 
 #pragma mark - 邮票模块
 /// 邮票主页

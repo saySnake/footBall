@@ -180,10 +180,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 #pragma mark - 比赛认证（打卡）
 
-/// POST `/api/v1/match-records/{recordId}/verify` — 提交现场认证/打卡；
-/// photoUrls 照片URL列表（最少2张，最多9张）
+/// POST `/api/v1/matches/{matchId}/verify` — 提交现场认证/打卡；
+/// photoUrls 照片URL列表（最少2张，最多4张）
 /// latitude GPS纬度
 /// longitude GPS经度
+/// address 地址（反向地理编码结果）
 - (void)verifyMatchRecord:(NSString *)recordId
                      body:(nullable NSDictionary *)body
                   success:(nullable APISuccessBlock)success

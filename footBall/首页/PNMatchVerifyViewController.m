@@ -565,7 +565,7 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
     }
     dispatch_group_notify(group, dispatch_get_main_queue(), ^{
        //调用比赛认证接口上传所有path至服务器
-        [MatchRequest.shared verifyMatchRecord:self.recordId body:@{@"photoUrls":urls,@"latitude":@(self.coordinate.latitude),@"longitude":@(self.coordinate.longitude)} success:^(HTTPResponse * _Nullable responseObject) {
+        [MatchRequest.shared verifyMatchRecord:self.recordId body:@{@"photoUrls":urls,@"latitude":@(self.coordinate.latitude),@"longitude":@(self.coordinate.longitude),@"address":self.currentAddress ?: @""} success:^(HTTPResponse * _Nullable responseObject) {
             if (self.completion) {
                 self.completion();
             }

@@ -586,7 +586,7 @@ static void PNMatchRequestGETMyTeamSegment(NSString *path, NSInteger page, NSInt
         return;
     }
     id params = body ?: @{};
-    [[APIManager sharedManager] POST:APIPathValueMatchRecordVerify(recordId) parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+    [[APIManager sharedManager] POST:APIPathValueMatchVerify(recordId) parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
             responseObject.dataObject = responseObject.data;
             if (success) success(responseObject);

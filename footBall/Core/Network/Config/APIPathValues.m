@@ -134,9 +134,9 @@ NSString * const APIPathValueMatchInteractionsLike(NSString *matchId) {
 NSString * const APIPathValueMatchInteractionsView(NSString *matchId) {
     return [NSString stringWithFormat:@"/api/v1/match-interactions/%@/view",matchId];
 };
-///
-NSString * const APIPathValueMatchRecordVerify(NSString *recordId) {
-    return [NSString stringWithFormat:@"/api/v1/match-records/%@/verify",recordId];
+/// 提交比赛认证（打卡）
+NSString * const APIPathValueMatchVerify(NSString *matchId) {
+    return [NSString stringWithFormat:@"/api/v1/matches/%@/verify", matchId];
 };
 
 #pragma mark - 邮票模块
