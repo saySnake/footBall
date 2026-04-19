@@ -13,7 +13,14 @@
 /// 客队名称
 @property (nonatomic, copy) NSString *awayName;
 
-/// 完成输入后的回调（仅用于通知上层即可，具体数据暂不持久化）
+/// 观赛记录 ID；非空时走 `PUT /match-records/{id}` 并先拉详情填充表单
+@property (nonatomic, copy, nullable) NSString *recordId;
+/// 比赛 ID；创建记录时（`recordId` 为空）必填，对应后端 `CreateMatchRecordReq.matchId`
+@property (nonatomic, copy, nullable) NSString *matchId;
+/// 手动录入且无 `matchId` 时与 `matchName` 一起使用（可选）
+@property (nonatomic, copy, nullable) NSString *stadiumName;
+
+/// 创建或更新成功后回调（上层可刷新列表等）
 @property (nonatomic, copy) void (^completion)(void);
 
 @end

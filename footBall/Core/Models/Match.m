@@ -23,6 +23,7 @@
              @"infoCompleted": @[@"infoCompleted", @"info_completed", @"inputCompleted", @"input_completed"],
              @"verifyCompleted": @[@"verifyCompleted", @"verify_completed", @"ticketVerified", @"ticket_verified"],
              @"certifiedMinutes": @[@"certifiedMinutes", @"certified_minutes", @"verifiedMinutes", @"verified_minutes"],
+             @"recordId": @[@"recordId", @"record_id"],
              @"favorited": @[@"favorited", @"favorite", @"isFavorited", @"is_favorite"],
              @"liked": @[@"liked", @"like"]};
 }
@@ -35,6 +36,14 @@
             self.matchId = [(NSNumber *)v stringValue];
         } else if ([v isKindOfClass:NSString.class]) {
             self.matchId = (NSString *)v;
+        }
+    }
+    if (self.recordId.length == 0) {
+        id r = dic[@"recordId"] ?: dic[@"record_id"];
+        if ([r isKindOfClass:NSNumber.class]) {
+            self.recordId = [(NSNumber *)r stringValue];
+        } else if ([r isKindOfClass:NSString.class]) {
+            self.recordId = (NSString *)r;
         }
     }
     void (^fillTeam)(NSDictionary *, BOOL) = ^(NSDictionary *team, BOOL home) {

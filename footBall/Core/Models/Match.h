@@ -46,7 +46,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL favorited;
 /// 首页日程 MatchScheduleVO：是否已点赞
 @property (nonatomic, assign) BOOL liked;
-
+/// 观赛记录主键；`MatchVO` / `MatchScheduleVO` 在有记录时由后端下发
+@property (nonatomic, copy) NSString *recordId;
 @end
 
 @interface MatchDetail : Match

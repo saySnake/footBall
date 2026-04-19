@@ -7,6 +7,7 @@
 //
 
 #import "MatchRequest.h"
+#import "MatchRecordModels.h"
 
 /// 与 Expense 等接口一致：`data` 可能是 `{ list }`、嵌套 `data`、或直接数组
 static NSArray *PNMatchJSONArrayFromPageData(id data) {
@@ -515,7 +516,8 @@ static void PNMatchRequestGETMyTeamSegment(NSString *path, NSInteger page, NSInt
     }
     [[APIManager sharedManager] GET:APIPathValueMatchRecordDetail(recordId) parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            responseObject.dataObject = responseObject.data;
+            PNMatchRecordDetail *detail = [PNMatchRecordDetail yy_modelWithJSON:responseObject.data];
+            responseObject.dataObject = detail ?: responseObject.data;
             if (success) success(responseObject);
         } else {
             if (failure) failure([APIError errorWithResponse:responseObject]);

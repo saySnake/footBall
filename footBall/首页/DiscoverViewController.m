@@ -95,6 +95,7 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
 }
 
 @interface DiscoverMatch : NSObject
+@property (nonatomic, copy) NSString *recordId;
 @property (nonatomic, copy) NSString *matchId;
 @property (nonatomic, copy) NSString *homeName;
 @property (nonatomic, copy) NSString *awayName;
@@ -979,6 +980,7 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
     NSString *fmtVerified = (NSLocalizedString(@"discover_verified_minutes_format", nil) ?: @"已认证%ld分钟");
     for (Match *match in matches) {
         DiscoverMatch *m = [DiscoverMatch new];
+        m.recordId = match.recordId;
         m.matchId = match.matchId ?: @"";
         m.homeName = match.homeTeamName ?: @"-";
         m.awayName = match.awayTeamName ?: @"-";
@@ -1225,6 +1227,8 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
 
 - (void)presentMatchInfoForMatch:(DiscoverMatch *)match {
     PNMatchInfoInputViewController *vc = [[PNMatchInfoInputViewController alloc] init];
+    vc.recordId = match.recordId;
+    vc.matchId = match.matchId;
     vc.homeName = match.homeName;
     vc.awayName = match.awayName;
     __weak typeof(self) weakSelf = self;

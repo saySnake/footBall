@@ -8,6 +8,10 @@
 #import <IQKeyboardManager/IQKeyboardManager.h>
 #import "PNPickerSheetViewController.h"
 #import "ColorManager.h"
+#import "MatchRequest.h"
+#import "MatchRecordModels.h"
+#import "LoadingManager.h"
+#import "APIError.h"
 
 static UIColor *PNInputGreenColor(void) {
     // 统一使用 ColorManager 的主色，方便以后适配黑天/白天皮肤
@@ -63,6 +67,8 @@ static CGFloat PNInputSectionSpacing(void) {
 @property (nonatomic, copy) NSString *selectedReason;
 @property (nonatomic, strong) NSMutableSet<NSString *> *selectedIdentities;
 
+@property (nonatomic, strong) UILabel *headerTitleLabel;
+
 // 记录进入页面前 IQKeyboardManager 的启用状态，方便恢复
 @property (nonatomic, assign) BOOL iqPreviouslyEnabled;
 
@@ -91,8 +97,7 @@ static CGFloat PNMatchInfoDimBaseAlpha(void) {
     self.selectedIdentities = [NSMutableSet set];
     
     [self buildUI];
-    [self fillDefaultValues];
-    [self.emotionButton setTitle:@"选择情绪" forState:UIControlStateNormal];
+    [self loadInitialFormData];
 }
 
 - (void)dismissWithCardAnimation {
@@ -308,6 +313,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     title.font = [UIFont boldSystemFontOfSize:18];
     title.textAlignment = NSTextAlignmentCenter;
     [card addSubview:title];
+    self.headerTitleLabel = title;
     [title mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(handle.mas_bottom).offset(12);
         make.centerX.equalTo(card);
@@ -838,6 +844,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     self.selectedWatchInfo = @"在球场";
     self.selectedSeat = @"VIP看台";
     self.selectedReason = @"球迷";
+    [self.selectedIdentities removeAllObjects];
     [self.selectedIdentities addObject:@"球迷"];
     [self.selectedIdentities addObject:@"媒体记者"];
     
@@ -846,6 +853,137 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [self refreshDateTimeButtons];
     self.commentView.text = @"";
 
+    [self pn_refreshPillButtonsFromSelection];
+    [self updateCommentCountLabel];
+    [self.emotionButton setTitle:@"选择情绪" forState:UIControlStateNormal];
+}
+
+- (void)loadInitialFormData {
+    if (self.recordId.length > 0) {
+        self.headerTitleLabel.text = @"编辑信息";
+        [[LoadingManager sharedManager] showLoadingInView:self.view];
+        __weak typeof(self) weakSelf = self;
+        [[MatchRequest shared] getMatchRecordDetail:self.recordId success:^(HTTPResponse * _Nullable responseObject) {
+            [[LoadingManager sharedManager] hideLoadingInView:weakSelf.view];
+            PNMatchRecordDetail *detail = nil;
+            if ([responseObject.dataObject isKindOfClass:PNMatchRecordDetail.class]) {
+                detail = responseObject.dataObject;
+            } else if ([responseObject.data isKindOfClass:NSDictionary.class]) {
+                detail = [PNMatchRecordDetail yy_modelWithJSON:responseObject.data];
+            }
+            if (detail) {
+                [weakSelf applyFromDetail:detail];
+            } else {
+                [weakSelf fillDefaultValues];
+                [[LoadingManager sharedManager] showError:@"加载观赛记录失败" inView:weakSelf.view];
+            }
+        } failure:^(NSError * _Nonnull error) {
+            [[LoadingManager sharedManager] hideLoadingInView:weakSelf.view];
+            [weakSelf fillDefaultValues];
+            NSString *msg = error.localizedDescription ?: @"网络错误";
+            if ([error isKindOfClass:[APIError class]]) {
+                APIError *ae = (APIError *)error;
+                if (ae.businessMessage.length > 0) {
+                    msg = ae.businessMessage;
+                }
+            }
+            [[LoadingManager sharedManager] showError:msg inView:weakSelf.view];
+        }];
+    } else {
+        self.headerTitleLabel.text = @"输入信息";
+        [self fillDefaultValues];
+    }
+}
+
+- (void)applyFromDetail:(PNMatchRecordDetail *)detail {
+    if (detail.matchName.length > 0) {
+        self.matchField.text = detail.matchName;
+    } else if (detail.homeTeamName.length > 0 && detail.awayTeamName.length > 0) {
+        self.matchField.text = [NSString stringWithFormat:@"%@ VS %@", detail.homeTeamName, detail.awayTeamName];
+    } else if (self.homeName.length > 0 && self.awayName.length > 0) {
+        self.matchField.text = [NSString stringWithFormat:@"%@ VS %@", self.homeName, self.awayName];
+    }
+
+    self.selectedWatchInfo = [self pn_serverValueOrFallback:self.watchButtons serverValue:detail.viewingLocation fallback:@"在球场"];
+    self.selectedSeat = [self pn_serverValueOrFallback:self.seatButtons serverValue:detail.standType fallback:@"VIP看台"];
+    self.selectedReason = [self pn_serverValueOrFallback:self.reasonButtons serverValue:detail.watchReason fallback:@"球迷"];
+
+    [self.selectedIdentities removeAllObjects];
+    for (NSString *ident in detail.viewingIdentities) {
+        if ([ident isKindOfClass:NSString.class] && ident.length > 0) {
+            [self.selectedIdentities addObject:ident];
+        }
+    }
+    if (self.selectedIdentities.count == 0) {
+        [self.selectedIdentities addObject:@"球迷"];
+    }
+
+    if (detail.ticketPrice.length > 0) {
+        self.priceField.text = detail.ticketPrice;
+    } else {
+        self.priceField.text = @"0";
+    }
+
+    NSDate *kick = [self pn_dateFromBackendDateTime:detail.matchDateTime];
+    if (!kick) {
+        kick = [self pn_dateFromBackendDateTime:detail.matchDate];
+    }
+    self.selectedDate = kick ?: [NSDate date];
+    [self refreshDateTimeButtons];
+
+    if (detail.postMatchEmotion.length > 0) {
+        self.selectedEmotion = detail.postMatchEmotion;
+        [self.emotionButton setTitle:detail.postMatchEmotion forState:UIControlStateNormal];
+    } else {
+        self.selectedEmotion = @"兴奋 🤩";
+        [self.emotionButton setTitle:@"选择情绪" forState:UIControlStateNormal];
+    }
+
+    self.commentView.text = detail.notes ?: @"";
+    [self pn_refreshPillButtonsFromSelection];
+    [self updateCommentCountLabel];
+}
+
+/// 若服务端文案与本地 pill 文案一致则采用，否则用默认 fallback
+- (NSString *)pn_serverValueOrFallback:(NSArray<UIButton *> *)buttons serverValue:(NSString *)server fallback:(NSString *)fallback {
+    NSString *s = server ?: @"";
+    for (UIButton *b in buttons) {
+        if ([b.titleLabel.text isEqualToString:s]) {
+            return s;
+        }
+    }
+    return fallback ?: @"";
+}
+
+- (nullable NSDate *)pn_dateFromBackendDateTime:(NSString *)s {
+    if (s.length == 0) {
+        return nil;
+    }
+    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    fmt.timeZone = [NSTimeZone localTimeZone];
+    NSArray<NSString *> *formats = @[
+        @"yyyy-MM-dd'T'HH:mm:ss",
+        @"yyyy-MM-dd'T'HH:mm:ss.SSS",
+        @"yyyy-MM-dd HH:mm:ss",
+        @"yyyy-MM-dd"
+    ];
+    for (NSString *f in formats) {
+        fmt.dateFormat = f;
+        NSDate *d = [fmt dateFromString:s];
+        if (d) {
+            return d;
+        }
+    }
+    if (@available(iOS 11.0, *)) {
+        NSISO8601DateFormatter *iso = [[NSISO8601DateFormatter alloc] init];
+        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime;
+        return [iso dateFromString:s];
+    }
+    return nil;
+}
+
+- (void)pn_refreshPillButtonsFromSelection {
     for (UIButton *b in self.watchButtons) {
         BOOL sel = [b.titleLabel.text isEqualToString:self.selectedWatchInfo];
         [self pn_applyPillButton:b selected:sel];
@@ -862,7 +1000,122 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         BOOL sel = [self.selectedIdentities containsObject:b.titleLabel.text];
         [self pn_applyPillButton:b selected:sel];
     }
-    [self updateCommentCountLabel];
+}
+
+- (NSString *)pn_isoMatchDateTimeString {
+    NSDate *date = self.selectedDate ?: [NSDate date];
+    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+    fmt.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
+    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    fmt.timeZone = [NSTimeZone localTimeZone];
+    fmt.dateFormat = @"yyyy-MM-dd'T'HH:mm:ss";
+    return [fmt stringFromDate:date];
+}
+
+- (NSMutableDictionary *)pn_matchRecordBodyMutable {
+    NSMutableDictionary *m = [NSMutableDictionary dictionary];
+    m[@"viewingLocation"] = self.selectedWatchInfo ?: @"";
+    m[@"standType"] = self.selectedSeat ?: @"";
+    m[@"viewingIdentities"] = self.selectedIdentities.count > 0 ? [self.selectedIdentities allObjects] : @[];
+    m[@"watchReason"] = self.selectedReason ?: @"";
+    m[@"ticketPrice"] = @([self.priceField.text ?: @"0" doubleValue]);
+    m[@"matchDateTime"] = [self pn_isoMatchDateTimeString];
+    m[@"postMatchEmotion"] = self.selectedEmotion ?: @"";
+    m[@"notes"] = self.commentView.text ?: @"";
+    m[@"photoUrls"] = @[];
+    return m;
+}
+
+- (BOOL)pn_validateBeforeSubmit:(NSString *__autoreleasing *)outMessage {
+    NSString *matchText = [self.matchField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (matchText.length == 0) {
+        if (outMessage) {
+            *outMessage = @"请填写比赛名称";
+        }
+        return NO;
+    }
+    long long mid = [self.matchId longLongValue];
+    BOOL hasMatchId = (self.matchId.length > 0 && mid > 0);
+    if (self.recordId.length == 0 && !hasMatchId) {
+        NSString *st = [self.stadiumName stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (st.length == 0) {
+            if (outMessage) {
+                *outMessage = @"缺少比赛 ID 时，请填写球场名称";
+            }
+            return NO;
+        }
+    }
+    return YES;
+}
+
+- (void)onConfirmTapped {
+    [self.view endEditing:YES];
+    NSString *errMsg = nil;
+    if (![self pn_validateBeforeSubmit:&errMsg]) {
+        [[LoadingManager sharedManager] showText:errMsg inView:self.view];
+        return;
+    }
+
+    NSDictionary *body = nil;
+    BOOL isUpdate = (self.recordId.length > 0);
+    if (isUpdate) {
+        body = [self pn_matchRecordBodyMutable];
+    } else {
+        NSMutableDictionary *m = [self pn_matchRecordBodyMutable];
+        long long mid = [self.matchId longLongValue];
+        if (mid > 0) {
+            m[@"matchId"] = @(mid);
+        }
+        NSString *mn = [self.matchField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (mn.length > 0) {
+            m[@"matchName"] = mn;
+        }
+        NSString *sn = [self.stadiumName stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (sn.length > 0) {
+            m[@"stadiumName"] = sn;
+        }
+        body = m;
+    }
+
+    [[LoadingManager sharedManager] showLoadingInView:self.view];
+    __weak typeof(self) weakSelf = self;
+    if (isUpdate) {
+        [[MatchRequest shared] updateMatchRecord:self.recordId body:body success:^(HTTPResponse * _Nullable responseObject) {
+            [[LoadingManager sharedManager] hideLoadingInView:weakSelf.view];
+            if (weakSelf.completion) {
+                weakSelf.completion();
+            }
+            [weakSelf dismissWithCardAnimation];
+        } failure:^(NSError * _Nonnull error) {
+            [[LoadingManager sharedManager] hideLoadingInView:weakSelf.view];
+            NSString *msg = error.localizedDescription ?: @"保存失败";
+            if ([error isKindOfClass:[APIError class]]) {
+                APIError *ae = (APIError *)error;
+                if (ae.businessMessage.length > 0) {
+                    msg = ae.businessMessage;
+                }
+            }
+            [[LoadingManager sharedManager] showError:msg inView:weakSelf.view];
+        }];
+    } else {
+        [[MatchRequest shared] createMatchRecordWithBody:body success:^(HTTPResponse * _Nullable responseObject) {
+            [[LoadingManager sharedManager] hideLoadingInView:weakSelf.view];
+            if (weakSelf.completion) {
+                weakSelf.completion();
+            }
+            [weakSelf dismissWithCardAnimation];
+        } failure:^(NSError * _Nonnull error) {
+            [[LoadingManager sharedManager] hideLoadingInView:weakSelf.view];
+            NSString *msg = error.localizedDescription ?: @"创建失败";
+            if ([error isKindOfClass:[APIError class]]) {
+                APIError *ae = (APIError *)error;
+                if (ae.businessMessage.length > 0) {
+                    msg = ae.businessMessage;
+                }
+            }
+            [[LoadingManager sharedManager] showError:msg inView:weakSelf.view];
+        }];
+    }
 }
 
 - (void)onDismiss {
@@ -1028,15 +1281,6 @@ shouldChangeTextInRange:(NSRange)range
             [self pn_applyPillButton:b selected:(b == sender)];
         }
     }
-}
-
-- (void)onConfirmTapped {
-    // 当前仅回传完成状态，具体字段提交由上层接口接入时处理
-    
-    if (self.completion) {
-        self.completion();
-    }
-    [self dismissWithCardAnimation];
 }
 
 @end

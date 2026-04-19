@@ -15,6 +15,14 @@
 + (NSDictionary<NSString *, id> *)modelCustomPropertyMapper {
     return @{ @"recordId": @[ @"id", @"recordId" ] };
 }
+
+- (BOOL)modelCustomTransformFromDictionary:(NSDictionary *)dic {
+    id p = dic[@"ticketPrice"];
+    if ([p isKindOfClass:NSNumber.class]) {
+        self.ticketPrice = [p stringValue];
+    }
+    return YES;
+}
 @end
 
 @implementation PNMatchRecordPage
