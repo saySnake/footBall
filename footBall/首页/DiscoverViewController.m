@@ -210,7 +210,7 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
         _verifiedPill.layer.cornerRadius = 13;
         _verifiedPill.backgroundColor = kDiscoverPillGreen;
         [_verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-        [_verifiedPill setImage:[UIImage imageNamed:@"notphoto"] forState:UIControlStateNormal];
+        [_verifiedPill setImage:[UIImage imageNamed:@"weizhi"] forState:UIControlStateNormal];
         _verifiedPill.tintColor = [UIColor whiteColor];
         _verifiedPill.semanticContentAttribute = UISemanticContentAttributeForceLeftToRight;
         _verifiedPill.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
@@ -1133,7 +1133,8 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
     cell.awayLogo.contentMode = UIViewContentModeScaleAspectFit;
 
     if (m.type == DiscoverMatchTypeUpcoming) {
-        cell.inputButton.hidden = NO;
+        // 未来观赛也按真实状态渲染：已提交输入信息后隐藏“输入信息”按钮
+        cell.inputButton.hidden = m.hasInputInfo;
         cell.verifiedPill.hidden = NO;
         cell.scoreLabel.text = m.timeText.length ? m.timeText : @"--:--";
         cell.scoreLabel.layer.borderWidth = 0.5;
@@ -1141,16 +1142,33 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
         cell.scoreLabel.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.18];
         cell.scoreLabel.textColor = kDiscoverGreen;
         cell.scoreLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-        [cell.verifiedPill setTitle:(NSLocalizedString(@"discover_verify_match", nil) ?: @"认证比赛") forState:UIControlStateNormal];
-        cell.verifiedPill.backgroundColor = kDiscoverPillGreen;
-        [cell.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-        [cell.verifiedPill setImage:[UIImage imageNamed:@"notphoto"] forState:UIControlStateNormal];
-        cell.verifiedPill.tintColor = [UIColor whiteColor];
-        cell.dateLabel.textAlignment = NSTextAlignmentCenter;
-        [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
-            make.centerX.equalTo(cell.scoreLabel);
-            make.top.equalTo(cell.scoreLabel.mas_bottom).offset(17);
-        }];
+        if (m.hasVerified) {
+            [cell.verifiedPill setTitle:m.verifiedText forState:UIControlStateNormal];
+            cell.verifiedPill.backgroundColor = [UIColor colorWithRed:6/255.0 green:15/255.0 blue:15/255.0 alpha:1.0];
+            [cell.verifiedPill setTitleColor:[UIColor colorWithRed:0.298 green:0.851 blue:0.392 alpha:1.0] forState:UIControlStateNormal];
+            [cell.verifiedPill setImage:[UIImage imageNamed:@"weizhi"] forState:UIControlStateNormal];
+            cell.verifiedPill.tintColor = [UIColor colorWithRed:0.298 green:0.851 blue:0.392 alpha:1.0];
+        } else {
+            [cell.verifiedPill setTitle:(NSLocalizedString(@"discover_verify_match", nil) ?: @"认证比赛") forState:UIControlStateNormal];
+            cell.verifiedPill.backgroundColor = kDiscoverPillGreen;
+            [cell.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+            [cell.verifiedPill setImage:[UIImage imageNamed:@"weizhi"] forState:UIControlStateNormal];
+            cell.verifiedPill.tintColor = [UIColor whiteColor];
+        }
+        if (m.hasInputInfo) {
+            // 提交后与原型一致，日期从中间态左移
+            cell.dateLabel.textAlignment = NSTextAlignmentLeft;
+            [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
+                make.leading.equalTo(cell.cardView).offset(16);
+                make.top.equalTo(cell.scoreLabel.mas_bottom).offset(17);
+            }];
+        } else {
+            cell.dateLabel.textAlignment = NSTextAlignmentCenter;
+            [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
+                make.centerX.equalTo(cell.scoreLabel);
+                make.top.equalTo(cell.scoreLabel.mas_bottom).offset(17);
+            }];
+        }
         [cell.inputButton removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
         [cell.inputButton addTarget:self action:@selector(onInputInfoButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
         [cell.verifiedPill removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
@@ -1167,24 +1185,30 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
             [cell.verifiedPill setTitle:m.verifiedText forState:UIControlStateNormal];
             cell.verifiedPill.backgroundColor = [UIColor colorWithRed:6/255.0 green:15/255.0 blue:15/255.0 alpha:1.0];
             [cell.verifiedPill setTitleColor:[UIColor colorWithRed:0.298 green:0.851 blue:0.392 alpha:1.0] forState:UIControlStateNormal];
-            if (@available(iOS 13.0, *)) {
-                [cell.verifiedPill setImage:[UIImage systemImageNamed:@"checkmark.circle.fill"] forState:UIControlStateNormal];
-                cell.verifiedPill.tintColor = [UIColor colorWithRed:0.298 green:0.851 blue:0.392 alpha:1.0];
-            } else {
-                [cell.verifiedPill setImage:nil forState:UIControlStateNormal];
-            }
+            [cell.verifiedPill setImage:[UIImage imageNamed:@"weizhi"] forState:UIControlStateNormal];
+            cell.verifiedPill.tintColor = [UIColor colorWithRed:0.298 green:0.851 blue:0.392 alpha:1.0];
         } else {
             [cell.verifiedPill setTitle:(NSLocalizedString(@"discover_verify_match", nil) ?: @"认证比赛") forState:UIControlStateNormal];
             cell.verifiedPill.backgroundColor = kDiscoverPillGreen;
             [cell.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-            [cell.verifiedPill setImage:[UIImage imageNamed:@"notphoto"] forState:UIControlStateNormal];
+            [cell.verifiedPill setImage:[UIImage imageNamed:@"weizhi"] forState:UIControlStateNormal];
             cell.verifiedPill.tintColor = [UIColor whiteColor];
         }
-        cell.dateLabel.textAlignment = NSTextAlignmentLeft;
-        [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(cell.cardView).offset(16);
-            make.top.equalTo(cell.scoreLabel.mas_bottom).offset(8);
-        }];
+        if (m.hasInputInfo) {
+            // 已提交输入信息：隐藏左下按钮，日期左移到卡片左下（对齐 Figma 1:9474）
+            cell.dateLabel.textAlignment = NSTextAlignmentLeft;
+            [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
+                make.leading.equalTo(cell.cardView).offset(16);
+                make.top.equalTo(cell.scoreLabel.mas_bottom).offset(8);
+            }];
+        } else {
+            // 未提交输入信息：保留日期在比分区域下方的中间态布局
+            cell.dateLabel.textAlignment = NSTextAlignmentCenter;
+            [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
+                make.centerX.equalTo(cell.scoreLabel);
+                make.top.equalTo(cell.scoreLabel.mas_bottom).offset(8);
+            }];
+        }
         [cell.verifiedPill removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
         [cell.verifiedPill addTarget:self action:@selector(onVerifyMatchButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
         [cell.inputButton removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];

@@ -252,7 +252,10 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
     }];
 
     UIImageView *locIcon = [[UIImageView alloc] init];
-    if (@available(iOS 13.0, *)) {
+    UIImage *weizhi = [UIImage imageNamed:@"weizhi"];
+    if (weizhi) {
+        locIcon.image = weizhi;
+    } else if (@available(iOS 13.0, *)) {
         locIcon.image = [UIImage systemImageNamed:@"mappin.and.ellipse"];
         locIcon.tintColor = [UIColor colorWithRed:0.10 green:0.36 blue:0.28 alpha:1.0];
     }
