@@ -20,8 +20,8 @@
 /// 手动录入且无 `matchId` 时与 `matchName` 一起使用（可选）
 @property (nonatomic, copy, nullable) NSString *stadiumName;
 
-/// 创建或更新成功后回调（上层可刷新列表等）
-@property (nonatomic, copy) void (^completion)(void);
+/// 创建或更新成功后回调；返回服务端观赛记录 ID（更新时为当前 recordId）
+@property (nonatomic, copy, nullable) void (^completion)(NSString * _Nullable recordId);
 
 @end
 

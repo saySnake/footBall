@@ -13,6 +13,7 @@
 #import "PassportSheetsViewController.h"
 #import "PNMatchDetailViewController.h"
 #import "PNMatchInfoInputViewController.h"
+#import "LoadingManager.h"
 #import "AuthManager.h"
 #import "User.h"
 #import "StatisticsModels.h"
@@ -1241,9 +1242,12 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
     vc.homeName = match.homeName;
     vc.awayName = match.awayName;
     __weak typeof(self) weakSelf = self;
-    vc.completion = ^{
+    vc.completion = ^(NSString * _Nullable recordId) {
         // 仅完成“输入信息”，暂不允许看详情，还需“认证比赛”
         match.hasInputInfo = YES;
+        if (recordId.length > 0) {
+            match.recordId = recordId;
+        }
         [weakSelf.tableView reloadData];
     };
     vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
@@ -1251,8 +1255,12 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
 }
 
 - (void)presentMatchVerifyForMatch:(DiscoverMatch *)match {
+    if (match.recordId.length == 0) {
+        [[LoadingManager sharedManager] showText:@"请先完成输入信息" inView:self.view];
+        return;
+    }
     PNMatchVerifyViewController *vc = [[PNMatchVerifyViewController alloc] init];
-    vc.recordId = match.matchId;
+    vc.recordId = match.recordId;
     vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
     __weak typeof(self) weakSelf = self;
     vc.completion = ^{

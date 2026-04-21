@@ -47,6 +47,9 @@ static CGFloat PNInputSectionSpacing(void) {
 
 @property (nonatomic, strong) UIButton *emotionButton;
 @property (nonatomic, strong) UIView *emotionPanel;
+@property (nonatomic, strong) UIImageView *emotionButtonIconView;
+@property (nonatomic, strong) UIImageView *emotionButtonArrowView;
+@property (nonatomic, copy) NSString *selectedEmotionName;
 
 @property (nonatomic, strong) UITextField *matchField;
 @property (nonatomic, strong) UITextField *priceField;
@@ -89,6 +92,53 @@ static CGFloat PNMatchInfoDimBaseAlpha(void) {
     button.backgroundColor = selected ? [UIColor whiteColor] : PNInputFieldBgColor();
     button.titleLabel.font = [UIFont systemFontOfSize:12 weight:(selected ? UIFontWeightMedium : UIFontWeightRegular)];
     [button setTitleColor:(selected ? PNInputGreenColor() : PNInputPillTextColor()) forState:UIControlStateNormal];
+}
+
+- (NSArray<NSDictionary<NSString *, NSString *> *> *)pn_emotionOptionsData {
+    static NSArray<NSDictionary<NSString *, NSString *> *> *options = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        options = @[
+            @{ @"name": @"兴奋", @"emoji": @"🤩", @"icon": @"team_ex" },
+            @{ @"name": @"激动", @"emoji": @"🥳", @"icon": @"team_ji" },
+            @{ @"name": @"希望", @"emoji": @"🤗", @"icon": @"team_hop" },
+            @{ @"name": @"遗憾", @"emoji": @"😩", @"icon": @"team_ku" },
+            @{ @"name": @"平静", @"emoji": @"😎", @"icon": @"team_ping" },
+            @{ @"name": @"失望", @"emoji": @"😤", @"icon": @"team_shi" },
+            @{ @"name": @"暴躁", @"emoji": @"😡", @"icon": @"team_angry" }
+        ];
+    });
+    return options;
+}
+
+- (nullable NSDictionary<NSString *, NSString *> *)pn_emotionOptionForValue:(NSString *)value {
+    NSString *v = [value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (v.length == 0) {
+        return nil;
+    }
+    for (NSDictionary<NSString *, NSString *> *opt in [self pn_emotionOptionsData]) {
+        NSString *name = opt[@"name"] ?: @"";
+        NSString *emoji = opt[@"emoji"] ?: @"";
+        NSString *legacy = [NSString stringWithFormat:@"%@ %@", name, emoji];
+        if ([v isEqualToString:name] ||
+            [v isEqualToString:emoji] ||
+            [v isEqualToString:legacy] ||
+            [v containsString:emoji]) {
+            return opt;
+        }
+    }
+    return nil;
+}
+
+- (void)pn_applyEmotionOption:(NSDictionary<NSString *, NSString *> *)option {
+    NSString *name = option[@"name"] ?: @"";
+    NSString *emoji = option[@"emoji"] ?: @"";
+    NSString *iconName = option[@"icon"] ?: @"";
+    self.selectedEmotionName = name;
+    self.selectedEmotion = emoji;
+    [self.emotionButton setTitle:(name.length > 0 ? name : @"选择情绪") forState:UIControlStateNormal];
+    UIImage *icon = [UIImage imageNamed:iconName];
+    self.emotionButtonIconView.image = icon ?: [UIImage imageNamed:@"team_ex"];
 }
 
 - (void)viewDidLoad {
@@ -326,27 +376,36 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     emotionBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightBold];
     emotionBtn.backgroundColor = PNInputFieldBgColor();
     emotionBtn.layer.cornerRadius = 16;
-    UIImage *teamAd = [UIImage imageNamed:@"teamAd"];
-    if (teamAd) {
-        [emotionBtn setImage:[teamAd imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal] forState:UIControlStateNormal];
-        emotionBtn.semanticContentAttribute = UISemanticContentAttributeForceRightToLeft;
-        emotionBtn.imageEdgeInsets = UIEdgeInsetsMake(0, 6, 0, -2);
-    } else if (@available(iOS 13.0, *)) {
-        UIImage *plus = [UIImage systemImageNamed:@"plus.circle.fill"];
-        if (plus) {
-            [emotionBtn setImage:[plus imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
-            emotionBtn.tintColor = [UIColor colorWithWhite:0.72 alpha:1.0];
-            emotionBtn.semanticContentAttribute = UISemanticContentAttributeForceRightToLeft;
-            emotionBtn.imageEdgeInsets = UIEdgeInsetsMake(0, 6, 0, -2);
-        }
-    }
-    emotionBtn.contentEdgeInsets = UIEdgeInsetsMake(0, 10, 0, 10);
+    emotionBtn.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
+    emotionBtn.contentEdgeInsets = UIEdgeInsetsMake(0, 38, 0, 20);
     // 去掉高亮时的系统效果
     emotionBtn.adjustsImageWhenHighlighted = NO;
     emotionBtn.showsTouchWhenHighlighted = NO;
     [emotionBtn addTarget:self action:@selector(onEmotionButtonTapped) forControlEvents:UIControlEventTouchUpInside];
     [card addSubview:emotionBtn];
     self.emotionButton = emotionBtn;
+    UIImageView *emotionIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"team_ex"]];
+    emotionIconView.contentMode = UIViewContentModeScaleAspectFit;
+    [emotionBtn addSubview:emotionIconView];
+    self.emotionButtonIconView = emotionIconView;
+    [emotionIconView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(emotionBtn).offset(10);
+        make.centerY.equalTo(emotionBtn);
+        make.width.height.mas_equalTo(24);
+    }];
+    UIImageView *emotionArrowView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"team_down"]];
+    if (!emotionArrowView.image && @available(iOS 13.0, *)) {
+        emotionArrowView.image = [UIImage systemImageNamed:@"chevron.down"];
+        emotionArrowView.tintColor = [UIColor colorWithWhite:0.45 alpha:1.0];
+    }
+    emotionArrowView.contentMode = UIViewContentModeScaleAspectFit;
+    [emotionBtn addSubview:emotionArrowView];
+    self.emotionButtonArrowView = emotionArrowView;
+    [emotionArrowView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.equalTo(emotionBtn).offset(-8);
+        make.centerY.equalTo(emotionBtn);
+        make.width.height.mas_equalTo(10);
+    }];
     [emotionBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerY.equalTo(title);
         make.trailing.equalTo(card).offset(-16);
@@ -356,63 +415,79 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     
     // 情绪面板先添加（在底层），scroll 后添加（在上层），保证默认时 scroll 可正常滑动
     UIView *emotionPanel = [[UIView alloc] init];
-    emotionPanel.backgroundColor = [UIColor colorWithWhite:0.98 alpha:1.0];
+    emotionPanel.backgroundColor = [UIColor whiteColor];
     emotionPanel.layer.cornerRadius = 12;
-    emotionPanel.layer.shadowColor = [UIColor blackColor].CGColor;
-    emotionPanel.layer.shadowOpacity = 0.12;
+    emotionPanel.layer.shadowColor = [UIColor colorWithRed:0.78 green:0.78 blue:0.78 alpha:1.0].CGColor;
+    emotionPanel.layer.shadowOpacity = 0.25;
     emotionPanel.layer.shadowOffset = CGSizeMake(0, 4);
-    emotionPanel.layer.shadowRadius = 8;
+    emotionPanel.layer.shadowRadius = 7.9;
     emotionPanel.hidden = YES;
     [card addSubview:emotionPanel];
     self.emotionPanel = emotionPanel;
     [emotionPanel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(title.mas_bottom).offset(8);
-        make.leading.equalTo(card).offset(18);
-        make.trailing.equalTo(card).offset(-18);
+        make.top.equalTo(emotionBtn.mas_bottom).offset(8);
+        make.trailing.equalTo(emotionBtn);
+        make.width.mas_equalTo(254);
     }];
     
-    NSArray<NSString *> *emotions = @[ @"兴奋 🤩", @"激动 🥳", @"希望 🤗", @"遗憾 😩",
-                                       @"平静 😎", @"失望 😤", @"暴躁 😡" ];
-    NSMutableArray *emotionButtons = [NSMutableArray array];
-    int columns = 4;
-    for (NSUInteger idx = 0; idx < emotions.count; idx++) {
-        // 使用 Custom 类型，避免系统点击时出现蓝色高亮背景
-        UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
-        [btn setTitle:emotions[idx] forState:UIControlStateNormal];
-        [btn setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
-        btn.titleLabel.font = [UIFont systemFontOfSize:12];
-        btn.backgroundColor = [UIColor whiteColor];
-        btn.layer.cornerRadius = 10;
-        btn.adjustsImageWhenHighlighted = NO;
-        btn.showsTouchWhenHighlighted = NO;
-        btn.tag = (NSInteger)idx;
-        [btn addTarget:self action:@selector(onEmotionOptionTapped:) forControlEvents:UIControlEventTouchUpInside];
-        [emotionPanel addSubview:btn];
-        [emotionButtons addObject:btn];
-        
-        int row = (int)(idx / columns);
-        int col = (int)(idx % columns);
-        [btn mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.height.mas_equalTo(32);
+    NSArray<NSDictionary<NSString *, NSString *> *> *emotionOptions = [self pn_emotionOptionsData];
+    NSMutableArray<UIControl *> *emotionOptionViews = [NSMutableArray array];
+    const NSInteger columns = 4;
+    for (NSUInteger idx = 0; idx < emotionOptions.count; idx++) {
+        NSDictionary<NSString *, NSString *> *option = emotionOptions[idx];
+        UIControl *optionView = [[UIControl alloc] init];
+        optionView.tag = (NSInteger)idx;
+        [optionView addTarget:self action:@selector(onEmotionOptionTapped:) forControlEvents:UIControlEventTouchUpInside];
+        [emotionPanel addSubview:optionView];
+        [emotionOptionViews addObject:optionView];
+        NSInteger row = (NSInteger)idx / columns;
+        NSInteger col = (NSInteger)idx % columns;
+        [optionView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.width.mas_equalTo(46);
+            make.height.mas_equalTo(60);
+            if (col == 0) {
+                make.leading.equalTo(emotionPanel).offset(16);
+            } else {
+                UIControl *prev = emotionOptionViews[idx - 1];
+                make.leading.equalTo(prev.mas_trailing).offset(15);
+            }
             if (row == 0) {
                 make.top.equalTo(emotionPanel).offset(12);
             } else {
-                UIButton *prevRowBtn = emotionButtons[(row - 1) * columns + col];
-                make.top.equalTo(prevRowBtn.mas_bottom).offset(8);
-            }
-            if (col == 0) {
-                make.leading.equalTo(emotionPanel).offset(8);
-            } else {
-                UIButton *prevBtn = emotionButtons[idx - 1];
-                make.leading.equalTo(prevBtn.mas_trailing).offset(8);
-                make.width.equalTo(prevBtn);
-            }
-            if (col == columns - 1) {
-                make.trailing.equalTo(emotionPanel).offset(-8);
+                UIControl *prevRowFirst = emotionOptionViews[(row - 1) * columns];
+                make.top.equalTo(prevRowFirst).offset(72);
             }
         }];
+        
+        UIView *iconBg = [[UIView alloc] init];
+        iconBg.backgroundColor = PNInputFieldBgColor();
+        iconBg.layer.cornerRadius = 20;
+        [optionView addSubview:iconBg];
+        [iconBg mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.leading.equalTo(optionView);
+            make.width.height.mas_equalTo(40);
+        }];
+        
+        UIImageView *iconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:(option[@"icon"] ?: @"")]];
+        iconView.contentMode = UIViewContentModeScaleAspectFit;
+        [iconBg addSubview:iconView];
+        [iconView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.center.equalTo(iconBg);
+            make.width.height.mas_equalTo(24);
+        }];
+        
+        UILabel *nameLabel = [[UILabel alloc] init];
+        nameLabel.text = option[@"name"];
+        nameLabel.textColor = [UIColor blackColor];
+        nameLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
+        nameLabel.textAlignment = NSTextAlignmentCenter;
+        [optionView addSubview:nameLabel];
+        [nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.equalTo(iconBg.mas_bottom).offset(8);
+            make.centerX.equalTo(iconBg);
+        }];
     }
-    UIButton *lastEmotionBtn = [emotionButtons lastObject];
+    UIControl *lastEmotionBtn = [emotionOptionViews lastObject];
     [emotionPanel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.bottom.equalTo(lastEmotionBtn.mas_bottom).offset(12);
     }];
@@ -428,12 +503,9 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [hit addGestureRecognizer:pan];
     [hit mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.trailing.equalTo(card);
-        make.height.mas_equalTo(44);
-        if (@available(iOS 11.0, *)) {
-            make.bottom.equalTo(card.mas_safeAreaLayoutGuideBottom);
-        } else {
-            make.bottom.equalTo(card);
-        }
+        // 不再占用底部可视高度，避免出现底部白色留白
+        make.height.mas_equalTo(0);
+        make.bottom.equalTo(card);
     }];
     
     // scroll 在 emotionPanel 之后添加，位于上层，保证默认可滑动
@@ -449,7 +521,8 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [scroll mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(title.mas_bottom).offset(14);
         make.leading.trailing.equalTo(card);
-        make.bottom.equalTo(hit.mas_top);
+        // 让滚动区域延伸到卡片底部，避免被“底部手势区”截短
+        make.bottom.equalTo(card);
     }];
     [card bringSubviewToFront:hit];
     
@@ -475,7 +548,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [content addSubview:matchTitle];
     [matchTitle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(content).offset(0);
-        make.leading.equalTo(content).offset(18);
+        make.leading.equalTo(content).offset(16);
     }];
     
     UITextField *matchField = [[UITextField alloc] init];
@@ -503,8 +576,8 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     self.matchField = matchField;
     [matchField mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(matchTitle.mas_bottom).offset(8);
-        make.leading.equalTo(content).offset(18);
-        make.trailing.equalTo(content).offset(-18);
+        make.leading.equalTo(content).offset(16);
+        make.trailing.equalTo(content).offset(-16);
         make.height.mas_equalTo(50);
     }];
     
@@ -515,7 +588,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [content addSubview:watchTitle];
     [watchTitle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(matchField.mas_bottom).offset(PNInputSectionSpacing());
-        make.leading.equalTo(content).offset(18);
+        make.leading.equalTo(content).offset(16);
     }];
     
     NSArray *watchOptions = @[ @"在现场", @"在球场", @"在酒吧", @"在家里", @"在外面", @"在学校", @"在公司" ];
@@ -531,7 +604,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [content addSubview:seatTitle];
     [seatTitle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(((UIButton *)self.watchButtons.lastObject).mas_bottom).offset(PNInputSectionSpacing());
-        make.leading.equalTo(content).offset(18);
+        make.leading.equalTo(content).offset(16);
     }];
     
     NSArray *seatOptions = @[ @"主席台", @"VIP看台", @"包厢", @"看台区", @"场边", @"山顶", @"短边", @"球门后", @"曲线看台", @"角旗区" ];
@@ -547,7 +620,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [content addSubview:idTitle];
     [idTitle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(((UIButton *)self.seatButtons.lastObject).mas_bottom).offset(PNInputSectionSpacing());
-        make.leading.equalTo(content).offset(18);
+        make.leading.equalTo(content).offset(16);
     }];
     
     NSArray *idOptions = @[ @"ULTRAS球迷", @"球迷", @"领喊", @"Supporters", @"曲线看台球迷", @"旗手", @"鼓手", @"场馆保障", @"媒体记者", @"文字记者", @"教练组", @"运动员", @"联赛组委会", @"导播", @"包厢VIP", @"赛事官员", @"俱乐部投资人", @"球童", @"医护人员", @"安保" ];
@@ -563,7 +636,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [content addSubview:reasonTitle];
     [reasonTitle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(((UIButton *)self.identityButtons.lastObject).mas_bottom).offset(PNInputSectionSpacing());
-        make.leading.equalTo(content).offset(18);
+        make.leading.equalTo(content).offset(16);
     }];
     
     NSArray *reasonOptions = @[ @"球迷", @"散客", @"商务", @"家属陪同" ];
@@ -579,7 +652,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [content addSubview:priceTitle];
     [priceTitle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(((UIButton *)self.reasonButtons.lastObject).mas_bottom).offset(PNInputSectionSpacing());
-        make.leading.equalTo(content).offset(18);
+        make.leading.equalTo(content).offset(16);
     }];
     
     UITextField *priceField = [[UITextField alloc] init];
@@ -622,7 +695,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [content addSubview:dateTitle];
     [dateTitle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(priceField.mas_bottom).offset(PNInputSectionSpacing());
-        make.leading.equalTo(content).offset(18);
+        make.leading.equalTo(content).offset(16);
     }];
     UILabel *timeTitle = [[UILabel alloc] init];
     timeTitle.text = @"时间";
@@ -630,7 +703,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [content addSubview:timeTitle];
     [timeTitle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerY.equalTo(dateTitle);
-        make.leading.equalTo(content.mas_centerX).offset(10);
+        make.leading.equalTo(content.mas_centerX).offset(2);
     }];
     
     UIButton *dateBtn = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -653,14 +726,14 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     
     [dateBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(dateTitle.mas_bottom).offset(8);
-        make.leading.equalTo(content).offset(18);
-        make.trailing.equalTo(content.mas_centerX).offset(-8);
+        make.leading.equalTo(content).offset(16);
+        make.trailing.equalTo(content.mas_centerX).offset(-5.5);
         make.height.mas_equalTo(50);
     }];
     [timeBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(dateBtn);
-        make.leading.equalTo(content.mas_centerX).offset(8);
-        make.trailing.equalTo(content).offset(-18);
+        make.leading.equalTo(content.mas_centerX).offset(5.5);
+        make.trailing.equalTo(content).offset(-16);
         make.height.equalTo(dateBtn);
     }];
     
@@ -671,7 +744,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [content addSubview:commentTitle];
     [commentTitle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(timeBtn.mas_bottom).offset(PNInputSectionSpacing());
-        make.leading.equalTo(content).offset(18);
+        make.leading.equalTo(content).offset(16);
     }];
     
     UITextView *commentView = [[UITextView alloc] init];
@@ -699,8 +772,8 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     self.commentCountLabel = commentCount;
     [commentView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(commentTitle.mas_bottom).offset(8);
-        make.leading.equalTo(content).offset(18);
-        make.trailing.equalTo(content).offset(-18);
+        make.leading.equalTo(content).offset(16);
+        make.trailing.equalTo(content).offset(-16);
         make.height.mas_equalTo(97);
     }];
     [commentCount mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -723,18 +796,25 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [confirmBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     confirmBtn.backgroundColor = PNInputGreenColor();
     confirmBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    // 保持严格半圆：cornerRadius = height / 2
     confirmBtn.layer.cornerRadius = 26;
+    confirmBtn.layer.shadowColor = [UIColor colorWithWhite:0 alpha:1.0].CGColor;
+    confirmBtn.layer.shadowOpacity = 0.19;
+    confirmBtn.layer.shadowOffset = CGSizeMake(0, 2);
+    confirmBtn.layer.shadowRadius = 4;
+    confirmBtn.layer.masksToBounds = NO;
     [confirmBtn addTarget:self action:@selector(onConfirmTapped) forControlEvents:UIControlEventTouchUpInside];
     [content addSubview:confirmBtn];
     [confirmBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(commentView.mas_bottom).offset(20);
-        make.leading.equalTo(content).offset(18);
-        make.trailing.equalTo(content).offset(-18);
-        make.height.mas_equalTo(40);
+        // Figma 设计为左右 24 间距，按钮更窄
+        make.leading.equalTo(content).offset(24);
+        make.trailing.equalTo(content).offset(-24);
+        make.height.mas_equalTo(52);
     }];
     // 用确认按钮底部撑开 content 高度，使 scrollView 的 contentSize 正确，可滚动到底
     [content mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.bottom.equalTo(confirmBtn.mas_bottom).offset(24);
+        make.bottom.equalTo(confirmBtn.mas_bottom).offset(22);
     }];
     if (@available(iOS 11.0, *)) {
         [scroll.contentLayoutGuide.bottomAnchor constraintEqualToAnchor:content.bottomAnchor].active = YES;
@@ -840,7 +920,8 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     if (self.homeName.length > 0 && self.awayName.length > 0) {
         self.matchField.text = [NSString stringWithFormat:@"%@ VS %@", self.homeName, self.awayName];
     }
-    self.selectedEmotion = @"兴奋 🤩";
+    NSDictionary<NSString *, NSString *> *defaultEmotion = [[self pn_emotionOptionsData] firstObject];
+    [self pn_applyEmotionOption:defaultEmotion];
     self.selectedWatchInfo = @"在球场";
     self.selectedSeat = @"VIP看台";
     self.selectedReason = @"球迷";
@@ -848,14 +929,13 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [self.selectedIdentities addObject:@"球迷"];
     [self.selectedIdentities addObject:@"媒体记者"];
     
-    self.priceField.text = @"55.5";
+    self.priceField.text = @"";
     self.selectedDate = [NSDate date];
     [self refreshDateTimeButtons];
     self.commentView.text = @"";
 
     [self pn_refreshPillButtonsFromSelection];
     [self updateCommentCountLabel];
-    [self.emotionButton setTitle:@"选择情绪" forState:UIControlStateNormal];
 }
 
 - (void)loadInitialFormData {
@@ -931,13 +1011,11 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     self.selectedDate = kick ?: [NSDate date];
     [self refreshDateTimeButtons];
 
-    if (detail.postMatchEmotion.length > 0) {
-        self.selectedEmotion = detail.postMatchEmotion;
-        [self.emotionButton setTitle:detail.postMatchEmotion forState:UIControlStateNormal];
-    } else {
-        self.selectedEmotion = @"兴奋 🤩";
-        [self.emotionButton setTitle:@"选择情绪" forState:UIControlStateNormal];
+    NSDictionary<NSString *, NSString *> *emotionOpt = [self pn_emotionOptionForValue:detail.postMatchEmotion];
+    if (!emotionOpt) {
+        emotionOpt = [[self pn_emotionOptionsData] firstObject];
     }
+    [self pn_applyEmotionOption:emotionOpt];
 
     self.commentView.text = detail.notes ?: @"";
     [self pn_refreshPillButtonsFromSelection];
@@ -1014,9 +1092,24 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
 
 - (NSMutableDictionary *)pn_matchRecordBodyMutable {
     NSMutableDictionary *m = [NSMutableDictionary dictionary];
+    NSString *mn = [self.matchField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (mn.length > 0) {
+        m[@"matchName"] = mn;
+    }
+    NSString *sn = [self.stadiumName stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (sn.length > 0) {
+        m[@"stadiumName"] = sn;
+    }
+    long long mid = [self.matchId longLongValue];
+    if (self.matchId.length > 0 && mid > 0) {
+        m[@"matchId"] = @(mid);
+    }
     m[@"viewingLocation"] = self.selectedWatchInfo ?: @"";
     m[@"standType"] = self.selectedSeat ?: @"";
+    // 当前页面只有一组座位选择，先同步到 seatLocation，满足后端完整字段
+    m[@"seatLocation"] = self.selectedSeat ?: @"";
     m[@"viewingIdentities"] = self.selectedIdentities.count > 0 ? [self.selectedIdentities allObjects] : @[];
+    m[@"onlineViewingMethods"] = @[];
     m[@"watchReason"] = self.selectedReason ?: @"";
     m[@"ticketPrice"] = @([self.priceField.text ?: @"0" doubleValue]);
     m[@"matchDateTime"] = [self pn_isoMatchDateTimeString];
@@ -1024,6 +1117,21 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     m[@"notes"] = self.commentView.text ?: @"";
     m[@"photoUrls"] = @[];
     return m;
+}
+
+- (NSString *)pn_recordIdFromResponseObject:(HTTPResponse *)response {
+    id data = response.dataObject ?: response.data;
+    if ([data isKindOfClass:NSDictionary.class]) {
+        NSDictionary *dict = (NSDictionary *)data;
+        id rid = dict[@"recordId"] ?: dict[@"id"];
+        if ([rid isKindOfClass:NSString.class]) {
+            return (NSString *)rid;
+        }
+        if ([rid isKindOfClass:NSNumber.class]) {
+            return [(NSNumber *)rid stringValue];
+        }
+    }
+    return @"";
 }
 
 - (BOOL)pn_validateBeforeSubmit:(NSString *__autoreleasing *)outMessage {
@@ -1056,26 +1164,8 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         return;
     }
 
-    NSDictionary *body = nil;
+    NSDictionary *body = [self pn_matchRecordBodyMutable];
     BOOL isUpdate = (self.recordId.length > 0);
-    if (isUpdate) {
-        body = [self pn_matchRecordBodyMutable];
-    } else {
-        NSMutableDictionary *m = [self pn_matchRecordBodyMutable];
-        long long mid = [self.matchId longLongValue];
-        if (mid > 0) {
-            m[@"matchId"] = @(mid);
-        }
-        NSString *mn = [self.matchField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        if (mn.length > 0) {
-            m[@"matchName"] = mn;
-        }
-        NSString *sn = [self.stadiumName stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        if (sn.length > 0) {
-            m[@"stadiumName"] = sn;
-        }
-        body = m;
-    }
 
     [[LoadingManager sharedManager] showLoadingInView:self.view];
     __weak typeof(self) weakSelf = self;
@@ -1083,7 +1173,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         [[MatchRequest shared] updateMatchRecord:self.recordId body:body success:^(HTTPResponse * _Nullable responseObject) {
             [[LoadingManager sharedManager] hideLoadingInView:weakSelf.view];
             if (weakSelf.completion) {
-                weakSelf.completion();
+                weakSelf.completion(weakSelf.recordId);
             }
             [weakSelf dismissWithCardAnimation];
         } failure:^(NSError * _Nonnull error) {
@@ -1100,8 +1190,12 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     } else {
         [[MatchRequest shared] createMatchRecordWithBody:body success:^(HTTPResponse * _Nullable responseObject) {
             [[LoadingManager sharedManager] hideLoadingInView:weakSelf.view];
+            NSString *newRecordId = [weakSelf pn_recordIdFromResponseObject:responseObject];
+            if (newRecordId.length > 0) {
+                weakSelf.recordId = newRecordId;
+            }
             if (weakSelf.completion) {
-                weakSelf.completion();
+                weakSelf.completion(newRecordId);
             }
             [weakSelf dismissWithCardAnimation];
         } failure:^(NSError * _Nonnull error) {
@@ -1133,10 +1227,12 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     }
 }
 
-- (void)onEmotionOptionTapped:(UIButton *)sender {
-    NSString *title = sender.titleLabel.text ?: @"";
-    self.selectedEmotion = title;
-    [self.emotionButton setTitle:@"选择情绪" forState:UIControlStateNormal];
+- (void)onEmotionOptionTapped:(UIControl *)sender {
+    NSInteger idx = sender.tag;
+    NSArray<NSDictionary<NSString *, NSString *> *> *options = [self pn_emotionOptionsData];
+    if (idx >= 0 && idx < (NSInteger)options.count) {
+        [self pn_applyEmotionOption:options[idx]];
+    }
     self.emotionPanel.hidden = YES;
 }
 
