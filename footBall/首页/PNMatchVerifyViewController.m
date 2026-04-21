@@ -476,6 +476,14 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
     }
     if (status == kCLAuthorizationStatusNotDetermined) {
         [self.locationManager requestWhenInUseAuthorization];
+        self.locationLabel.text = @"等待定位授权...";
+        return;
+    }
+    if (status == kCLAuthorizationStatusDenied || status == kCLAuthorizationStatusRestricted) {
+        self.locationLabel.text = @"定位权限未开启";
+        self.currentAddress = @"";
+        [self updateConfirmButtonState];
+        return;
     }
 
     self.locationLabel.text = @"定位中...";
@@ -484,6 +492,29 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
 
     // 请求一次当前定位，结果在代理回调中处理
     [self.locationManager requestLocation];
+}
+
+- (void)locationManagerDidChangeAuthorization:(CLLocationManager *)manager API_AVAILABLE(ios(14.0)) {
+    CLAuthorizationStatus status = manager.authorizationStatus;
+    if (status == kCLAuthorizationStatusAuthorizedWhenInUse || status == kCLAuthorizationStatusAuthorizedAlways) {
+        self.locationLabel.text = @"定位中...";
+        [manager requestLocation];
+    } else if (status == kCLAuthorizationStatusDenied || status == kCLAuthorizationStatusRestricted) {
+        self.locationLabel.text = @"定位权限未开启";
+        self.currentAddress = @"";
+        [self updateConfirmButtonState];
+    }
+}
+
+- (void)locationManager:(CLLocationManager *)manager didChangeAuthorizationStatus:(CLAuthorizationStatus)status {
+    if (status == kCLAuthorizationStatusAuthorizedWhenInUse || status == kCLAuthorizationStatusAuthorizedAlways) {
+        self.locationLabel.text = @"定位中...";
+        [manager requestLocation];
+    } else if (status == kCLAuthorizationStatusDenied || status == kCLAuthorizationStatusRestricted) {
+        self.locationLabel.text = @"定位权限未开启";
+        self.currentAddress = @"";
+        [self updateConfirmButtonState];
+    }
 }
 
 - (void)locationManager:(CLLocationManager *)manager didFailWithError:(NSError *)error {
@@ -517,9 +548,15 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
             NSString *city = placemark.locality ?: placemark.administrativeArea;
             NSString *subLocality = placemark.subLocality ?: @"";
             NSString *name = placemark.name ?: @"";
+            NSString *poi = @"";
+            if ([placemark.areasOfInterest.firstObject isKindOfClass:NSString.class]) {
+                poi = (NSString *)placemark.areasOfInterest.firstObject;
+            }
             
             NSString *display = nil;
-            if (city.length > 0 && name.length > 0) {
+            if (poi.length > 0) {
+                display = poi;
+            } else if (city.length > 0 && name.length > 0) {
                 display = [NSString stringWithFormat:@"%@·%@", city, name];
             } else if (city.length > 0 && subLocality.length > 0) {
                 display = [NSString stringWithFormat:@"%@%@", city, subLocality];
@@ -532,8 +569,8 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
                 display = city;
             } else {
                 display = [NSString stringWithFormat:@"%.6f,%.6f",
-                           location.coordinate.longitude,
-                           location.coordinate.latitude];
+                           location.coordinate.latitude,
+                           location.coordinate.longitude];
             }
             
             weakSelf.currentAddress = display;
