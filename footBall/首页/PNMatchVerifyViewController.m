@@ -68,8 +68,12 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
 @property (nonatomic, strong) CLLocationManager *locationManager;
 @property (nonatomic, copy) NSString *currentAddress;
 @property (nonatomic, assign) CLLocationCoordinate2D coordinate;
+@property (nonatomic, assign) BOOL isResolvingLocation;
+@property (nonatomic, strong) NSDate *locateStartAt;
+@property (nonatomic, strong) CLLocation *bestCandidateLocation;
 
 @property (nonatomic, strong) UIButton *confirmButton;
+@property (nonatomic, strong) UIButton *relocateButton;
 
 @end
 
@@ -247,7 +251,7 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
         make.top.equalTo(locTitle.mas_bottom).offset(8);
         make.leading.equalTo(card).offset(18);
         // 宽度由内部图标+文字内容撑开，最多不超过整体左右 18 间距
-        make.trailing.lessThanOrEqualTo(card).offset(-18);
+        make.trailing.lessThanOrEqualTo(card).offset(-90);
         make.height.mas_equalTo(32);
     }];
 
@@ -279,6 +283,23 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
         make.trailing.lessThanOrEqualTo(locBox).offset(-12);
     }];
 
+    UIButton *relocate = [UIButton buttonWithType:UIButtonTypeSystem];
+    [relocate setTitle:@"重定位" forState:UIControlStateNormal];
+    relocate.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    [relocate setTitleColor:[ColorManager sharedManager].primaryColor forState:UIControlStateNormal];
+    relocate.layer.cornerRadius = 15;
+    relocate.layer.borderWidth = 1;
+    relocate.layer.borderColor = [ColorManager sharedManager].primaryColor.CGColor;
+    [relocate addTarget:self action:@selector(onRelocateTapped) forControlEvents:UIControlEventTouchUpInside];
+    [card addSubview:relocate];
+    self.relocateButton = relocate;
+    [relocate mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerY.equalTo(locBox);
+        make.trailing.equalTo(card).offset(-18);
+        make.width.mas_equalTo(64);
+        make.height.mas_equalTo(30);
+    }];
+
     UIButton *confirm = [UIButton buttonWithType:UIButtonTypeSystem];
     [confirm setTitle:@"确认" forState:UIControlStateNormal];
     // 使用 ColorManager 主色
@@ -299,6 +320,10 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
 
     [self updateUploadCountLabel];
     [self updateConfirmButtonState];
+}
+
+- (void)onRelocateTapped {
+    [self startLocate];
 }
 
 - (void)dismissWithCardAnimation {
@@ -463,8 +488,10 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
 
     if (!self.locationManager) {
         self.locationManager = [[CLLocationManager alloc] init];
-        self.locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters;
+        // 优先拿到更准确的位置，避免命中过期缓存定位
+        self.locationManager.desiredAccuracy = kCLLocationAccuracyBest;
         self.locationManager.delegate = self;
+        self.locationManager.distanceFilter = kCLDistanceFilterNone;
     }
     
     // iOS 8+ 需要显式请求授权
@@ -477,69 +504,132 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
     if (status == kCLAuthorizationStatusNotDetermined) {
         [self.locationManager requestWhenInUseAuthorization];
         self.locationLabel.text = @"等待定位授权...";
+        self.relocateButton.enabled = YES;
+        [self.relocateButton setTitle:@"重定位" forState:UIControlStateNormal];
         return;
     }
     if (status == kCLAuthorizationStatusDenied || status == kCLAuthorizationStatusRestricted) {
         self.locationLabel.text = @"定位权限未开启";
         self.currentAddress = @"";
+        self.relocateButton.enabled = YES;
+        [self.relocateButton setTitle:@"重定位" forState:UIControlStateNormal];
         [self updateConfirmButtonState];
         return;
     }
 
     self.locationLabel.text = @"定位中...";
     self.currentAddress = @"";
+    self.coordinate = kCLLocationCoordinate2DInvalid;
+    self.isResolvingLocation = NO;
+    self.bestCandidateLocation = nil;
+    self.locateStartAt = [NSDate date];
+    self.relocateButton.enabled = NO;
+    [self.relocateButton setTitle:@"定位中" forState:UIControlStateNormal];
     [self updateConfirmButtonState];
 
-    // 请求一次当前定位，结果在代理回调中处理
+    // 先请求一次，再开启连续定位，直到拿到新鲜且精度足够的点
     [self.locationManager requestLocation];
+    [self.locationManager startUpdatingLocation];
 }
 
 - (void)locationManagerDidChangeAuthorization:(CLLocationManager *)manager API_AVAILABLE(ios(14.0)) {
     CLAuthorizationStatus status = manager.authorizationStatus;
     if (status == kCLAuthorizationStatusAuthorizedWhenInUse || status == kCLAuthorizationStatusAuthorizedAlways) {
-        self.locationLabel.text = @"定位中...";
-        [manager requestLocation];
+        [self startLocate];
     } else if (status == kCLAuthorizationStatusDenied || status == kCLAuthorizationStatusRestricted) {
         self.locationLabel.text = @"定位权限未开启";
         self.currentAddress = @"";
+        self.relocateButton.enabled = YES;
+        [self.relocateButton setTitle:@"重定位" forState:UIControlStateNormal];
         [self updateConfirmButtonState];
     }
 }
 
 - (void)locationManager:(CLLocationManager *)manager didChangeAuthorizationStatus:(CLAuthorizationStatus)status {
     if (status == kCLAuthorizationStatusAuthorizedWhenInUse || status == kCLAuthorizationStatusAuthorizedAlways) {
-        self.locationLabel.text = @"定位中...";
-        [manager requestLocation];
+        [self startLocate];
     } else if (status == kCLAuthorizationStatusDenied || status == kCLAuthorizationStatusRestricted) {
         self.locationLabel.text = @"定位权限未开启";
         self.currentAddress = @"";
+        self.relocateButton.enabled = YES;
+        [self.relocateButton setTitle:@"重定位" forState:UIControlStateNormal];
         [self updateConfirmButtonState];
     }
 }
 
 - (void)locationManager:(CLLocationManager *)manager didFailWithError:(NSError *)error {
     dispatch_async(dispatch_get_main_queue(), ^{
+        [self.locationManager stopUpdatingLocation];
         self.locationLabel.text = @"定位失败";
         self.currentAddress = @"";
+        self.coordinate = kCLLocationCoordinate2DInvalid;
+        self.relocateButton.enabled = YES;
+        [self.relocateButton setTitle:@"重定位" forState:UIControlStateNormal];
         [self updateConfirmButtonState];
     });
 }
 
 - (void)locationManager:(CLLocationManager *)manager didUpdateLocations:(NSArray<CLLocation *> *)locations {
-    CLLocation *location = [locations lastObject];
-    if (!location) {
-        [self locationManager:manager didFailWithError:[NSError errorWithDomain:kCLErrorDomain code:kCLErrorLocationUnknown userInfo:nil]];
+    if (@available(iOS 14.0, *)) {
+        if (manager.accuracyAuthorization == CLAccuracyAuthorizationReducedAccuracy) {
+            [self.locationManager stopUpdatingLocation];
+            self.locationLabel.text = @"请开启精确定位";
+            self.currentAddress = @"";
+            self.coordinate = kCLLocationCoordinate2DInvalid;
+            self.relocateButton.enabled = YES;
+            [self.relocateButton setTitle:@"重定位" forState:UIControlStateNormal];
+            [self updateConfirmButtonState];
+            return;
+        }
+    }
+    CLLocation *location = nil;
+    NSTimeInterval nowTs = [[NSDate date] timeIntervalSince1970];
+    for (CLLocation *loc in [locations reverseObjectEnumerator]) {
+        if (loc.horizontalAccuracy < 0) { continue; }
+        // 只接收“新鲜”定位，规避历史缓存（例如跨城市旧坐标）
+        NSTimeInterval age = fabs(nowTs - [loc.timestamp timeIntervalSince1970]);
+        if (age > 8) { continue; }
+        location = loc;
+        if (!self.bestCandidateLocation || loc.horizontalAccuracy < self.bestCandidateLocation.horizontalAccuracy) {
+            self.bestCandidateLocation = loc;
+        }
+    }
+    NSTimeInterval elapsed = self.locateStartAt ? fabs([self.locateStartAt timeIntervalSinceNow]) : 0;
+    CLLocation *candidate = self.bestCandidateLocation;
+    BOOL hasGoodPrecision = candidate && candidate.horizontalAccuracy <= 80;
+    BOOL canFallbackUseBest = candidate && elapsed >= 8.0 && candidate.horizontalAccuracy <= 200;
+    if (!hasGoodPrecision && !canFallbackUseBest) {
+        // 若暂无新鲜点，继续等；超时则给出提示
+        if (self.locateStartAt && elapsed > 15.0) {
+            [self.locationManager stopUpdatingLocation];
+            self.locationLabel.text = @"定位超时，请重试";
+            self.currentAddress = @"";
+            self.coordinate = kCLLocationCoordinate2DInvalid;
+            self.relocateButton.enabled = YES;
+            [self.relocateButton setTitle:@"重定位" forState:UIControlStateNormal];
+            [self updateConfirmButtonState];
+        }
         return;
     }
+    location = candidate ?: location;
+    if (self.isResolvingLocation) {
+        return;
+    }
+    [self.locationManager stopUpdatingLocation];
+    self.isResolvingLocation = YES;
     
     CLGeocoder *geocoder = [[CLGeocoder alloc] init];
     __weak typeof(self) weakSelf = self;
     self.coordinate=location.coordinate;
     [geocoder reverseGeocodeLocation:location completionHandler:^(NSArray<CLPlacemark *> * _Nullable placemarks, NSError * _Nullable error) {
         dispatch_async(dispatch_get_main_queue(), ^{
+            weakSelf.isResolvingLocation = NO;
+            weakSelf.relocateButton.enabled = YES;
+            [weakSelf.relocateButton setTitle:@"重定位" forState:UIControlStateNormal];
             if (error || placemarks.count == 0) {
                 weakSelf.locationLabel.text = @"定位失败";
                 weakSelf.currentAddress = @"";
+                weakSelf.coordinate = kCLLocationCoordinate2DInvalid;
                 [weakSelf updateConfirmButtonState];
                 return;
             }
@@ -583,7 +673,10 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
 #pragma mark - Confirm
 
 - (void)updateConfirmButtonState {
-    BOOL enabled = (self.photos.count >= 2 && self.currentAddress.length > 0);
+    BOOL hasValidCoordinate = CLLocationCoordinate2DIsValid(self.coordinate) &&
+                              fabs(self.coordinate.latitude) > 0.000001 &&
+                              fabs(self.coordinate.longitude) > 0.000001;
+    BOOL enabled = (self.photos.count >= 2 && self.currentAddress.length > 0 && hasValidCoordinate);
     self.confirmButton.enabled = enabled;
     self.confirmButton.alpha = enabled ? 1.0 : 0.4;
 }
