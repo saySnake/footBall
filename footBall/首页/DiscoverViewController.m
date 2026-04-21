@@ -198,16 +198,24 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
         _inputButton.layer.borderColor = [UIColor blackColor].CGColor;
         [_inputButton setImage:[UIImage imageNamed:@"edit_icon"] forState:UIControlStateNormal];
         _inputButton.tintColor = [UIColor colorWithRed:0.192 green:0.192 blue:0.192 alpha:1.0];
-        _inputButton.imageEdgeInsets = UIEdgeInsetsMake(0, -4, 0, 0);
+        _inputButton.semanticContentAttribute = UISemanticContentAttributeForceLeftToRight;
+        _inputButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
+        _inputButton.contentEdgeInsets = UIEdgeInsetsMake(0, 8, 0, 8);
+        _inputButton.imageEdgeInsets = UIEdgeInsetsMake(0, -2, 0, 2);
+        _inputButton.titleEdgeInsets = UIEdgeInsetsMake(0, 2, 0, -2);
 
         _verifiedPill = [UIButton buttonWithType:UIButtonTypeSystem];
         _verifiedPill.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
         _verifiedPill.layer.cornerRadius = 13;
         _verifiedPill.backgroundColor = kDiscoverPillGreen;
         [_verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-        [_verifiedPill setImage:[UIImage imageNamed:@"verified_icon"] forState:UIControlStateNormal];
+        [_verifiedPill setImage:[UIImage imageNamed:@"notphoto"] forState:UIControlStateNormal];
         _verifiedPill.tintColor = [UIColor whiteColor];
-        _verifiedPill.imageEdgeInsets = UIEdgeInsetsMake(0, -4, 0, 0);
+        _verifiedPill.semanticContentAttribute = UISemanticContentAttributeForceLeftToRight;
+        _verifiedPill.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
+        _verifiedPill.contentEdgeInsets = UIEdgeInsetsMake(0, 8, 0, 8);
+        _verifiedPill.imageEdgeInsets = UIEdgeInsetsMake(0, -2, 0, 2);
+        _verifiedPill.titleEdgeInsets = UIEdgeInsetsMake(0, 2, 0, -2);
 
         [card addSubview:_homeLogo];
         [card addSubview:_homeLabel];
@@ -223,10 +231,10 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
         [_homeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(card).offset(16);
             make.centerY.equalTo(_homeLogo);
-            make.width.mas_lessThanOrEqualTo(card.mas_width).multipliedBy(0.34);
+            make.width.mas_equalTo(80);
         }];
         [_homeLogo mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_homeLabel.mas_trailing).offset(8);
+            make.leading.equalTo(_homeLabel.mas_trailing).offset(7);
             make.top.equalTo(card).offset(14);
             make.width.height.mas_equalTo(24);
         }];
@@ -243,8 +251,9 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
             make.width.height.mas_equalTo(24);
         }];
         [_awayLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_awayLogo.mas_trailing).offset(6);
+            make.leading.equalTo(_awayLogo.mas_trailing).offset(8);
             make.centerY.equalTo(_homeLogo);
+            make.width.mas_lessThanOrEqualTo(80);
             make.trailing.lessThanOrEqualTo(card).offset(-16);
         }];
         // Figma 里“中间徽章”与客队队徽重叠/相邻，这里保留占位但隐藏，避免影响布局
@@ -1134,12 +1143,12 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
         [cell.verifiedPill setTitle:(NSLocalizedString(@"discover_verify_match", nil) ?: @"认证比赛") forState:UIControlStateNormal];
         cell.verifiedPill.backgroundColor = kDiscoverPillGreen;
         [cell.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-        [cell.verifiedPill setImage:[UIImage imageNamed:@"verified_icon"] forState:UIControlStateNormal];
+        [cell.verifiedPill setImage:[UIImage imageNamed:@"notphoto"] forState:UIControlStateNormal];
         cell.verifiedPill.tintColor = [UIColor whiteColor];
-        cell.dateLabel.textAlignment = NSTextAlignmentLeft;
+        cell.dateLabel.textAlignment = NSTextAlignmentCenter;
         [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(cell.scoreLabel);
-            make.top.equalTo(cell.scoreLabel.mas_bottom).offset(10);
+            make.centerX.equalTo(cell.scoreLabel);
+            make.top.equalTo(cell.scoreLabel.mas_bottom).offset(17);
         }];
         [cell.inputButton removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
         [cell.inputButton addTarget:self action:@selector(onInputInfoButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
@@ -1167,7 +1176,7 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
             [cell.verifiedPill setTitle:(NSLocalizedString(@"discover_verify_match", nil) ?: @"认证比赛") forState:UIControlStateNormal];
             cell.verifiedPill.backgroundColor = kDiscoverPillGreen;
             [cell.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-            [cell.verifiedPill setImage:[UIImage imageNamed:@"verified_icon"] forState:UIControlStateNormal];
+            [cell.verifiedPill setImage:[UIImage imageNamed:@"notphoto"] forState:UIControlStateNormal];
             cell.verifiedPill.tintColor = [UIColor whiteColor];
         }
         cell.dateLabel.textAlignment = NSTextAlignmentLeft;
