@@ -47,6 +47,27 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)getSelectableStampsSuccess:(nullable APISuccessBlock)success
                            failure:(nullable APIFailureBlock)failure;
 
+/// GET `/api/v1/stamps/{stampId}/detail` 邮票详情（图片、描述、获取日期、解锁条件、稀有度）
+- (void)getStampDetail:(NSString *)stampId
+               success:(nullable APISuccessBlock)success
+               failure:(nullable APIFailureBlock)failure;
+
+/// GET `/api/v1/stamps/quota` 邮票配额信息（已认证场次、已选邮票数、是否可添加、会员状态）
+- (void)getStampQuotaSuccess:(nullable APISuccessBlock)success
+                     failure:(nullable APIFailureBlock)failure;
+
+/// POST `/api/v1/stamps/select/{stampId}` 用户选择添加邮票；position 可选，格式 "1,5"
+- (void)selectStamp:(NSString *)stampId
+           position:(nullable NSString *)position
+            success:(nullable APISuccessBlock)success
+            failure:(nullable APIFailureBlock)failure;
+
+/// PUT `/api/v1/stamps/{stampId}/position` 更新邮票位置
+- (void)updateStampPosition:(NSString *)stampId
+                   position:(NSString *)position
+                    success:(nullable APISuccessBlock)success
+                    failure:(nullable APIFailureBlock)failure;
+
 
 @end
 

@@ -134,6 +134,14 @@ FOUNDATION_EXPORT NSString * const APIPathValueDeleteStamps(NSString *stampId);
 FOUNDATION_EXPORT NSString * const APIPathValueStampsCategories;
 /// 查看指定分类全部邮票（网格布局）
 FOUNDATION_EXPORT NSString * const APIPathValueStampsCategoryAll(NSString *categoryId);
+/// 获取邮票详情（图片、描述、获取日期、解锁条件、稀有度）
+FOUNDATION_EXPORT NSString * const APIPathValueStampDetail(NSString *stampId);
+/// 获取邮票配额信息（已认证场次、已选邮票数、是否可添加、会员状态）
+FOUNDATION_EXPORT NSString * const APIPathValueStampsQuota;
+/// POST 用户选择添加邮票
+FOUNDATION_EXPORT NSString * const APIPathValueStampsSelect(NSString *stampId);
+/// PUT 更新邮票位置
+FOUNDATION_EXPORT NSString * const APIPathValueStampPosition(NSString *stampId);
 #pragma mark - 关注模块
 /// POST关注用户 / DELETE取消关注用户
 FOUNDATION_EXPORT NSString * const APIPathValueFollowsUser(NSString *userId);
@@ -192,6 +200,8 @@ FOUNDATION_EXPORT NSString * const APIPathValueCommunityFriendData(NSString *fri
 FOUNDATION_EXPORT NSString * const APIPathValueMembershipPlans;
 /// Apple IAP收据验证并激活会员
 FOUNDATION_EXPORT NSString * const APIPathValueMembershipPurchase;
+/// 兑换码/礼包码兑换
+FOUNDATION_EXPORT NSString * const APIPathValueMembershipRedeem;
 /// 获取当前用户会员状态
 FOUNDATION_EXPORT NSString * const APIPathValueMembershipStatus;
 /// 获取会员权益列表

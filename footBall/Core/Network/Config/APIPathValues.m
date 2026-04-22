@@ -152,6 +152,16 @@ NSString * const APIPathValueStampsCategories = @"/api/v1/stamps/my-stamps";
 NSString * const APIPathValueStampsCategoryAll(NSString *categoryId) {
     return [NSString stringWithFormat:@"/api/v1/stamps/categories/%@/stamps",categoryId];
 }
+NSString * const APIPathValueStampDetail(NSString *stampId) {
+    return [NSString stringWithFormat:@"/api/v1/stamps/%@/detail",stampId];
+}
+NSString * const APIPathValueStampsQuota = @"/api/v1/stamps/quota";
+NSString * const APIPathValueStampsSelect(NSString *stampId) {
+    return [NSString stringWithFormat:@"/api/v1/stamps/select/%@",stampId];
+}
+NSString * const APIPathValueStampPosition(NSString *stampId) {
+    return [NSString stringWithFormat:@"/api/v1/stamps/%@/position",stampId];
+}
 
 #pragma mark - 关注模块
 NSString * const APIPathValueFollowsUser(NSString *userId) {
@@ -204,6 +214,7 @@ NSString * const APIPathValueCommunityFriendData(NSString *friendId) {
 #pragma mark - 会员模块
 NSString * const APIPathValueMembershipPlans = @"/api/v1/membership/plans";
 NSString * const APIPathValueMembershipPurchase = @"/api/v1/membership/purchase";
+NSString * const APIPathValueMembershipRedeem = @"/api/v1/membership/redeem";
 NSString * const APIPathValueMembershipStatus = @"/api/v1/membership/status";
 NSString * const APIPathValueMembershipBenefits = @"/api/v1/membership/benefits";
 NSString * const APIPathValueMembershipRecords = @"/api/v1/membership/records";

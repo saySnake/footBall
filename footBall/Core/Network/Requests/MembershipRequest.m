@@ -91,4 +91,21 @@
     }];
 }
 
+- (void)redeemCodeWithBody:(NSDictionary *)body success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    if (![body isKindOfClass:NSDictionary.class] || body.count == 0) {
+        if (failure) failure([NSError errorWithDomain:@"MembershipRequestErrorDomain" code:-1 userInfo:@{ NSLocalizedDescriptionKey: @"兑换码不能为空" }]);
+        return;
+    }
+    [[APIManager sharedManager] POST:APIPathValueMembershipRedeem parameters:body headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            responseObject.dataObject = responseObject.data;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
+
 @end
