@@ -265,16 +265,10 @@ static CGFloat const kMyTeamsGridSideInset = 14.f;
     }];
 
     UIButton *back = [UIButton buttonWithType:UIButtonTypeCustom];
+    /// 固定 nav_back，Original 不随主题染色
     UIImage *backImg = [UIImage imageNamed:@"nav_back"];
-    if (!backImg) {
-        backImg = [UIImage imageNamed:@"ad_left"];
-    }
-    if (!backImg && @available(iOS 13.0, *)) {
-        backImg = [UIImage systemImageNamed:@"arrow.left"];
-    }
     if (backImg) {
-        [back setImage:[backImg imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
-        back.tintColor = cm.textColor;
+        [back setImage:[backImg imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal] forState:UIControlStateNormal];
     }
     back.imageView.contentMode = UIViewContentModeScaleAspectFit;
     back.adjustsImageWhenHighlighted = NO;
@@ -288,7 +282,7 @@ static CGFloat const kMyTeamsGridSideInset = 14.f;
 
     self.navTitle = [UILabel new];
     self.navTitle.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
-    self.navTitle.textColor = cm.textColor;
+    self.navTitle.textColor = [UIColor blackColor];
     [navRow addSubview:self.navTitle];
     [self.navTitle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.center.equalTo(navRow);
@@ -375,6 +369,7 @@ static CGFloat const kMyTeamsGridSideInset = 14.f;
 - (void)updateLocalizedStrings {
     [super updateLocalizedStrings];
     self.navTitle.text = NSLocalizedString(@"profile_my_teams", nil);
+    self.navTitle.textColor = [UIColor blackColor];
     self.cardTitle.text = NSLocalizedString(@"profile_my_teams", nil);
     [self applySearchFieldPlaceholderStyle];
 }
