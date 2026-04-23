@@ -645,43 +645,67 @@ static UIColor *PassportCircleStrokeColor(void) {
     }];
 
     // 竖向分隔线：逐段补齐每个胶囊之间
-    // x=1h（matches 跨2列，故从 y=2h 往下画）
+    // x=1h（第三行左侧为跨列胶囊，不穿过该行；从 y=3h 往下）
     UIView *v1 = [self newLine];
     [self addSubview:v1];
     [v1 mas_makeConstraints:^(MASConstraintMaker *make) {
         make.width.mas_equalTo(lineW);
         make.left.equalTo(self).offset(wh);
-        make.top.equalTo(self).offset(wh * 2);
+        make.top.equalTo(self).offset(wh * 3);
         make.bottom.equalTo(self);
     }];
 
-    // x=2h（从 y=1h 往下）
-    UIView *v2 = [self newLine];
-    [self addSubview:v2];
-    [v2 mas_makeConstraints:^(MASConstraintMaker *make) {
+    // x=2h（第三行左侧为跨列胶囊，分段绘制：y=1~2 与 y=3~5）
+    UIView *v2Top = [self newLine];
+    [self addSubview:v2Top];
+    [v2Top mas_makeConstraints:^(MASConstraintMaker *make) {
         make.width.mas_equalTo(lineW);
         make.left.equalTo(self).offset(wh * 2);
         make.top.equalTo(self).offset(wh);
+        make.height.mas_equalTo(wh);
+    }];
+    UIView *v2Bottom = [self newLine];
+    [self addSubview:v2Bottom];
+    [v2Bottom mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.width.mas_equalTo(lineW);
+        make.left.equalTo(self).offset(wh * 2);
+        make.top.equalTo(self).offset(wh * 3);
         make.bottom.equalTo(self);
     }];
 
-    // x=3h（从 y=1h 往下）
-    UIView *v3 = [self newLine];
-    [self addSubview:v3];
-    [v3 mas_makeConstraints:^(MASConstraintMaker *make) {
+    // x=3h（第三行为胶囊，分段绘制：y=1~2 与 y=3~5）
+    UIView *v3Top = [self newLine];
+    [self addSubview:v3Top];
+    [v3Top mas_makeConstraints:^(MASConstraintMaker *make) {
         make.width.mas_equalTo(lineW);
         make.left.equalTo(self).offset(wh * 3);
         make.top.equalTo(self).offset(wh);
+        make.height.mas_equalTo(wh);
+    }];
+    UIView *v3Bottom = [self newLine];
+    [self addSubview:v3Bottom];
+    [v3Bottom mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.width.mas_equalTo(lineW);
+        make.left.equalTo(self).offset(wh * 3);
+        make.top.equalTo(self).offset(wh * 3);
         make.bottom.equalTo(self);
     }];
 
-    // x=4h（从 y=1h 往下）
-    UIView *v4 = [self newLine];
-    [self addSubview:v4];
-    [v4 mas_makeConstraints:^(MASConstraintMaker *make) {
+    // x=4h（第三行为胶囊，分段绘制：y=1~2 与 y=3~5）
+    UIView *v4Top = [self newLine];
+    [self addSubview:v4Top];
+    [v4Top mas_makeConstraints:^(MASConstraintMaker *make) {
         make.width.mas_equalTo(lineW);
         make.left.equalTo(self).offset(wh * 4);
         make.top.equalTo(self).offset(wh);
+        make.height.mas_equalTo(wh);
+    }];
+    UIView *v4Bottom = [self newLine];
+    [self addSubview:v4Bottom];
+    [v4Bottom mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.width.mas_equalTo(lineW);
+        make.left.equalTo(self).offset(wh * 4);
+        make.top.equalTo(self).offset(wh * 3);
         make.bottom.equalTo(self);
     }];
 
