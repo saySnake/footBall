@@ -201,16 +201,10 @@ static CGFloat const kAddTeamCheckBadgeD = 24.f;
     }];
 
     UIButton *back = [UIButton buttonWithType:UIButtonTypeCustom];
+    /// 固定 nav_back，Original 不随主题染色
     UIImage *backImg = [UIImage imageNamed:@"nav_back"];
-    if (!backImg) {
-        backImg = [UIImage imageNamed:@"ad_left"];
-    }
-    if (!backImg && @available(iOS 13.0, *)) {
-        backImg = [UIImage systemImageNamed:@"arrow.left"];
-    }
     if (backImg) {
-        [back setImage:[backImg imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
-        back.tintColor = cm.textColor;
+        [back setImage:[backImg imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal] forState:UIControlStateNormal];
     }
     back.imageView.contentMode = UIViewContentModeScaleAspectFit;
     back.adjustsImageWhenHighlighted = NO;
@@ -224,7 +218,7 @@ static CGFloat const kAddTeamCheckBadgeD = 24.f;
 
     self.navTitle = [UILabel new];
     self.navTitle.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
-    self.navTitle.textColor = cm.textColor;
+    self.navTitle.textColor = [UIColor blackColor];
     [navRow addSubview:self.navTitle];
     [self.navTitle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(navRow);
@@ -337,6 +331,7 @@ static CGFloat const kAddTeamCheckBadgeD = 24.f;
 - (void)updateLocalizedStrings {
     [super updateLocalizedStrings];
     self.navTitle.text = NSLocalizedString(@"profile_add_team_title", nil);
+    self.navTitle.textColor = [UIColor blackColor];
     [self applySearchFieldPlaceholderStyle];
     [self.confirmBtn setTitle:NSLocalizedString(@"confirm", nil) forState:UIControlStateNormal];
 }
