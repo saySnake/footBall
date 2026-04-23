@@ -11,6 +11,7 @@
 #import "MatchRequest.h"
 #import "APIError.h"
 #import <QMUIKit/QMUITips.h>
+#import <SDWebImage/SDWebImage.h>
 
 #define kHeaderGreen [UIColor colorWithRed:0.05 green:0.13 blue:0.13 alpha:1.0]
 #define kCardDarkerGreen [UIColor colorWithRed:0.17 green:0.42 blue:0.34 alpha:1.0]
@@ -637,6 +638,13 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     awayIcon.clipsToBounds = YES;
     UIImage *placeImg = [UIImage imageNamed:kLogoPlaceholder];
     if (placeImg) { homeIcon.image = placeImg; awayIcon.image = placeImg; }
+    // 加载球队 Logo（圆角已通过 cornerRadius + clipsToBounds 设置）
+    if (m.homeTeamLogo.length > 0) {
+        [homeIcon sd_setImageWithURL:[NSURL URLWithString:m.homeTeamLogo] placeholderImage:placeImg];
+    }
+    if (m.awayTeamLogo.length > 0) {
+        [awayIcon sd_setImageWithURL:[NSURL URLWithString:m.awayTeamLogo] placeholderImage:placeImg];
+    }
     NSString *homeScore = [NSString stringWithFormat:@"%ld", (long)m.homeScore];
     NSString *awayScore = [NSString stringWithFormat:@"%ld", (long)m.awayScore];
     UILabel *homeL = [[UILabel alloc] init];

@@ -71,6 +71,9 @@ static NSArray<NSString *> *PNStringArray(id value) {
                             success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
             [VerificationRequest applyVerificationStatusData:responseObject.data];
+#if DEBUG
+            NSLog(@"[VerifDebug] status response: %@", responseObject.data);
+#endif
             if (success) success(responseObject);
         } else {
             if (failure) failure([APIError errorWithResponse:responseObject]);

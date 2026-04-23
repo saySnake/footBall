@@ -442,6 +442,10 @@ static BOOL IAStatusNeedsRetry(NSString *s) {
     [super viewWillAppear:animated];
     __weak typeof(self) weakSelf = self;
     if (AuthManager.sharedManager.isLoggedIn) {
+        // 先清空旧缓存，避免显示过期的认证状态
+        [VerificationRequest shared].cachedVerificationStatus = nil;
+        [self refreshVerificationUI];
+
         [[VerificationRequest shared] fetchStatusSuccess:^(HTTPResponse * _Nullable responseObject) {
             [[VerificationRequest shared] fetchRealnameInfoSuccess:^(HTTPResponse * _Nullable responseObject) {
             } failure:^(NSError * _Nonnull error) {
