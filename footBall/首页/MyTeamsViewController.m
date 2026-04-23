@@ -62,6 +62,7 @@ static CGFloat const kMyTeamsGridSideInset = 14.f;
         _nameLabel.numberOfLines = 2;
 
         _removeBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        // UI 稿：黑色实心圆 + 白色 × 号，优先用图片资源，没有则用代码绘制
         UIImage *rmImg = [UIImage imageNamed:@"set_delete"];
         if (!rmImg) rmImg = [UIImage imageNamed:@"team_removed"];
         if (rmImg) {
@@ -69,14 +70,19 @@ static CGFloat const kMyTeamsGridSideInset = 14.f;
             [_removeBtn setImage:rmImg forState:UIControlStateNormal];
             _removeBtn.imageView.contentMode = UIViewContentModeScaleAspectFit;
         } else {
+            // 代码绘制：黑色实心圆 + 白色 × 号
             _removeBtn.backgroundColor = [UIColor blackColor];
-            _removeBtn.layer.cornerRadius = 7;
+            _removeBtn.layer.cornerRadius = 8;
             _removeBtn.clipsToBounds = YES;
             if (@available(iOS 13.0, *)) {
-                UIImageConfiguration *symCfg = [UIImageSymbolConfiguration configurationWithPointSize:8 weight:UIImageSymbolWeightBold];
-                UIImage *img = [UIImage systemImageNamed:@"xmark" withConfiguration:symCfg];
-                [_removeBtn setImage:[img imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+                UIImageSymbolConfiguration *symCfg = [UIImageSymbolConfiguration configurationWithPointSize:7 weight:UIImageSymbolWeightBold];
+                UIImage *img = [[UIImage systemImageNamed:@"xmark" withConfiguration:symCfg] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+                [_removeBtn setImage:img forState:UIControlStateNormal];
                 _removeBtn.tintColor = [UIColor whiteColor];
+            } else {
+                [_removeBtn setTitle:@"×" forState:UIControlStateNormal];
+                [_removeBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+                _removeBtn.titleLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightBold];
             }
         }
         [_removeBtn addTarget:self action:@selector(onRemoveTapped) forControlEvents:UIControlEventTouchUpInside];
@@ -102,12 +108,14 @@ static CGFloat const kMyTeamsGridSideInset = 14.f;
             [_removeBtn mas_makeConstraints:^(MASConstraintMaker *make) {
                 make.centerX.equalTo(_circleBg.mas_centerX).offset(d);
                 make.centerY.equalTo(_circleBg.mas_centerY).offset(-d);
-                make.size.mas_equalTo(CGSizeMake(18, 18));
+                make.size.mas_equalTo(CGSizeMake(16, 16));
             }];
         }
         [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(_circleBg.mas_bottom).offset(4);
-            make.leading.trailing.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 2, 0, 2));
+            make.centerX.equalTo(self.contentView);
+            make.leading.greaterThanOrEqualTo(self.contentView).offset(2);
+            make.trailing.lessThanOrEqualTo(self.contentView).offset(-2);
         }];
     }
     return self;
@@ -119,13 +127,14 @@ static CGFloat const kMyTeamsGridSideInset = 14.f;
 
 - (void)configureWithAPITeam:(Team *)team isAdd:(BOOL)isAdd {
     if (isAdd) {
-        self.nameLabel.text = NSLocalizedString(@"profile_add_team", nil);
+        self.nameLabel.text = NSLocalizedString(@"profile_add_team", nil) ?: @"添加";
         self.removeBtn.hidden = YES;
-        self.circleBg.backgroundColor = [UIColor colorWithWhite:0.92 alpha:1.0];
+        self.circleBg.backgroundColor = [UIColor colorWithRed:239/255.0 green:239/255.0 blue:239/255.0 alpha:1.0];
         [self.iconView sd_cancelCurrentImageLoad];
         if (@available(iOS 13.0, *)) {
-            self.iconView.image = [UIImage systemImageNamed:@"plus"];
-            self.iconView.tintColor = [UIColor colorWithWhite:0.55 alpha:1.0];
+            UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:20 weight:UIImageSymbolWeightRegular];
+            self.iconView.image = [[UIImage systemImageNamed:@"plus" withConfiguration:cfg] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+            self.iconView.tintColor = [UIColor blackColor];
         }
         return;
     }
@@ -172,14 +181,12 @@ static CGFloat const kMyTeamsGridSideInset = 14.f;
     self.hidesBottomBarWhenPushed = YES;
     [super viewDidLoad];
     self.shouldShowNavigationBar = NO;
+    // UI 稿页面背景为白色
     self.view.backgroundColor = kMyTeamsPageBg;
 }
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
-    if (self.topGradientLayer && self.gradientHostView) {
-        self.topGradientLayer.frame = self.gradientHostView.bounds;
-    }
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -233,19 +240,7 @@ static CGFloat const kMyTeamsGridSideInset = 14.f;
 - (void)setupUI {
     ColorManager *cm = [ColorManager sharedManager];
 
-    self.gradientHostView = [UIView new];
-    self.gradientHostView.backgroundColor = [UIColor clearColor];
-    self.gradientHostView.userInteractionEnabled = NO;
-    [self.view addSubview:self.gradientHostView];
-    [self.gradientHostView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.leading.trailing.equalTo(self.view);
-        make.height.mas_equalTo(kMyTeamsTopGradientH);
-    }];
-    self.topGradientLayer = [CAGradientLayer layer];
-    self.topGradientLayer.colors = @[(id)[UIColor whiteColor].CGColor, (id)kMyTeamsPageBg.CGColor];
-    self.topGradientLayer.startPoint = CGPointMake(0.5, 0);
-    self.topGradientLayer.endPoint = CGPointMake(0.5, 1);
-    [self.gradientHostView.layer addSublayer:self.topGradientLayer];
+    // UI 稿无顶部渐变，直接白色背景
 
     UIView *nav = [UIView new];
     nav.backgroundColor = [UIColor clearColor];
@@ -277,7 +272,7 @@ static CGFloat const kMyTeamsGridSideInset = 14.f;
     [back mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(navRow).offset(16);
         make.centerY.equalTo(navRow);
-        make.size.mas_equalTo(CGSizeMake(44, 44));
+        make.size.mas_equalTo(CGSizeMake(24, 44));
     }];
 
     self.navTitle = [UILabel new];
@@ -288,8 +283,9 @@ static CGFloat const kMyTeamsGridSideInset = 14.f;
         make.center.equalTo(navRow);
     }];
 
+    // 搜索框：UI 稿浅灰圆角胶囊 #EFEFEF
     UIView *searchPill = [UIView new];
-    searchPill.backgroundColor = kMyTeamsSearchFill;
+    searchPill.backgroundColor = [UIColor colorWithRed:239/255.0 green:239/255.0 blue:239/255.0 alpha:1.0];
     searchPill.layer.cornerRadius = kMyTeamsSearchH / 2.0;
     searchPill.clipsToBounds = YES;
     [self.view addSubview:searchPill];
@@ -327,9 +323,10 @@ static CGFloat const kMyTeamsGridSideInset = 14.f;
         make.height.mas_equalTo(32);
     }];
 
+    // card：UI 稿白色圆角卡片
     self.card = [UIView new];
-    self.card.backgroundColor = kCardBg;
-    self.card.layer.cornerRadius = kMyTeamsCardCorner;
+    self.card.backgroundColor = [UIColor whiteColor];
+    self.card.layer.cornerRadius = 12;
     self.card.clipsToBounds = YES;
     [self.view addSubview:self.card];
     [self.card mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -345,13 +342,13 @@ static CGFloat const kMyTeamsGridSideInset = 14.f;
     [self.card addSubview:self.cardTitle];
     [self.cardTitle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.card).offset(16);
-        make.leading.equalTo(self.card).offset(15);
+        make.leading.equalTo(self.card).offset(14);
     }];
 
     UICollectionViewFlowLayout *fl = [UICollectionViewFlowLayout new];
-    fl.minimumInteritemSpacing = 0;
-    fl.minimumLineSpacing = 0;
-    fl.sectionInset = UIEdgeInsetsMake(8, kMyTeamsGridSideInset, 16, kMyTeamsGridSideInset);
+    fl.minimumInteritemSpacing = 30;
+    fl.minimumLineSpacing = 16;
+    fl.sectionInset = UIEdgeInsetsMake(8, 14, 16, 14);
 
     self.collectionView = [[UICollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:fl];
     self.collectionView.backgroundColor = [UIColor clearColor];
@@ -425,11 +422,9 @@ static CGFloat const kMyTeamsGridSideInset = 14.f;
 }
 
 - (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)layout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
-    // 原型：4 列
-    CGFloat w = collectionView.bounds.size.width;
-    NSInteger col = 4;
-    CGFloat itemW = floor(w / col);
-    /// Figma 行高约 89pt（54 图标 + 文案区）
+    // 左右各 14，4 列，相邻间距 30
+    // cell 宽 = (总宽 - 14 - 14 - 30×3) / 4
+    CGFloat itemW = floor((collectionView.bounds.size.width - 14 - 14 - 30 * 3) / 4.0);
     return CGSizeMake(itemW, 89);
 }
 

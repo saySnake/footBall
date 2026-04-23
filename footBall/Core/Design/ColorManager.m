@@ -201,11 +201,7 @@
 #pragma mark - 文本颜色
 
 - (UIColor *)textColor {
-    if (@available(iOS 13.0, *)) {
-        return [UIColor labelColor];
-    } else {
-        return [UIColor blackColor];
-    }
+    return [UIColor blackColor];
 }
 
 - (UIColor *)secondaryTextColor {

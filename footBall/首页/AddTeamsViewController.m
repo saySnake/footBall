@@ -87,13 +87,15 @@ static CGFloat const kAddTeamCheckBadgeD = 24.f;
             make.center.equalTo(_outerCircle);
             make.size.mas_equalTo(CGSizeMake(kAddTeamLogoD, kAddTeamLogoD));
         }];
-        /// 选中角标中心落在外圈圆周（右上 45°），一半在圆内一半在圆外
+        /// 选中角标完全在外圈圆外（右上角），中心距圆心 = 半径 + 角标半径/2
         {
             CGFloat r = kAddTeamOuterD / 2.f;
-            CGFloat d = (CGFloat)(r / sqrt(2.0));
+            CGFloat badgeR = kAddTeamCheckBadgeD / 2.f;
+            // 沿右上 45° 方向，向里 2pt
+            CGFloat offset = (CGFloat)((r + badgeR - 2) / sqrt(2.0));
             [_checkBadge mas_makeConstraints:^(MASConstraintMaker *make) {
-                make.centerX.equalTo(_outerCircle.mas_centerX).offset(d);
-                make.centerY.equalTo(_outerCircle.mas_centerY).offset(-d);
+                make.centerX.equalTo(_outerCircle.mas_centerX).offset(offset);
+                make.centerY.equalTo(_outerCircle.mas_centerY).offset(-offset);
                 make.size.mas_equalTo(CGSizeMake(kAddTeamCheckBadgeD, kAddTeamCheckBadgeD));
             }];
         }
@@ -148,6 +150,7 @@ static CGFloat const kAddTeamCheckBadgeD = 24.f;
 @property (nonatomic, strong) UITextField *searchField;
 @property (nonatomic, strong) UICollectionView *collectionView;
 @property (nonatomic, strong) UIButton *confirmBtn;
+@property (nonatomic, strong) UIButton *cancelBtn;
 
 @property (nonatomic, strong) NSArray<Team *> *allTeams;
 @property (nonatomic, strong) NSMutableSet<NSString *> *selectedIds;
@@ -213,7 +216,7 @@ static CGFloat const kAddTeamCheckBadgeD = 24.f;
     [back mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(navRow).offset(16);
         make.centerY.equalTo(navRow);
-        make.size.mas_equalTo(CGSizeMake(44, 44));
+        make.size.mas_equalTo(CGSizeMake(24, 44));
     }];
 
     self.navTitle = [UILabel new];
@@ -275,6 +278,17 @@ static CGFloat const kAddTeamCheckBadgeD = 24.f;
         make.height.mas_equalTo(kAddTeamsBottomBtnH);
     }];
 
+    // 取消按钮（左侧，灰色背景）
+    self.cancelBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.cancelBtn.backgroundColor = [UIColor colorWithRed:239/255.0 green:239/255.0 blue:239/255.0 alpha:1.0];
+    self.cancelBtn.layer.cornerRadius = bottomCorner;
+    self.cancelBtn.clipsToBounds = YES;
+    self.cancelBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    [self.cancelBtn setTitleColor:[UIColor colorWithRed:0.2 green:0.2 blue:0.2 alpha:1.0] forState:UIControlStateNormal];
+    [self.cancelBtn addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
+    [bottom addSubview:self.cancelBtn];
+
+    // 确定按钮（右侧，深绿色背景）
     self.confirmBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     self.confirmBtn.backgroundColor = kGreen;
     self.confirmBtn.layer.cornerRadius = bottomCorner;
@@ -284,8 +298,13 @@ static CGFloat const kAddTeamCheckBadgeD = 24.f;
     [self.confirmBtn addTarget:self action:@selector(onConfirmTapped) forControlEvents:UIControlEventTouchUpInside];
     [bottom addSubview:self.confirmBtn];
 
-    [self.confirmBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+    [self.cancelBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(bottom).offset(kAddTeamsPadding);
+        make.trailing.equalTo(bottom.mas_centerX).offset(-6);
+        make.top.bottom.equalTo(bottom);
+    }];
+    [self.confirmBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(bottom.mas_centerX).offset(6);
         make.trailing.equalTo(bottom).offset(-kAddTeamsPadding);
         make.top.bottom.equalTo(bottom);
     }];
@@ -333,7 +352,8 @@ static CGFloat const kAddTeamCheckBadgeD = 24.f;
     self.navTitle.text = NSLocalizedString(@"profile_add_team_title", nil);
     self.navTitle.textColor = [UIColor blackColor];
     [self applySearchFieldPlaceholderStyle];
-    [self.confirmBtn setTitle:NSLocalizedString(@"confirm", nil) forState:UIControlStateNormal];
+    [self.cancelBtn setTitle:NSLocalizedString(@"cancel", nil) ?: @"取消" forState:UIControlStateNormal];
+    [self.confirmBtn setTitle:NSLocalizedString(@"confirm", nil) ?: @"确定" forState:UIControlStateNormal];
 }
 
 - (void)onBack { [self.navigationController popViewControllerAnimated:YES]; }
