@@ -799,8 +799,47 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
 }
 
 - (void)fetchScheduleMatches {
-    [[MatchRequest shared] getMatchScheduleWithDate:nil myTeamOnly:NO page:1 pageSize:50 success:^(HTTPResponse<NSArray<Match *> *> * _Nullable responseObject) {
+    // date 是必填参数，传今天日期；myTeamOnly=YES 只显示关注球队的比赛
+    NSDateFormatter *dateFmt = [[NSDateFormatter alloc] init];
+    dateFmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    dateFmt.dateFormat = @"yyyy-MM-dd";
+    NSString *todayStr = [dateFmt stringFromDate:[NSDate date]];
+
+    __weak typeof(self) weakSelf = self;
+    [[MatchRequest shared] getMatchScheduleWithDate:todayStr myTeamOnly:YES page:1 pageSize:50 success:^(HTTPResponse<NSArray<Match *> *> * _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
         NSArray<Match *> *list = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+        // 如果今天没有比赛，尝试不限日期（传当月第一天）
+        if (list.count == 0) {
+            NSDateFormatter *monthFmt = [[NSDateFormatter alloc] init];
+            monthFmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+            monthFmt.dateFormat = @"yyyy-MM-01";
+            NSString *monthStart = [monthFmt stringFromDate:[NSDate date]];
+            [[MatchRequest shared] getMatchScheduleWithDate:monthStart myTeamOnly:YES page:1 pageSize:50 success:^(HTTPResponse<NSArray<Match *> *> * _Nullable r2) {
+                __strong typeof(weakSelf) self = weakSelf;
+                if (!self) return;
+                NSArray<Match *> *list2 = [r2.dataObject isKindOfClass:NSArray.class] ? r2.dataObject : @[];
+                NSArray<Match *> *sorted = [list2 sortedArrayUsingComparator:^NSComparisonResult(Match *a, Match *b) {
+                    NSDate *da = [self dateFromRaw:a.matchDate];
+                    NSDate *db = [self dateFromRaw:b.matchDate];
+                    if (!da && !db) return NSOrderedSame;
+                    if (!da) return NSOrderedDescending;
+                    if (!db) return NSOrderedAscending;
+                    return [db compare:da];
+                }];
+                self.dataSource = sorted.mutableCopy;
+                [self filterData];
+                [self updateTableHeight];
+            } failure:^(NSError * _Nonnull error) {
+                __strong typeof(weakSelf) self = weakSelf;
+                if (!self) return;
+                self.dataSource = NSMutableArray.array;
+                [self filterData];
+                [self updateTableHeight];
+            }];
+            return;
+        }
         NSArray<Match *> *sorted = [list sortedArrayUsingComparator:^NSComparisonResult(Match *a, Match *b) {
             NSDate *da = [self dateFromRaw:a.matchDate];
             NSDate *db = [self dateFromRaw:b.matchDate];
@@ -813,6 +852,8 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
         [self filterData];
         [self updateTableHeight];
     } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
         self.dataSource = NSMutableArray.array;
         [self filterData];
         [self updateTableHeight];
@@ -826,12 +867,29 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     }];
 }
 - (void)fetchFollowTeams {
+    __weak typeof(self) weakSelf = self;
     [TeamsRequest.shared getFollowTeamIconsSuccess:^(HTTPResponse <NSArray <TeamIcon *> *>* _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
         self.teamItems = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+        // 默认选中第一个球队
+        TeamIcon *first = self.teamItems.firstObject;
+        self.selectedTeamId = first.teamId;
         [self.teamCollectionView reloadData];
+        // 选中后滚动到第一个
+        if (self.teamItems.count > 0) {
+            [self.teamCollectionView scrollToItemAtIndexPath:[NSIndexPath indexPathForItem:0 inSection:0]
+                                           atScrollPosition:UICollectionViewScrollPositionLeft
+                                                   animated:NO];
+        }
+        [self filterData];
     } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
         self.teamItems = @[];
+        self.selectedTeamId = nil;
         [self.teamCollectionView reloadData];
+        [self filterData];
     }];
 }
 - (void)refreshUserProfile {
