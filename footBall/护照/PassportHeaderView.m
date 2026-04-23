@@ -336,16 +336,16 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
             make.width.height.mas_equalTo(_circleLblWH);
             make.centerX.equalTo(view).multipliedBy((2*i+1)/3.0);
         }];
-        if (i>0) {
-            UIView *line = [self newLine];
-            [view addSubview:line];
-            [line mas_makeConstraints:^(MASConstraintMaker *make) {
-                make.height.equalTo(view);
-                make.top.bottom.equalTo(view);
-                make.width.equalTo(@0.25);
-                make.right.equalTo(lbl.mas_left);
-            }];
-        }
+    }
+    // 金钱胶囊上方 3 个圆：补齐 2 条分隔竖线，保证每个圆之间都可见
+    for (int col = 1; col <= 2; col++) {
+        UIView *line = [self newLine];
+        [view addSubview:line];
+        [line mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.bottom.equalTo(view);
+            make.width.equalTo(@0.5);
+            make.left.equalTo(view).offset(_circleLblWH * col);
+        }];
     }
     return view;
 }
