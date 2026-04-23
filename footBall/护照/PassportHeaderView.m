@@ -133,10 +133,10 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
             make.top.equalTo(self.lineChartView.mas_bottom).offset(-0.25);
         }];
         [self.moneyView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.left.equalTo(self.nothingView);
             make.right.equalTo(self.topView);
             make.top.equalTo(self.nothingView.mas_bottom);
-            make.height.equalTo(@(_circleLblWH));
-            make.left.equalTo(self.nothingView);
+            make.bottom.equalTo(self.topView).offset(-_circleLblWH);
         }];
         [self.globalMapView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.equalTo(self.topView);
