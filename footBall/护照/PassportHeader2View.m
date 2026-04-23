@@ -598,6 +598,18 @@ static UIColor *PassportCircleStrokeColor(void) {
         make.left.right.equalTo(self);
     }];
 
+    // 顶排 8 个圆之间的竖线（只覆盖 y=0~1h）
+    for (int col = 1; col <= 7; col++) {
+        UIView *vTop = [self newLine];
+        [self addSubview:vTop];
+        [vTop mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.width.mas_equalTo(lineW);
+            make.left.equalTo(self).offset(wh * col);
+            make.top.equalTo(self);
+            make.height.mas_equalTo(wh);
+        }];
+    }
+
     UIView *h2Left = [self newLine]; // y=2h（左侧到第5列）
     [self addSubview:h2Left];
     [h2Left mas_makeConstraints:^(MASConstraintMaker *make) {
