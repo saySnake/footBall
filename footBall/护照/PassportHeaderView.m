@@ -432,14 +432,14 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
         make.left.right.equalTo(self.topView);
     }];
 
-    // ── 横线2: y=3h, x=5h~7h（黄绿之间，从竖线A到竖线B，不穿过地图） ──
+    // ── 横线2: y=3h, 从竖线A贯穿到最右边（位于金钱胶囊上方） ──
     UIView *horLine_yg = [self newLine];
     [self.topView addSubview:horLine_yg];
     [horLine_yg mas_makeConstraints:^(MASConstraintMaker *make) {
         make.height.equalTo(@0.5);
         make.top.equalTo(self.topView).offset(h * 3);
         make.left.equalTo(userInfoView.mas_right);
-        make.right.equalTo(self.topView).offset(-h);
+        make.right.equalTo(self.topView);
     }];
 
     // ── 横线3: y=4h, 全宽（行3 底部） ──
