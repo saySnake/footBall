@@ -558,63 +558,150 @@ static UIColor *PassportCircleStrokeColor(void) {
 
 - (void)addLines{
     CGFloat wh = self.circleWH;
+    CGFloat lineW = 0.5;
+
+    // 外框（下半部分也统一有边）
     UIView *leftLine = [self newLine];
     [self addSubview:leftLine];
     [leftLine mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.width.equalTo(@0.25);
-        make.left.equalTo(self);
-        make.top.equalTo(@(wh));
-        make.bottom.equalTo(@(0));
+        make.width.mas_equalTo(lineW);
+        make.left.top.bottom.equalTo(self);
+    }];
+
+    UIView *rightLine = [self newLine];
+    [self addSubview:rightLine];
+    [rightLine mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.width.mas_equalTo(lineW);
+        make.right.top.bottom.equalTo(self);
     }];
 
     UIView *topLine = [self newLine];
     [self addSubview:topLine];
     [topLine mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.height.equalTo(@0.25);
-        make.top.equalTo(self);
-        make.left.equalTo(@(0));
-        make.right.equalTo(@(0));
+        make.height.mas_equalTo(lineW);
+        make.top.left.right.equalTo(self);
     }];
 
+    UIView *bottomLine = [self newLine];
+    [self addSubview:bottomLine];
+    [bottomLine mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.height.mas_equalTo(lineW);
+        make.bottom.left.right.equalTo(self);
+    }];
 
-    // 内部view之间的水平线
-    UIView *subHorLine1= [self newLine];
-    [self addSubview:subHorLine1];
-    [subHorLine1 mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.height.equalTo(@0.25);
-        make.top.equalTo(@(wh));
+    // 水平分隔线：按胶囊跨度分段，避免穿过跨行胶囊
+    UIView *h1 = [self newLine]; // y=1h（整行）
+    [self addSubview:h1];
+    [h1 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.height.mas_equalTo(lineW);
+        make.top.equalTo(self).offset(wh);
+        make.left.right.equalTo(self);
+    }];
+
+    UIView *h2Left = [self newLine]; // y=2h（左侧到第5列）
+    [self addSubview:h2Left];
+    [h2Left mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.height.mas_equalTo(lineW);
+        make.top.equalTo(self).offset(wh * 2);
         make.left.equalTo(self);
+        make.right.equalTo(self).offset(-wh * 3);
+    }];
+
+    UIView *h2Right = [self newLine]; // y=2h（最右第8列占位）
+    [self addSubview:h2Right];
+    [h2Right mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.height.mas_equalTo(lineW);
+        make.top.equalTo(self).offset(wh * 2);
+        make.left.equalTo(self).offset(wh * 7);
         make.right.equalTo(self);
     }];
 
-    UIView *subHorLine2= [self newLine];
-    [self addSubview:subHorLine2];
-    [subHorLine2 mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.height.equalTo(@0.25);
-        make.top.equalTo(subHorLine1.mas_bottom).offset(wh);
-        make.left.equalTo(self);
-        make.right.equalTo(self).offset(-3*wh);
+    UIView *h3 = [self newLine]; // y=3h（整行）
+    [self addSubview:h3];
+    [h3 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.height.mas_equalTo(lineW);
+        make.top.equalTo(self).offset(wh * 3);
+        make.left.right.equalTo(self);
     }];
 
-    UIView *subHorLine3= [self newLine];
-    [self addSubview:subHorLine3];
-    [subHorLine3 mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.height.equalTo(@0.25);
-        make.top.equalTo(subHorLine2.mas_bottom).offset(wh);
-        make.left.equalTo(self);
-        make.right.equalTo(self);
-    }];
-    UIView *subHorLine4= [self newLine];
-    [self addSubview:subHorLine4];
-    [subHorLine4 mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.height.equalTo(@0.25);
-        make.top.equalTo(subHorLine3.mas_bottom).offset(wh);
-        make.left.equalTo(self);
-        make.right.equalTo(self);
+    UIView *h4 = [self newLine]; // y=4h（整行）
+    [self addSubview:h4];
+    [h4 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.height.mas_equalTo(lineW);
+        make.top.equalTo(self).offset(wh * 4);
+        make.left.right.equalTo(self);
     }];
 
-    
-    // 内部view之间的垂直线
+    // 竖向分隔线：逐段补齐每个胶囊之间
+    // x=1h（matches 跨2列，故从 y=2h 往下画）
+    UIView *v1 = [self newLine];
+    [self addSubview:v1];
+    [v1 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.width.mas_equalTo(lineW);
+        make.left.equalTo(self).offset(wh);
+        make.top.equalTo(self).offset(wh * 2);
+        make.bottom.equalTo(self);
+    }];
+
+    // x=2h（从 y=1h 往下）
+    UIView *v2 = [self newLine];
+    [self addSubview:v2];
+    [v2 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.width.mas_equalTo(lineW);
+        make.left.equalTo(self).offset(wh * 2);
+        make.top.equalTo(self).offset(wh);
+        make.bottom.equalTo(self);
+    }];
+
+    // x=3h（从 y=1h 往下）
+    UIView *v3 = [self newLine];
+    [self addSubview:v3];
+    [v3 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.width.mas_equalTo(lineW);
+        make.left.equalTo(self).offset(wh * 3);
+        make.top.equalTo(self).offset(wh);
+        make.bottom.equalTo(self);
+    }];
+
+    // x=4h（从 y=1h 往下）
+    UIView *v4 = [self newLine];
+    [self addSubview:v4];
+    [v4 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.width.mas_equalTo(lineW);
+        make.left.equalTo(self).offset(wh * 4);
+        make.top.equalTo(self).offset(wh);
+        make.bottom.equalTo(self);
+    }];
+
+    // x=5h（从 y=2h 往下；上方为跨2行城市胶囊）
+    UIView *v5 = [self newLine];
+    [self addSubview:v5];
+    [v5 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.width.mas_equalTo(lineW);
+        make.left.equalTo(self).offset(wh * 5);
+        make.top.equalTo(self).offset(wh * 2);
+        make.bottom.equalTo(self);
+    }];
+
+    // x=6h（从 y=1h 往下）
+    UIView *v6 = [self newLine];
+    [self addSubview:v6];
+    [v6 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.width.mas_equalTo(lineW);
+        make.left.equalTo(self).offset(wh * 6);
+        make.top.equalTo(self).offset(wh);
+        make.bottom.equalTo(self);
+    }];
+
+    // x=7h（从 y=1h 往下）
+    UIView *v7 = [self newLine];
+    [self addSubview:v7];
+    [v7 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.width.mas_equalTo(lineW);
+        make.left.equalTo(self).offset(wh * 7);
+        make.top.equalTo(self).offset(wh);
+        make.bottom.equalTo(self);
+    }];
 }
 
 
