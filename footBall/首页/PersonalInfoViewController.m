@@ -342,6 +342,12 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
     }];
     self.nickLeft = [self addLeftLabelToCard:self.nickCard];
     self.nickField = [self addRightTextFieldToCard:self.nickCard];
+    // 昵称输入框：固定左边距为 50，右边距 16，宽度确定，避免首次成为响应者时内容显示不全
+    [self.nickField mas_remakeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.nickCard).offset(50);
+        make.trailing.equalTo(self.nickCard).offset(-16);
+        make.centerY.equalTo(self.nickCard);
+    }];
     prev = self.nickCard;
 
     // 手机号卡片（可编辑 TextField）
@@ -854,28 +860,42 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
 
     void (^putProfile)(void) = ^{
         void (^afterSaveOK)(void) = ^{
-            AuthManager.sharedManager.user.profile = p;
-            if (p.nickname.length > 0) {
-                AuthManager.sharedManager.user.nickname = p.nickname;
-            }
-            if (p.avatar.length > 0) {
-                AuthManager.sharedManager.user.avatar = p.avatar;
-            }
-            if (p.phone.length > 0) {
-                AuthManager.sharedManager.user.phone = p.phone;
-            }
-            [AuthManager.sharedManager saveUser];
-            [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
-            weakSelf.avatarNeedsUpload = NO;
-            [weakSelf.navigationController popViewControllerAnimated:YES];
-            [[LoadingManager sharedManager] showSuccess:NSLocalizedString(@"profile_save_success", nil)];
+            // 不直接用 p.avatar（可能是 objectKey），等服务端返回签名 URL 后再更新本地
+            [[UserRequest shared] getLoginUserInfoSuccess:^(HTTPResponse * _Nullable r2) {
+                // getLoginUserInfoSuccess 内部已更新 AuthManager.sharedManager.user.profile
+                if (p.nickname.length > 0) {
+                    AuthManager.sharedManager.user.nickname = p.nickname;
+                }
+                if (p.phone.length > 0) {
+                    AuthManager.sharedManager.user.phone = p.phone;
+                }
+                [AuthManager.sharedManager saveUser];
+                [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+                weakSelf.avatarNeedsUpload = NO;
+                [weakSelf.navigationController popViewControllerAnimated:YES];
+                [[LoadingManager sharedManager] showSuccess:NSLocalizedString(@"profile_save_success", nil)];
+            } failure:^(NSError * _Nonnull error) {
+                // 拉取失败时用本地数据兜底，但 avatar 保留原来的签名 URL
+                UserProfile *cur = AuthManager.sharedManager.user.profile;
+                if (cur) {
+                    cur.nickname = p.nickname;
+                    cur.gender = p.gender;
+                    cur.birthDate = p.birthDate;
+                    cur.firstWatchYear = p.firstWatchYear;
+                    cur.preferenceTags = p.preferenceTags;
+                    // 不覆盖 cur.avatar，保留原来的签名 URL
+                }
+                if (p.nickname.length > 0) AuthManager.sharedManager.user.nickname = p.nickname;
+                if (p.phone.length > 0) AuthManager.sharedManager.user.phone = p.phone;
+                [AuthManager.sharedManager saveUser];
+                [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+                weakSelf.avatarNeedsUpload = NO;
+                [weakSelf.navigationController popViewControllerAnimated:YES];
+                [[LoadingManager sharedManager] showSuccess:NSLocalizedString(@"profile_save_success", nil)];
+            }];
         };
         [[UserRequest shared] updateUserInfo:p success:^(HTTPResponse * _Nullable responseObject) {
-            [[UserRequest shared] getLoginUserInfoSuccess:^(HTTPResponse * _Nullable r2) {
-                afterSaveOK();
-            } failure:^(NSError * _Nonnull error) {
-                afterSaveOK();
-            }];
+            afterSaveOK();
         } failure:^(NSError * _Nonnull error) {
             [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
             NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"profile_save_fail", @"保存失败");

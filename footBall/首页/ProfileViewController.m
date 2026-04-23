@@ -235,7 +235,6 @@ static NSArray<NSString *> * _menuKeys(void) {
         self.stat3Num.text = @"0";
         self.apiFollowedTeams = @[];
         [self updateTeamsCardUI];
-        self.vipBadgeView.hidden = YES;
         return;
     }
 
@@ -297,7 +296,8 @@ static NSArray<NSString *> * _menuKeys(void) {
 - (BOOL)parseMembershipActiveFromPayload:(id)data {
     if ([data isKindOfClass:NSDictionary.class]) {
         NSDictionary *d = data;
-        id v = d[@"active"] ?: d[@"isActive"] ?: d[@"vip"] ?: d[@"isVip"] ?: d[@"valid"];
+        // 服务端 MembershipStatusVO 字段：isMember
+        id v = d[@"isMember"] ?: d[@"active"] ?: d[@"isActive"] ?: d[@"vip"] ?: d[@"isVip"] ?: d[@"valid"];
         if ([v isKindOfClass:NSNumber.class]) return [v boolValue];
         if ([v isKindOfClass:NSString.class]) {
             NSString *s = [(NSString *)v lowercaseString];

@@ -9,6 +9,10 @@
 #import <math.h>
 #import "AuthManager.h"
 #import "FontManager.h"
+#import "MembershipRequest.h"
+#import "MembershipModels.h"
+#import "LoadingManager.h"
+#import <MBProgressHUD/MBProgressHUD.h>
 
 #define kMCPageBg [UIColor colorWithRed:13/255.0 green:33/255.0 blue:34/255.0 alpha:1.0]
 #define kMCMint [UIColor colorWithRed:83/255.0 green:204/255.0 blue:158/255.0 alpha:1.0]
@@ -96,6 +100,10 @@
 @property (nonatomic, assign) NSInteger currentIndex;
 @property (nonatomic, assign) BOOL redeemDialogShowingSuccess;
 @property (nonatomic, assign) BOOL hasAppliedRedeemDiscount;
+/// 服务端返回的方案列表，用于获取 appleProductId 和 planId
+@property (nonatomic, strong) NSArray<PNMemberPlan *> *apiPlans;
+/// 当前会员状态
+@property (nonatomic, strong) PNMembershipStatus *membershipStatus;
 @end
 
 @implementation MembershipCenterViewController
@@ -109,6 +117,7 @@
     [self buildPlanData];
     [self setupUI];
     [self refreshUserProfile];
+    [self loadRemoteData];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -1051,6 +1060,76 @@
     return attr;
 }
 
+- (void)loadRemoteData {
+    __weak typeof(self) weakSelf = self;
+
+    // 加载会员方案列表，用价格和 appleProductId 更新本地 plans
+    [[MembershipRequest shared] getMembershipPlansSuccess:^(HTTPResponse * _Nullable responseObject) {
+        id raw = responseObject.dataObject ?: responseObject.data;
+        NSArray *list = nil;
+        if ([raw isKindOfClass:NSArray.class]) {
+            list = raw;
+        } else if ([raw isKindOfClass:NSDictionary.class]) {
+            id inner = ((NSDictionary *)raw)[@"list"] ?: ((NSDictionary *)raw)[@"data"];
+            if ([inner isKindOfClass:NSArray.class]) list = inner;
+        }
+        if (list.count == 0) return;
+        NSArray<PNMemberPlan *> *apiPlans = [NSArray yy_modelArrayWithClass:PNMemberPlan.class json:list];
+        weakSelf.apiPlans = apiPlans;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [weakSelf applyAPIPlansToUI:apiPlans];
+        });
+    } failure:^(NSError * _Nonnull error) {
+        // 接口失败时保留本地写死数据，不影响展示
+    }];
+
+    // 加载会员状态，更新 banner 标题
+    [[MembershipRequest shared] getMembershipStatusSuccess:^(HTTPResponse * _Nullable responseObject) {
+        id raw = responseObject.dataObject ?: responseObject.data;
+        PNMembershipStatus *status = [PNMembershipStatus yy_modelWithJSON:raw];
+        weakSelf.membershipStatus = status;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [weakSelf applyMembershipStatusToUI:status];
+        });
+    } failure:^(NSError * _Nonnull error) {
+    }];
+}
+
+/// 用服务端方案数据更新本地 MCPlan 的价格和 appleProductId
+- (void)applyAPIPlansToUI:(NSArray<PNMemberPlan *> *)apiPlans {
+    if (apiPlans.count == 0 || self.plans.count == 0) return;
+    // 按顺序映射：月卡→plans[0]，季卡→plans[1]，年卡/终身→plans[2/3]
+    // 服务端目前只有月卡、季卡、年卡三种，按 durationDays 排序
+    NSArray<PNMemberPlan *> *sorted = [apiPlans sortedArrayUsingComparator:^NSComparisonResult(PNMemberPlan *a, PNMemberPlan *b) {
+        return [@(a.durationDays) compare:@(b.durationDays)];
+    }];
+    for (NSInteger i = 0; i < (NSInteger)sorted.count && i < (NSInteger)self.plans.count; i++) {
+        PNMemberPlan *api = sorted[i];
+        MCPlan *local = self.plans[i];
+        if (api.price.length > 0) {
+            local.price = api.price;
+            local.payPrice = api.price;
+        }
+        if (api.name.length > 0) {
+            local.title = api.name;
+        }
+    }
+    [self reloadPlanCardsPreservingIndex];
+}
+
+/// 根据会员状态更新 banner 文案
+- (void)applyMembershipStatusToUI:(PNMembershipStatus *)status {
+    if (!status) return;
+    if (status.isMember && status.expireTime.length > 0) {
+        self.bannerTitleLabel.text = [NSString stringWithFormat:@"会员有效期至 %@",
+                                      [status.expireTime substringToIndex:MIN(10, status.expireTime.length)]];
+        if (status.nearExpiry) {
+            self.bannerSubLabel.text = @"即将到期，续费享优惠";
+            self.bannerSubLabel.textColor = [UIColor colorWithRed:1.0 green:0.8 blue:0.2 alpha:1.0];
+        }
+    }
+}
+
 - (void)refreshUserProfile {
     User *user = AuthManager.sharedManager.user;
     UserProfile *profile = user.profile;
@@ -1374,22 +1453,42 @@
     NSString *code = self.redeemInputField.text ?: @"";
     if (code.length < 5) return;
     [self.view endEditing:YES];
-    self.hasAppliedRedeemDiscount = YES;
-    self.redeemDialogShowingSuccess = YES;
-    self.redeemDialogTicketIconView.hidden = YES;
-    self.redeemInputWrapView.hidden = YES;
-    self.redeemHelpLabel.hidden = YES;
-    self.redeemSuccessWrapView.hidden = NO;
-    self.redeemSuccessTitleLabel.hidden = NO;
-    self.redeemSuccessDescLabel.hidden = NO;
-    [self reloadPlanCardsPreservingIndex];
-    [self refreshRedeemBannerState];
-    [self switchToGiftMode:NO];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.85 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        if (self.redeemDialogShowingSuccess) {
-            [self hideRedeemDialog];
-        }
-    });
+
+    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+    __weak typeof(self) weakSelf = self;
+    [[MembershipRequest shared] redeemCodeWithBody:@{@"code": code} success:^(HTTPResponse * _Nullable responseObject) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+            weakSelf.hasAppliedRedeemDiscount = YES;
+            weakSelf.redeemDialogShowingSuccess = YES;
+            weakSelf.redeemDialogTicketIconView.hidden = YES;
+            weakSelf.redeemInputWrapView.hidden = YES;
+            weakSelf.redeemHelpLabel.hidden = YES;
+            weakSelf.redeemSuccessWrapView.hidden = NO;
+            weakSelf.redeemSuccessTitleLabel.hidden = NO;
+            weakSelf.redeemSuccessDescLabel.hidden = NO;
+            [weakSelf reloadPlanCardsPreservingIndex];
+            [weakSelf refreshRedeemBannerState];
+            [weakSelf switchToGiftMode:NO];
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.85 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                if (weakSelf.redeemDialogShowingSuccess) {
+                    [weakSelf hideRedeemDialog];
+                }
+            });
+        });
+    } failure:^(NSError * _Nonnull error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+            NSString *msg = @"兑换失败";
+            if ([error isKindOfClass:[APIError class]]) {
+                APIError *ae = (APIError *)error;
+                if (ae.businessMessage.length) msg = ae.businessMessage;
+            }
+            weakSelf.redeemHelpLabel.text = [NSString stringWithFormat:@"%@ 点击寻求帮助", msg];
+            weakSelf.redeemHelpLabel.hidden = NO;
+            [weakSelf applyRedeemHelpLabelStyle];
+        });
+    }];
 }
 
 - (void)switchToGiftMode:(BOOL)giftMode {
@@ -1435,9 +1534,41 @@
         [self presentViewController:alert animated:YES completion:nil];
         return;
     }
+
+    // 找到当前方案对应的 appleProductId 和 planId
+    NSString *appleProductId = nil;
+    NSString *planId = nil;
+    if (self.apiPlans.count > (NSUInteger)self.currentIndex) {
+        // 按 durationDays 排序后取对应位置
+        NSArray<PNMemberPlan *> *sorted = [self.apiPlans sortedArrayUsingComparator:^NSComparisonResult(PNMemberPlan *a, PNMemberPlan *b) {
+            return [@(a.durationDays) compare:@(b.durationDays)];
+        }];
+        if ((NSUInteger)self.currentIndex < sorted.count) {
+            PNMemberPlan *api = sorted[self.currentIndex];
+            appleProductId = api.appleProductId;
+            planId = api.planId;
+        }
+    }
+
+    if (appleProductId.length == 0) {
+        // 没有 appleProductId，提示暂不支持
+        [[LoadingManager sharedManager] showError:@"该方案暂不支持购买" inView:self.view];
+        return;
+    }
+
+    // TODO: 接入 StoreKit，发起 IAP 购买
+    // 购买成功后调用：
+    // [[MembershipRequest shared] verifyPurchaseWithBody:@{
+    //     @"transactionId": transactionId,
+    //     @"signedTransaction": signedTransaction,
+    //     @"planId": planId,
+    //     @"agreementAccepted": @YES
+    // } success:^(...) { ... } failure:^(...) { ... }];
+
     MCPlan *plan = self.plans[self.currentIndex];
     NSString *pay = plan.payPrice.length ? plan.payPrice : plan.price;
-    NSString *msg = [NSString stringWithFormat:@"已选择 %@，支付金额 ¥%@", self.planTitleLabel.text ?: @"会员方案", pay];
+    NSString *msg = [NSString stringWithFormat:@"已选择 %@，支付金额 ¥%@\n（IAP 购买流程待接入）",
+                     self.planTitleLabel.text ?: @"会员方案", pay];
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"支付确认"
                                                                    message:msg
                                                             preferredStyle:UIAlertControllerStyleAlert];
@@ -1481,11 +1612,32 @@
     NSString *code = self.giftHiddenInput.text ?: @"";
     if (code.length < 5) return;
     [self.view endEditing:YES];
-    self.giftPromptLabel.hidden = YES;
-    self.giftCodeTapAreaBtn.hidden = YES;
-    self.giftRedeemBtn.hidden = YES;
-    self.giftSuccessWrap.hidden = NO;
-    self.giftSuccessLabel.hidden = NO;
+
+    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+    __weak typeof(self) weakSelf = self;
+    [[MembershipRequest shared] redeemCodeWithBody:@{@"code": code} success:^(HTTPResponse * _Nullable responseObject) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+            weakSelf.giftPromptLabel.hidden = YES;
+            weakSelf.giftCodeTapAreaBtn.hidden = YES;
+            weakSelf.giftRedeemBtn.hidden = YES;
+            weakSelf.giftSuccessWrap.hidden = NO;
+            weakSelf.giftSuccessLabel.hidden = NO;
+            weakSelf.giftSuccessLabel.text = @"兑换成功";
+            // 刷新会员状态
+            [weakSelf loadRemoteData];
+        });
+    } failure:^(NSError * _Nonnull error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+            NSString *msg = @"兑换失败，请检查礼包码";
+            if ([error isKindOfClass:[APIError class]]) {
+                APIError *ae = (APIError *)error;
+                if (ae.businessMessage.length) msg = ae.businessMessage;
+            }
+            [[LoadingManager sharedManager] showError:msg inView:weakSelf.view];
+        });
+    }];
 }
 
 - (void)onTapGiftCodeArea {

@@ -131,7 +131,7 @@ static NSArray<NSString *> *PNStringArray(id value) {
     }
     NSDictionary *params = @{
         @"workCertUrls": urls,
-        @"professionInfo": @""
+        @"professionInfo": @"职业认证"
     };
     [[APIManager sharedManager] POST:APIPathValueVerificationProfessional parameters:params headers:nil
                              success:^(HTTPResponse * _Nullable responseObject) {

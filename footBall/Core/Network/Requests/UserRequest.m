@@ -88,7 +88,20 @@
     }
     NSMutableDictionary *dict = NSMutableDictionary.dictionary;
     dict[@"nickname"] = user.nickname;
-    dict[@"avatar"] = user.avatar;
+    // avatar 可能是签名 URL（含 ?OSSAccessKeyId=... 等参数），需要去掉查询参数只保留路径部分
+    // 否则服务端 toObjectKey 会把查询参数也存进数据库，导致下次签名出错
+    NSString *avatarToSend = user.avatar;
+    if (avatarToSend.length > 0) {
+        NSURL *avatarURL = [NSURL URLWithString:avatarToSend];
+        if (avatarURL && avatarURL.query.length > 0) {
+            // 是带签名参数的完整 URL，去掉 query 只保留 scheme+host+path
+            NSURLComponents *components = [NSURLComponents componentsWithURL:avatarURL resolvingAgainstBaseURL:NO];
+            components.query = nil;
+            components.fragment = nil;
+            avatarToSend = components.URL.absoluteString ?: avatarToSend;
+        }
+    }
+    dict[@"avatar"] = avatarToSend;
     if (user.phone.length > 0) dict[@"phone"] = user.phone;
     dict[@"gender"] = @(user.gender);
     dict[@"birthDate"] = user.birthDate;
