@@ -375,12 +375,9 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
     // 行2:   globalMap(5列)    | nothingView(2列) | rygCard绿(1列)
     // 行3:   globalMap(5列)    | moneyView(3列，含rygCard列)
     // 行4:   totalWatchTimeView(8列)
-    //
-    // 线：外框4条 + 竖线A(x=5h,y=0~4h) + 竖线B(x=7h,y=0~3h)
-    //     + 横线1(y=2h,全宽) + 横线2(y=4h,全宽)
     CGFloat h = _circleLblWH;
 
-    // 外框
+    // ── 外框 ──
     UIView *leftLine = [self newLine];
     [self.topView addSubview:leftLine];
     [leftLine mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -406,7 +403,7 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
         make.bottom.left.right.equalTo(self.topView);
     }];
 
-    // 竖线A: x=5h, y=0~4h（userInfoView/globalMap 右边）
+    // ── 竖线A: x=5h, y=0~4h（userInfoView/globalMap 右边） ──
     UIView *verLineA = [self newLine];
     [self.topView addSubview:verLineA];
     [verLineA mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -416,7 +413,7 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
         make.height.equalTo(@(h * 4));
     }];
 
-    // 竖线B: x=7h, y=0~3h（rygCard 左边，只到rygCard底部）
+    // ── 竖线B: x=7h, y=0~3h（rygCard 左边，只到rygCard底部） ──
     UIView *verLineB = [self newLine];
     [self.topView addSubview:verLineB];
     [verLineB mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -426,7 +423,7 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
         make.height.equalTo(@(h * 3));
     }];
 
-    // 横线1: y=2h, 全宽（行0-1 底部）
+    // ── 横线1: y=2h, 全宽（行0-1 底部） ──
     UIView *horLine1 = [self newLine];
     [self.topView addSubview:horLine1];
     [horLine1 mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -435,7 +432,17 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
         make.left.right.equalTo(self.topView);
     }];
 
-    // 横线2: y=4h, 全宽（行3 底部）
+    // ── 横线2: y=3h, x=5h~7h（黄绿之间，从竖线A到竖线B，不穿过地图） ──
+    UIView *horLine_yg = [self newLine];
+    [self.topView addSubview:horLine_yg];
+    [horLine_yg mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.height.equalTo(@0.5);
+        make.top.equalTo(self.topView).offset(h * 3);
+        make.left.equalTo(userInfoView.mas_right);
+        make.right.equalTo(self.topView).offset(-h);
+    }];
+
+    // ── 横线3: y=4h, 全宽（行3 底部） ──
     UIView *horLine2 = [self newLine];
     [self.topView addSubview:horLine2];
     [horLine2 mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -443,6 +450,21 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
         make.top.equalTo(self.topView).offset(h * 4);
         make.left.right.equalTo(self.topView);
     }];
+
+    // ── totalWatchTimeView（行4）内部竖线：列1~7各一条 ──
+    // _totalWatchTimeView 内部已有 i>0 的竖线，但用 centerX.multipliedBy 定位
+    // 这里在 topView 层面补充，确保每列都有线
+    for (int col = 1; col <= 7; col++) {
+        UIView *vl = [self newLine];
+        [self.topView addSubview:vl];
+        CGFloat xOffset = h * col;
+        [vl mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.width.equalTo(@0.5);
+            make.left.equalTo(self.topView).offset(xOffset);
+            make.top.equalTo(self.topView).offset(h * 4);
+            make.height.equalTo(@(h));
+        }];
+    }
 }
 
 - (void)configureWithModel:(PassportViewModel *)model {
