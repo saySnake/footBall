@@ -368,94 +368,80 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
 }
 
 - (void)addLines{
-    // 防御：避免某些情况下子视图尚未创建导致 Masonry equalTo(nil) 崩溃
-    UIView *globalMapView = self.globalMapView ?: self.topView;
-    UIView *rygCardView = self.rygCardView ?: self.topView;
-    UIView *nothingView = self.nothingView ?: self.topView;
     UIView *userInfoView = self.userInfoView ?: self.topView;
-    UIView *scoresView = self.totalWatchTimeView ?: self.topView;
-    UIView *moneyView = self.moneyView ?: self.topView;
 
+    // 网格：8列×5行，h = _circleLblWH
+    // 行0-1: userInfoView(5列) | lineChart(2列) | rygCard红黄(1列)
+    // 行2:   globalMap(5列)    | nothingView(2列) | rygCard绿(1列)
+    // 行3:   globalMap(5列)    | moneyView(3列，含rygCard列)
+    // 行4:   totalWatchTimeView(8列)
+    //
+    // 线：外框4条 + 竖线A(x=5h,y=0~4h) + 竖线B(x=7h,y=0~3h)
+    //     + 横线1(y=2h,全宽) + 横线2(y=4h,全宽)
+    CGFloat h = _circleLblWH;
+
+    // 外框
     UIView *leftLine = [self newLine];
     [self.topView addSubview:leftLine];
     [leftLine mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.width.equalTo(@0.25);
-        make.left.equalTo(self.topView);
-        make.top.equalTo(@0);
-        make.bottom.equalTo(@(0));
+        make.width.equalTo(@0.5);
+        make.left.top.bottom.equalTo(self.topView);
     }];
     UIView *rightLine = [self newLine];
     [self.topView addSubview:rightLine];
     [rightLine mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.width.equalTo(@0.25);
-        make.right.equalTo(self.topView);
-        make.top.equalTo(@(0));
-        make.bottom.equalTo(@(0));
+        make.width.equalTo(@0.5);
+        make.right.top.bottom.equalTo(self.topView);
     }];
-
     UIView *topLine = [self newLine];
     [self.topView addSubview:topLine];
     [topLine mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.height.equalTo(@0.25);
-        make.top.equalTo(self.topView);
-        make.left.equalTo(@(0));
-        make.right.equalTo(@(0));
+        make.height.equalTo(@0.5);
+        make.top.left.right.equalTo(self.topView);
     }];
-
     UIView *bottomLine = [self newLine];
     [self.topView addSubview:bottomLine];
     [bottomLine mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.height.equalTo(@0.25);
-        make.bottom.equalTo(self.topView);
-        make.left.equalTo(@(0));
-        make.right.equalTo(@(0));
+        make.height.equalTo(@0.5);
+        make.bottom.left.right.equalTo(self.topView);
     }];
 
-    // 内部view之间的水平线
-    UIView *subHorLine1= [self newLine];
-    [self.topView addSubview:subHorLine1];
-    [subHorLine1 mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.height.equalTo(@0.3);
-        make.top.equalTo(userInfoView.mas_bottom);
-        make.left.equalTo(self.topView);
-        make.right.equalTo(rygCardView.mas_left);
-    }];
-
-    UIView *subHorLine2= [self newLine];
-    [self.topView addSubview:subHorLine2];
-    [subHorLine2 mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.height.equalTo(@0.25);
-        make.top.equalTo(nothingView.mas_bottom);
-        make.left.equalTo(globalMapView.mas_right);
-        make.right.equalTo(self.topView);
-    }];
-
-    UIView *subHorLine3= [self newLine];
-    [self.topView addSubview:subHorLine3];
-    [subHorLine3 mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.height.equalTo(@0.25);
-        make.top.equalTo(globalMapView.mas_bottom);
-        make.left.equalTo(self.topView);
-        make.right.equalTo(self.topView);
-    }];
-
-    // 内部view之间的垂直线
-    UIView *subVerLine1= [self newLine];
-    [self.topView addSubview:subVerLine1];
-    [subVerLine1 mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.width.equalTo(@0.25);
+    // 竖线A: x=5h, y=0~4h（userInfoView/globalMap 右边）
+    UIView *verLineA = [self newLine];
+    [self.topView addSubview:verLineA];
+    [verLineA mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.width.equalTo(@0.5);
         make.left.equalTo(userInfoView.mas_right);
         make.top.equalTo(self.topView);
-        make.bottom.equalTo(scoresView.mas_top);
+        make.height.equalTo(@(h * 4));
     }];
 
-    UIView *subVerLine2= [self newLine];
-    [self.topView addSubview:subVerLine2];
-    [subVerLine2 mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.width.equalTo(@0.25);
+    // 竖线B: x=7h, y=0~3h（rygCard 左边，只到rygCard底部）
+    UIView *verLineB = [self newLine];
+    [self.topView addSubview:verLineB];
+    [verLineB mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.width.equalTo(@0.5);
+        make.right.equalTo(self.topView).offset(-h);
         make.top.equalTo(self.topView);
-        make.bottom.equalTo(moneyView.mas_top);
-        make.right.equalTo(rygCardView.mas_left);
+        make.height.equalTo(@(h * 3));
+    }];
+
+    // 横线1: y=2h, 全宽（行0-1 底部）
+    UIView *horLine1 = [self newLine];
+    [self.topView addSubview:horLine1];
+    [horLine1 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.height.equalTo(@0.5);
+        make.top.equalTo(self.topView).offset(h * 2);
+        make.left.right.equalTo(self.topView);
+    }];
+
+    // 横线2: y=4h, 全宽（行3 底部）
+    UIView *horLine2 = [self newLine];
+    [self.topView addSubview:horLine2];
+    [horLine2 mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.height.equalTo(@0.5);
+        make.top.equalTo(self.topView).offset(h * 4);
+        make.left.right.equalTo(self.topView);
     }];
 }
 
