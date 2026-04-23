@@ -24,6 +24,14 @@ static UIColor *kMoreMatchesGreen(void) {
     return [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0]; // #285D4B
 }
 
+static UIColor *kMoreMatchesTeamBadgeBg(void) {
+    return [UIColor colorWithRed:0.914 green:0.922 blue:0.929 alpha:1.0]; // #E9EBED
+}
+
+static UIColor *kMoreMatchesPrimaryText(void) {
+    return [UIColor colorWithRed:0.059 green:0.059 blue:0.059 alpha:1.0]; // #0f0f0f
+}
+
 static UIImage *kMoreMatchesCalendarBarIcon(void) {
     UIImage *asset = [UIImage imageNamed:@"Calendar"];
     if (asset) {
@@ -123,6 +131,8 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
 
 @interface MoreMatchCell : UITableViewCell
 @property (nonatomic, strong) UIView *cardView;
+@property (nonatomic, strong) UIView *homeBadge;
+@property (nonatomic, strong) UIView *awayBadge;
 @property (nonatomic, strong) UIImageView *homeLogo;
 @property (nonatomic, strong) UIImageView *awayLogo;
 @property (nonatomic, strong) UILabel *homeLabel;
@@ -141,11 +151,21 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
         UIView *card = [[UIView alloc] init];
         card.backgroundColor = kMoreMatchesCardBG();
         card.layer.cornerRadius = 8;
+        card.clipsToBounds = YES;
         [self.contentView addSubview:card];
         self.cardView = card;
         [card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(5, 17, 5, 15));
+            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 16, 6, 16));
         }];
+
+        _homeBadge = [[UIView alloc] init];
+        _homeBadge.backgroundColor = kMoreMatchesTeamBadgeBg();
+        _homeBadge.layer.cornerRadius = 16;
+        _homeBadge.clipsToBounds = YES;
+        _awayBadge = [[UIView alloc] init];
+        _awayBadge.backgroundColor = kMoreMatchesTeamBadgeBg();
+        _awayBadge.layer.cornerRadius = 16;
+        _awayBadge.clipsToBounds = YES;
 
         _homeLogo = [[UIImageView alloc] init];
         _awayLogo = [[UIImageView alloc] init];
@@ -155,8 +175,8 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
 
         _homeLabel = [[UILabel alloc] init];
         _awayLabel = [[UILabel alloc] init];
-        _homeLabel.font = _awayLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-        _homeLabel.textColor = _awayLabel.textColor = [UIColor colorWithRed:0.208 green:0.200 blue:0.208 alpha:1.0];
+        _homeLabel.font = _awayLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
+        _homeLabel.textColor = _awayLabel.textColor = kMoreMatchesPrimaryText();
         _homeLabel.textAlignment = NSTextAlignmentRight;
         _awayLabel.textAlignment = NSTextAlignmentLeft;
         _homeLabel.lineBreakMode = NSLineBreakByTruncatingTail;
@@ -174,15 +194,17 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
         _timePill.layer.borderWidth = 0.5;
         _timePill.layer.borderColor = kMoreMatchesGreen().CGColor;
         _timePill.contentEdgeInsets = UIEdgeInsetsMake(4, 8, 4, 8);
-        _timePill.backgroundColor = [UIColor clearColor];
+        _timePill.backgroundColor = [UIColor colorWithRed:0.973 green:0.980 blue:0.969 alpha:1.0];
 
         _favoriteBtn = [UIButton buttonWithType:UIButtonTypeCustom];
         _favoriteBtn.adjustsImageWhenHighlighted = NO;
 
         [card addSubview:_homeLabel];
-        [card addSubview:_homeLogo];
+        [card addSubview:_homeBadge];
+        [_homeBadge addSubview:_homeLogo];
         [card addSubview:_timePill];
-        [card addSubview:_awayLogo];
+        [card addSubview:_awayBadge];
+        [_awayBadge addSubview:_awayLogo];
         [card addSubview:_awayLabel];
         [card addSubview:_favoriteBtn];
 
@@ -192,16 +214,20 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
             // 主队名：随卡片宽度占一行可用空间（原 70pt 过窄），由与 timePill 的间距约束自然截断
             make.width.mas_lessThanOrEqualTo(card.mas_width).multipliedBy(0.34);
         }];
-        [_homeLogo mas_makeConstraints:^(MASConstraintMaker *make) {
+        [_homeBadge mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_homeLabel.mas_trailing).offset(8);
             make.centerY.equalTo(card);
-            make.width.height.mas_equalTo(24);
+            make.width.height.mas_equalTo(32);
+        }];
+        [_homeLogo mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.center.equalTo(_homeBadge);
+            make.width.height.mas_equalTo(18);
         }];
         [_timePill mas_makeConstraints:^(MASConstraintMaker *make) {
             // 时间与两侧队徽固定 14pt 间距（设计稿）
-            make.leading.equalTo(_homeLogo.mas_trailing).offset(14);
+            make.leading.equalTo(_homeBadge.mas_trailing).offset(14);
             make.centerY.equalTo(card);
-            make.width.mas_greaterThanOrEqualTo(56);
+            make.width.mas_equalTo(50);
             make.height.mas_equalTo(24);
         }];
         [_timePill setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
@@ -215,11 +241,15 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
             make.centerY.equalTo(card);
             make.width.mas_lessThanOrEqualTo(card.mas_width).multipliedBy(0.34);
         }];
-        [_awayLogo mas_makeConstraints:^(MASConstraintMaker *make) {
+        [_awayBadge mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_timePill.mas_trailing).offset(14);
             make.trailing.equalTo(_awayLabel.mas_leading).offset(-8);
             make.centerY.equalTo(card);
-            make.width.height.mas_equalTo(24);
+            make.width.height.mas_equalTo(32);
+        }];
+        [_awayLogo mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.center.equalTo(_awayBadge);
+            make.width.height.mas_equalTo(18);
         }];
     }
     return self;

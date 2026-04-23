@@ -348,8 +348,21 @@ static UIColor * SettingsPageBackgroundColor(void) {
 }
 
 - (void)performLogoutAndGoLogin {
-    [[AuthManager sharedManager] removeUser];
+    __weak typeof(self) weakSelf = self;
+    [[AuthManager sharedManager] logoutSuccess:^(HTTPResponse * _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [self routeToLoginAfterLogout];
+    } failure:^(NSError * _Nonnull error) {
+        // 服务端退出失败时，仍执行本地清理，避免用户无法退出
+        [[AuthManager sharedManager] removeUser];
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [self routeToLoginAfterLogout];
+    }];
+}
 
+- (void)routeToLoginAfterLogout {
     UIWindow *window = self.view.window;
     if (!window) {
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
