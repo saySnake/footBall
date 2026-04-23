@@ -709,13 +709,13 @@ static UIColor *PassportCircleStrokeColor(void) {
         make.bottom.equalTo(self);
     }];
 
-    // x=5h（从 y=2h 往下；上方为跨2行城市胶囊）
+    // x=5h（从 y=1h 往下，补齐第二排第4个胶囊右边界竖线）
     UIView *v5 = [self newLine];
     [self addSubview:v5];
     [v5 mas_makeConstraints:^(MASConstraintMaker *make) {
         make.width.mas_equalTo(lineW);
         make.left.equalTo(self).offset(wh * 5);
-        make.top.equalTo(self).offset(wh * 2);
+        make.top.equalTo(self).offset(wh);
         make.bottom.equalTo(self);
     }];
 
