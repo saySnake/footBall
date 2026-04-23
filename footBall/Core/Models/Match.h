@@ -40,6 +40,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL infoCompleted;
 /// 是否已完成球票/比赛认证
 @property (nonatomic, assign) BOOL verifyCompleted;
+/// 认证审核状态（PENDING/APPROVED/REJECTED 等）
+@property (nonatomic, copy) NSString *verificationStatus;
 /// 已认证时长（分钟），用于「已认证 xx 分钟」
 @property (nonatomic, assign) NSInteger certifiedMinutes;
 /// 首页日程 MatchScheduleVO：是否已收藏

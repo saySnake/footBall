@@ -37,6 +37,10 @@ static UIColor *kAddConsumePlaceholder(void) {
 @property (nonatomic, strong) UIImageView *photoPreview;
 @property (nonatomic, strong) UIButton *photoBtn;
 @property (nonatomic, strong) UIImage *selectedImage;
+/// 图片选中后立即上传，成功后保存 objectKey，提交时直接使用
+@property (nonatomic, copy, nullable) NSString *uploadedPhotoKey;
+/// 图片正在上传中
+@property (nonatomic, assign) BOOL photoUploading;
 
 @property (nonatomic, strong) UITextField *itemField;
 @property (nonatomic, strong) UITextField *priceField;
@@ -433,16 +437,36 @@ static UIColor *kAddConsumePlaceholder(void) {
     self.selectedImage = img;
     self.photoPreview.image = img;
     self.photoBtn.hidden = (img != nil);
+    self.uploadedPhotoKey = nil;
     [picker dismissViewControllerAnimated:YES completion:nil];
-    NSData *imgData = UIImageJPEGRepresentation(img, 0.5);
-    
+
+    // 选图后立即上传，保存 objectKey，提交时直接使用，避免提交时重复上传
+    NSData *imgData = UIImageJPEGRepresentation(img, 0.85);
+    if (!imgData) imgData = UIImagePNGRepresentation(img);
+    if (!imgData) return;
+
+    self.photoUploading = YES;
+    __weak typeof(self) weakSelf = self;
     [FileRequest.shared uploadImage:imgData type:ImageObjectTypeConsumption success:^(HTTPResponse * _Nullable responseObject) {
-        
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) return;
+            self.photoUploading = NO;
+            NSString *key = [responseObject.dataObject isKindOfClass:[NSString class]] ? responseObject.dataObject : nil;
+            self.uploadedPhotoKey = key;
+        });
     } failure:^(NSError * _Nonnull error) {
-        [QMUITips showError:error.userInfo[@"Message"] inView:self.view];
-        self.photoPreview.image = nil;
-        self.selectedImage = nil;
-        self.photoBtn.hidden = NO;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) return;
+            self.photoUploading = NO;
+            self.uploadedPhotoKey = nil;
+            // 上传失败，清除已选图片，提示用户重新选择
+            self.selectedImage = nil;
+            self.photoPreview.image = nil;
+            self.photoBtn.hidden = NO;
+            [[LoadingManager sharedManager] showError:(NSLocalizedString(@"add_consume_upload_fail", nil) ?: @"图片上传失败，请重新选择") inView:self.view];
+        });
     }];
 }
 
@@ -483,7 +507,8 @@ static UIColor *kAddConsumePlaceholder(void) {
     NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
     fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
     fmt.timeZone = [NSTimeZone localTimeZone];
-    fmt.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+    // 服务端 expenseDate 是 LocalDate，只接受 yyyy-MM-dd 格式
+    fmt.dateFormat = @"yyyy-MM-dd";
     return [fmt stringFromDate:d];
 }
 
@@ -564,7 +589,8 @@ static UIColor *kAddConsumePlaceholder(void) {
         if (!self) return;
         NSMutableDictionary *body = [NSMutableDictionary dictionary];
         body[@"itemName"] = itemName;
-        body[@"amount"] = [amount stringValue];
+        // amount 必须传数字类型，不能传字符串，否则服务端 BigDecimal 反序列化失败
+        body[@"amount"] = amount;
         body[@"expenseDate"] = dateStr;
         if (photoURLs.count > 0) {
             body[@"photos"] = photoURLs;
@@ -572,44 +598,27 @@ static UIColor *kAddConsumePlaceholder(void) {
         [self postCreateExpenseWithBody:body];
     };
 
-    if (self.selectedImage) {
-        NSData *jpeg = UIImageJPEGRepresentation(self.selectedImage, 0.85);
-        if (!jpeg) jpeg = UIImagePNGRepresentation(self.selectedImage);
-        if (!jpeg) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                __strong typeof(weakSelf) self = weakSelf;
-                if (!self) return;
-                [self resetSubmittingState];
-                NSString *msg = NSLocalizedString(@"add_consume_image_fail", nil) ?: @"图片处理失败";
-                [[LoadingManager sharedManager] showError:msg inView:self.view];
-            });
-            return;
-        }
-        [[FileRequest shared] uploadImage:jpeg type:ImageObjectTypeOther success:^(HTTPResponse * _Nullable responseObject) {
-            NSString *url = [responseObject.dataObject isKindOfClass:[NSString class]] ? responseObject.dataObject : nil;
-            if (url.length == 0) {
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    __strong typeof(weakSelf) self = weakSelf;
-                    if (!self) return;
-                    [self resetSubmittingState];
-                    NSString *msg = NSLocalizedString(@"add_consume_upload_fail", nil) ?: @"图片上传失败";
-                    [[LoadingManager sharedManager] showError:msg inView:self.view];
-                });
-                return;
-            }
-            sendBody(@[url]);
-        } failure:^(NSError * _Nonnull error) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                __strong typeof(weakSelf) self = weakSelf;
-                if (!self) return;
-                [self resetSubmittingState];
-                NSString *msg = error.localizedDescription.length ? error.localizedDescription : (NSLocalizedString(@"add_consume_upload_fail", nil) ?: @"图片上传失败");
-                [[LoadingManager sharedManager] showError:msg inView:self.view];
-            });
-        }];
+    // 有选图但还在上传中，等待上传完成
+    if (self.selectedImage && self.photoUploading) {
+        [self resetSubmittingState];
+        [[LoadingManager sharedManager] showError:(NSLocalizedString(@"add_consume_photo_uploading", nil) ?: @"图片上传中，请稍候再提交") inView:self.view];
         return;
     }
 
+    // 有选图且上传成功，直接用已上传的 key
+    if (self.selectedImage && self.uploadedPhotoKey.length > 0) {
+        sendBody(@[self.uploadedPhotoKey]);
+        return;
+    }
+
+    // 有选图但上传失败（key 为空），提示重新选图
+    if (self.selectedImage && self.uploadedPhotoKey.length == 0) {
+        [self resetSubmittingState];
+        [[LoadingManager sharedManager] showError:(NSLocalizedString(@"add_consume_upload_fail", nil) ?: @"图片上传失败，请重新选择") inView:self.view];
+        return;
+    }
+
+    // 没有选图，直接提交
     sendBody(@[]);
 }
 

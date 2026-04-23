@@ -93,21 +93,25 @@ NS_ASSUME_NONNULL_BEGIN
 @interface PNStatistics : NSObject <YYModel>
 @property (nonatomic, strong, nullable) PNStatisticsBasicStats *basicStats;
 @property (nonatomic, strong) NSArray<PNLeagueStat *> *leagueStats;
-/// 累计观赛时长（分钟或小时，以后端单位为准）
+/// 累计观赛时长（分钟）
 @property (nonatomic, assign) NSInteger cumulativeWatchTime;
 @property (nonatomic, strong) NSArray<PNStadiumRank *> *stadiumRanking;
 @property (nonatomic, copy, nullable) NSString *homeAwayRatio;
 @property (nonatomic, strong) NSArray<PNRoleDist *> *roleDistribution;
 @property (nonatomic, strong, nullable) PNStatisticsTeamRecord *teamRecord;
-/// 观赛涉及国家数（若后端提供）
+/// 观赛涉及国家数
 @property (nonatomic, assign) NSInteger countryCount;
-/// 月度频次（12 个月等，顺序以后端为准）
+/// 月度频次（12 个月，Jan-Dec）
 @property (nonatomic, strong) NSArray<NSNumber *> *monthlyFrequency;
 @property (nonatomic, strong, nullable) PNHolidayStats *holidayStats;
 @property (nonatomic, copy, nullable) NSString *certificationRate;
 @property (nonatomic, assign) NSInteger recentTrend7Days;
 @property (nonatomic, assign) NSInteger recentTrend30Days;
 @property (nonatomic, strong) NSArray<PNStadiumCoordinate *> *stadiumCoordinates;
+/// 去重球场总数（服务端 totalStadiumCount，比 stadiumRanking.count 更直接）
+@property (nonatomic, assign) NSInteger totalStadiumCount;
+/// 已认证场次
+@property (nonatomic, assign) NSInteger verifiedMatchCount;
 @end
 
 NS_ASSUME_NONNULL_END

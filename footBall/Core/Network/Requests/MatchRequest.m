@@ -68,6 +68,23 @@ static void PNMatchRequestGETMyTeamSegment(NSString *path, NSInteger page, NSInt
             if (!list) {
                 list = @[];
             }
+#if DEBUG
+            // 打印第一条原始 JSON，确认 verifyCompleted / certifiedMinutes 字段值
+            if (list.count > 0) {
+                id firstRaw = list[0];
+                if ([firstRaw isKindOfClass:NSDictionary.class]) {
+                    NSDictionary *d = (NSDictionary *)firstRaw;
+                    NSLog(@"[MatchDebug] %@ raw[0] ALL KEYS => %@", path, d.allKeys);
+                    NSLog(@"[MatchDebug] %@ raw[0] => verifyCompleted=%@ (%@), certifiedMinutes=%@, verificationStatus=%@, recordId=%@ (%@), matchId=%@",
+                          path,
+                          d[@"verifyCompleted"], NSStringFromClass([d[@"verifyCompleted"] class]),
+                          d[@"certifiedMinutes"],
+                          d[@"verificationStatus"],
+                          d[@"recordId"], NSStringFromClass([d[@"recordId"] class]),
+                          d[@"matchId"]);
+                }
+            }
+#endif
             NSArray *matches = [NSArray yy_modelArrayWithClass:Match.class json:list];
             responseObject.dataObject = matches;
             if (success) {

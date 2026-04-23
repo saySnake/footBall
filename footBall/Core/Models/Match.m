@@ -22,6 +22,7 @@
              @"awayScore": @[@"awayScore", @"away_score", @"awayGoals"],
              @"infoCompleted": @[@"infoCompleted", @"info_completed", @"inputCompleted", @"input_completed"],
              @"verifyCompleted": @[@"verifyCompleted", @"verify_completed", @"ticketVerified", @"ticket_verified"],
+             @"verificationStatus": @[@"verificationStatus", @"verification_status", @"verifyStatus", @"verify_status", @"certificationStatus", @"authStatus", @"status"],
              @"certifiedMinutes": @[@"certifiedMinutes", @"certified_minutes", @"verifiedMinutes", @"verified_minutes"],
              @"recordId": @[@"recordId", @"record_id"],
              @"favorited": @[@"favorited", @"favorite", @"isFavorited", @"is_favorite"],
@@ -44,6 +45,39 @@
             self.recordId = [(NSNumber *)r stringValue];
         } else if ([r isKindOfClass:NSString.class]) {
             self.recordId = (NSString *)r;
+        }
+    }
+    // 兼容后端将 verifyCompleted 以字符串/数字/枚举返回的情况
+    BOOL (^parseBoolLike)(id) = ^BOOL(id raw) {
+        if ([raw isKindOfClass:NSNumber.class]) {
+            return [(NSNumber *)raw boolValue];
+        }
+        if ([raw isKindOfClass:NSString.class]) {
+            NSString *s = [(NSString *)raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]].lowercaseString;
+            if (s.length == 0) return NO;
+            if ([s isEqualToString:@"1"] || [s isEqualToString:@"true"] || [s isEqualToString:@"yes"]) return YES;
+            if ([s isEqualToString:@"0"] || [s isEqualToString:@"false"] || [s isEqualToString:@"no"]) return NO;
+            if ([s isEqualToString:@"verified"] || [s isEqualToString:@"approved"] || [s isEqualToString:@"passed"] || [s isEqualToString:@"success"]) return YES;
+        }
+        return NO;
+    };
+    id verifyRaw = dic[@"verifyCompleted"] ?: dic[@"verify_completed"] ?: dic[@"ticketVerified"] ?: dic[@"ticket_verified"];
+    if (verifyRaw) {
+        self.verifyCompleted = parseBoolLike(verifyRaw);
+    }
+    // 若 verifyCompleted 未命中，但状态字段是已通过，也应视为已认证
+    if (!self.verifyCompleted) {
+        NSString *status = self.verificationStatus;
+        if (![status isKindOfClass:NSString.class] || status.length == 0) {
+            id st = dic[@"verificationStatus"] ?: dic[@"verification_status"] ?: dic[@"verifyStatus"] ?: dic[@"verify_status"] ?: dic[@"certificationStatus"] ?: dic[@"authStatus"] ?: dic[@"status"];
+            if ([st isKindOfClass:NSString.class]) {
+                status = (NSString *)st;
+                self.verificationStatus = status;
+            }
+        }
+        NSString *s = [[status stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] lowercaseString];
+        if ([s isEqualToString:@"verified"] || [s isEqualToString:@"approved"] || [s isEqualToString:@"passed"] || [s isEqualToString:@"success"] || [s isEqualToString:@"已认证"]) {
+            self.verifyCompleted = YES;
         }
     }
     void (^fillTeam)(NSDictionary *, BOOL) = ^(NSDictionary *team, BOOL home) {

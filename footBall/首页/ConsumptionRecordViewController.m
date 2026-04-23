@@ -36,12 +36,61 @@ static UIImage *kConsumeCalendarBarIcon(void) {
     return nil;
 }
 
+/// Figma：标题 16 Medium / 时间 12 Regular，中文优先 PingFang
+static UIFont *kConsumeTitleFont(void) {
+    UIFont *p = [UIFont fontWithName:@"PingFangSC-Medium" size:16.0];
+    if (p) {
+        return p;
+    }
+    return [UIFont systemFontOfSize:16.0 weight:UIFontWeightMedium];
+}
+
+static UIFont *kConsumeTimeFont(void) {
+    UIFont *p = [UIFont fontWithName:@"PingFangSC-Regular" size:12.0];
+    if (p) {
+        return p;
+    }
+    return [UIFont systemFontOfSize:12.0 weight:UIFontWeightRegular];
+}
+
+static UIFont *kConsumeAmountFont(void) {
+    UIFont *p = [UIFont fontWithName:@"PingFangSC-Medium" size:16.0];
+    if (p) {
+        return p;
+    }
+    return [UIFont systemFontOfSize:16.0 weight:UIFontWeightMedium];
+}
+
+/// Figma 行高 26 / 20 与稿面对齐
+static void kConsumeSetLabelLineHeight(UILabel *label, CGFloat lineHeight) {
+    if (!label || lineHeight <= 0) {
+        return;
+    }
+    NSString *text = label.text ?: @"";
+    if (text.length == 0) {
+        return;
+    }
+    NSMutableParagraphStyle *ps = [[NSMutableParagraphStyle alloc] init];
+    ps.lineHeightMultiple = 1.0;
+    ps.minimumLineHeight = lineHeight;
+    ps.maximumLineHeight = lineHeight;
+    ps.alignment = label.textAlignment;
+    NSAttributedString *as = [[NSAttributedString alloc] initWithString:text
+                                                             attributes:@{
+        NSParagraphStyleAttributeName: ps,
+        NSFontAttributeName: label.font,
+        NSForegroundColorAttributeName: label.textColor ?: [UIColor blackColor]
+    }];
+    label.attributedText = as;
+}
+
 @interface ConsumeRecordCell : UITableViewCell
 @property (nonatomic, strong) UIView *iconWrap;
 @property (nonatomic, strong) UIImageView *iconView;
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UILabel *timeLabel;
 @property (nonatomic, strong) UILabel *amountLabel;
+- (void)reapplyFigmaTextStyles;
 @end
 
 @implementation ConsumeRecordCell
@@ -58,7 +107,7 @@ static UIImage *kConsumeCalendarBarIcon(void) {
         card.tag = 999;
         [self.contentView addSubview:card];
         [card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(4, 16, 4, 16));
+            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(5, 16, 5, 16));
         }];
 
         _iconWrap = [[UIView alloc] init];
@@ -69,20 +118,23 @@ static UIImage *kConsumeCalendarBarIcon(void) {
         _iconView = [[UIImageView alloc] init];
         _iconView.contentMode = UIViewContentModeScaleAspectFit;
         _iconView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
-        _iconView.layer.cornerRadius = 20;
+        _iconView.layer.cornerRadius = 15;
         _iconView.clipsToBounds = YES;
 
         _titleLabel = [[UILabel alloc] init];
-        _titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
-        _titleLabel.textColor = [UIColor colorWithWhite:0.15 alpha:1.0];
+        _titleLabel.numberOfLines = 1;
+        _titleLabel.font = kConsumeTitleFont();
+        _titleLabel.textColor = [UIColor colorWithRed:0.0f green:0.0f blue:0.0f alpha:1.0f];
 
         _timeLabel = [[UILabel alloc] init];
-        _timeLabel.font = [UIFont systemFontOfSize:12];
-        _timeLabel.textColor = [UIColor colorWithWhite:0.5 alpha:1.0];
+        _timeLabel.numberOfLines = 1;
+        _timeLabel.font = kConsumeTimeFont();
+        _timeLabel.textColor = [UIColor colorWithRed:0.47f green:0.47f blue:0.47f alpha:1.0f]; // Figma 辅助文字
 
         _amountLabel = [[UILabel alloc] init];
-        _amountLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
-        _amountLabel.textColor = [UIColor colorWithWhite:0.15 alpha:1.0];
+        _amountLabel.numberOfLines = 1;
+        _amountLabel.font = kConsumeAmountFont();
+        _amountLabel.textColor = [UIColor colorWithRed:0.0f green:0.0f blue:0.0f alpha:1.0f];
         _amountLabel.textAlignment = NSTextAlignmentRight;
 
         [card addSubview:_iconWrap];
@@ -98,24 +150,33 @@ static UIImage *kConsumeCalendarBarIcon(void) {
         }];
         [_iconView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.center.equalTo(_iconWrap);
-            make.width.height.mas_equalTo(40);
+            make.width.height.mas_equalTo(30);
         }];
         [_titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_iconWrap.mas_trailing).offset(12);
             make.trailing.lessThanOrEqualTo(_amountLabel.mas_leading).offset(-8);
-            make.top.equalTo(card).offset(15);
+            make.top.equalTo(card).offset(11);
         }];
         [_timeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_titleLabel);
-            make.top.equalTo(_titleLabel.mas_bottom).offset(4);
+            // Figma：第二行与第一行上沿间距 26pt，不用依赖 title 的 intrinsic 高度
+            make.top.equalTo(_titleLabel.mas_top).offset(26);
         }];
         [_amountLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.trailing.equalTo(card).offset(-16);
-            make.centerY.equalTo(card);
+            make.centerY.mas_equalTo(_iconView);
             make.width.mas_greaterThanOrEqualTo(80);
         }];
     }
     return self;
+}
+
+- (void)reapplyFigmaTextStyles {
+    self.titleLabel.font = kConsumeTitleFont();
+    self.timeLabel.font = kConsumeTimeFont();
+    self.amountLabel.font = kConsumeAmountFont();
+    kConsumeSetLabelLineHeight(self.titleLabel, 26.0);
+    kConsumeSetLabelLineHeight(self.timeLabel, 20.0);
 }
 
 @end
@@ -142,53 +203,85 @@ static UIImage *kConsumeCalendarBarIcon(void) {
 /// 解析单条消费的时间，用于排序与按日筛选
 - (NSDate *)parseAPIInstant:(NSString *)raw {
     if (raw.length == 0) return nil;
+    NSString *s = [raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (s.length == 0) return nil;
+    if (@available(iOS 11.0, *)) {
+        NSISO8601DateFormatter *iso = [[NSISO8601DateFormatter alloc] init];
+        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
+        NSDate *d = [iso dateFromString:s];
+        if (d) return d;
+        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime;
+        d = [iso dateFromString:s];
+        if (d) return d;
+    }
     NSDateFormatter *f = [[NSDateFormatter alloc] init];
     f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
     NSArray<NSString *> *fmts = @[
         @"yyyy-MM-dd'T'HH:mm:ssZ",
         @"yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+        @"yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+        @"yyyy-MM-dd'T'HH:mm:ssXXX",
         @"yyyy-MM-dd HH:mm:ss",
         @"yyyy-MM-dd"
     ];
     for (NSString *fmt in fmts) {
         f.dateFormat = fmt;
-        NSDate *d = [f dateFromString:raw];
+        NSDate *d = [f dateFromString:s];
         if (d) return d;
+    }
+    if (s.length == 13 && [s longLongValue] > 0) {
+        return [NSDate dateWithTimeIntervalSince1970:[s longLongValue] / 1000.0];
     }
     return nil;
 }
 
 - (NSDate *)eventDateForExpense:(PNExpense *)e {
-    NSString *raw = e.expenseDate.length ? e.expenseDate : e.createTime;
-    NSDate *d = [self parseAPIInstant:raw];
-    if (!d && e.createTime.length) d = [self parseAPIInstant:e.createTime];
-    return d;
+    // 优先用 expenseDate（纯日期 yyyy-MM-dd，无时区歧义）
+    if (e.expenseDate.length >= 10) {
+        NSString *s = [e.expenseDate substringToIndex:10];
+        NSDateFormatter *f = [[NSDateFormatter alloc] init];
+        f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+        f.timeZone = [NSTimeZone localTimeZone];
+        f.dateFormat = @"yyyy-MM-dd";
+        NSDate *d = [f dateFromString:s];
+        if (d) return d;
+    }
+    // 兜底：createTime（带时间，需用本地时区解析）
+    if (e.createTime.length) {
+        return [self parseAPIInstant:e.createTime];
+    }
+    return nil;
 }
 
 - (BOOL)expense:(PNExpense *)e matchesCalendarDayString:(NSString *)dayStr {
     if (dayStr.length < 10) return NO;
     NSString *pre = [dayStr substringToIndex:10];
+    // 优先用 expenseDate 前缀匹配（最可靠，无时区问题）
     NSString *ed = e.expenseDate ?: @"";
-    NSString *ct = e.createTime ?: @"";
     if (ed.length >= 10 && [[ed substringToIndex:10] isEqualToString:pre]) return YES;
-    if (ct.length >= 10 && [[ct substringToIndex:10] isEqualToString:pre]) return YES;
+    // 兜底：createTime 前缀匹配（仅当 expenseDate 为空时）
+    if (ed.length == 0) {
+        NSString *ct = e.createTime ?: @"";
+        if (ct.length >= 10 && [[ct substringToIndex:10] isEqualToString:pre]) return YES;
+    }
     return NO;
 }
 
 - (NSArray<PNExpense *> *)filterAndSortExpenses:(NSArray<PNExpense *> *)all
                                   forCalendarDay:(NSDate *)day
                                        dayString:(NSString *)dayStr {
-    if (!day || all.count == 0) return all ?: @[];
+    if (all.count == 0) return @[];
     NSMutableArray<PNExpense *> *m = [NSMutableArray array];
     for (PNExpense *e in all) {
-        NSDate *d = [self eventDateForExpense:e];
-        if (d && [self isSameDay:d other:day]) {
+        // 优先用 expenseDate 字符串前缀匹配（无时区问题，最可靠）
+        if ([self expense:e matchesCalendarDayString:dayStr]) {
             [m addObject:e];
+            continue;
         }
-    }
-    if (m.count == 0 && all.count > 0) {
-        for (PNExpense *e in all) {
-            if ([self expense:e matchesCalendarDayString:dayStr]) {
+        // 兜底：expenseDate 为空时，用 NSDate 比较（需要 day 不为 nil）
+        if (e.expenseDate.length == 0 && day) {
+            NSDate *d = [self eventDateForExpense:e];
+            if (d && [self isSameDay:d other:day]) {
                 [m addObject:e];
             }
         }
@@ -235,7 +328,7 @@ static UIImage *kConsumeCalendarBarIcon(void) {
     [super viewDidLoad];
     self.hidesBottomBarWhenPushed = YES;
     self.shouldShowNavigationBar = NO;
-    self.view.backgroundColor = [UIColor whiteColor];
+    self.view.backgroundColor = [UIColor whiteColor]; // #F0F0F0
     self.calendar = [[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian];
     self.calendar.firstWeekday = 1;
     self.calendar.timeZone = [NSTimeZone localTimeZone];
@@ -422,6 +515,8 @@ static UIImage *kConsumeCalendarBarIcon(void) {
     self.tableView.delegate = self;
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.tableView.backgroundColor = [UIColor whiteColor];
+    self.tableView.contentInset = UIEdgeInsetsMake(26, 0, 0, 0);
+    self.tableView.scrollIndicatorInsets = self.tableView.contentInset;
     [self.tableView registerClass:[ConsumeRecordCell class] forCellReuseIdentifier:@"ConsumeRecordCell"];
     [self.view addSubview:self.tableView];
     [self.tableView mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -489,49 +584,94 @@ static UIImage *kConsumeCalendarBarIcon(void) {
     NSDate *day = self.selectedDate ?: [NSDate date];
     NSDateFormatter *ym = [[NSDateFormatter alloc] init];
     ym.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    ym.timeZone = [NSTimeZone localTimeZone];
     ym.dateFormat = @"yyyy-MM";
     NSString *monthStr = [ym stringFromDate:day];
     NSDateFormatter *ymd = [[NSDateFormatter alloc] init];
     ymd.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    ymd.timeZone = [NSTimeZone localTimeZone];
     ymd.dateFormat = @"yyyy-MM-dd";
     NSString *dayStr = [ymd stringFromDate:day];
 
     __weak typeof(self) weakSelf = self;
+    /// 请求发出时的选中日期。若用户已点到其它日，后到的响对应丢弃，避免 22/23 等切换时列表被旧结果覆盖
+    NSDate *requestedDay = day;
     [[ExpenseRequest shared] getExpensesWithMonth:monthStr date:dayStr page:1 pageSize:100 success:^(HTTPResponse * _Nullable responseObject) {
         dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) {
+                return;
+            }
+            if (![self isSameDay:requestedDay other:self.selectedDate]) {
+                return;
+            }
             PNExpensePage *page = [responseObject.dataObject isKindOfClass:PNExpensePage.class] ? responseObject.dataObject : nil;
             NSArray<PNExpense *> *list = page.list ?: @[];
-            weakSelf.records = [weakSelf filterAndSortExpenses:list forCalendarDay:day dayString:dayStr];
-            [weakSelf.tableView reloadData];
-            [weakSelf updateConsumeEmptyState];
+            self.records = [self filterAndSortExpenses:list forCalendarDay:requestedDay dayString:dayStr];
+            [self.tableView reloadData];
+            [self updateConsumeEmptyState];
         });
     } failure:^(NSError * _Nonnull error) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            weakSelf.records = @[];
-            [weakSelf.tableView reloadData];
-            [weakSelf updateConsumeEmptyState];
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) {
+                return;
+            }
+            if (![self isSameDay:requestedDay other:self.selectedDate]) {
+                return;
+            }
+            self.records = @[];
+            [self.tableView reloadData];
+            [self updateConsumeEmptyState];
         });
     }];
 }
 
 - (NSString *)shortTimeFromString:(NSString *)raw {
     if (raw.length == 0) return @"--:--";
-    NSDateFormatter *input = [[NSDateFormatter alloc] init];
-    input.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    input.dateFormat = @"yyyy-MM-dd'T'HH:mm:ssZ";
-    NSDate *date = [input dateFromString:raw];
-    if (!date) {
-        input.dateFormat = @"yyyy-MM-dd HH:mm:ss";
-        date = [input dateFromString:raw];
-    }
-    if (!date) {
-        input.dateFormat = @"yyyy-MM-dd";
-        date = [input dateFromString:raw];
-    }
+    NSDate *date = [self parseAPIInstant:raw];
     if (!date) return @"--:--";
     NSDateFormatter *output = [[NSDateFormatter alloc] init];
+    output.locale = [NSLocale currentLocale];
     output.dateFormat = @"HH:mm";
     return [output stringFromDate:date];
+}
+
+/// 副标题时间：有完整时间则显示「HH:mm」；仅业务日期为 yyyy-MM-dd 时显示「MM-dd」避免显示 00:00
+- (NSString *)timeSubtitleForExpense:(PNExpense *)e {
+    NSString *tCreate = e.createTime ?: @"";
+    NSString *tExpense = e.expenseDate ?: @"";
+    if (tCreate.length) {
+        NSDate *d = [self parseAPIInstant:tCreate];
+        if (d) {
+            NSDateFormatter *out = [NSDateFormatter new];
+            out.dateFormat = @"HH:mm";
+            return [out stringFromDate:d];
+        }
+    }
+    NSString *dOnly = tExpense;
+    if (dOnly.length == 0) {
+        dOnly = tCreate;
+    }
+    dOnly = [dOnly stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    BOOL looksDateOnly = (dOnly.length == 10 && [dOnly rangeOfString:@"-"].location != NSNotFound && [dOnly rangeOfString:@"T"].location == NSNotFound);
+    if (looksDateOnly) {
+        NSDate *d = [self parseAPIInstant:dOnly];
+        if (d) {
+            NSDateFormatter *out = [NSDateFormatter new];
+            out.dateFormat = @"MM-dd";
+            return [out stringFromDate:d];
+        }
+    }
+    if (dOnly.length) {
+        NSDate *d = [self parseAPIInstant:dOnly];
+        if (d) {
+            NSDateFormatter *out = [NSDateFormatter new];
+            out.dateFormat = @"MM-dd HH:mm";
+            return [out stringFromDate:d];
+        }
+    }
+    return @"--:--";
 }
 
 #pragma mark - Actions
@@ -571,19 +711,21 @@ static UIImage *kConsumeCalendarBarIcon(void) {
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    return 82;
+    return 84;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     ConsumeRecordCell *cell = [tableView dequeueReusableCellWithIdentifier:@"ConsumeRecordCell" forIndexPath:indexPath];
     PNExpense *item = self.records[indexPath.row];
-    cell.titleLabel.text = item.itemName.length > 0 ? item.itemName : @"消费";
-    NSString *timeRaw = item.createTime.length ? item.createTime : item.expenseDate;
-    cell.timeLabel.text = [self shortTimeFromString:timeRaw];
+    cell.titleLabel.text = item.itemName.length > 0 ? item.itemName : (NSLocalizedString(@"consume_item_placeholder", nil) ?: @"消费标题");
+    cell.titleLabel.textColor = [UIColor blackColor];
+    cell.timeLabel.text = [self timeSubtitleForExpense:item];
+    cell.timeLabel.textColor = [UIColor blackColor];
     cell.amountLabel.text = [self displayAmountForExpense:item];
+    [cell reapplyFigmaTextStyles];
     cell.iconView.backgroundColor = [UIColor colorWithWhite:0.95 alpha:1.0];
     NSURL *logoURL = [NSURL URLWithString:item.logoUrl ?: @""];
-    if (logoURL && logoURL.scheme.length) {
+    if (logoURL && (logoURL.scheme.length > 0)) {
         [cell.iconView sd_setImageWithURL:logoURL placeholderImage:nil options:SDWebImageRetryFailed];
     } else {
         [cell.iconView sd_cancelCurrentImageLoad];

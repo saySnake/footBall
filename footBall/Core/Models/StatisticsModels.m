@@ -67,6 +67,8 @@
         @"stadiumCoordinates": @[@"stadiumCoordinates", @"stadium_coordinates"],
         @"cumulativeWatchTime": @[@"cumulativeWatchTime", @"cumulative_watch_time", @"totalWatchMinutes", @"total_watch_minutes"],
         @"countryCount": @[@"countryCount", @"country_count", @"nationCount", @"nation_count"],
+        @"totalStadiumCount": @[@"totalStadiumCount", @"total_stadium_count"],
+        @"verifiedMatchCount": @[@"verifiedMatchCount", @"verified_match_count"],
     };
 }
 + (NSDictionary<NSString *, id> *)modelContainerPropertyGenericClass {

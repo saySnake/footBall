@@ -17,6 +17,7 @@
 #import "AuthManager.h"
 #import "User.h"
 #import "StatisticsModels.h"
+#import "MatchRecordModels.h"
 
 #define kDiscoverHeaderBg     [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0]   // #0D2122
 #define kDiscoverGreen        [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0]   // #285D4B
@@ -95,6 +96,127 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
     return nil;
 }
 
+static BOOL DiscoverIsPendingVerificationStatus(NSString *status) {
+    if (status.length == 0) return NO;
+    NSString *s = status.lowercaseString;
+    if ([s containsString:@"reject"] || [s containsString:@"refuse"] || [s containsString:@"fail"] || [s containsString:@"拒"]) {
+        return NO;
+    }
+    return [s isEqualToString:@"pending"] ||
+           [s isEqualToString:@"in_review"] ||
+           [s isEqualToString:@"reviewing"] ||
+           [s isEqualToString:@"submitted"] ||
+           [s isEqualToString:@"processing"] ||
+           [s isEqualToString:@"pending_review"] ||
+           [s isEqualToString:@"under_review"] ||
+           [s containsString:@"pending"] ||
+           [s containsString:@"review"] ||
+           [s isEqualToString:@"审核中"] ||
+           [s isEqualToString:@"待审核"] ||
+           [s containsString:@"审核"];
+}
+
+static BOOL DiscoverIsApprovedVerificationStatus(NSString *status) {
+    if (status.length == 0) return NO;
+    NSString *s = status.lowercaseString;
+    return [s isEqualToString:@"approved"] ||
+           [s isEqualToString:@"verified"] ||
+           [s isEqualToString:@"passed"] ||
+           [s isEqualToString:@"success"] ||
+           [s isEqualToString:@"已认证"];
+}
+
+static NSString *DiscoverStringFromAny(id value) {
+    if ([value isKindOfClass:NSString.class]) {
+        return (NSString *)value;
+    }
+    if ([value isKindOfClass:NSNumber.class]) {
+        return [(NSNumber *)value stringValue];
+    }
+    return nil;
+}
+
+static BOOL DiscoverBoolFromAny(id value, BOOL *hasValue) {
+    if (hasValue) *hasValue = NO;
+    if ([value isKindOfClass:NSNumber.class]) {
+        if (hasValue) *hasValue = YES;
+        return [(NSNumber *)value boolValue];
+    }
+    if ([value isKindOfClass:NSString.class]) {
+        NSString *s = [((NSString *)value) stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]].lowercaseString;
+        if (s.length == 0) return NO;
+        if ([s isEqualToString:@"1"] || [s isEqualToString:@"true"] || [s isEqualToString:@"yes"]) {
+            if (hasValue) *hasValue = YES;
+            return YES;
+        }
+        if ([s isEqualToString:@"0"] || [s isEqualToString:@"false"] || [s isEqualToString:@"no"]) {
+            if (hasValue) *hasValue = YES;
+            return NO;
+        }
+    }
+    return NO;
+}
+
+static NSString *DiscoverNormalizedRecordStatus(NSDictionary *row) {
+    NSString *status = DiscoverStringFromAny(row[@"verificationStatus"]);
+    if (status.length == 0) status = DiscoverStringFromAny(row[@"verification_status"]);
+    if (status.length == 0) status = DiscoverStringFromAny(row[@"verifyStatus"]);
+    if (status.length == 0) status = DiscoverStringFromAny(row[@"verify_status"]);
+    if (status.length == 0) status = DiscoverStringFromAny(row[@"status"]);
+    if (status.length > 0) {
+        if (DiscoverIsApprovedVerificationStatus(status)) return @"VERIFIED";
+        if (DiscoverIsPendingVerificationStatus(status)) return @"PENDING";
+        NSString *s = status.lowercaseString;
+        if ([s containsString:@"reject"] || [s containsString:@"refuse"] || [s containsString:@"fail"] || [s containsString:@"拒"]) {
+            return @"REJECTED";
+        }
+    }
+    BOOL hasValue = NO;
+    BOOL verified = DiscoverBoolFromAny(row[@"verifyCompleted"], &hasValue);
+    if (!hasValue) verified = DiscoverBoolFromAny(row[@"verify_completed"], &hasValue);
+    if (!hasValue) verified = DiscoverBoolFromAny(row[@"ticketVerified"], &hasValue);
+    if (!hasValue) verified = DiscoverBoolFromAny(row[@"ticket_verified"], &hasValue);
+    if (!hasValue) verified = DiscoverBoolFromAny(row[@"verified"], &hasValue);
+    if (!hasValue) verified = DiscoverBoolFromAny(row[@"isVerified"], &hasValue);
+    if (hasValue && verified) {
+        return @"VERIFIED";
+    }
+    BOOL pendingFlag = DiscoverBoolFromAny(row[@"pending"], &hasValue);
+    if (!hasValue) pendingFlag = DiscoverBoolFromAny(row[@"isPending"], &hasValue);
+    if (!hasValue) pendingFlag = DiscoverBoolFromAny(row[@"pendingReview"], &hasValue);
+    if (!hasValue) pendingFlag = DiscoverBoolFromAny(row[@"isPendingReview"], &hasValue);
+    if (hasValue && pendingFlag) {
+        return @"PENDING";
+    }
+    return nil;
+}
+
+static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
+    if ([data isKindOfClass:NSArray.class]) {
+        return (NSArray<NSDictionary *> *)data;
+    }
+    if (![data isKindOfClass:NSDictionary.class]) {
+        return @[];
+    }
+    NSDictionary *dict = (NSDictionary *)data;
+    id list = dict[@"list"] ?: dict[@"records"] ?: dict[@"rows"] ?: dict[@"items"];
+    if ([list isKindOfClass:NSArray.class]) {
+        return (NSArray<NSDictionary *> *)list;
+    }
+    id inner = dict[@"data"];
+    if ([inner isKindOfClass:NSArray.class]) {
+        return (NSArray<NSDictionary *> *)inner;
+    }
+    if ([inner isKindOfClass:NSDictionary.class]) {
+        NSDictionary *innerDict = (NSDictionary *)inner;
+        id innerList = innerDict[@"list"] ?: innerDict[@"records"] ?: innerDict[@"rows"] ?: innerDict[@"items"];
+        if ([innerList isKindOfClass:NSArray.class]) {
+            return (NSArray<NSDictionary *> *)innerList;
+        }
+    }
+    return @[];
+}
+
 @interface DiscoverMatch : NSObject
 @property (nonatomic, copy) NSString *recordId;
 @property (nonatomic, copy) NSString *matchId;
@@ -109,6 +231,8 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
 @property (nonatomic, assign) BOOL hasInputInfo;
 /// 是否已经完成“认证比赛”
 @property (nonatomic, assign) BOOL hasVerified;
+/// 已提交认证，待审核
+@property (nonatomic, assign) BOOL hasPendingVerification;
 @property (nonatomic, assign) DiscoverMatchType type;
 @property (nonatomic, copy) NSString *homeLogoURL;
 @property (nonatomic, copy) NSString *awayLogoURL;
@@ -927,7 +1051,11 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
     self.statAValue.text = [NSString stringWithFormat:@"%ld", (long)totalMatches];
     NSInteger mins = MAX(statistics.cumulativeWatchTime, 0);
     self.statBValue.text = [NSString stringWithFormat:@"%ld min", (long)mins];
-    self.statCValue.text = [NSString stringWithFormat:@"%ld", (long)MAX((NSInteger)statistics.stadiumRanking.count, 0)];
+    // 总球场数：优先用服务端直接返回的 totalStadiumCount，兜底用 stadiumRanking 列表长度
+    NSInteger stadiumCount = statistics.totalStadiumCount > 0
+        ? statistics.totalStadiumCount
+        : (NSInteger)statistics.stadiumRanking.count;
+    self.statCValue.text = [NSString stringWithFormat:@"%ld", (long)MAX(stadiumCount, 0)];
     self.statDValue.text = [NSString stringWithFormat:@"%ld", (long)MAX((NSInteger)statistics.leagueStats.count, 0)];
     self.statEValue.text = [NSString stringWithFormat:@"%ld", (long)MAX(statistics.countryCount, 0)];
 
@@ -975,7 +1103,23 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
     dispatch_group_notify(group, dispatch_get_main_queue(), ^{
         weakSelf.upcomingMatches = [weakSelf discoverMatchesFrom:upList type:DiscoverMatchTypeUpcoming];
         weakSelf.finishedMatches = [weakSelf discoverMatchesFrom:finList type:DiscoverMatchTypeFinished];
+        // Debug: 打印第一条已观赛数据的关键字段
+        if (finList.count > 0) {
+            Match *first = finList[0];
+            NSLog(@"[DiscoverDebug] finishedMatches[0] => matchId=%@, recordId=%@, verifyCompleted=%d, verificationStatus=%@, certifiedMinutes=%ld",
+                  first.matchId ?: @"",
+                  first.recordId ?: @"",
+                  first.verifyCompleted,
+                  first.verificationStatus ?: @"(nil)",
+                  (long)first.certifiedMinutes);
+        }
+        if (weakSelf.finishedMatches.count > 0) {
+            DiscoverMatch *dm = weakSelf.finishedMatches[0];
+            NSLog(@"[DiscoverDebug] DiscoverMatch[0] => hasVerified=%d, hasPending=%d, verifiedText=%@",
+                  dm.hasVerified, dm.hasPendingVerification, dm.verifiedText ?: @"(nil)");
+        }
         [weakSelf refreshTabs];
+        [weakSelf refreshFinishedPendingStatusByDetail];
     });
     [[ProfileRequest shared] getMyStatisticsWithPeriod:@"all" success:^(HTTPResponse * _Nullable responseObject) {
         PNStatistics *statistics = [responseObject.dataObject isKindOfClass:PNStatistics.class] ? responseObject.dataObject : nil;
@@ -985,10 +1129,224 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
     }];
 }
 
+- (void)refreshFinishedStatusFromPassportRecords {
+    if (self.finishedMatches.count == 0) return;
+    NSString *pendingTitle = (NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"待审核");
+    NSString *fmtVerified = (NSLocalizedString(@"discover_verified_minutes_format", nil) ?: @"已认证%ld分钟");
+    __weak typeof(self) weakSelf = self;
+    [[ProfileRequest shared] getMyPassportMatchRecordsWithYear:nil tab:@"past" status:nil page:1 pageSize:200 success:^(HTTPResponse * _Nullable responseObject) {
+        id payload = responseObject.dataObject ?: responseObject.data;
+        NSArray<NSDictionary *> *rows = DiscoverRecordArrayFromData(payload);
+#if DEBUG
+        NSLog(@"[DiscoverDebug] passportRecords payload class=%@, rows.count=%ld",
+              NSStringFromClass([payload class]), (long)rows.count);
+        if (rows.count > 0 && [rows[0] isKindOfClass:NSDictionary.class]) {
+            NSDictionary *r0 = rows[0];
+            NSLog(@"[DiscoverDebug] passportRecords row[0] keys=%@", r0.allKeys);
+            NSLog(@"[DiscoverDebug] passportRecords row[0] verificationStatus=%@, matchId=%@, recordId=%@",
+                  r0[@"verificationStatus"] ?: @"(nil)",
+                  r0[@"matchId"] ?: @"(nil)",
+                  r0[@"recordId"] ?: @"(nil)");
+        }
+#endif
+        if (rows.count == 0) {
+            return;
+        }
+        // statusByMatchId: matchId -> normalized status
+        // minutesByMatchId: matchId -> duration（来自护照记录里关联的比赛时长，没有则兜底90）
+        NSMutableDictionary<NSString *, NSString *> *statusByRecordId = [NSMutableDictionary dictionary];
+        NSMutableDictionary<NSString *, NSString *> *statusByMatchId = [NSMutableDictionary dictionary];
+        __block BOOL loggedFirstMatchedRow = NO;
+        for (id item in rows) {
+            if (![item isKindOfClass:NSDictionary.class]) continue;
+            NSDictionary *row = (NSDictionary *)item;
+            NSString *normalized = DiscoverNormalizedRecordStatus(row);
+            if (normalized.length == 0) continue;
+            NSString *recordId = DiscoverStringFromAny(row[@"recordId"]);
+            if (recordId.length == 0) recordId = DiscoverStringFromAny(row[@"id"]);
+            NSString *matchId = DiscoverStringFromAny(row[@"matchId"]);
+            if (matchId.length == 0) matchId = DiscoverStringFromAny(row[@"match_id"]);
+            if (!loggedFirstMatchedRow) {
+                loggedFirstMatchedRow = YES;
+                NSLog(@"[DiscoverDebug] first matched row => recordId=%@, matchId=%@, status=%@, verificationStatus=%@, verifyCompleted=%@, verification_status=%@, verifyStatus=%@, verify_status=%@, verify_completed=%@",
+                      recordId ?: @"",
+                      matchId ?: @"",
+                      DiscoverStringFromAny(row[@"status"]) ?: @"",
+                      DiscoverStringFromAny(row[@"verificationStatus"]) ?: @"",
+                      DiscoverStringFromAny(row[@"verifyCompleted"]) ?: @"",
+                      DiscoverStringFromAny(row[@"verification_status"]) ?: @"",
+                      DiscoverStringFromAny(row[@"verifyStatus"]) ?: @"",
+                      DiscoverStringFromAny(row[@"verify_status"]) ?: @"",
+                      DiscoverStringFromAny(row[@"verify_completed"]) ?: @"");
+            }
+            if (recordId.length > 0) statusByRecordId[recordId] = normalized;
+            if (matchId.length > 0) statusByMatchId[matchId] = normalized;
+        }
+        if (statusByRecordId.count == 0 && statusByMatchId.count == 0) {
+            return;
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+        BOOL changed = NO;
+        for (DiscoverMatch *match in weakSelf.finishedMatches) {
+            NSString *normalized = nil;
+            if (match.recordId.length > 0) {
+                normalized = statusByRecordId[match.recordId];
+            }
+            if (normalized.length == 0 && match.matchId.length > 0) {
+                normalized = statusByMatchId[match.matchId];
+            }
+            if (normalized.length == 0) {
+                continue;
+            }
+            if ([normalized isEqualToString:@"VERIFIED"]) {
+                if (!match.hasVerified || match.hasPendingVerification) {
+                    match.hasVerified = YES;
+                    match.hasPendingVerification = NO;
+                    // 已有带分钟数的文本则保留，否则用 90 分钟兜底
+                    if (match.verifiedText.length == 0) {
+                        match.verifiedText = [NSString stringWithFormat:fmtVerified, (long)90];
+                    }
+                    changed = YES;
+                }
+            } else if ([normalized isEqualToString:@"PENDING"]) {
+                if (match.hasVerified || !match.hasPendingVerification || ![match.verifiedText isEqualToString:pendingTitle]) {
+                    match.hasVerified = NO;
+                    match.hasPendingVerification = YES;
+                    match.verifiedText = pendingTitle;
+                    changed = YES;
+                }
+            }
+        }
+        if (changed) {
+            [weakSelf.tableView reloadData];
+        }
+        });
+        
+    } failure:^(NSError * _Nonnull error) {
+    }];
+}
+
+- (void)refreshFinishedPendingStatusByDetail {
+    if (self.finishedMatches.count == 0) return;
+    NSString *pendingTitle = (NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"待审核");
+    NSString *fmtVerified = (NSLocalizedString(@"discover_verified_minutes_format", nil) ?: @"已认证%ld分钟");
+    __weak typeof(self) weakSelf = self;
+
+    // 先批量拉护照记录，建立 matchId -> {status, duration} 映射，作为兜底数据源
+    [[ProfileRequest shared] getMyPassportMatchRecordsWithYear:nil tab:@"past" status:nil page:1 pageSize:200 success:^(HTTPResponse * _Nullable responseObject) {
+        id payload = responseObject.dataObject ?: responseObject.data;
+        NSArray<NSDictionary *> *rows = DiscoverRecordArrayFromData(payload);
+
+        // matchId -> verificationStatus
+        NSMutableDictionary<NSString *, NSString *> *statusByMatchId = [NSMutableDictionary dictionary];
+        // matchId -> duration
+        NSMutableDictionary<NSString *, NSNumber *> *durationByMatchId = [NSMutableDictionary dictionary];
+
+        for (id item in rows) {
+            if (![item isKindOfClass:NSDictionary.class]) continue;
+            NSDictionary *row = (NSDictionary *)item;
+            NSString *normalized = DiscoverNormalizedRecordStatus(row);
+            if (normalized.length == 0) continue;
+            NSString *matchId = DiscoverStringFromAny(row[@"matchId"]);
+            if (matchId.length == 0) matchId = DiscoverStringFromAny(row[@"match_id"]);
+            if (matchId.length == 0) continue;
+            // 同一 matchId 优先保留 VERIFIED
+            if (statusByMatchId[matchId] == nil || [normalized isEqualToString:@"VERIFIED"]) {
+                statusByMatchId[matchId] = normalized;
+            }
+            // duration
+            id dur = row[@"duration"];
+            if ([dur respondsToSelector:@selector(integerValue)] && [dur integerValue] > 0) {
+                durationByMatchId[matchId] = @([dur integerValue]);
+            }
+        }
+
+        // 对每条已观赛记录：有 recordId 则查 detail（最准确），否则用护照记录的 matchId 映射
+        for (DiscoverMatch *match in weakSelf.finishedMatches) {
+            if (match.recordId.length > 0) {
+                // 有 recordId：调 detail 接口，结果最权威
+                [[MatchRequest shared] getMatchRecordDetail:match.recordId success:^(HTTPResponse * _Nullable responseObject) {
+                    NSString *status = nil;
+                    NSInteger duration = 0;
+                    if ([responseObject.dataObject isKindOfClass:PNMatchRecordDetail.class]) {
+                        PNMatchRecordDetail *detailObj = (PNMatchRecordDetail *)responseObject.dataObject;
+                        status = detailObj.verificationStatus;
+                        duration = detailObj.duration;
+                    }
+                    // 从原始 JSON 兜底
+                    NSDictionary *raw = [responseObject.data isKindOfClass:NSDictionary.class] ? (NSDictionary *)responseObject.data : nil;
+                    NSDictionary *inner = [raw[@"data"] isKindOfClass:NSDictionary.class] ? (NSDictionary *)raw[@"data"] : nil;
+                    NSDictionary *src = inner ?: raw;
+                    if (status.length == 0 && src) {
+                        for (NSString *key in @[@"verificationStatus", @"verification_status", @"verifyStatus", @"verify_status"]) {
+                            id v = src[key];
+                            if ([v isKindOfClass:NSString.class] && [(NSString *)v length] > 0) { status = (NSString *)v; break; }
+                        }
+                    }
+                    if (duration == 0 && src) {
+                        id d = src[@"duration"];
+                        if ([d respondsToSelector:@selector(integerValue)]) duration = [d integerValue];
+                    }
+#if DEBUG
+                    NSLog(@"[DiscoverDebug] detail recordId=%@ => status=%@, duration=%ld", match.recordId, status ?: @"(nil)", (long)duration);
+#endif
+                    if (status.length == 0) return;
+                    BOOL approved = DiscoverIsApprovedVerificationStatus(status);
+                    BOOL pending  = !approved && DiscoverIsPendingVerificationStatus(status);
+                    if (!approved && !pending) return;
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        if (approved) {
+                            match.hasVerified = YES;
+                            match.hasPendingVerification = NO;
+                            NSInteger minutes = duration > 0 ? duration : 90;
+                            match.verifiedText = [NSString stringWithFormat:fmtVerified, (long)minutes];
+                        } else {
+                            match.hasVerified = NO;
+                            match.hasPendingVerification = YES;
+                            match.verifiedText = pendingTitle;
+                        }
+                        [weakSelf.tableView reloadData];
+                    });
+                } failure:^(NSError * _Nonnull error) {
+#if DEBUG
+                    NSLog(@"[DiscoverDebug] detail recordId=%@ FAILED: %@", match.recordId, error.localizedDescription);
+#endif
+                }];
+            } else if (match.matchId.length > 0) {
+                // 没有 recordId：用护照记录的 matchId 映射兜底
+                NSString *normalized = statusByMatchId[match.matchId];
+                if (normalized.length == 0) continue;
+                NSInteger duration = [durationByMatchId[match.matchId] integerValue];
+                BOOL approved = [normalized isEqualToString:@"VERIFIED"];
+                BOOL pending  = [normalized isEqualToString:@"PENDING"];
+                if (!approved && !pending) continue;
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (approved) {
+                        match.hasVerified = YES;
+                        match.hasPendingVerification = NO;
+                        NSInteger minutes = duration > 0 ? duration : 90;
+                        match.verifiedText = [NSString stringWithFormat:fmtVerified, (long)minutes];
+                    } else {
+                        match.hasVerified = NO;
+                        match.hasPendingVerification = YES;
+                        match.verifiedText = pendingTitle;
+                    }
+                    [weakSelf.tableView reloadData];
+                });
+            }
+        }
+    } failure:^(NSError * _Nonnull error) {
+#if DEBUG
+        NSLog(@"[DiscoverDebug] passportRecords FAILED: %@", error.localizedDescription);
+#endif
+    }];
+}
+
 - (NSArray<DiscoverMatch *> *)discoverMatchesFrom:(NSArray<Match *> *)matches type:(DiscoverMatchType)type {
     NSMutableArray *result = [NSMutableArray arrayWithCapacity:matches.count];
     NSString *fmtVerified = (NSLocalizedString(@"discover_verified_minutes_format", nil) ?: @"已认证%ld分钟");
     NSString *approvedTitle = (NSLocalizedString(@"auth_cert_status_approved", nil) ?: @"已认证");
+    NSString *pendingTitle = (NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"待审核");
     for (Match *match in matches) {
         DiscoverMatch *m = [DiscoverMatch new];
         m.recordId = match.recordId;
@@ -1002,14 +1360,23 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
         if (type == DiscoverMatchTypeUpcoming) {
             m.scoreText = m.timeText;
             m.hasInputInfo = match.infoCompleted;
-            m.hasVerified = match.verifyCompleted;
+            m.hasVerified = match.verifyCompleted || DiscoverIsApprovedVerificationStatus(match.verificationStatus);
+            m.hasPendingVerification = (!m.hasVerified && DiscoverIsPendingVerificationStatus(match.verificationStatus));
             m.verifiedText = m.hasVerified ? approvedTitle : @"";
         } else {
             m.scoreText = [NSString stringWithFormat:@"%ld : %ld", (long)match.homeScore, (long)match.awayScore];
             m.hasInputInfo = match.infoCompleted;
-            m.hasVerified = match.verifyCompleted;
-            NSInteger minutes = match.certifiedMinutes > 0 ? match.certifiedMinutes : (NSInteger)[match.viewCount integerValue];
-            m.verifiedText = [NSString stringWithFormat:fmtVerified, (long)MAX(minutes, 0)];
+            m.hasVerified = match.verifyCompleted || DiscoverIsApprovedVerificationStatus(match.verificationStatus);
+            m.hasPendingVerification = (!m.hasVerified && DiscoverIsPendingVerificationStatus(match.verificationStatus));
+            if (m.hasVerified) {
+                // certifiedMinutes > 0 时显示具体分钟数，否则显示默认 90 分钟（标准足球比赛时长）
+                NSInteger minutes = match.certifiedMinutes > 0 ? match.certifiedMinutes : 90;
+                m.verifiedText = [NSString stringWithFormat:fmtVerified, (long)minutes];
+            } else if (m.hasPendingVerification) {
+                m.verifiedText = pendingTitle;
+            } else {
+                m.verifiedText = @"";
+            }
         }
         m.type = type;
         [result addObject:m];
@@ -1176,6 +1543,12 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
             [cell.verifiedPill setTitleColor:[UIColor colorWithRed:0.298 green:0.851 blue:0.392 alpha:1.0] forState:UIControlStateNormal];
             [cell.verifiedPill setImage:[UIImage imageNamed:@"weizhi"] forState:UIControlStateNormal];
             cell.verifiedPill.tintColor = [UIColor colorWithRed:0.298 green:0.851 blue:0.392 alpha:1.0];
+        } else if (m.hasPendingVerification) {
+            [cell.verifiedPill setTitle:(m.verifiedText.length ? m.verifiedText : (NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"待审核")) forState:UIControlStateNormal];
+            cell.verifiedPill.backgroundColor = [UIColor colorWithRed:0.42 green:0.42 blue:0.42 alpha:1.0];
+            [cell.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+            [cell.verifiedPill setImage:nil forState:UIControlStateNormal];
+            cell.verifiedPill.tintColor = [UIColor whiteColor];
         } else {
             [cell.verifiedPill setTitle:(NSLocalizedString(@"discover_verify_match", nil) ?: @"认证比赛") forState:UIControlStateNormal];
             cell.verifiedPill.backgroundColor = kDiscoverPillGreen;
@@ -1218,6 +1591,8 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
         // 仍有步骤未完成时，不允许直接进详情，这里优先引导到“输入信息”
         if (!m.hasInputInfo) {
             [self presentMatchInfoForMatch:m];
+        } else if (m.hasPendingVerification) {
+            [[LoadingManager sharedManager] showText:(NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"待审核") inView:self.view];
         } else {
             [self presentMatchVerifyForMatch:m];
         }
@@ -1229,6 +1604,10 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
     NSIndexPath *indexPath = [self.tableView indexPathForRowAtPoint:pointInTable];
     if (!indexPath) return;
     DiscoverMatch *m = [self currentDataSource][indexPath.row];
+    if (m.hasPendingVerification) {
+        [[LoadingManager sharedManager] showText:(NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"待审核") inView:self.view];
+        return;
+    }
     if (m.type == DiscoverMatchTypeUpcoming) {
         [self presentMatchVerifyForMatch:m];
         return;
@@ -1277,9 +1656,12 @@ static NSDate *DiscoverDateFromRawString(NSString *raw) {
     vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
     __weak typeof(self) weakSelf = self;
     vc.completion = ^{
-        // 完成“认证比赛”流程
-        match.hasVerified = YES;
+        // 提交后先显示待审核，最终状态以后端回源为准
+        match.hasVerified = NO;
+        match.hasPendingVerification = YES;
+        match.verifiedText = (NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"待审核");
         [weakSelf.tableView reloadData];
+        [weakSelf loadRemoteData];
     };
     [self presentViewController:vc animated:NO completion:nil];
 }
