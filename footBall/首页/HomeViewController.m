@@ -807,64 +807,76 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
 }
 
 - (void)fetchScheduleMatches {
-    // date 是必填参数，传今天日期；myTeamOnly=YES 只显示关注球队的比赛
     NSDateFormatter *dateFmt = [[NSDateFormatter alloc] init];
     dateFmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
     dateFmt.dateFormat = @"yyyy-MM-dd";
     NSString *todayStr = [dateFmt stringFromDate:[NSDate date]];
 
+    NSDateFormatter *monthFmt = [[NSDateFormatter alloc] init];
+    monthFmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    monthFmt.dateFormat = @"yyyy-MM";
+    NSString *monthStr = [monthFmt stringFromDate:[NSDate date]];
+
     __weak typeof(self) weakSelf = self;
-    [[MatchRequest shared] getMatchScheduleWithDate:todayStr myTeamOnly:YES page:1 pageSize:50 success:^(HTTPResponse<NSArray<Match *> *> * _Nullable responseObject) {
+
+    // 先查当月所有有比赛的日期，然后并发拉每个日期的日程，合并展示
+    [[MatchRequest shared] getMatchScheduleDatesWithMonth:monthStr success:^(HTTPResponse * _Nullable responseObject) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
-        NSArray<Match *> *list = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
-        // 如果今天没有比赛，尝试不限日期（传当月第一天）
-        if (list.count == 0) {
-            NSDateFormatter *monthFmt = [[NSDateFormatter alloc] init];
-            monthFmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-            monthFmt.dateFormat = @"yyyy-MM-01";
-            NSString *monthStart = [monthFmt stringFromDate:[NSDate date]];
-            [[MatchRequest shared] getMatchScheduleWithDate:monthStart myTeamOnly:YES page:1 pageSize:50 success:^(HTTPResponse<NSArray<Match *> *> * _Nullable r2) {
-                __strong typeof(weakSelf) self = weakSelf;
-                if (!self) return;
-                NSArray<Match *> *list2 = [r2.dataObject isKindOfClass:NSArray.class] ? r2.dataObject : @[];
-                NSArray<Match *> *sorted = [list2 sortedArrayUsingComparator:^NSComparisonResult(Match *a, Match *b) {
-                    NSDate *da = [self dateFromRaw:a.matchDate];
-                    NSDate *db = [self dateFromRaw:b.matchDate];
-                    if (!da && !db) return NSOrderedSame;
-                    if (!da) return NSOrderedDescending;
-                    if (!db) return NSOrderedAscending;
-                    return [db compare:da];
-                }];
-                self.dataSource = sorted.mutableCopy;
-                [self filterData];
-                [self updateTableHeight];
-            } failure:^(NSError * _Nonnull error) {
-                __strong typeof(weakSelf) self = weakSelf;
-                if (!self) return;
-                self.dataSource = NSMutableArray.array;
-                [self filterData];
-                [self updateTableHeight];
-            }];
-            return;
+
+        NSArray *dates = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+        if (dates.count == 0) {
+            // 当月没有比赛，用今天查一次兜底
+            dates = @[todayStr];
         }
-        NSArray<Match *> *sorted = [list sortedArrayUsingComparator:^NSComparisonResult(Match *a, Match *b) {
-            NSDate *da = [self dateFromRaw:a.matchDate];
-            NSDate *db = [self dateFromRaw:b.matchDate];
-            if (!da && !db) return NSOrderedSame;
-            if (!da) return NSOrderedDescending;
-            if (!db) return NSOrderedAscending;
-            return [db compare:da];
-        }];
-        self.dataSource = sorted.mutableCopy;
-        [self filterData];
-        [self updateTableHeight];
+
+        // 并发请求所有日期的日程，合并结果
+        dispatch_group_t group = dispatch_group_create();
+        NSMutableArray<Match *> *allMatches = [NSMutableArray array];
+        NSLock *lock = [[NSLock alloc] init];
+
+        for (NSString *date in dates) {
+            if (![date isKindOfClass:NSString.class]) continue;
+            dispatch_group_enter(group);
+            [[MatchRequest shared] getMatchScheduleWithDate:date myTeamOnly:NO page:1 pageSize:50 success:^(HTTPResponse<NSArray<Match *> *> * _Nullable r) {
+                NSArray<Match *> *list = [r.dataObject isKindOfClass:NSArray.class] ? r.dataObject : @[];
+                [lock lock];
+                [allMatches addObjectsFromArray:list];
+                [lock unlock];
+                dispatch_group_leave(group);
+            } failure:^(NSError * _Nonnull error) {
+                dispatch_group_leave(group);
+            }];
+        }
+
+        dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) return;
+            // 按日期倒序排列
+            NSArray<Match *> *sorted = [allMatches sortedArrayUsingComparator:^NSComparisonResult(Match *a, Match *b) {
+                NSDate *da = [self dateFromRaw:a.matchDate];
+                NSDate *db = [self dateFromRaw:b.matchDate];
+                if (!da && !db) return NSOrderedSame;
+                if (!da) return NSOrderedDescending;
+                if (!db) return NSOrderedAscending;
+                return [db compare:da];
+            }];
+            self.dataSource = sorted.mutableCopy;
+            [self filterData];
+            [self updateTableHeight];
+        });
     } failure:^(NSError * _Nonnull error) {
+        // 日历接口失败，直接用今天查
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
-        self.dataSource = NSMutableArray.array;
-        [self filterData];
-        [self updateTableHeight];
+        [[MatchRequest shared] getMatchScheduleWithDate:todayStr myTeamOnly:NO page:1 pageSize:50 success:^(HTTPResponse<NSArray<Match *> *> * _Nullable r2) {
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) return;
+            NSArray<Match *> *list = [r2.dataObject isKindOfClass:NSArray.class] ? r2.dataObject : @[];
+            self.dataSource = [list mutableCopy];
+            [self filterData];
+            [self updateTableHeight];
+        } failure:nil];
     }];
 }
 
@@ -880,16 +892,9 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
         self.teamItems = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
-        // 默认选中第一个球队
-        TeamIcon *first = self.teamItems.firstObject;
-        self.selectedTeamId = first.teamId;
+        // 默认不选中任何球队，显示全部比赛
+        self.selectedTeamId = nil;
         [self.teamCollectionView reloadData];
-        // 选中后滚动到第一个
-        if (self.teamItems.count > 0) {
-            [self.teamCollectionView scrollToItemAtIndexPath:[NSIndexPath indexPathForItem:0 inSection:0]
-                                           atScrollPosition:UICollectionViewScrollPositionLeft
-                                                   animated:NO];
-        }
         [self filterData];
     } failure:^(NSError * _Nonnull error) {
         __strong typeof(weakSelf) self = weakSelf;
