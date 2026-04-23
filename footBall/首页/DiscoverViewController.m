@@ -1227,119 +1227,77 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
 }
 
 - (void)refreshFinishedPendingStatusByDetail {
+    NSLog(@"[DiscoverDebug] refreshByDetail called, finishedMatches.count=%ld", (long)self.finishedMatches.count);
     if (self.finishedMatches.count == 0) return;
     NSString *pendingTitle = (NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"待审核");
     NSString *fmtVerified = (NSLocalizedString(@"discover_verified_minutes_format", nil) ?: @"已认证%ld分钟");
     __weak typeof(self) weakSelf = self;
 
-    // 先批量拉护照记录，建立 matchId -> {status, duration} 映射，作为兜底数据源
-    [[ProfileRequest shared] getMyPassportMatchRecordsWithYear:nil tab:@"past" status:nil page:1 pageSize:200 success:^(HTTPResponse * _Nullable responseObject) {
-        id payload = responseObject.dataObject ?: responseObject.data;
-        NSArray<NSDictionary *> *rows = DiscoverRecordArrayFromData(payload);
+    // 收集所有需要查询的 matchId
+    NSMutableSet<NSString *> *matchIds = [NSMutableSet set];
+    for (DiscoverMatch *match in self.finishedMatches) {
+        if (match.matchId.length > 0) [matchIds addObject:match.matchId];
+    }
+    if (matchIds.count == 0) return;
 
-        // matchId -> verificationStatus
-        NSMutableDictionary<NSString *, NSString *> *statusByMatchId = [NSMutableDictionary dictionary];
-        // matchId -> duration
-        NSMutableDictionary<NSString *, NSNumber *> *durationByMatchId = [NSMutableDictionary dictionary];
+    // 直接查护照记录接口，status=VERIFIED，不限年份，获取所有已认证记录
+    // 用 matchId 做映射，不依赖 recordId（绕过后端 getUserMatchRecordMap 的 bug）
+    // 同时查当前年和上一年，覆盖跨年场景
+    NSCalendar *cal = [NSCalendar currentCalendar];
+    NSInteger currentYear = [cal component:NSCalendarUnitYear fromDate:[NSDate date]];
+    NSInteger lastYear = currentYear - 1;
 
+    dispatch_group_t grp = dispatch_group_create();
+    NSMutableSet<NSString *> *verifiedMatchIds = [NSMutableSet set];
+    NSMutableDictionary<NSString *, NSNumber *> *durationByMatchId = [NSMutableDictionary dictionary];
+
+    void (^processRows)(NSArray<NSDictionary *> *) = ^(NSArray<NSDictionary *> *rows) {
         for (id item in rows) {
             if (![item isKindOfClass:NSDictionary.class]) continue;
             NSDictionary *row = (NSDictionary *)item;
-            NSString *normalized = DiscoverNormalizedRecordStatus(row);
-            if (normalized.length == 0) continue;
             NSString *matchId = DiscoverStringFromAny(row[@"matchId"]);
             if (matchId.length == 0) matchId = DiscoverStringFromAny(row[@"match_id"]);
             if (matchId.length == 0) continue;
-            // 同一 matchId 优先保留 VERIFIED
-            if (statusByMatchId[matchId] == nil || [normalized isEqualToString:@"VERIFIED"]) {
-                statusByMatchId[matchId] = normalized;
-            }
-            // duration
-            id dur = row[@"duration"];
-            if ([dur respondsToSelector:@selector(integerValue)] && [dur integerValue] > 0) {
-                durationByMatchId[matchId] = @([dur integerValue]);
+            @synchronized(verifiedMatchIds) {
+                [verifiedMatchIds addObject:matchId];
             }
         }
+    };
 
-        // 对每条已观赛记录：有 recordId 则查 detail（最准确），否则用护照记录的 matchId 映射
+    dispatch_group_enter(grp);
+    [[ProfileRequest shared] getMyPassportMatchRecordsWithYear:@(currentYear).stringValue tab:@"past" status:@"VERIFIED" page:1 pageSize:200 success:^(HTTPResponse * _Nullable responseObject) {
+        id payload = responseObject.dataObject ?: responseObject.data;
+        processRows(DiscoverRecordArrayFromData(payload));
+        dispatch_group_leave(grp);
+    } failure:^(NSError * _Nonnull error) {
+        dispatch_group_leave(grp);
+    }];
+
+    dispatch_group_enter(grp);
+    [[ProfileRequest shared] getMyPassportMatchRecordsWithYear:@(lastYear).stringValue tab:@"past" status:@"VERIFIED" page:1 pageSize:200 success:^(HTTPResponse * _Nullable responseObject) {
+        id payload = responseObject.dataObject ?: responseObject.data;
+        processRows(DiscoverRecordArrayFromData(payload));
+        dispatch_group_leave(grp);
+    } failure:^(NSError * _Nonnull error) {
+        dispatch_group_leave(grp);
+    }];
+
+    dispatch_group_notify(grp, dispatch_get_main_queue(), ^{
+        NSLog(@"[DiscoverDebug] verifiedMatchIds=%@", verifiedMatchIds);
+        BOOL changed = NO;
         for (DiscoverMatch *match in weakSelf.finishedMatches) {
-            if (match.recordId.length > 0) {
-                // 有 recordId：调 detail 接口，结果最权威
-                [[MatchRequest shared] getMatchRecordDetail:match.recordId success:^(HTTPResponse * _Nullable responseObject) {
-                    NSString *status = nil;
-                    NSInteger duration = 0;
-                    if ([responseObject.dataObject isKindOfClass:PNMatchRecordDetail.class]) {
-                        PNMatchRecordDetail *detailObj = (PNMatchRecordDetail *)responseObject.dataObject;
-                        status = detailObj.verificationStatus;
-                        duration = detailObj.duration;
-                    }
-                    // 从原始 JSON 兜底
-                    NSDictionary *raw = [responseObject.data isKindOfClass:NSDictionary.class] ? (NSDictionary *)responseObject.data : nil;
-                    NSDictionary *inner = [raw[@"data"] isKindOfClass:NSDictionary.class] ? (NSDictionary *)raw[@"data"] : nil;
-                    NSDictionary *src = inner ?: raw;
-                    if (status.length == 0 && src) {
-                        for (NSString *key in @[@"verificationStatus", @"verification_status", @"verifyStatus", @"verify_status"]) {
-                            id v = src[key];
-                            if ([v isKindOfClass:NSString.class] && [(NSString *)v length] > 0) { status = (NSString *)v; break; }
-                        }
-                    }
-                    if (duration == 0 && src) {
-                        id d = src[@"duration"];
-                        if ([d respondsToSelector:@selector(integerValue)]) duration = [d integerValue];
-                    }
-#if DEBUG
-                    NSLog(@"[DiscoverDebug] detail recordId=%@ => status=%@, duration=%ld", match.recordId, status ?: @"(nil)", (long)duration);
-#endif
-                    if (status.length == 0) return;
-                    BOOL approved = DiscoverIsApprovedVerificationStatus(status);
-                    BOOL pending  = !approved && DiscoverIsPendingVerificationStatus(status);
-                    if (!approved && !pending) return;
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                        if (approved) {
-                            match.hasVerified = YES;
-                            match.hasPendingVerification = NO;
-                            NSInteger minutes = duration > 0 ? duration : 90;
-                            match.verifiedText = [NSString stringWithFormat:fmtVerified, (long)minutes];
-                        } else {
-                            match.hasVerified = NO;
-                            match.hasPendingVerification = YES;
-                            match.verifiedText = pendingTitle;
-                        }
-                        [weakSelf.tableView reloadData];
-                    });
-                } failure:^(NSError * _Nonnull error) {
-#if DEBUG
-                    NSLog(@"[DiscoverDebug] detail recordId=%@ FAILED: %@", match.recordId, error.localizedDescription);
-#endif
-                }];
-            } else if (match.matchId.length > 0) {
-                // 没有 recordId：用护照记录的 matchId 映射兜底
-                NSString *normalized = statusByMatchId[match.matchId];
-                if (normalized.length == 0) continue;
-                NSInteger duration = [durationByMatchId[match.matchId] integerValue];
-                BOOL approved = [normalized isEqualToString:@"VERIFIED"];
-                BOOL pending  = [normalized isEqualToString:@"PENDING"];
-                if (!approved && !pending) continue;
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    if (approved) {
-                        match.hasVerified = YES;
-                        match.hasPendingVerification = NO;
-                        NSInteger minutes = duration > 0 ? duration : 90;
-                        match.verifiedText = [NSString stringWithFormat:fmtVerified, (long)minutes];
-                    } else {
-                        match.hasVerified = NO;
-                        match.hasPendingVerification = YES;
-                        match.verifiedText = pendingTitle;
-                    }
-                    [weakSelf.tableView reloadData];
-                });
+            if (match.matchId.length == 0) continue;
+            if ([verifiedMatchIds containsObject:match.matchId]) {
+                if (!match.hasVerified) {
+                    match.hasVerified = YES;
+                    match.hasPendingVerification = NO;
+                    match.verifiedText = [NSString stringWithFormat:fmtVerified, (long)90];
+                    changed = YES;
+                }
             }
         }
-    } failure:^(NSError * _Nonnull error) {
-#if DEBUG
-        NSLog(@"[DiscoverDebug] passportRecords FAILED: %@", error.localizedDescription);
-#endif
-    }];
+        if (changed) [weakSelf.tableView reloadData];
+    });
 }
 
 - (NSArray<DiscoverMatch *> *)discoverMatchesFrom:(NSArray<Match *> *)matches type:(DiscoverMatchType)type {
