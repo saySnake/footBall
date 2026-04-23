@@ -11,6 +11,7 @@
 #import "SDImageManager.h"
 #import <Masonry/Masonry.h>
 #import "ColorManager.h"
+#import "PrivacyAgreementViewController.h"
 
 static UIColor * SettingsPageBackgroundColor(void) {
     return [UIColor colorWithRed:0.969 green:0.969 blue:0.969 alpha:1.0];
@@ -215,7 +216,8 @@ static UIColor * SettingsPageBackgroundColor(void) {
 - (void)onBack { [self.navigationController popViewControllerAnimated:YES]; }
 
 - (void)onPrivacy {
-    // 原型仅跳转入口，这里先做占位
+    PrivacyAgreementViewController *vc = [PrivacyAgreementViewController new];
+    [self.navigationController pushViewController:vc animated:YES];
 }
 
 #pragma mark - Cache

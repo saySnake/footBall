@@ -388,6 +388,7 @@
 "settings_title" = "Settings";
 "settings_notice" = "Notifications";
 "settings_privacy" = "Privacy Policy";
+"settings_privacy_content" = "Privacy Policy\n\nWe highly value your personal information and privacy. To provide our services, we collect and use only the information necessary for core features, and apply reasonable safeguards to protect it.\n\n1. Information Collection\nWe collect only what is necessary to deliver product functions, such as account data, device details, and usage logs.\n\n2. Information Usage\nYour information is used for account login, feature delivery, service optimization, and security protection, and will not be used beyond agreed purposes.\n\n3. Information Sharing\nWithout your consent, we do not sell your personal information to third parties, except where required by law or explicitly authorized by you.\n\n4. Information Security\nWe use access control, encrypted transmission, and data minimization to reduce risks of information leakage.\n\n5. Your Rights\nYou may request access, correction, or deletion of your personal information through the Settings page or customer support.\n\nIf you have any questions, please contact us through in-app feedback channels.";
 "settings_test_version" = "Test Version";
 "settings_test_version_value" = "Test 1.1";
 "settings_clear_data" = "Clear Data";

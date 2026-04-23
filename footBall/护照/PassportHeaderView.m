@@ -94,17 +94,34 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
 
         [self addLines];
 
-//        UIImageView *footer = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"passport_header_sep"]];
-//        [self.contentView addSubview:footer];
-        DashView *dashLine = [[DashView alloc] init];
-        dashLine.lineColor = [UIColor colorWithHexString:@"#E0E0E0"];
-        [self.contentView addSubview:dashLine];
+        UIImageView *sepMid = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"passport_header_sep"]];
+        sepMid.contentMode = UIViewContentModeScaleToFill;
+        [self.contentView addSubview:sepMid];
+        UIView *sepFallbackLine = nil;
+        if (!sepMid.image) {
+            sepFallbackLine = [[UIView alloc] init];
+            sepFallbackLine.backgroundColor = [UIColor colorWithHexString:@"#E0E0E0"];
+            [self.contentView addSubview:sepFallbackLine];
+        }
+        DashView *sepMidDash = [[DashView alloc] init];
+        sepMidDash.lineColor = [UIColor colorWithHexString:@"#E0E0E0"];
+        [self.contentView addSubview:sepMidDash];
 
         self.passportHeader2View = [[PassportHeader2View alloc] initWithFrame:CGRectZero];
         self.passportHeader2View.userInteractionEnabled = YES;
         UITapGestureRecognizer *header2Tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handlePassportHeader2Tap)];
         [self.passportHeader2View addGestureRecognizer:header2Tap];
         [self.contentView addSubview:self.passportHeader2View];
+
+        UIImageView *sepBottom = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"passport_header_sep"]];
+        sepBottom.contentMode = UIViewContentModeScaleToFill;
+        [self.contentView addSubview:sepBottom];
+        UIView *sepBottomFallbackLine = nil;
+        if (!sepBottom.image) {
+            sepBottomFallbackLine = [[UIView alloc] init];
+            sepBottomFallbackLine.backgroundColor = [UIColor colorWithHexString:@"#E0E0E0"];
+            [self.contentView addSubview:sepBottomFallbackLine];
+        }
 
 //        UIImageView *footer2 = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"passport_header_sep"]];
 //        [self.contentView addSubview:footer2];
@@ -150,21 +167,42 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
             make.height.equalTo(@(_circleLblWH));
         }];
 
-//        [footer mas_makeConstraints:^(MASConstraintMaker *make) {
-//            make.left.right.equalTo(self.topView);
-//            make.top.equalTo(self.topView.mas_bottom).offset(2);
-//        }];
-        [dashLine mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.left.right.equalTo(self.contentView);
-            make.top.equalTo(self.topView.mas_bottom).offset(10);
-            make.height.equalTo(@1);
+        [sepMid mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.equalTo(self.topView.mas_bottom).offset(2);
+            make.height.mas_equalTo(10);
+            make.leading.trailing.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 10, 0, 10));
+        }];
+        if (sepFallbackLine) {
+            [sepFallbackLine mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.top.equalTo(self.topView.mas_bottom).offset(14);
+                make.leading.trailing.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 10, 0, 10));
+                make.height.mas_equalTo(1);
+            }];
+        }
+        [sepMidDash mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.equalTo(sepMid.mas_bottom).offset(2);
+            make.leading.trailing.equalTo(self.contentView);
+            make.height.mas_equalTo(1);
         }];
         [self.passportHeader2View mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.right.equalTo(self.topView);
-            make.top.equalTo(dashLine.mas_bottom).offset(10);
+            make.top.equalTo(sepMidDash.mas_bottom).offset(7);
             make.height.mas_equalTo(_circleLblWH * 5);
+        }];
+        [sepBottom mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.equalTo(self.passportHeader2View.mas_bottom).offset(2);
+            make.height.mas_equalTo(10);
+            make.leading.trailing.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 10, 0, 10));
             make.bottom.equalTo(self.contentView).offset(-16);
         }];
+        if (sepBottomFallbackLine) {
+            [sepBottomFallbackLine mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.top.equalTo(self.passportHeader2View.mas_bottom).offset(14);
+                make.leading.trailing.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 10, 0, 10));
+                make.height.mas_equalTo(1);
+                make.bottom.equalTo(self.contentView).offset(-16);
+            }];
+        }
 //        [footer2 mas_makeConstraints:^(MASConstraintMaker *make) {
 //            make.left.right.equalTo(self.passportHeader2View);
 //            make.top.equalTo(self.passportHeader2View.mas_bottom).offset(2);
