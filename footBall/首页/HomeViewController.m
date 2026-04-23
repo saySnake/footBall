@@ -22,6 +22,11 @@
 #define kHomeTeamBadgeBg [UIColor colorWithRed:0.965 green:0.973 blue:0.996 alpha:1.0]
 #define kHomeMetaIconColor [UIColor colorWithRed:0.114 green:0.114 blue:0.114 alpha:1.0]
 static NSString *const kLogoPlaceholder = @"team_placeholder";
+static CGFloat const kHomeFeaturedCardH = 168.f;
+static CGFloat const kHomeFeaturedCardGap = 12.f;
+static CGFloat const kHomeFeaturedCardPad = 16.f;
+static CGFloat const kHomeFeaturedBadgeSize = 24.f;
+static CGFloat const kHomeFeaturedCardCorner = 24.f;
 
 /// 与「更多比赛」一致：收藏用 match_star
 static UIImage *kHomeFavoriteIcon(BOOL favorited) {
@@ -294,7 +299,6 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
 @property (nonatomic, strong) UIImageView *avatarView;
 @property (nonatomic, strong) UILabel *challengerLabel;
 @property (nonatomic, strong) UILabel *dateLabel;
-@property (nonatomic, strong) UIButton *heartBtn;
 @property (nonatomic, strong) UICollectionView *teamCollectionView;
 @property (nonatomic, strong) NSArray<TeamIcon *> *teamItems;
 @property (nonatomic, copy, nullable) NSString *selectedTeamId; // nil = 全部
@@ -416,15 +420,9 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     _dateLabel.text = @"February 20, 2025";
     _dateLabel.font = [UIFont systemFontOfSize:12];
     _dateLabel.textColor = [UIColor colorWithWhite:0.75 alpha:1.0];
-    _heartBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    if (@available(iOS 13.0, *)) {
-        [_heartBtn setImage:[UIImage systemImageNamed:@"heart"] forState:UIControlStateNormal];
-        _heartBtn.tintColor = [UIColor whiteColor];
-    }
     [_headerView addSubview:_avatarView];
     [_headerView addSubview:_challengerLabel];
     [_headerView addSubview:_dateLabel];
-    [_headerView addSubview:_heartBtn];
 
     UICollectionViewFlowLayout *layout = [[UICollectionViewFlowLayout alloc] init];
     layout.scrollDirection = UICollectionViewScrollDirectionHorizontal;
@@ -454,11 +452,6 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     [_dateLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(_challengerLabel);
         make.top.equalTo(_challengerLabel.mas_bottom).offset(1);
-    }];
-    [_heartBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(_headerView).offset(-16);
-        make.centerY.equalTo(_avatarView);
-        make.width.height.mas_equalTo(32);
     }];
     [_teamCollectionView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(_avatarView.mas_bottom).offset(24);
@@ -537,9 +530,9 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     }];
     [_twoCardsContainer mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(_titleLabel.mas_bottom).offset(16);
-        make.leading.equalTo(_contentView).offset(15);
-        make.trailing.equalTo(_contentView).offset(-15);
-        make.height.mas_equalTo(198);
+        make.leading.equalTo(_contentView).offset(16);
+        make.trailing.equalTo(_contentView).offset(-16);
+        make.height.mas_equalTo(kHomeFeaturedCardH);
     }];
     [_tableView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(_twoCardsContainer.mas_bottom).offset(10);
@@ -593,7 +586,7 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     }];
     [right mas_makeConstraints:^(MASConstraintMaker *make) {
         make.trailing.top.bottom.equalTo(_twoCardsContainer);
-        make.leading.equalTo(left.mas_trailing).offset(12);
+        make.leading.equalTo(left.mas_trailing).offset(kHomeFeaturedCardGap);
         make.width.equalTo(left);
     }];
 }
@@ -610,7 +603,7 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     UIView *card = [[UIView alloc] init];
     card.backgroundColor = bg;
     // 原型：大圆角 + 连续曲线
-    card.layer.cornerRadius = 24;
+    card.layer.cornerRadius = kHomeFeaturedCardCorner;
     if (@available(iOS 13.0, *)) {
         card.layer.cornerCurve = kCACornerCurveContinuous;
     }
@@ -618,20 +611,20 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     UILabel *timeL = [[UILabel alloc] init];
     // Fri/11:00 pm：优先从 dateDetail 里取星期缩写
     NSString *weekday = @"";
-    NSString *detailText = [self dateDetailFromRaw:m.matchDate];
+    NSString *detailText = [self featuredDateTextFromRaw:m.matchDate];
     if ([detailText containsString:@","]) {
         weekday = [[detailText componentsSeparatedByString:@","] firstObject] ?: @"";
     }
     weekday = [weekday stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (weekday.length == 0) weekday = @"Fri";
-    NSString *t = [self timeTextFromRaw:m.matchDate];
+    NSString *t = [self featuredTimeTextFromRaw:m.matchDate];
     timeL.text = [NSString stringWithFormat:@"%@/%@", weekday, t];
     timeL.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
-    timeL.textColor = textColor;
+    timeL.textColor = [textColor colorWithAlphaComponent:0.96];
     UILabel *dateL = [[UILabel alloc] init];
     dateL.text = detailText;
-    dateL.font = [UIFont systemFontOfSize:11];
-    dateL.textColor = [textColor colorWithAlphaComponent:0.7];
+    dateL.font = [UIFont systemFontOfSize:11 weight:UIFontWeightRegular];
+    dateL.textColor = [textColor colorWithAlphaComponent:0.75];
     UIImageView *homeIcon = [[UIImageView alloc] init];
     homeIcon.contentMode = UIViewContentModeScaleAspectFit;
     homeIcon.backgroundColor = kHomeTeamBadgeBg;
@@ -648,13 +641,13 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     NSString *awayScore = [NSString stringWithFormat:@"%ld", (long)m.awayScore];
     UILabel *homeL = [[UILabel alloc] init];
     homeL.text = kHomeFeaturedTeamDisplayName(m.homeTeamName);
-    homeL.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-    homeL.textColor = textColor;
+    homeL.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
+    homeL.textColor = [textColor colorWithAlphaComponent:0.96];
     homeL.lineBreakMode = NSLineBreakByTruncatingTail;
     UILabel *awayL = [[UILabel alloc] init];
     awayL.text = kHomeFeaturedTeamDisplayName(m.awayTeamName);
-    awayL.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-    awayL.textColor = textColor;
+    awayL.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
+    awayL.textColor = [textColor colorWithAlphaComponent:0.96];
     awayL.lineBreakMode = NSLineBreakByTruncatingTail;
     [card addSubview:timeL];
     [card addSubview:dateL];
@@ -662,36 +655,40 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     [card addSubview:homeL];
     [card addSubview:awayIcon];
     [card addSubview:awayL];
-    CGFloat pad = 16;
+    CGFloat pad = kHomeFeaturedCardPad;
     [timeL mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(card).offset(18);
+        make.top.equalTo(card).offset(24);
         make.leading.equalTo(card).offset(pad);
+        make.height.mas_equalTo(17);
     }];
     [dateL mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(timeL.mas_bottom).offset(4);
+        make.top.equalTo(timeL.mas_bottom).offset(0);
         make.leading.equalTo(card).offset(pad);
+        make.height.mas_equalTo(22);
     }];
 
     // 底部两行球队：与原型一致的留白与行距
     [awayIcon mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(card).offset(pad);
         make.bottom.equalTo(card).offset(-20);
-        make.width.height.mas_equalTo(24);
+        make.width.height.mas_equalTo(kHomeFeaturedBadgeSize);
     }];
     [awayL mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(awayIcon.mas_trailing).offset(6);
+        make.leading.equalTo(awayIcon.mas_trailing).offset(4);
         make.centerY.equalTo(awayIcon);
+        make.height.mas_equalTo(22);
         make.trailing.lessThanOrEqualTo(card).offset(showScore ? -58 : -16);
     }];
 
     [homeIcon mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(card).offset(pad);
-        make.bottom.equalTo(awayIcon.mas_top).offset(-10);
-        make.width.height.mas_equalTo(24);
+        make.bottom.equalTo(awayIcon.mas_top).offset(-16);
+        make.width.height.mas_equalTo(kHomeFeaturedBadgeSize);
     }];
     [homeL mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(homeIcon.mas_trailing).offset(6);
+        make.leading.equalTo(homeIcon.mas_trailing).offset(4);
         make.centerY.equalTo(homeIcon);
+        make.height.mas_equalTo(22);
         make.trailing.lessThanOrEqualTo(card).offset(showScore ? -58 : -16);
     }];
     if (showScore) {
@@ -715,6 +712,26 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
         }];
     }
     return card;
+}
+
+/// 精选卡片顶部时间：12 小时制并带小写 am/pm（如 11:00 pm）
+- (NSString *)featuredTimeTextFromRaw:(NSString *)raw {
+    NSDate *date = [self dateFromRaw:raw];
+    if (!date) return @"--:--";
+    NSDateFormatter *fmt = NSDateFormatter.new;
+    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    fmt.dateFormat = @"h:mm a";
+    return [[fmt stringFromDate:date] lowercaseString];
+}
+
+/// 精选卡片日期：与设计一致（如 Sun,18 Feb 25）
+- (NSString *)featuredDateTextFromRaw:(NSString *)raw {
+    NSDate *date = [self dateFromRaw:raw];
+    if (!date) return @"--";
+    NSDateFormatter *fmt = NSDateFormatter.new;
+    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    fmt.dateFormat = @"EEE, d MMM yy";
+    return [fmt stringFromDate:date];
 }
 
 - (void)setupRefresh {
