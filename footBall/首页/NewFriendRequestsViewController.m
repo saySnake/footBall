@@ -150,7 +150,7 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
         // 文字区域：头像右侧，纵向依次排列
         [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_avatarView.mas_trailing).offset(8);
-            make.top.equalTo(_cardView).offset(12);
+            make.top.equalTo(_cardView).offset(9);
             make.trailing.lessThanOrEqualTo(_acceptBtn.mas_leading).offset(-8);
         }];
         [_idLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -159,13 +159,13 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
             make.trailing.lessThanOrEqualTo(_acceptBtn.mas_leading).offset(-8);
         }];
         [_statusDot mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_avatarView.mas_trailing).offset(-11);
+            make.leading.equalTo(_avatarView.mas_trailing).offset(-8);
             make.top.equalTo(_avatarView.mas_bottom).offset(-11);
             make.size.mas_equalTo(CGSizeMake(8, 8));
         }];
         [_statusLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_statusDot.mas_trailing).offset(6);
-            make.centerY.equalTo(_statusDot);
+            make.leading.equalTo(_idLabel);
+            make.top.equalTo(_idLabel.mas_bottom).offset(2);
             make.trailing.lessThanOrEqualTo(_acceptBtn.mas_leading).offset(-8);
         }];
         // messageLabel：在 statusLabel 下方，不撑高 cardView（高度已固定）
