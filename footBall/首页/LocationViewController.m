@@ -7,6 +7,8 @@
 #import "AddFriendViewController.h"
 #import "MyQRCodeViewController.h"
 #import "CommunityRequest.h"
+#import "StampAlbumViewController.h"
+#import "PassportViewController.h"
 #import <Masonry/Masonry.h>
 #import "ColorManager.h"
 #import <SDWebImage/SDWebImage.h>
@@ -131,6 +133,12 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     return self;
 }
 
+- (void)prepareForReuse {
+    [super prepareForReuse];
+    [self.avatarView sd_cancelCurrentImageLoad];
+    self.avatarView.image = nil;
+}
+
 - (void)configureWithFriend:(PNFriend *)f {
     self.nameLabel.text = f.nickname.length > 0 ? f.nickname : @"-";
     self.idLabel.text = [NSString stringWithFormat:NSLocalizedString(@"community_id_format", nil), f.userId];
@@ -142,13 +150,23 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
     NSURL *url = f.avatar.length > 0 ? [NSURL URLWithString:f.avatar] : nil;
     UIImage *placeholder = (@available(iOS 13.0, *)) ? [UIImage systemImageNamed:@"person.crop.circle.fill"] : nil;
-    [self.avatarView sd_setImageWithURL:url placeholderImage:placeholder];
-    if (!self.avatarView.image && @available(iOS 13.0, *)) {
-        self.avatarView.tintColor = [UIColor colorWithWhite:0.7 alpha:1.0];
-        self.avatarView.contentMode = UIViewContentModeCenter;
-    } else {
-        self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
-    }
+    __weak typeof(self) weakSelf = self;
+    [self.avatarView sd_setImageWithURL:url
+                       placeholderImage:placeholder
+                                options:SDWebImageRetryFailed
+                              completed:^(UIImage *image, NSError *error, SDImageCacheType cacheType, NSURL *imageURL) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        if (image && !error) {
+            self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
+            self.avatarView.tintColor = nil;
+        } else {
+            if (@available(iOS 13.0, *)) {
+                self.avatarView.tintColor = [UIColor colorWithWhite:0.7 alpha:1.0];
+                self.avatarView.contentMode = UIViewContentModeCenter;
+            }
+        }
+    }];
 }
 
 @end
@@ -271,6 +289,8 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 @property (nonatomic, strong) MASConstraint *headerHeightConstraint;
 @property (nonatomic, strong) UIView *friendsEmptyBackgroundView;
 @property (nonatomic, strong) UILabel *friendsEmptyTitleLabel;
+/// 标记是否需要重新拉取好友列表（首次进入或好友关系变化时置 YES，从子页面返回时不重拉）
+@property (nonatomic, assign) BOOL needsReloadFriends;
 @end
 
 @implementation LocationViewController
@@ -337,6 +357,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     self.isFriendsTab = YES;
     self.currentRankType = CommunityRankTypeWeek;
     self.pendingCount = [[NSUserDefaults standardUserDefaults] integerForKey:kCommunityPendingCountKey];
+    self.needsReloadFriends = YES; // 首次进入需要拉取
     [self loadRemoteFriends];
     [self loadRemoteRanks];
     [super viewDidLoad];
@@ -359,9 +380,12 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     self.pendingCount = [[NSUserDefaults standardUserDefaults] integerForKey:kCommunityPendingCountKey];
-    [self loadRemoteFriends];
+    // 只在需要时重新拉取好友列表（首次进入或好友关系变化），从子页面返回时跳过，避免头像闪烁
+    if (self.needsReloadFriends) {
+        self.needsReloadFriends = NO;
+        [self loadRemoteFriends];
+    }
     [self refreshPendingCountFromServer];
-    [self.tableView reloadData];
     [self updateCommunityEmptyState];
     [self updatePendingBadge];
 }
@@ -689,7 +713,12 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 }
 
 - (void)onFriendsChanged {
-    [self loadRemoteFriends];
+    // 如果当前页面可见，立即刷新；否则标记等下次 viewWillAppear 时刷新
+    if (self.isViewLoaded && self.view.window) {
+        [self loadRemoteFriends];
+    } else {
+        self.needsReloadFriends = YES;
+    }
     [self.tableView reloadData];
     [self updateCommunityEmptyState];
 }
@@ -830,38 +859,26 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     if (sender.tag < 0 || sender.tag >= self.friends.count) return;
     PNFriend *friend = self.friends[sender.tag];
     if (friend.userId.length == 0) return;
-    [self showLoading];
-    __weak typeof(self) weakSelf = self;
-    [CommunityRequest.shared getFriendStamps:friend.userId success:^(HTTPResponse * _Nullable responseObject) {
-        __strong typeof(weakSelf) self = weakSelf;
-        if (!self) return;
-        [self hideLoading];
-    } failure:^(NSError * _Nonnull error) {
-        __strong typeof(weakSelf) self = weakSelf;
-        if (!self) return;
-        [self hideLoading];
-        NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"community_search_failed", nil);
-        [self showError:msg];
-    }];
+    
+    // 跳转到邮票夹页面，传入好友 userId
+    StampAlbumViewController *vc = [[StampAlbumViewController alloc] init];
+    vc.targetUserId = friend.userId;
+    vc.targetNickname = friend.nickname.length > 0 ? [NSString stringWithFormat:@"%@%@", friend.nickname, (NSLocalizedString(@"stamp_album_suffix", nil) ?: @"的邮票夹")] : nil;
+    vc.hidesBottomBarWhenPushed = YES;
+    [self.navigationController pushViewController:vc animated:YES];
 }
 
 - (void)onFriendDataTapped:(UIButton *)sender {
     if (sender.tag < 0 || sender.tag >= self.friends.count) return;
     PNFriend *friend = self.friends[sender.tag];
     if (friend.userId.length == 0) return;
-    [self showLoading];
-    __weak typeof(self) weakSelf = self;
-    [CommunityRequest.shared getFriendData:friend.userId success:^(HTTPResponse * _Nullable responseObject) {
-        __strong typeof(weakSelf) self = weakSelf;
-        if (!self) return;
-        [self hideLoading];
-    } failure:^(NSError * _Nonnull error) {
-        __strong typeof(weakSelf) self = weakSelf;
-        if (!self) return;
-        [self hideLoading];
-        NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"community_search_failed", nil);
-        [self showError:msg];
-    }];
+    
+    // 跳转到护照页面，传入好友 userId
+    PassportViewController *vc = [[PassportViewController alloc] init];
+    vc.targetUserId = friend.userId;
+    vc.targetNickname = friend.nickname.length > 0 ? [NSString stringWithFormat:@"%@%@", friend.nickname, (NSLocalizedString(@"passport_suffix", nil) ?: @"的护照")] : nil;
+    vc.hidesBottomBarWhenPushed = YES;
+    [self.navigationController pushViewController:vc animated:YES];
 }
 
 @end

@@ -91,7 +91,12 @@ static UIColor *PassportPageBg(void) {
     _titleLabel = [[UILabel alloc] init];
     _titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
     _titleLabel.textColor = [UIColor whiteColor];
-    _titleLabel.text = NSLocalizedString(@"passport_nav_title", nil) ?: @"我的护照";
+    if (self.targetUserId.length > 0) {
+        NSString *name = self.targetNickname.length > 0 ? self.targetNickname : (NSLocalizedString(@"passport_nav_title_friend", nil) ?: @"TA的护照");
+        _titleLabel.text = name;
+    } else {
+        _titleLabel.text = NSLocalizedString(@"passport_nav_title", nil) ?: @"我的护照";
+    }
 
     _refreshButton = [UIButton buttonWithType:UIButtonTypeSystem];
     if (@available(iOS 13.0, *)) {
@@ -247,16 +252,17 @@ static UIColor *PassportPageBg(void) {
     __weak typeof(self) weakSelf = self;
     [self showLoading];
     NSString *y = [NSString stringWithFormat:@"%ld", (long)self.selectedYear];
-    [[ProfileRequest shared] getMyPassportWithYear:y success:^(HTTPResponse * _Nullable responseObject) {
+    BOOL isOther = self.targetUserId.length > 0;
+    void (^handleSuccess)(PNPassport *) = ^(PNPassport *p) {
         [weakSelf hideLoading];
-        PNPassport *p = responseObject.dataObject;
         weakSelf.viewModel = [PassportViewModel viewModelWithPassport:p year:weakSelf.selectedYear];
         [weakSelf.passportHeader configureWithModel:weakSelf.viewModel];
         [weakSelf.yearStrip setYears:[weakSelf recentFiveYears] selectedYear:weakSelf.selectedYear];
         [weakSelf.tableView reloadData];
         [weakSelf invalidatePassportHeaderLayoutCache];
         [weakSelf.view setNeedsLayout];
-    } failure:^(NSError * _Nonnull error) {
+    };
+    void (^handleFailure)(NSError *) = ^(NSError *error) {
         [weakSelf hideLoading];
         [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
         weakSelf.viewModel = [PassportViewModel viewModelWithPassport:nil year:weakSelf.selectedYear];
@@ -264,7 +270,22 @@ static UIColor *PassportPageBg(void) {
         [weakSelf.tableView reloadData];
         [weakSelf invalidatePassportHeaderLayoutCache];
         [weakSelf.view setNeedsLayout];
-    }];
+    };
+    if (isOther) {
+        [[ProfileRequest shared] getPassportForUserId:self.targetUserId year:y success:^(HTTPResponse * _Nullable responseObject) {
+            PNPassport *p = [responseObject.dataObject isKindOfClass:PNPassport.class] ? responseObject.dataObject : nil;
+            handleSuccess(p);
+        } failure:^(NSError * _Nonnull error) {
+            handleFailure(error);
+        }];
+    } else {
+        [[ProfileRequest shared] getMyPassportWithYear:y success:^(HTTPResponse * _Nullable responseObject) {
+            PNPassport *p = responseObject.dataObject;
+            handleSuccess(p);
+        } failure:^(NSError * _Nonnull error) {
+            handleFailure(error);
+        }];
+    }
 }
 
 - (void)onBack {
