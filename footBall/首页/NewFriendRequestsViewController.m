@@ -603,10 +603,19 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
 
 - (FriendRequestStatus)statusForFriendRequest:(PNFriendRequest *)request {
     NSString *status = (request.status ?: @"PENDING").uppercaseString;
+    if ([status isEqualToString:@"ACCEPTED"] || [status isEqualToString:@"ADDED"]) return FriendRequestStatusAdded;
     if ([status isEqualToString:@"EXPIRED"] || [status isEqualToString:@"REJECTED"] || [status isEqualToString:@"DECLINED"] || [status isEqualToString:@"REFUSED"]) {
+        // 3天内处理过的请求（handleTime 有值且在3天内）视为"已添加"，而非"已过期"
+        NSDate *handleDate = [self dateFromFriendAPIString:request.handleTime];
+        if (handleDate) {
+            NSCalendar *cal = [NSCalendar currentCalendar];
+            NSDate *threeDaysAgo = [cal dateByAddingUnit:NSCalendarUnitDay value:-3 toDate:[NSDate date] options:0];
+            if ([handleDate compare:threeDaysAgo] == NSOrderedDescending) {
+                return FriendRequestStatusAdded;
+            }
+        }
         return FriendRequestStatusExpired;
     }
-    if ([status isEqualToString:@"ACCEPTED"] || [status isEqualToString:@"ADDED"]) return FriendRequestStatusAdded;
     return FriendRequestStatusPending;
 }
 
