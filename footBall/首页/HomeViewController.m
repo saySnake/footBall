@@ -106,7 +106,7 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
 
         _circleView = [[UIView alloc] init];
         _circleView.layer.cornerRadius = 28;
-        _circleView.clipsToBounds = YES;
+        _circleView.clipsToBounds = YES; // 裁剪子视图（logoView），border 画在 layer 内部不受影响
         _circleView.backgroundColor = [UIColor colorWithWhite:0.17 alpha:1.0];
 
         _logoView = [[UIImageView alloc] init];
@@ -140,13 +140,19 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
 }
 - (void)setSelected:(BOOL)selected {
     [super setSelected:selected];
-    // 选中：白色背景；未选中：深灰背景
-    _circleView.backgroundColor = selected
-        ? [UIColor whiteColor]
-        : [UIColor colorWithWhite:0.17 alpha:1.0];
-    _nameLabel.font = selected
-        ? [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold]
-        : [UIFont systemFontOfSize:11 weight:UIFontWeightRegular];
+    if (selected) {
+        // 选中：深灰背景 + 绿色边框
+        _circleView.backgroundColor = [UIColor whiteColor];
+        _nameLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
+        _nameLabel.textColor = [UIColor whiteColor];
+    } else {
+        // 未选中：深灰背景，无边框
+        _circleView.backgroundColor = [UIColor colorWithWhite:0.17 alpha:1.0];
+        _circleView.layer.borderWidth = 0;
+        _circleView.layer.borderColor = [UIColor clearColor].CGColor;
+        _nameLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightRegular];
+        _nameLabel.textColor = [UIColor colorWithWhite:0.85 alpha:1.0];
+    }
 }
 @end
 
@@ -1030,8 +1036,9 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     cell.nameLabel.text = item.name;
     [cell.logoView sd_setImageWithURL:[NSURL URLWithString:item.logo] placeholderImage:[UIImage imageNamed:kLogoPlaceholder]];
     if (!cell.logoView.image) cell.logoView.backgroundColor = [UIColor colorWithWhite:0.6 alpha:1.0];
-    BOOL sel = (item.teamId == nil && _selectedTeamId == nil) || (item.teamId && [_selectedTeamId isEqualToString:item.teamId]);
-    cell.selected = sel;
+    BOOL sel = item.teamId && [_selectedTeamId isEqualToString:item.teamId];
+    // 直接调用 setSelected: 确保视觉状态更新
+    [cell setSelected:sel];
     return cell;
 }
 - (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)layout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
