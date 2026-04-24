@@ -141,6 +141,47 @@
     if ([awayObj isKindOfClass:NSDictionary.class]) {
         fillTeam((NSDictionary *)awayObj, NO);
     }
+    NSInteger (^intFromId)(id) = ^NSInteger(id o) {
+        if (o == nil || o == (id)kCFNull) { return 0; }
+        if ([o isKindOfClass:NSNumber.class]) { return [(NSNumber *)o integerValue]; }
+        if ([o isKindOfClass:NSString.class]) { return [(NSString *)o integerValue]; }
+        return 0;
+    };
+    if (self.homeScore == 0 && self.awayScore == 0) {
+        id ft = dic[@"fullTime"] ?: dic[@"ft"] ?: dic[@"full_time"] ?: dic[@"fulltime"] ?: dic[@"fullTimeScore"];
+        if ([ft isKindOfClass:NSDictionary.class]) {
+            NSDictionary *f = (NSDictionary *)ft;
+            self.homeScore = intFromId(f[@"home"] ?: f[@"homeScore"] ?: f[@"homeTeamScore"] ?: f[@"h"] ?: f[@"goalsHome"]);
+            self.awayScore = intFromId(f[@"away"] ?: f[@"awayScore"] ?: f[@"awayTeamScore"] ?: f[@"a"] ?: f[@"goalsAway"]);
+        } else {
+            id sc = dic[@"score"] ?: dic[@"result"] ?: dic[@"ftScore"] ?: dic[@"ft_score"];
+            if ([sc isKindOfClass:NSString.class]) {
+                NSString *s = [((NSString *)sc) stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                if (s.length > 0) {
+                    NSCharacterSet *sep = [NSCharacterSet characterSetWithCharactersInString:@":-·"];
+                    NSArray<NSString *> *parts = [s componentsSeparatedByCharactersInSet:sep];
+                    if (parts.count >= 2) {
+                        self.homeScore = (NSInteger)[parts[0] integerValue];
+                        self.awayScore = (NSInteger)[parts[1] integerValue];
+                    }
+                }
+            } else if ([sc isKindOfClass:NSDictionary.class]) {
+                NSDictionary *f = (NSDictionary *)sc;
+                self.homeScore = intFromId(f[@"home"] ?: f[@"h"] ?: f[@"left"]);
+                self.awayScore = intFromId(f[@"away"] ?: f[@"a"] ?: f[@"right"]);
+            }
+        }
+    }
+    if (self.homeScore == 0 && self.awayScore == 0) {
+        if ([homeObj isKindOfClass:NSDictionary.class]) {
+            NSDictionary *h = (NSDictionary *)homeObj;
+            self.homeScore = intFromId(h[@"goals"] ?: h[@"goal"] ?: h[@"score"]);
+        }
+        if ([awayObj isKindOfClass:NSDictionary.class]) {
+            NSDictionary *a = (NSDictionary *)awayObj;
+            self.awayScore = intFromId(a[@"goals"] ?: a[@"goal"] ?: a[@"score"]);
+        }
+    }
     return YES;
 }
 @end

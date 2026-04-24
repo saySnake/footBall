@@ -147,11 +147,13 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
     if (self = [super initWithStyle:style reuseIdentifier:reuseIdentifier]) {
         self.selectionStyle = UITableViewCellSelectionStyleNone;
         self.backgroundColor = [UIColor clearColor];
+        self.contentView.semanticContentAttribute = UISemanticContentAttributeForceLeftToRight;
 
         UIView *card = [[UIView alloc] init];
         card.backgroundColor = kMoreMatchesCardBG();
         card.layer.cornerRadius = 8;
         card.clipsToBounds = YES;
+        card.semanticContentAttribute = UISemanticContentAttributeForceLeftToRight;
         [self.contentView addSubview:card];
         self.cardView = card;
         [card mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -209,13 +211,13 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
         [card addSubview:_favoriteBtn];
 
         [_homeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(card).offset(12);
+            make.left.equalTo(card).offset(12);
             make.centerY.equalTo(card);
-            // 主队名：随卡片宽度占一行可用空间（原 70pt 过窄），由与 timePill 的间距约束自然截断
+            // 主队（homeTeamName）在左；随卡片宽度截断
             make.width.mas_lessThanOrEqualTo(card.mas_width).multipliedBy(0.34);
         }];
         [_homeBadge mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_homeLabel.mas_trailing).offset(8);
+            make.left.equalTo(_homeLabel.mas_right).offset(8);
             make.centerY.equalTo(card);
             make.width.height.mas_equalTo(32);
         }];
@@ -224,26 +226,26 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
             make.width.height.mas_equalTo(18);
         }];
         [_timePill mas_makeConstraints:^(MASConstraintMaker *make) {
-            // 时间与两侧队徽固定 14pt 间距（设计稿）
-            make.leading.equalTo(_homeBadge.mas_trailing).offset(14);
+            // 中间时间：左接主队队徽、右接客队队徽，各 14pt
+            make.left.equalTo(_homeBadge.mas_right).offset(14);
             make.centerY.equalTo(card);
             make.width.mas_equalTo(50);
             make.height.mas_equalTo(24);
         }];
         [_timePill setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
         [_favoriteBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.trailing.equalTo(card).offset(-16);
+            make.right.equalTo(card).offset(-16);
             make.centerY.equalTo(card);
             make.width.height.mas_equalTo(20);
         }];
         [_awayLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.trailing.equalTo(_favoriteBtn.mas_leading).offset(-12);
+            make.right.equalTo(_favoriteBtn.mas_left).offset(-12);
             make.centerY.equalTo(card);
             make.width.mas_lessThanOrEqualTo(card.mas_width).multipliedBy(0.34);
         }];
         [_awayBadge mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_timePill.mas_trailing).offset(14);
-            make.trailing.equalTo(_awayLabel.mas_leading).offset(-8);
+            make.left.equalTo(_timePill.mas_right).offset(14);
+            make.right.equalTo(_awayLabel.mas_left).offset(-8);
             make.centerY.equalTo(card);
             make.width.height.mas_equalTo(32);
         }];

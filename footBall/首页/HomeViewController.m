@@ -185,7 +185,8 @@ static NSString *kHomeTeamIdString(id raw) {
 }
 @end
 
-#pragma mark - 赛程卡片 Cell（Figma 1:9843：日期下 — 队名+队徽 / 比分 / 队徽+队名；底行日期 + 时间胶囊 + 播放 + match_star）
+#pragma mark - 赛程卡片 Cell（日期下 — 队名+队徽 / 比分 / 队徽+队名；底行日期 + 时间胶囊 + 播放 + match_star）
+
 @interface MatchCell : UITableViewCell
 @property (nonatomic, strong) UIImageView *homeLogo;
 @property (nonatomic, strong) UIImageView *awayLogo;
@@ -196,16 +197,21 @@ static NSString *kHomeTeamIdString(id raw) {
 @property (nonatomic, strong) UIButton *timePill;
 @property (nonatomic, strong) UIButton *playBtn;
 @property (nonatomic, strong) UIButton *bookmarkBtn;
+
 @end
+
 @implementation MatchCell
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
     if (self = [super initWithStyle:style reuseIdentifier:reuseIdentifier]) {
         self.selectionStyle = UITableViewCellSelectionStyleNone;
         self.backgroundColor = [UIColor clearColor];
+        self.contentView.semanticContentAttribute = UISemanticContentAttributeForceLeftToRight;
         UIView *card = [[UIView alloc] init];
         card.backgroundColor = kHomeMatchCardBg;
         card.layer.cornerRadius = 8;
         card.clipsToBounds = YES;
+        // 体育赛程固定「主队左、客队右」，避免在 RTL 语言环境下 leading/trailing 镜像后主队跑到右侧
+        card.semanticContentAttribute = UISemanticContentAttributeForceLeftToRight;
         [self.contentView addSubview:card];
         [card mas_makeConstraints:^(MASConstraintMaker *make) {
             make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(6, 16, 6, 16));
@@ -224,7 +230,9 @@ static NSString *kHomeTeamIdString(id raw) {
         _awayLogo = [[UIImageView alloc] init];
         _homeLogo.contentMode = _awayLogo.contentMode = UIViewContentModeScaleAspectFit;
         _homeLogo.backgroundColor = [UIColor clearColor];
+        _homeLogo.layer.cornerRadius = 9;
         _awayLogo.backgroundColor = [UIColor clearColor];
+        _awayLogo.layer.cornerRadius = 9;
 
         _homeLabel = [[UILabel alloc] init];
         _awayLabel = [[UILabel alloc] init];
@@ -285,7 +293,7 @@ static NSString *kHomeTeamIdString(id raw) {
             make.width.mas_greaterThanOrEqualTo(56);
         }];
         [homeBadge mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.trailing.equalTo(_centerLabel.mas_leading).offset(-14);
+            make.right.equalTo(_centerLabel.mas_left).offset(-14);
             make.centerY.equalTo(_centerLabel);
             make.width.height.mas_equalTo(32);
         }];
@@ -294,13 +302,13 @@ static NSString *kHomeTeamIdString(id raw) {
             make.width.height.mas_equalTo(18);
         }];
         [_homeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.greaterThanOrEqualTo(card).offset(12);
-            make.trailing.equalTo(homeBadge.mas_leading).offset(-8);
+            make.left.greaterThanOrEqualTo(card).offset(12);
+            make.right.equalTo(homeBadge.mas_left).offset(-8);
             make.centerY.equalTo(homeBadge);
             make.width.mas_lessThanOrEqualTo(card.mas_width).multipliedBy(0.28);
         }];
         [awayBadge mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_centerLabel.mas_trailing).offset(14);
+            make.left.equalTo(_centerLabel.mas_right).offset(14);
             make.centerY.equalTo(_centerLabel);
             make.width.height.mas_equalTo(32);
         }];
@@ -309,14 +317,14 @@ static NSString *kHomeTeamIdString(id raw) {
             make.width.height.mas_equalTo(18);
         }];
         [_awayLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(awayBadge.mas_trailing).offset(6);
+            make.left.equalTo(awayBadge.mas_right).offset(6);
             make.centerY.equalTo(awayBadge);
-            make.trailing.lessThanOrEqualTo(card).offset(-12);
+            make.right.lessThanOrEqualTo(card).offset(-12);
             make.width.mas_lessThanOrEqualTo(card.mas_width).multipliedBy(0.28);
         }];
 
         [_dateLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(card).offset(33);
+            make.left.equalTo(card).offset(33);
             make.bottom.equalTo(card).offset(-12);
         }];
         [_timePill mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -325,12 +333,12 @@ static NSString *kHomeTeamIdString(id raw) {
             make.height.mas_equalTo(24);
         }];
         [_bookmarkBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.trailing.equalTo(card).offset(-16);
+            make.right.equalTo(card).offset(-16);
             make.centerY.equalTo(_dateLabel);
             make.width.height.mas_equalTo(20);
         }];
         [_playBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.trailing.equalTo(_bookmarkBtn.mas_leading).offset(-12);
+            make.right.equalTo(_bookmarkBtn.mas_left).offset(-12);
             make.centerY.equalTo(_dateLabel);
             make.width.height.mas_equalTo(20);
         }];
@@ -372,15 +380,19 @@ static NSString *kHomeTeamIdString(id raw) {
 @implementation HomeViewController
 
 - (void)viewDidLoad {
-    [super viewDidLoad];
-    self.view.backgroundColor = kCardLightGray;
-    self.shouldShowNavigationBar = NO;
+    // 先准备好赛程数据源：QMBaseViewController 会在 [super viewDidLoad] 里调用 -setupUI，本页若晚于 super 再建数据，第一次建 UI 时 table 无有效数据
     [self buildTeams];
     self.dataSource = NSMutableArray.array;
     self.filteredData = NSMutableArray.array;
     self.selectedTeamId = nil;
     [self filterData];
-    [self setupUI];
+
+    // super 内会调一次 -setupUI；切勿在本方法末尾再调 setupUI，否则 header/body/scroll/table 会重复添加，出现叠在一起的重复布局
+    [super viewDidLoad];
+
+    self.view.backgroundColor = kCardLightGray;
+    self.shouldShowNavigationBar = NO;
+    [self filterData];
     [self setupRefresh];
 }
 - (void)viewWillAppear:(BOOL)animated {
@@ -654,6 +666,7 @@ static NSString *kHomeTeamIdString(id raw) {
     }
     UIView *card = [[UIView alloc] init];
     card.backgroundColor = bg;
+    card.semanticContentAttribute = UISemanticContentAttributeForceLeftToRight;
     // 原型：大圆角 + 连续曲线
     card.layer.cornerRadius = kHomeFeaturedCardCorner;
     if (@available(iOS 13.0, *)) {
@@ -1178,8 +1191,8 @@ static NSString *kHomeTeamIdString(id raw) {
     cell.awayLabel.text = m.awayTeamName ?: @"";
     cell.dateLabel.text = [self dateDetailFromRaw:m.matchDate];
     [cell.timePill setTitle:[self timeTextFromRaw:m.matchDate] forState:UIControlStateNormal];
-    BOOL finished = [self home_isMatchFinished:m];
-    cell.centerLabel.text = finished ? [NSString stringWithFormat:@"%ld : %ld", (long)m.homeScore, (long)m.awayScore] : @"VS";
+    BOOL showScore = (![self home_isMatchNotYetStartedForDisplay:m]) || (m.homeScore > 0 || m.awayScore > 0);
+    cell.centerLabel.text = showScore ? [NSString stringWithFormat:@"%ld : %ld", (long)m.homeScore, (long)m.awayScore] : @"VS";
     [cell.homeLogo sd_setImageWithURL:[NSURL URLWithString:m.homeTeamLogo] placeholderImage:[UIImage imageNamed:kLogoPlaceholder]];
     [cell.awayLogo sd_setImageWithURL:[NSURL URLWithString:m.awayTeamLogo] placeholderImage:[UIImage imageNamed:kLogoPlaceholder]];
     UIImage *ph = [UIImage imageNamed:kLogoPlaceholder];
@@ -1201,7 +1214,7 @@ static NSString *kHomeTeamIdString(id raw) {
     return cell;
 }
 
-/// 与发现页逻辑接近：已结束赛事中间显示比分，未结束显示开球时间
+/// 与发现页类似：已结束/进行中用于精选卡片等；LIVE 视为未「踢完终场」但不一定算「已结束」
 - (BOOL)home_isMatchFinished:(Match *)match {
     NSString *st = match.matchStatus.uppercaseString;
     if (st.length > 0) {
@@ -1223,6 +1236,30 @@ static NSString *kHomeTeamIdString(id raw) {
         return NO;
     }
     return [kickoff compare:[NSDate date]] == NSOrderedAscending;
+}
+
+/// 仅用于赛程列表中间：未开赛（含无法判定时间且无进球）时显示 "VS"；进行中 / 已开球 / 已结束 显示 "x : y"（含 0:0）
+- (BOOL)home_isMatchNotYetStartedForDisplay:(Match *)match {
+    NSString *st = (match.matchStatus ?: @"").uppercaseString;
+    if (st.length > 0) {
+        if ([st containsString:@"LIVE"] || [st containsString:@"IN_PLAY"] || [st containsString:@"1ST"] || [st isEqualToString:@"1H"] || [st isEqualToString:@"2H"] || [st containsString:@"2ND"] || [st containsString:@"ET"] || [st containsString:@"PEN"] || [st isEqualToString:@"HT"] || [st containsString:@"HALF"] || [st containsString:@"中场"] || [st containsString:@"INT"] || [st containsString:@"PAUSE"]) {
+            return NO;
+        }
+        if ([st containsString:@"FINISH"] || [st containsString:@"COMPLETE"] || [st isEqualToString:@"FT"] || [st containsString:@"ENDED"] || [st containsString:@"AET"] || [st isEqualToString:@"FT_PEN"] || [st containsString:@"PEN_"] || [st containsString:@"已结束"] || [st containsString:@"完赛"] || [st isEqualToString:@"END"] || [st isEqualToString:@"CLOSED"] || [st isEqualToString:@"RESULT"] || [st isEqualToString:@"FIN"]) {
+            return NO;
+        }
+        if ([st containsString:@"SCHEDULE"] || [st containsString:@"UPCOM"] || [st isEqualToString:@"NS"] || [st containsString:@"TBD"] || [st isEqualToString:@"PST"] || [st isEqualToString:@"NOS"] || [st containsString:@"未开始"] || [st containsString:@"未赛"] || [st containsString:@"待定"] || [st isEqualToString:@"PRE"]) {
+            return YES;
+        }
+    }
+    NSDate *kick = [self dateFromRaw:match.matchDate];
+    if (!kick) {
+        return YES;
+    }
+    if ([kick compare:[NSDate date]] == NSOrderedDescending) {
+        return YES;
+    }
+    return NO;
 }
 
 - (NSString *)home_errorText:(NSError *)error defaultText:(NSString *)def {
