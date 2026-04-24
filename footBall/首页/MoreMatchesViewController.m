@@ -626,8 +626,10 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
     [cell.favoriteBtn setImage:starImg forState:UIControlStateNormal];
     if (m.favorited) {
         cell.favoriteBtn.tintColor = [UIColor clearColor];
+        cell.favoriteBtn.alpha = 1.0;
     } else {
-        cell.favoriteBtn.tintColor = [UIColor colorWithRed:0.58 green:0.58 blue:0.58 alpha:1.0];
+        cell.favoriteBtn.tintColor = [UIColor colorWithRed:0.114 green:0.114 blue:0.114 alpha:1.0];
+        cell.favoriteBtn.alpha = 0.72;
     }
     cell.favoriteBtn.tag = indexPath.row;
     [cell.favoriteBtn removeTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];

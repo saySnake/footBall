@@ -284,7 +284,6 @@ static NSString *kHomeTeamIdString(id raw) {
         [card addSubview:_awayLabel];
         [card addSubview:_dateLabel];
         [card addSubview:_timePill];
-        [card addSubview:_playBtn];
         [card addSubview:_bookmarkBtn];
 
         [_centerLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -334,11 +333,6 @@ static NSString *kHomeTeamIdString(id raw) {
         }];
         [_bookmarkBtn mas_makeConstraints:^(MASConstraintMaker *make) {
             make.right.equalTo(card).offset(-16);
-            make.centerY.equalTo(_dateLabel);
-            make.width.height.mas_equalTo(20);
-        }];
-        [_playBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.right.equalTo(_bookmarkBtn.mas_left).offset(-12);
             make.centerY.equalTo(_dateLabel);
             make.width.height.mas_equalTo(20);
         }];
@@ -852,6 +846,19 @@ static NSString *kHomeTeamIdString(id raw) {
 - (void)fetchFeatureMatchs {
     [MatchRequest.shared getFeaturesMatchsSuccess:^(HTTPResponse <NSArray <Match*> *>* _Nullable responseObject) {
         NSArray<Match *> *list = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+#if DEBUG
+        NSLog(@"[HomeFeatured] success=%d rawDataClass=%@ rawData=%@",
+              responseObject.success,
+              NSStringFromClass([responseObject.data class]),
+              responseObject.data);
+        NSLog(@"[HomeFeatured] parsed count=%ld", (long)list.count);
+        if (list.count > 0) {
+            Match *first = list.firstObject;
+            NSLog(@"[HomeFeatured] first => matchId=%@ status=%@ home=%@ away=%@ score=%ld:%ld date=%@",
+                  first.matchId, first.matchStatus, first.homeTeamName, first.awayTeamName,
+                  (long)first.homeScore, (long)first.awayScore, first.matchDate);
+        }
+#endif
         Match *firstFinished = nil;
         Match *firstUpcoming = nil;
         for (Match *m in list) {
@@ -864,6 +871,9 @@ static NSString *kHomeTeamIdString(id raw) {
         self.highlightUpcoming = firstUpcoming ?: list.firstObject;
         [self buildTwoCards];
     } failure:^(NSError * _Nonnull error) {
+#if DEBUG
+        NSLog(@"[HomeFeatured] failed error=%@", error);
+#endif
         self.highlightFinished = nil;
         self.highlightUpcoming = nil;
         [self buildTwoCards];
@@ -1205,8 +1215,10 @@ static NSString *kHomeTeamIdString(id raw) {
     [cell.bookmarkBtn setImage:starImg forState:UIControlStateNormal];
     if (m.favorited) {
         cell.bookmarkBtn.tintColor = [UIColor clearColor];
+        cell.bookmarkBtn.alpha = 1.0;
     } else {
         cell.bookmarkBtn.tintColor = kHomeMetaIconColor;
+        cell.bookmarkBtn.alpha = 0.5;
     }
     cell.bookmarkBtn.tag = (NSInteger)(indexPath.section * 10000 + indexPath.row);
     [cell.bookmarkBtn removeTarget:self action:@selector(onHomeFavoriteTapped:) forControlEvents:UIControlEventTouchUpInside];

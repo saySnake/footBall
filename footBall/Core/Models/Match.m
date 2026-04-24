@@ -25,8 +25,8 @@
              @"verificationStatus": @[@"verificationStatus", @"verification_status", @"verifyStatus", @"verify_status", @"certificationStatus", @"authStatus", @"status"],
              @"certifiedMinutes": @[@"certifiedMinutes", @"certified_minutes", @"verifiedMinutes", @"verified_minutes"],
              @"recordId": @[@"recordId", @"record_id"],
-             @"favorited": @[@"favorited", @"favorite", @"isFavorited", @"is_favorite"],
-             @"liked": @[@"liked", @"like"]};
+             @"favorited": @[@"favorited", @"favorite", @"isFavorited", @"is_favorite", @"collected", @"bookmarked", @"isCollected", @"isBookmarked"],
+             @"liked": @[@"liked", @"like", @"isLiked", @"is_like"]};
 }
 
 /// 日程 / 关注球队比赛：id 与队名可能在嵌套对象里
@@ -64,6 +64,39 @@
     id verifyRaw = dic[@"verifyCompleted"] ?: dic[@"verify_completed"] ?: dic[@"ticketVerified"] ?: dic[@"ticket_verified"];
     if (verifyRaw) {
         self.verifyCompleted = parseBoolLike(verifyRaw);
+    }
+    // 收藏/点赞状态：兼容常见命名与嵌套结构（interaction / interactionInfo / userInteraction）
+    id favRaw = dic[@"favorited"] ?: dic[@"favorite"] ?: dic[@"isFavorited"] ?: dic[@"is_favorite"] ?: dic[@"collected"] ?: dic[@"bookmarked"] ?: dic[@"isCollected"] ?: dic[@"isBookmarked"];
+    if (!favRaw) {
+        NSDictionary *interaction = nil;
+        id i1 = dic[@"interaction"];
+        id i2 = dic[@"interactionInfo"];
+        id i3 = dic[@"userInteraction"];
+        if ([i1 isKindOfClass:NSDictionary.class]) interaction = (NSDictionary *)i1;
+        else if ([i2 isKindOfClass:NSDictionary.class]) interaction = (NSDictionary *)i2;
+        else if ([i3 isKindOfClass:NSDictionary.class]) interaction = (NSDictionary *)i3;
+        if (interaction) {
+            favRaw = interaction[@"favorited"] ?: interaction[@"favorite"] ?: interaction[@"isFavorited"] ?: interaction[@"is_favorite"] ?: interaction[@"collected"] ?: interaction[@"bookmarked"] ?: interaction[@"isCollected"] ?: interaction[@"isBookmarked"];
+        }
+    }
+    if (favRaw) {
+        self.favorited = parseBoolLike(favRaw);
+    }
+    id likeRaw = dic[@"liked"] ?: dic[@"like"] ?: dic[@"isLiked"] ?: dic[@"is_like"];
+    if (!likeRaw) {
+        NSDictionary *interaction = nil;
+        id i1 = dic[@"interaction"];
+        id i2 = dic[@"interactionInfo"];
+        id i3 = dic[@"userInteraction"];
+        if ([i1 isKindOfClass:NSDictionary.class]) interaction = (NSDictionary *)i1;
+        else if ([i2 isKindOfClass:NSDictionary.class]) interaction = (NSDictionary *)i2;
+        else if ([i3 isKindOfClass:NSDictionary.class]) interaction = (NSDictionary *)i3;
+        if (interaction) {
+            likeRaw = interaction[@"liked"] ?: interaction[@"like"] ?: interaction[@"isLiked"] ?: interaction[@"is_like"];
+        }
+    }
+    if (likeRaw) {
+        self.liked = parseBoolLike(likeRaw);
     }
     // 若 verifyCompleted 未命中，但状态字段是已通过，也应视为已认证
     if (!self.verifyCompleted) {
