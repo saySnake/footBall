@@ -115,11 +115,14 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
 
         _circleView = [[UIView alloc] init];
         _circleView.layer.cornerRadius = 28;
-        _circleView.clipsToBounds = YES;
+        _circleView.clipsToBounds = NO;  // 不裁剪，否则 layer.border 会被裁掉
+        _circleView.layer.masksToBounds = NO;
         _circleView.backgroundColor = [UIColor colorWithWhite:0.17 alpha:1.0];
 
         _logoView = [[UIImageView alloc] init];
         _logoView.contentMode = UIViewContentModeScaleAspectFit;
+        _logoView.layer.cornerRadius = 14;
+        _logoView.clipsToBounds = YES;
 
         _nameLabel = [[UILabel alloc] init];
         _nameLabel.font = [UIFont systemFontOfSize:11];
@@ -141,7 +144,9 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
             make.width.height.mas_equalTo(56);
         }];
         [_logoView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(_circleView);
+            make.center.equalTo(_circleView);
+            make.width.height.mas_equalTo(28);
+//            make.edges.equalTo(_circleView);
         }];
         [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(_borderView.mas_bottom).offset(5);
@@ -153,13 +158,19 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
 - (void)setSelected:(BOOL)selected {
     [super setSelected:selected];
     if (selected) {
-        _borderView.layer.borderWidth = 0;
-        _circleView.backgroundColor = [UIColor whiteColor]; // 选中：白色背景
+        // 选中：白色背景 + 绿色边框
+        _borderView.backgroundColor = [UIColor whiteColor];
+        _circleView.backgroundColor = [UIColor whiteColor];
+        _circleView.layer.borderWidth = 3;
+        _circleView.layer.borderColor = [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0].CGColor;
         _nameLabel.textColor = [UIColor whiteColor];
         _nameLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
     } else {
-        _borderView.layer.borderWidth = 0;
-        _circleView.backgroundColor = [UIColor colorWithWhite:0.17 alpha:1.0]; // 未选中：深灰背景
+        // 未选中：深灰背景，无边框
+        _borderView.backgroundColor = [UIColor clearColor];
+        _circleView.backgroundColor = [UIColor colorWithWhite:0.17 alpha:1.0];
+        _circleView.layer.borderWidth = 0;
+        _circleView.layer.borderColor = [UIColor clearColor].CGColor;
         _nameLabel.textColor = [UIColor colorWithWhite:0.85 alpha:1.0];
         _nameLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightRegular];
     }
