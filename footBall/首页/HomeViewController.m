@@ -91,11 +91,27 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     return trimmed;
 }
 
+/// 关注球队、赛程里的 teamId 可能为数字或字符串，统一成字符串再比较/存储
+static NSString *kHomeTeamIdString(id raw) {
+    if (raw == nil || raw == (id)kCFNull) return @"";
+    if ([raw isKindOfClass:NSString.class]) {
+        return [(NSString *)raw copy] ?: @"";
+    }
+    if ([raw isKindOfClass:NSNumber.class]) {
+        return [(NSNumber *)raw stringValue];
+    }
+    return [raw description] ?: @"";
+}
+
 #pragma mark - 顶部球队 Cell
 @interface HomeTeamCell : UICollectionViewCell
 @property (nonatomic, strong) UIView *circleView;
 @property (nonatomic, strong) UIImageView *logoView;
 @property (nonatomic, strong) UILabel *nameLabel;
+/// 在 cellForItem 中写入的选中态。UICollectionView 布局会在 -applyLayoutAttributes: 里用 layoutAttributes.selected 再调 -setSelected:，
+/// 若未使用 selectItemAtIndexPath:，一般为 NO，会覆盖在 cell 里手写的 setSelected:YES，导致白底被刷回深灰。
+@property (nonatomic, assign) BOOL homeTeamStyleSelected;
+- (void)applyHomeTeamSelectionAppearance;
 @end
 @implementation HomeTeamCell
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -111,6 +127,7 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
 
         _logoView = [[UIImageView alloc] init];
         _logoView.layer.cornerRadius = 14;
+        _logoView.clipsToBounds = YES;
         _logoView.contentMode = UIViewContentModeScaleAspectFit;
 
         _nameLabel = [[UILabel alloc] init];
@@ -138,21 +155,33 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     }
     return self;
 }
-- (void)setSelected:(BOOL)selected {
-    [super setSelected:selected];
-    if (selected) {
-        // 选中：深灰背景 + 绿色边框
+- (void)applyHomeTeamSelectionAppearance {
+    if (self.homeTeamStyleSelected) {
         _circleView.backgroundColor = [UIColor whiteColor];
+        _circleView.layer.borderWidth = 0;
+        _circleView.layer.borderColor = [UIColor clearColor].CGColor;
         _nameLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
         _nameLabel.textColor = [UIColor whiteColor];
     } else {
-        // 未选中：深灰背景，无边框
         _circleView.backgroundColor = [UIColor colorWithWhite:0.17 alpha:1.0];
         _circleView.layer.borderWidth = 0;
         _circleView.layer.borderColor = [UIColor clearColor].CGColor;
         _nameLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightRegular];
         _nameLabel.textColor = [UIColor colorWithWhite:0.85 alpha:1.0];
     }
+}
+- (void)setSelected:(BOOL)selected {
+    [super setSelected:selected];
+    [self applyHomeTeamSelectionAppearance];
+}
+- (void)applyLayoutAttributes:(UICollectionViewLayoutAttributes *)layoutAttributes {
+    [super applyLayoutAttributes:layoutAttributes];
+    [self applyHomeTeamSelectionAppearance];
+}
+- (void)prepareForReuse {
+    [super prepareForReuse];
+    _homeTeamStyleSelected = NO;
+    [self applyHomeTeamSelectionAppearance];
 }
 @end
 
@@ -913,9 +942,17 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     [TeamsRequest.shared getFollowTeamIconsSuccess:^(HTTPResponse <NSArray <TeamIcon *> *>* _Nullable responseObject) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
-        self.teamItems = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
-        // 默认不选中任何球队，显示全部比赛
-        self.selectedTeamId = nil;
+        NSArray *list = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+        self.teamItems = list;
+        // 仅在新列表中找不到当前选中项时清空，避免每次拉取关注球队都把选中态打回未选中
+        NSString *kept = self.selectedTeamId;
+        if (kept.length) {
+            BOOL found = NO;
+            for (TeamIcon *t in list) {
+                if ([kHomeTeamIdString(t.teamId) isEqualToString:kept]) { found = YES; break; }
+            }
+            if (!found) self.selectedTeamId = nil;
+        }
         [self.teamCollectionView reloadData];
         [self filterData];
     } failure:^(NSError * _Nonnull error) {
@@ -1034,10 +1071,24 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     HomeTeamCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"TeamCell" forIndexPath:indexPath];
     TeamIcon *item = _teamItems[indexPath.item];
     cell.nameLabel.text = item.name;
-    [cell.logoView sd_setImageWithURL:[NSURL URLWithString:item.logo] placeholderImage:[UIImage imageNamed:kLogoPlaceholder]];
-    if (!cell.logoView.image) cell.logoView.backgroundColor = [UIColor colorWithWhite:0.6 alpha:1.0];
-    BOOL sel = item.teamId && [_selectedTeamId isEqualToString:item.teamId];
-    // 直接调用 setSelected: 确保视觉状态更新
+    __weak HomeTeamCell *weakCell = cell;
+    [cell.logoView sd_setImageWithURL:[NSURL URLWithString:item.logo]
+                     placeholderImage:[UIImage imageNamed:kLogoPlaceholder]
+                            completed:^(UIImage * _Nullable image, NSError * _Nullable error, SDImageCacheType cacheType, NSURL * _Nullable imageURL) {
+        __strong HomeTeamCell *c = weakCell;
+        if (!c) return;
+        c.logoView.backgroundColor = (image && !error) ? [UIColor clearColor] : [UIColor colorWithWhite:0.6 alpha:1.0];
+        [c applyHomeTeamSelectionAppearance];
+    }];
+    if (!cell.logoView.image) {
+        cell.logoView.backgroundColor = [UIColor colorWithWhite:0.6 alpha:1.0];
+    } else {
+        cell.logoView.backgroundColor = [UIColor clearColor];
+    }
+    NSString *tid = kHomeTeamIdString(item.teamId);
+    BOOL sel = (tid.length > 0) && _selectedTeamId.length && [tid isEqualToString:_selectedTeamId];
+    // 必须先于 setSelected: 写入，否则系统 layout 会按 layoutAttributes 把 selected 置 NO 时仍要用这里的状态画白底
+    cell.homeTeamStyleSelected = sel;
     [cell setSelected:sel];
     return cell;
 }
@@ -1046,11 +1097,12 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
 }
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
     TeamIcon *item = _teamItems[indexPath.item];
-    // 再次点击已选中的球队 → 取消选中，显示全部
-    if (item.teamId && [_selectedTeamId isEqualToString:item.teamId]) {
+    NSString *tid = kHomeTeamIdString(item.teamId);
+    if (tid.length == 0) { return; }
+    if (_selectedTeamId.length && [tid isEqualToString:_selectedTeamId]) {
         _selectedTeamId = nil;
     } else {
-        _selectedTeamId = item.teamId;
+        _selectedTeamId = [tid copy];
     }
     [collectionView reloadData];
     [self filterData];

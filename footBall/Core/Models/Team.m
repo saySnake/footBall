@@ -10,6 +10,17 @@
 + (NSDictionary<NSString *,id> *)modelCustomPropertyMapper {
     return @{ @"teamId": @[ @"id", @"teamId" ] };
 }
+- (BOOL)modelCustomTransformFromDictionary:(__unused NSDictionary *)dic {
+    id t = self.teamId;
+    if (t && ![t isKindOfClass:NSString.class]) {
+        if ([t isKindOfClass:NSNumber.class]) {
+            self.teamId = [(NSNumber *)t stringValue];
+        } else {
+            self.teamId = [t description] ?: @"";
+        }
+    }
+    return YES;
+}
 @end
 @implementation Team
 @end
