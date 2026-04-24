@@ -275,6 +275,15 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
 @implementation LocationViewController
 
+- (void)updateFriendsSectionTitle {
+    if (!self.isFriendsTab) {
+        return;
+    }
+    self.sectionLabel.text = (self.friends.count > 0)
+        ? (NSLocalizedString(@"community_tab_friends", nil) ?: @"好友")
+        : (NSLocalizedString(@"community_section_may_know", nil) ?: @"你可能认识的人");
+}
+
 - (NSArray<PNFriend *> *)pnFriendsFromCommunityData:(id)data {
     if (!data || data == (id)kCFNull) {
         return @[];
@@ -366,10 +375,12 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     [CommunityRequest.shared getCommunityFriendsWithPage:1 pageSize:50 success:^(HTTPResponse * _Nullable responseObject) {
         id raw = responseObject.dataObject ?: responseObject.data;
         weakSelf.friends = [weakSelf pnFriendsFromCommunityData:raw];
+        [weakSelf updateFriendsSectionTitle];
         [weakSelf.tableView reloadData];
         [weakSelf updateCommunityEmptyState];
     } failure:^(NSError * _Nonnull error) {
         weakSelf.friends = @[];
+        [weakSelf updateFriendsSectionTitle];
         [weakSelf.tableView reloadData];
         [weakSelf updateCommunityEmptyState];
     }];
@@ -587,6 +598,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         self.friendsTab.backgroundColor = [UIColor clearColor];
         [self.friendsTab setTitleColor:kCommunityGreen forState:UIControlStateNormal];
     }
+    [self updateFriendsSectionTitle];
     [self refreshTableHeaderForCurrentMode];
     [self.tableView reloadData];
     [self updateCommunityEmptyState];
@@ -781,7 +793,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     [self.rankTab setTitle:NSLocalizedString(@"community_tab_rank", nil) forState:UIControlStateNormal];
     [self.addFriendBtn setTitle:[NSString stringWithFormat:@"  %@  ", NSLocalizedString(@"community_add_friend", nil)] forState:UIControlStateNormal];
     [self.qrCodeBtn setTitle:[NSString stringWithFormat:@"  %@  ", NSLocalizedString(@"community_my_qrcode", nil)] forState:UIControlStateNormal];
-    self.sectionLabel.text = NSLocalizedString(@"community_section_may_know", nil);
+    [self updateFriendsSectionTitle];
     [self loadRemoteRanks];
     [self.tableView reloadData];
     [self updateCommunityEmptyState];
