@@ -93,7 +93,6 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
 
 #pragma mark - 顶部球队 Cell
 @interface HomeTeamCell : UICollectionViewCell
-@property (nonatomic, strong) UIView *borderView;   // 选中边框圆
 @property (nonatomic, strong) UIView *circleView;
 @property (nonatomic, strong) UIImageView *logoView;
 @property (nonatomic, strong) UILabel *nameLabel;
@@ -102,27 +101,17 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
-        // 关闭 cell 和 contentView 的裁剪，避免圆圈被截断
         self.clipsToBounds = NO;
         self.contentView.clipsToBounds = NO;
 
-        // 外层边框圆（比 circleView 大 6pt，用于显示选中边框）
-        _borderView = [[UIView alloc] init];
-        _borderView.layer.cornerRadius = 28;
-        _borderView.backgroundColor = [UIColor clearColor];
-        _borderView.layer.borderWidth = 0;
-        _borderView.layer.borderColor = [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0].CGColor;
-
         _circleView = [[UIView alloc] init];
         _circleView.layer.cornerRadius = 28;
-        _circleView.clipsToBounds = NO;  // 不裁剪，否则 layer.border 会被裁掉
-        _circleView.layer.masksToBounds = NO;
+        _circleView.clipsToBounds = YES;
         _circleView.backgroundColor = [UIColor colorWithWhite:0.17 alpha:1.0];
 
         _logoView = [[UIImageView alloc] init];
-        _logoView.contentMode = UIViewContentModeScaleAspectFit;
         _logoView.layer.cornerRadius = 14;
-        _logoView.clipsToBounds = YES;
+        _logoView.contentMode = UIViewContentModeScaleAspectFit;
 
         _nameLabel = [[UILabel alloc] init];
         _nameLabel.font = [UIFont systemFontOfSize:11];
@@ -130,26 +119,20 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
         _nameLabel.textAlignment = NSTextAlignmentCenter;
         _nameLabel.numberOfLines = 1;
 
-        [self.contentView addSubview:_borderView];
         [self.contentView addSubview:_circleView];
         [_circleView addSubview:_logoView];
         [self.contentView addSubview:_nameLabel];
 
-        [_borderView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.centerX.equalTo(self.contentView);
-            make.width.height.mas_equalTo(56);
-        }];
         [_circleView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.center.equalTo(_borderView);
+            make.top.centerX.equalTo(self.contentView);
             make.width.height.mas_equalTo(56);
         }];
         [_logoView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.center.equalTo(_circleView);
             make.width.height.mas_equalTo(28);
-//            make.edges.equalTo(_circleView);
         }];
         [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(_borderView.mas_bottom).offset(5);
+            make.top.equalTo(_circleView.mas_bottom).offset(5);
             make.leading.trailing.equalTo(self.contentView);
         }];
     }
@@ -157,23 +140,13 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
 }
 - (void)setSelected:(BOOL)selected {
     [super setSelected:selected];
-    if (selected) {
-        // 选中：白色背景 + 绿色边框
-        _borderView.backgroundColor = [UIColor whiteColor];
-        _circleView.backgroundColor = [UIColor whiteColor];
-        _circleView.layer.borderWidth = 3;
-        _circleView.layer.borderColor = [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0].CGColor;
-        _nameLabel.textColor = [UIColor whiteColor];
-        _nameLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
-    } else {
-        // 未选中：深灰背景，无边框
-        _borderView.backgroundColor = [UIColor clearColor];
-        _circleView.backgroundColor = [UIColor colorWithWhite:0.17 alpha:1.0];
-        _circleView.layer.borderWidth = 0;
-        _circleView.layer.borderColor = [UIColor clearColor].CGColor;
-        _nameLabel.textColor = [UIColor colorWithWhite:0.85 alpha:1.0];
-        _nameLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightRegular];
-    }
+    // 选中：白色背景；未选中：深灰背景
+    _circleView.backgroundColor = selected
+        ? [UIColor whiteColor]
+        : [UIColor colorWithWhite:0.17 alpha:1.0];
+    _nameLabel.font = selected
+        ? [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold]
+        : [UIFont systemFontOfSize:11 weight:UIFontWeightRegular];
 }
 @end
 
