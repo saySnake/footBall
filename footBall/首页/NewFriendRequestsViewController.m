@@ -56,7 +56,7 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
         _cardView.clipsToBounds = YES;
 
         _avatarView = [UIImageView new];
-        _avatarView.layer.cornerRadius = 27;
+        _avatarView.layer.cornerRadius = 20;
         _avatarView.clipsToBounds = YES;
         _avatarView.layer.borderWidth = 0.5;
         _avatarView.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.9].CGColor;
@@ -113,12 +113,13 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
         [_cardView addSubview:_rejectBtn];
         [_cardView addSubview:_statusBtn];
 
-        // cardView 撑满 contentView（上下各留 4pt 间距）
+        // cardView 撑满 contentView（上下各留 4pt 间距），固定高度 84pt
         [_cardView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(self.contentView).offset(4);
             make.leading.equalTo(self.contentView).offset(16);
             make.trailing.equalTo(self.contentView).offset(-16);
             make.bottom.equalTo(self.contentView).offset(-4);
+            make.height.mas_equalTo(84);
         }];
 
         // 右侧操作按钮：同意/拒绝 竖排，固定宽高
@@ -142,9 +143,8 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
         // 头像：左侧固定，顶部距 cardView 12pt，固定 40×40，底部约束撑起无 message 时的最小高度
         [_avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_cardView).offset(12);
-            make.top.equalTo(_cardView).offset(12);
-            make.size.mas_equalTo(CGSizeMake(54, 54));
-            make.bottom.lessThanOrEqualTo(_cardView).offset(-12);
+            make.top.equalTo(_cardView).offset(11);
+            make.size.mas_equalTo(CGSizeMake(40, 40));
         }];
 
         // 文字区域：头像右侧，纵向依次排列
@@ -168,12 +168,12 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
             make.centerY.equalTo(_statusDot);
             make.trailing.lessThanOrEqualTo(_acceptBtn.mas_leading).offset(-8);
         }];
-        // messageLabel：在 statusLabel 下方，bottom 撑起 cardView（有内容时生效）
+        // messageLabel：在 statusLabel 下方，不撑高 cardView（高度已固定）
         [_messageLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_cardView).offset(12);
             make.trailing.equalTo(_cardView).offset(-90);
-            make.top.equalTo(_statusLabel.mas_bottom).offset(6);
-            make.bottom.equalTo(_cardView).offset(-12);
+            make.height.mas_equalTo(22);
+            make.top.equalTo(_statusLabel.mas_bottom).offset(5);
         }];
     }
     return self;
@@ -450,8 +450,8 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     self.tableView.scrollIndicatorInsets = self.tableView.contentInset;
     self.tableView.dataSource = self;
     self.tableView.delegate = self;
-    self.tableView.rowHeight = UITableViewAutomaticDimension;
-    self.tableView.estimatedRowHeight = 80;
+    self.tableView.rowHeight = 84;
+    self.tableView.estimatedRowHeight = 84;
     [self.tableView registerClass:[FriendRequestCell class] forCellReuseIdentifier:@"FriendRequestCell"];
     [self.view addSubview:self.tableView];
     [self.headerView mas_makeConstraints:^(MASConstraintMaker *make) { make.top.leading.trailing.equalTo(self.view); make.height.mas_equalTo(162); }];
