@@ -63,7 +63,9 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         _idLabel.textColor = [UIColor colorWithWhite:0.26 alpha:1.0];
 
         _statusDot = [[UIView alloc] init];
-        _statusDot.layer.cornerRadius = 4;
+        _statusDot.layer.cornerRadius = 5;
+        _statusDot.layer.borderWidth = 1.5;
+        _statusDot.layer.borderColor = [UIColor whiteColor].CGColor;
         _statusDot.backgroundColor = [UIColor colorWithRed:0.0 green:0.71 blue:0.12 alpha:1.0];
 
         _statusLabel = [[UILabel alloc] init];
@@ -109,13 +111,13 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
             make.top.equalTo(_nameLabel.mas_bottom).offset(1);
         }];
         [_statusDot mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_nameLabel);
-            make.top.equalTo(_idLabel.mas_bottom).offset(5);
-            make.width.height.mas_equalTo(8);
+            make.trailing.equalTo(_avatarView).offset(-6);
+            make.bottom.equalTo(_avatarView).offset(1);
+            make.width.height.mas_equalTo(10);
         }];
         [_statusLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_statusDot.mas_trailing).offset(6);
-            make.centerY.equalTo(_statusDot);
+            make.leading.equalTo(_nameLabel);
+            make.top.equalTo(_idLabel.mas_bottom).offset(5);
         }];
         [_stampBtn mas_makeConstraints:^(MASConstraintMaker *make) {
             make.trailing.equalTo(_cardView).offset(-10);
