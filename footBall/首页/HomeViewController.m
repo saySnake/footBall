@@ -93,6 +93,7 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
 
 #pragma mark - 顶部球队 Cell
 @interface HomeTeamCell : UICollectionViewCell
+@property (nonatomic, strong) UIView *borderView;   // 选中边框圆
 @property (nonatomic, strong) UIView *circleView;
 @property (nonatomic, strong) UIImageView *logoView;
 @property (nonatomic, strong) UILabel *nameLabel;
@@ -101,29 +102,49 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
+        // 关闭 cell 和 contentView 的裁剪，避免圆圈被截断
+        self.clipsToBounds = NO;
+        self.contentView.clipsToBounds = NO;
+
+        // 外层边框圆（比 circleView 大 6pt，用于显示选中边框）
+        _borderView = [[UIView alloc] init];
+        _borderView.layer.cornerRadius = 28;
+        _borderView.backgroundColor = [UIColor clearColor];
+        _borderView.layer.borderWidth = 0;
+        _borderView.layer.borderColor = [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0].CGColor;
+
         _circleView = [[UIView alloc] init];
-        _circleView.layer.cornerRadius = 25;
+        _circleView.layer.cornerRadius = 28;
         _circleView.clipsToBounds = YES;
+        _circleView.backgroundColor = [UIColor colorWithWhite:0.17 alpha:1.0];
+
         _logoView = [[UIImageView alloc] init];
         _logoView.contentMode = UIViewContentModeScaleAspectFit;
+
         _nameLabel = [[UILabel alloc] init];
         _nameLabel.font = [UIFont systemFontOfSize:11];
         _nameLabel.textColor = [UIColor colorWithWhite:0.85 alpha:1.0];
         _nameLabel.textAlignment = NSTextAlignmentCenter;
         _nameLabel.numberOfLines = 1;
+
+        [self.contentView addSubview:_borderView];
         [self.contentView addSubview:_circleView];
         [_circleView addSubview:_logoView];
         [self.contentView addSubview:_nameLabel];
-        [_circleView mas_makeConstraints:^(MASConstraintMaker *make) {
+
+        [_borderView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.centerX.equalTo(self.contentView);
-            make.width.height.mas_equalTo(50);
+            make.width.height.mas_equalTo(56);
+        }];
+        [_circleView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.center.equalTo(_borderView);
+            make.width.height.mas_equalTo(56);
         }];
         [_logoView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.center.equalTo(_circleView);
-            make.width.height.mas_equalTo(28);
+            make.edges.equalTo(_circleView);
         }];
         [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(_circleView.mas_bottom).offset(8);
+            make.top.equalTo(_borderView.mas_bottom).offset(5);
             make.leading.trailing.equalTo(self.contentView);
         }];
     }
@@ -131,7 +152,17 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
 }
 - (void)setSelected:(BOOL)selected {
     [super setSelected:selected];
-    _circleView.backgroundColor = selected ? [UIColor whiteColor] : [UIColor colorWithWhite:0.17 alpha:1.0];
+    if (selected) {
+        _borderView.layer.borderWidth = 0;
+        _circleView.backgroundColor = [UIColor whiteColor]; // 选中：白色背景
+        _nameLabel.textColor = [UIColor whiteColor];
+        _nameLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
+    } else {
+        _borderView.layer.borderWidth = 0;
+        _circleView.backgroundColor = [UIColor colorWithWhite:0.17 alpha:1.0]; // 未选中：深灰背景
+        _nameLabel.textColor = [UIColor colorWithWhite:0.85 alpha:1.0];
+        _nameLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightRegular];
+    }
 }
 @end
 
@@ -432,6 +463,7 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     _teamCollectionView = [[UICollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:layout];
     _teamCollectionView.backgroundColor = [UIColor clearColor];
     _teamCollectionView.showsHorizontalScrollIndicator = NO;
+    _teamCollectionView.clipsToBounds = NO; // 允许圆圈超出 collectionView 边界显示
     _teamCollectionView.dataSource = self;
     _teamCollectionView.delegate = self;
     [_teamCollectionView registerClass:[HomeTeamCell class] forCellWithReuseIdentifier:@"TeamCell"];
@@ -439,7 +471,7 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
 
     [_headerView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.leading.trailing.equalTo(self.view);
-        make.height.mas_equalTo(241);
+        make.height.mas_equalTo(257);
     }];
     [_avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(_headerView.mas_safeAreaLayoutGuideTop).offset(12);
@@ -457,7 +489,7 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     [_teamCollectionView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(_avatarView.mas_bottom).offset(24);
         make.leading.trailing.equalTo(_headerView);
-        make.height.mas_equalTo(80);
+        make.height.mas_equalTo(96);
     }];
 }
 
@@ -1019,11 +1051,16 @@ static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     return cell;
 }
 - (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)layout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
-    return CGSizeMake(60, 80);
+    return CGSizeMake(64, 96);
 }
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
     TeamIcon *item = _teamItems[indexPath.item];
-    _selectedTeamId = item.teamId; // nil 表示全部
+    // 再次点击已选中的球队 → 取消选中，显示全部
+    if (item.teamId && [_selectedTeamId isEqualToString:item.teamId]) {
+        _selectedTeamId = nil;
+    } else {
+        _selectedTeamId = item.teamId;
+    }
     [collectionView reloadData];
     [self filterData];
 }
