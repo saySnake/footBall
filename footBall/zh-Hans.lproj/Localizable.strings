@@ -287,6 +287,7 @@
 "community_request_message" = "看你的护照很精彩，想添加您为好友";
 "community_request_accept" = "同意";
 "community_request_reject" = "拒绝";
+"community_request_rejected" = "已拒绝";
 "community_request_expired" = "已过期";
 "community_request_added" = "已添加";
 "community_request_sent" = "已发送";

@@ -287,6 +287,7 @@
 "community_request_message" = "Your passport looks great, I'd like to add you as a friend.";
 "community_request_accept" = "Accept";
 "community_request_reject" = "Reject";
+"community_request_rejected" = "Rejected";
 "community_request_expired" = "Expired";
 "community_request_added" = "Added";
 "community_request_sent" = "Sent";
