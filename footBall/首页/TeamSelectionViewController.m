@@ -664,6 +664,10 @@
 
 - (__kindof UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
     TeamCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"TeamCell" forIndexPath:indexPath];
+    if (indexPath.item >= self.filteredTeams.count) {
+        // 搜索结果变化与列表刷新存在时序差，兜底避免越界崩溃。
+        return cell;
+    }
     Team *m = self.filteredTeams[indexPath.item];
     cell.nameLabel.text = m.name;
     [cell.logoView sd_setImageWithURL:[NSURL URLWithString:m.logo]];
@@ -680,6 +684,9 @@
 }
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
+    if (indexPath.item >= self.filteredTeams.count) {
+        return;
+    }
     Team *m = self.filteredTeams[indexPath.item];
     if ([self.selectedTeams containsObject:m]) {
         [self.selectedTeams removeObject:m];
