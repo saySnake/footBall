@@ -210,6 +210,14 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
                                                                                    URLString:fullURL
                                                                                   parameters:parameters
                                                                                        error:nil];
+    // NSJSONSerialization 默认把 '/' 转义成 '\/'，服务端可能不接受，统一还原
+    if (request.HTTPBody.length > 0) {
+        NSString *bodyStr = [[NSString alloc] initWithData:request.HTTPBody encoding:NSUTF8StringEncoding];
+        if ([bodyStr containsString:@"\\/"]) {
+            bodyStr = [bodyStr stringByReplacingOccurrencesOfString:@"\\/" withString:@"/"];
+            request.HTTPBody = [bodyStr dataUsingEncoding:NSUTF8StringEncoding];
+        }
+    }
     
     // 合并请求头
     NSMutableDictionary *allHeaders = [NSMutableDictionary dictionaryWithDictionary:self.commonHeaders];
