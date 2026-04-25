@@ -85,7 +85,7 @@
 
     UILabel *navTitle = [[UILabel alloc] init];
     navTitle.text = @"比赛详情";
-    navTitle.font = [UIFont systemFontOfSize:40 weight:UIFontWeightSemibold];
+    navTitle.font = [UIFont boldSystemFontOfSize:17];
     navTitle.textColor = [UIColor blackColor];
     [navBar addSubview:navTitle];
     [navTitle mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -172,18 +172,18 @@
         make.top.equalTo(content).offset(14);
         make.leading.equalTo(content).offset(16);
         make.trailing.equalTo(content).offset(-16);
-        make.height.mas_equalTo(168);
+        make.height.mas_equalTo(109);
     }];
 
     _homeLogoView = [[UIImageView alloc] init];
-    _homeLogoView.layer.cornerRadius = 16;
+    _homeLogoView.layer.cornerRadius = 19;
     _homeLogoView.clipsToBounds = YES;
     _homeLogoView.contentMode = UIViewContentModeScaleAspectFit;
-    _homeLogoView.backgroundColor = [UIColor colorWithWhite:0.9 alpha:1.0];
+    _homeLogoView.backgroundColor = [UIColor clearColor];
     [topCard addSubview:_homeLogoView];
 
     _homeNameLabel = [[UILabel alloc] init];
-    _homeNameLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
+    _homeNameLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
     _homeNameLabel.textColor = [UIColor blackColor];
     _homeNameLabel.lineBreakMode = NSLineBreakByTruncatingTail;
     _homeNameLabel.text = self.homeName ?: @"-";
@@ -191,13 +191,13 @@
 
     UILabel *vsLabel = [[UILabel alloc] init];
     vsLabel.text = @"VS";
-    vsLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
+    vsLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
     vsLabel.textColor = [UIColor blackColor];
     vsLabel.textAlignment = NSTextAlignmentCenter;
     [topCard addSubview:vsLabel];
 
     _awayNameLabel = [[UILabel alloc] init];
-    _awayNameLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
+    _awayNameLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
     _awayNameLabel.textColor = [UIColor blackColor];
     _awayNameLabel.textAlignment = NSTextAlignmentRight;
     _awayNameLabel.lineBreakMode = NSLineBreakByTruncatingTail;
@@ -205,14 +205,14 @@
     [topCard addSubview:_awayNameLabel];
 
     _awayLogoView = [[UIImageView alloc] init];
-    _awayLogoView.layer.cornerRadius = 16;
+    _awayLogoView.layer.cornerRadius = 19;
     _awayLogoView.clipsToBounds = YES;
     _awayLogoView.contentMode = UIViewContentModeScaleAspectFit;
-    _awayLogoView.backgroundColor = [UIColor colorWithWhite:0.9 alpha:1.0];
+    _awayLogoView.backgroundColor = [UIColor clearColor];
     [topCard addSubview:_awayLogoView];
 
     _matchDateLabel = [[UILabel alloc] init];
-    _matchDateLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightRegular];
+    _matchDateLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
     _matchDateLabel.textColor = [UIColor colorWithWhite:0.23 alpha:1.0];
     _matchDateLabel.text = @"-";
     [topCard addSubview:_matchDateLabel];
@@ -221,7 +221,7 @@
     _kickTimeLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
     _kickTimeLabel.textColor = kDetailGreen;
     _kickTimeLabel.textAlignment = NSTextAlignmentCenter;
-    _kickTimeLabel.layer.cornerRadius = 21;
+    _kickTimeLabel.layer.cornerRadius = 15;
     _kickTimeLabel.layer.borderWidth = 1.2;
     _kickTimeLabel.layer.borderColor = kDetailGreen.CGColor;
     _kickTimeLabel.clipsToBounds = YES;
@@ -230,14 +230,14 @@
 
     // 布局：队名 → 队徽 → VS → 队徽 → 队名（与原型一致）
     [_homeNameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(topCard).offset(36);
-        make.centerY.equalTo(_homeLogoView);
+        make.leading.equalTo(topCard).offset(18);
+        make.top.equalTo(topCard).offset(22);
         make.trailing.lessThanOrEqualTo(_homeLogoView.mas_leading).offset(-10);
     }];
     [_homeLogoView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(topCard.mas_centerX).offset(-84);
-        make.top.equalTo(topCard).offset(38);
-        make.width.height.mas_equalTo(32);
+        make.centerX.equalTo(topCard.mas_centerX).offset(-60);
+        make.top.equalTo(topCard).offset(16);
+        make.width.height.mas_equalTo(38);
     }];
     [vsLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(topCard);
@@ -245,24 +245,24 @@
         make.width.mas_equalTo(52);
     }];
     [_awayLogoView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(topCard.mas_centerX).offset(84);
+        make.centerX.equalTo(topCard.mas_centerX).offset(60);
         make.centerY.equalTo(_homeLogoView);
-        make.width.height.mas_equalTo(32);
+        make.width.height.mas_equalTo(38);
     }];
     [_awayNameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.greaterThanOrEqualTo(_awayLogoView.mas_trailing).offset(10);
-        make.trailing.equalTo(topCard).offset(-36);
+        make.trailing.equalTo(topCard).offset(-18);
         make.centerY.equalTo(_homeLogoView);
     }];
     [_matchDateLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(topCard).offset(36);
-        make.top.equalTo(_homeLogoView.mas_bottom).offset(34);
+        make.leading.equalTo(topCard).offset(18);
+        make.centerY.equalTo(_kickTimeLabel);
     }];
     [_kickTimeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerY.equalTo(_matchDateLabel);
+        make.bottom.equalTo(topCard).offset(-12);
         make.centerX.equalTo(topCard);
-        make.width.mas_equalTo(110);
-        make.height.mas_equalTo(42);
+        make.width.mas_equalTo(82);
+        make.height.mas_equalTo(30);
     }];
 
     // ── 比赛信息 ──
