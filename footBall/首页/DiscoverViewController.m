@@ -1606,7 +1606,8 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
 
 - (void)presentMatchVerifyForMatch:(DiscoverMatch *)match {
     if (match.recordId.length == 0) {
-        [[LoadingManager sharedManager] showText:@"请先完成输入信息" inView:self.view];
+        // showText 在 LoadingManager 中默认底部偏移；此处改为居中提示，避免被底部区域遮挡。
+        [[LoadingManager sharedManager] showError:@"请先完成输入信息" inView:self.view];
         return;
     }
     PNMatchVerifyViewController *vc = [[PNMatchVerifyViewController alloc] init];
