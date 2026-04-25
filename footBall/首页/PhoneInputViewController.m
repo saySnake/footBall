@@ -149,10 +149,16 @@ static UIColor *PNFigmaSocialCircleBG(void) {
     self.agreeCheckButton = [UIButton buttonWithType:UIButtonTypeCustom];
     UIImage *checkOn = nil;
     UIImage *checkOff = nil;
+    UIImage *agreeOffAsset = [UIImage imageNamed:@"agree_policy"];
+    if (agreeOffAsset) {
+        checkOff = [agreeOffAsset imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+    }
     if (@available(iOS 13.0, *)) {
         UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:16 weight:UIImageSymbolWeightRegular];
         checkOn = [[UIImage systemImageNamed:@"checkmark.circle.fill" withConfiguration:cfg] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-        checkOff = [[UIImage systemImageNamed:@"circle" withConfiguration:cfg] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+        if (!checkOff) {
+            checkOff = [[UIImage systemImageNamed:@"circle" withConfiguration:cfg] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+        }
     }
     [self.agreeCheckButton setImage:checkOn forState:UIControlStateSelected];
     [self.agreeCheckButton setImage:checkOff forState:UIControlStateNormal];
@@ -225,11 +231,6 @@ static UIColor *PNFigmaSocialCircleBG(void) {
     [self.view addSubview:self.phoneContainer];
     [self.view addSubview:self.getCodeButton];
     [self.view addSubview:self.agreementStack];
-    [self.view addSubview:self.otherLoginLabel];
-    [self.view addSubview:self.otherLoginLeftLine];
-    [self.view addSubview:self.otherLoginRightLine];
-    [self.view addSubview:self.appleLoginButton];
-    [self.view addSubview:self.wechatLoginButton];
     
     [self.phoneContainer addSubview:self.countryCodeLabel];
     [self.phoneContainer addSubview:self.phoneSeparatorView];
@@ -297,36 +298,6 @@ static UIColor *PNFigmaSocialCircleBG(void) {
         make.centerX.equalTo(self.view);
     }];
     
-    [self.otherLoginLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.agreementStack.mas_bottom).offset(36);
-        make.centerX.equalTo(self.view);
-    }];
-    
-    [self.otherLoginLeftLine mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerY.equalTo(self.otherLoginLabel);
-        make.leading.equalTo(self.view).offset(24);
-        make.trailing.equalTo(self.otherLoginLabel.mas_leading).offset(-12);
-        make.height.mas_equalTo(1.0);
-    }];
-    
-    [self.otherLoginRightLine mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerY.equalTo(self.otherLoginLabel);
-        make.leading.equalTo(self.otherLoginLabel.mas_trailing).offset(12);
-        make.trailing.equalTo(self.view).offset(-24);
-        make.height.mas_equalTo(1.0);
-    }];
-    
-    [self.appleLoginButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.otherLoginLabel.mas_bottom).offset(24);
-        make.centerX.equalTo(self.view).offset(-40);
-        make.width.height.mas_equalTo(50);
-    }];
-    
-    [self.wechatLoginButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.otherLoginLabel.mas_bottom).offset(24);
-        make.centerX.equalTo(self.view).offset(40);
-        make.width.height.mas_equalTo(50);
-    }];
 }
 
 - (void)textFieldDidChange:(UITextField *)textField {
