@@ -1152,16 +1152,6 @@ static NSString *kHomeTeamIdString(id raw) {
 
 #pragma mark - UITableView（按日期倒序、分组）
 - (NSArray *)sortedDates {
-    NSMutableArray *dates = NSMutableArray.array;
-    for (Match *m in _filteredData) {
-        [dates addObject:[self monthTextFromRaw:m.matchDate]];
-    }
-    NSArray *unique = [[NSSet setWithArray:dates] allObjects];
-    return [unique sortedArrayUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
-        return [b compare:a];
-    }];
-}
-- (NSArray *)sortedDates {
     return self.sortedDateKeys ?: @[];
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
