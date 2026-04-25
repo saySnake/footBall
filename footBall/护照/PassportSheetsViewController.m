@@ -441,11 +441,16 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     }
     _backButton.tintColor = [UIColor whiteColor];
     [_backButton addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
-
     _titleLabel = [[UILabel alloc] init];
     _titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
     _titleLabel.textColor = [UIColor whiteColor];
-    _titleLabel.text = NSLocalizedString(@"passport_nav_title", nil) ?: @"我的护照";
+    if (self.targetUserId.length > 0) {
+        NSString *name = self.targetNickname.length > 0 ? self.targetNickname : (NSLocalizedString(@"stamp_album_friend_title", nil) ?: @"TA的邮票夹");
+        _titleLabel.text = name;
+    } else {
+        _titleLabel.text = NSLocalizedString(@"passport_nav_title", nil) ?: @"我的护照";
+    }
+
 
     _shareButton = [UIButton buttonWithType:UIButtonTypeSystem];
     if (@available(iOS 13.0, *)) {

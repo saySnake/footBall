@@ -40,7 +40,7 @@
     }];
 }
 - (void)addStamp:(NSString *)stampId position:(NSString *)position success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
-    [[APIManager sharedManager] POST:APIPathValueDeleteStamps(stampId) parameters:@{@"position":position} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+    [[APIManager sharedManager] POST:APIPathValueStampsSelect(stampId) parameters:@{@"position":position} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
             responseObject.dataObject = responseObject.data;
             if (success) success(responseObject);

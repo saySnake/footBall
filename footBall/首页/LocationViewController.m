@@ -7,7 +7,7 @@
 #import "AddFriendViewController.h"
 #import "MyQRCodeViewController.h"
 #import "CommunityRequest.h"
-#import "StampAlbumViewController.h"
+#import "PassportSheetsViewController.h"
 #import "PassportViewController.h"
 #import <Masonry/Masonry.h>
 #import "ColorManager.h"
@@ -923,7 +923,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     if (friend.userId.length == 0) return;
     
     // 跳转到邮票夹页面，传入好友 userId
-    StampAlbumViewController *vc = [[StampAlbumViewController alloc] init];
+    PassportSheetsViewController *vc = [[PassportSheetsViewController alloc] init];
     vc.targetUserId = friend.userId;
     vc.targetNickname = friend.nickname.length > 0 ? [NSString stringWithFormat:@"%@%@", friend.nickname, (NSLocalizedString(@"stamp_album_suffix", nil) ?: @"的邮票夹")] : nil;
     vc.hidesBottomBarWhenPushed = YES;

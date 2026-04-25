@@ -207,55 +207,13 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
     void (^handleError)(NSError *) = ^(NSError *error) {
         [QMUITips showError:error.localizedDescription];
     };
-    if (self.targetUserId.length > 0) {
-        // 查看他人邮票：调社区好友邮票接口
-        [CommunityRequest.shared getFriendStamps:self.targetUserId success:^(HTTPResponse * _Nullable responseObject) {
-            NSArray<PNStampCategory *> *cats = [responseObject.dataObject isKindOfClass:NSArray.class] ? (NSArray<PNStampCategory *> *)responseObject.dataObject : @[];
-            handleCategories(cats);
-        } failure:handleError];
-    } else {
-        // 查看自己邮票
-        [[StampRequest shared] getSelectableStampsSuccess:^(HTTPResponse * _Nullable responseObject) {
-            NSArray<PNStampCategory *> *cats = [responseObject.dataObject isKindOfClass:NSArray.class] ? (NSArray<PNStampCategory *> *)responseObject.dataObject : @[];
-            handleCategories(cats);
-        } failure:handleError];
-    }
+    // 查看自己邮票
+    [[StampRequest shared] getSelectableStampsSuccess:^(HTTPResponse * _Nullable responseObject) {
+        NSArray<PNStampCategory *> *cats = [responseObject.dataObject isKindOfClass:NSArray.class] ? (NSArray<PNStampCategory *> *)responseObject.dataObject : @[];
+        handleCategories(cats);
+    } failure:handleError];
 }
-//    [[StampRequest shared] getStampCollectionSuccess:^(HTTPResponse * _Nullable responseObject) {
-//        PNStampCollection *c = (PNStampCollection *)responseObject.dataObject;
-//        weakSelf.apiCategories = c.categories ?: @[];
-//
-//        NSMutableArray<StampAlbumSectionModel *> *sec = [NSMutableArray array];
-//        [weakSelf.apiCategories enumerateObjectsUsingBlock:^(PNStampCategorySection * _Nonnull cat, NSUInteger idx, BOOL * _Nonnull stop) {
-//            NSString *displayTitle = StampAlbumNormalizedCategoryTitle(cat.name, (NSInteger)idx);
-//            if (displayTitle.length == 0) {
-//                return;
-//            }
-//            StampAlbumSectionModel *s = [[StampAlbumSectionModel alloc] init];
-//            s.title = displayTitle;
-//            NSMutableArray<StampAlbumItem *> *items = [NSMutableArray array];
-//            for (PNStampAlbumItem *st in (cat.stamps ?: @[])) {
-//                StampAlbumItem *it = [[StampAlbumItem alloc] init];
-//                it.unlocked = st.unlocked;
-//                it.isNew = st.isNew;
-//                it.imageURL = st.image;
-//                it.rarity = st.rarity;
-//                it.circleColor = StampAlbumRarityColor(st.rarity);
-//                it.rawStamp = st;
-//                [items addObject:it];
-//            }
-//            s.items = [items copy];
-//            [sec addObject:s];
-//        }];
-//
-//        weakSelf.allSections = [sec copy];
-//        weakSelf.sections = weakSelf.allSections;
-//        [weakSelf setupFilterOptions];
-//        [weakSelf.tableView reloadData];
-//        [weakSelf.filterTableView reloadData];
-//    } failure:^(NSError * _Nonnull error) {
-//        [QMUITips showError:error.localizedDescription];
-//    }];
+;
 
 - (void)setupFilterOptions {
     // 分类名：按 allCategories 出现顺序去重（不含「全部」）
@@ -296,12 +254,8 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
     _titleLabel = [[UILabel alloc] init];
     _titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
     _titleLabel.textColor = [UIColor whiteColor];
-    if (self.targetUserId.length > 0) {
-        NSString *name = self.targetNickname.length > 0 ? self.targetNickname : (NSLocalizedString(@"stamp_album_friend_title", nil) ?: @"TA的邮票夹");
-        _titleLabel.text = name;
-    } else {
-        _titleLabel.text = NSLocalizedString(@"discover_stamp_album", nil) ?: @"邮票夹";
-    }
+    _titleLabel.text = NSLocalizedString(@"discover_stamp_album", nil) ?: @"邮票夹";
+
     _filterButton = [UIButton buttonWithType:UIButtonTypeSystem];
     _filterButton.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
     _filterButton.backgroundColor = [UIColor clearColor];

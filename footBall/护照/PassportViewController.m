@@ -59,14 +59,14 @@ static UIColor *PassportPageBg(void) {
     [self buildTable];
     [self buildTableHeader];
     __weak typeof(self) weakSelf = self;
-    self.passportHeader.onPassportHeader2Tap = ^{
-        PassportViewModel *m = weakSelf.viewModel;
-        if (!m) {
-            return;
-        }
-        PassportSheetsViewController *vc = [[PassportSheetsViewController alloc] initWithViewModel:m year:weakSelf.selectedYear];
-        [weakSelf.navigationController pushViewController:vc animated:YES];
-    };
+//    self.passportHeader.onPassportHeader2Tap = ^{
+//        PassportViewModel *m = weakSelf.viewModel;
+//        if (!m) {
+//            return;
+//        }
+//        PassportSheetsViewController *vc = [[PassportSheetsViewController alloc] initWithViewModel:m year:weakSelf.selectedYear];
+//        [weakSelf.navigationController pushViewController:vc animated:YES];
+//    };
     self.viewModel = [PassportViewModel viewModelWithPassport:nil year:self.selectedYear];
     [self.passportHeader configureWithModel:self.viewModel];
     [self.tableView reloadData];

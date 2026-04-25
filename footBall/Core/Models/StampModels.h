@@ -25,6 +25,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) NSString *position;
 /// 选择页：是否已被选择（已占用位置）
 @property (nonatomic, assign) BOOL selected;
+/// 是否已认证
+@property (nonatomic, assign) BOOL verified;
+
 @end
 
 /// 邮票分类（选择页/已认证列表共用）
