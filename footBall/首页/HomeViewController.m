@@ -49,45 +49,6 @@ static UIImage *kHomeFavoriteIcon(BOOL favorited) {
 static NSString *kHomeFeaturedTeamDisplayName(NSString *name) {
     NSString *trimmed = [[name ?: @"" stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] copy];
     if (trimmed.length == 0) return @"-";
-
-    NSDictionary<NSString *, NSString *> *aliases = @{
-        @"Nottingham Forest": @"N Forest",
-        @"Wolverhampton Wanderers": @"Wolves",
-        @"Brighton & Hove Albion": @"Brighton",
-        @"Tottenham Hotspur": @"Tottenham",
-        @"Manchester United": @"Man United",
-        @"Manchester City": @"Man City",
-        @"Newcastle United": @"Newcastle",
-        @"Leicester City": @"Leicester",
-        @"West Ham United": @"West Ham",
-        @"Burnley FC": @"Burnley",
-        @"Arsenal FC": @"Arsenal",
-        @"Liverpool FC": @"Liverpool",
-        @"Chelsea FC": @"Chelsea"
-    };
-    NSString *alias = aliases[trimmed];
-    if (alias.length > 0) return alias;
-
-    if ([trimmed rangeOfString:@"森林"].location != NSNotFound) return @"N Forest";
-    if ([trimmed rangeOfString:@"狼"].location != NSNotFound) return @"Wolves";
-    if ([trimmed rangeOfString:@"布莱顿"].location != NSNotFound) return @"Brighton";
-    if ([trimmed rangeOfString:@"利物浦"].location != NSNotFound) return @"Liverpool";
-    if ([trimmed rangeOfString:@"阿森纳"].location != NSNotFound) return @"Arsenal";
-    if ([trimmed rangeOfString:@"伯恩利"].location != NSNotFound) return @"Burnley";
-    if ([trimmed rangeOfString:@"布伦特福德"].location != NSNotFound) return @"Brentford";
-
-    NSArray<NSString *> *parts = [trimmed componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-    NSPredicate *nonEmpty = [NSPredicate predicateWithBlock:^BOOL(NSString *value, NSDictionary<NSString *,id> * _Nullable bindings) {
-        return value.length > 0;
-    }];
-    parts = [parts filteredArrayUsingPredicate:nonEmpty];
-    if (parts.count >= 2 && trimmed.length > 12) {
-        NSString *first = parts.firstObject;
-        NSString *last = parts.lastObject;
-        if (first.length > 0 && last.length > 0) {
-            return [NSString stringWithFormat:@"%@ %@", [[first substringToIndex:1] uppercaseString], last];
-        }
-    }
     return trimmed;
 }
 
@@ -668,14 +629,10 @@ static NSString *kHomeTeamIdString(id raw) {
     }
     card.clipsToBounds = YES;
     UILabel *timeL = [[UILabel alloc] init];
-    // Fri/11:00 pm：优先从 dateDetail 里取星期缩写
-    NSString *weekday = @"";
+    // 顶部星期与时间使用系统语言，避免固定英文。
+    NSString *weekday = [self featuredWeekdayTextFromRaw:m.matchDate];
     NSString *detailText = [self featuredDateTextFromRaw:m.matchDate];
-    if ([detailText containsString:@","]) {
-        weekday = [[detailText componentsSeparatedByString:@","] firstObject] ?: @"";
-    }
-    weekday = [weekday stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if (weekday.length == 0) weekday = @"Fri";
+    if (weekday.length == 0) weekday = @"--";
     NSString *t = [self featuredTimeTextFromRaw:m.matchDate];
     timeL.text = [NSString stringWithFormat:@"%@/%@", weekday, t];
     timeL.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
@@ -785,9 +742,19 @@ static NSString *kHomeTeamIdString(id raw) {
     NSDate *date = [self dateFromRaw:raw];
     if (!date) return @"--:--";
     NSDateFormatter *fmt = NSDateFormatter.new;
-    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    fmt.dateFormat = @"h:mm a";
-    return [[fmt stringFromDate:date] lowercaseString];
+    fmt.locale = [NSLocale currentLocale];
+    [fmt setLocalizedDateFormatFromTemplate:@"Hm"];
+    return [fmt stringFromDate:date];
+}
+
+/// 精选卡片顶部星期：按系统语言显示（如「周六」/「Sat」）
+- (NSString *)featuredWeekdayTextFromRaw:(NSString *)raw {
+    NSDate *date = [self dateFromRaw:raw];
+    if (!date) return @"";
+    NSDateFormatter *fmt = NSDateFormatter.new;
+    fmt.locale = [NSLocale currentLocale];
+    [fmt setLocalizedDateFormatFromTemplate:@"EEE"];
+    return [fmt stringFromDate:date];
 }
 
 /// 精选卡片日期：与设计一致（如 Sun,18 Feb 25）
@@ -795,8 +762,8 @@ static NSString *kHomeTeamIdString(id raw) {
     NSDate *date = [self dateFromRaw:raw];
     if (!date) return @"--";
     NSDateFormatter *fmt = NSDateFormatter.new;
-    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    fmt.dateFormat = @"EEE, d MMM yy";
+    fmt.locale = [NSLocale currentLocale];
+    [fmt setLocalizedDateFormatFromTemplate:@"d MMM yy"];
     return [fmt stringFromDate:date];
 }
 
@@ -859,17 +826,7 @@ static NSString *kHomeTeamIdString(id raw) {
                   (long)first.homeScore, (long)first.awayScore, first.matchDate);
         }
 #endif
-        Match *firstFinished = nil;
-        Match *firstUpcoming = nil;
-        for (Match *m in list) {
-            BOOL finished = [self home_isMatchFinished:m];
-            if (finished && !firstFinished) firstFinished = m;
-            if (!finished && !firstUpcoming) firstUpcoming = m;
-            if (firstFinished && firstUpcoming) break;
-        }
-        self.highlightFinished = firstFinished ?: list.firstObject;
-        self.highlightUpcoming = firstUpcoming ?: list.firstObject;
-        [self buildTwoCards];
+        [self applyFeaturedList:list];
     } failure:^(NSError * _Nonnull error) {
 #if DEBUG
         NSLog(@"[HomeFeatured] failed error=%@", error);
@@ -878,6 +835,34 @@ static NSString *kHomeTeamIdString(id raw) {
         self.highlightUpcoming = nil;
         [self buildTwoCards];
     }];
+}
+
+- (void)applyFeaturedList:(NSArray<Match *> *)list {
+    if (list.count == 0) {
+        self.highlightFinished = nil;
+        self.highlightUpcoming = nil;
+        [self buildTwoCards];
+        return;
+    }
+
+    Match *firstFinished = nil;
+    Match *firstUpcoming = nil;
+    for (Match *m in list) {
+        BOOL finished = [self home_isMatchFinished:m];
+        if (finished && !firstFinished) firstFinished = m;
+        if (!finished && !firstUpcoming) firstUpcoming = m;
+        if (firstFinished && firstUpcoming) break;
+    }
+
+    Match *first = list.firstObject;
+    Match *second = (list.count > 1) ? list[1] : first;
+    self.highlightFinished = firstFinished ?: first;
+    self.highlightUpcoming = firstUpcoming ?: ((second != self.highlightFinished) ? second : first);
+    if (self.highlightFinished == self.highlightUpcoming && list.count > 1) {
+        self.highlightUpcoming = second;
+    }
+
+    [self buildTwoCards];
 }
 
 - (void)fetchScheduleMatches {
