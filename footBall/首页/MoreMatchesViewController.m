@@ -177,25 +177,25 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
 
         _homeLabel = [[UILabel alloc] init];
         _awayLabel = [[UILabel alloc] init];
-        _homeLabel.font = _awayLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
+        _homeLabel.font = _awayLabel.font = [UIFont systemFontOfSize:24/2.0 weight:UIFontWeightSemibold];
+        _homeLabel.adjustsFontSizeToFitWidth = YES;
         _homeLabel.textColor = _awayLabel.textColor = kMoreMatchesPrimaryText();
         _homeLabel.textAlignment = NSTextAlignmentRight;
         _awayLabel.textAlignment = NSTextAlignmentLeft;
+        _awayLabel.adjustsFontSizeToFitWidth = YES;
         _homeLabel.lineBreakMode = NSLineBreakByTruncatingTail;
         _awayLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-        _homeLabel.adjustsFontSizeToFitWidth = YES;
-        _awayLabel.adjustsFontSizeToFitWidth = YES;
-        _homeLabel.minimumScaleFactor = 0.75f;
-        _awayLabel.minimumScaleFactor = 0.75f;
+        _homeLabel.adjustsFontSizeToFitWidth = NO;
+        _awayLabel.adjustsFontSizeToFitWidth = NO;
 
         _timePill = [UIButton buttonWithType:UIButtonTypeSystem];
         _timePill.userInteractionEnabled = NO;
-        _timePill.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+        _timePill.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
         [_timePill setTitleColor:kMoreMatchesGreen() forState:UIControlStateNormal];
-        _timePill.layer.cornerRadius = 12;
+        _timePill.layer.cornerRadius = 14;
         _timePill.layer.borderWidth = 0.5;
         _timePill.layer.borderColor = kMoreMatchesGreen().CGColor;
-        _timePill.contentEdgeInsets = UIEdgeInsetsMake(4, 8, 4, 8);
+        _timePill.contentEdgeInsets = UIEdgeInsetsMake(0, 10, 0, 10);
         _timePill.backgroundColor = [UIColor colorWithRed:0.973 green:0.980 blue:0.969 alpha:1.0];
 
         _favoriteBtn = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -213,11 +213,10 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
         [_homeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.equalTo(card).offset(12);
             make.centerY.equalTo(card);
-            // 主队（homeTeamName）在左；随卡片宽度截断
-            make.width.mas_lessThanOrEqualTo(card.mas_width).multipliedBy(0.34);
+            make.right.equalTo(_homeBadge.mas_left).offset(-6);
         }];
         [_homeBadge mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.left.equalTo(_homeLabel.mas_right).offset(8);
+            make.right.equalTo(_timePill.mas_left).offset(-10);
             make.centerY.equalTo(card);
             make.width.height.mas_equalTo(32);
         }];
@@ -226,32 +225,31 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
             make.width.height.mas_equalTo(18);
         }];
         [_timePill mas_makeConstraints:^(MASConstraintMaker *make) {
-            // 中间时间：左接主队队徽、右接客队队徽，各 14pt
-            make.left.equalTo(_homeBadge.mas_right).offset(14);
+            make.centerX.equalTo(card);
             make.centerY.equalTo(card);
-            make.width.mas_equalTo(50);
-            make.height.mas_equalTo(24);
+            make.width.mas_equalTo(64);
+            make.height.mas_equalTo(28);
         }];
         [_timePill setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+        [_timePill setContentHuggingPriority:UILayoutPriorityDefaultHigh forAxis:UILayoutConstraintAxisHorizontal];
         [_favoriteBtn mas_makeConstraints:^(MASConstraintMaker *make) {
             make.right.equalTo(card).offset(-16);
             make.centerY.equalTo(card);
             make.width.height.mas_equalTo(20);
         }];
-        [_awayLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.right.equalTo(_favoriteBtn.mas_left).offset(-12);
-            make.centerY.equalTo(card);
-            make.width.mas_lessThanOrEqualTo(card.mas_width).multipliedBy(0.34);
-        }];
         [_awayBadge mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.left.equalTo(_timePill.mas_right).offset(14);
-            make.right.equalTo(_awayLabel.mas_left).offset(-8);
+            make.left.equalTo(_timePill.mas_right).offset(10);
             make.centerY.equalTo(card);
             make.width.height.mas_equalTo(32);
         }];
         [_awayLogo mas_makeConstraints:^(MASConstraintMaker *make) {
             make.center.equalTo(_awayBadge);
             make.width.height.mas_equalTo(18);
+        }];
+        [_awayLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.left.equalTo(_awayBadge.mas_right).offset(6);
+            make.centerY.equalTo(card);
+            make.right.lessThanOrEqualTo(_favoriteBtn.mas_left).offset(-10);
         }];
     }
     return self;
@@ -628,8 +626,8 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
         cell.favoriteBtn.tintColor = [UIColor clearColor];
         cell.favoriteBtn.alpha = 1.0;
     } else {
-        cell.favoriteBtn.tintColor = [UIColor colorWithRed:0.114 green:0.114 blue:0.114 alpha:1.0];
-        cell.favoriteBtn.alpha = 0.72;
+        cell.favoriteBtn.tintColor = [UIColor colorWithWhite:0.45 alpha:1.0];
+        cell.favoriteBtn.alpha = 0.55;
     }
     cell.favoriteBtn.tag = indexPath.row;
     [cell.favoriteBtn removeTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];
