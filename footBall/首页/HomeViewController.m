@@ -1081,8 +1081,8 @@ static NSString *kHomeTeamIdString(id raw) {
     NSDate *date = [self dateFromRaw:raw];
     if (!date) return @"--";
     NSDateFormatter *fmt = NSDateFormatter.new;
-    fmt.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
-    fmt.dateFormat = @"dd MMM, yyyy";
+    fmt.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"zh_CN"];
+    fmt.dateFormat = @"yyyy年MM月dd日";
     return [fmt stringFromDate:date];
 }
 

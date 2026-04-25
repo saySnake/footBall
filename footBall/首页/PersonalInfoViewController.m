@@ -151,6 +151,8 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
 @property (nonatomic, strong) NSDate *firstMatchDate;
 @property (nonatomic, strong) NSDateFormatter *dateFormatter;
 @property (nonatomic, assign) BOOL avatarNeedsUpload;
+/// 选完照片后立即上传，成功后缓存 objectKey，onSave 时直接使用
+@property (nonatomic, copy, nullable) NSString *uploadedAvatarKey;
 @end
 
 @implementation PersonalInfoViewController
@@ -836,15 +838,60 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
 
 - (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary<UIImagePickerControllerInfoKey,id> *)info {
     UIImage *image = info[UIImagePickerControllerEditedImage] ?: info[UIImagePickerControllerOriginalImage];
+    NSLog(@"[AvatarDebug] picker finished, editedImage=%@, originalImage=%@, image=%@",
+          info[UIImagePickerControllerEditedImage] ? @"YES" : @"nil",
+          info[UIImagePickerControllerOriginalImage] ? @"YES" : @"nil",
+          image ? [NSString stringWithFormat:@"%.0fx%.0f", image.size.width, image.size.height] : @"nil");
     [picker dismissViewControllerAnimated:YES completion:nil];
     if (!image) return;
 
     self.avatarView.image = image;
     self.avatarNeedsUpload = YES;
+    NSLog(@"[AvatarDebug] avatarNeedsUpload set to YES, image size=%.0fx%.0f", image.size.width, image.size.height);
+    // 选完照片立即上传，不等用户点保存
+    [self uploadAvatarImage:image];
 }
 
 - (void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
     [picker dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)uploadAvatarImage:(UIImage *)image {
+    NSData *jpeg = UIImageJPEGRepresentation(image, 0.85);
+    if (jpeg.length == 0) {
+        NSData *png = UIImagePNGRepresentation(image);
+        if (png.length > 0) {
+            jpeg = UIImageJPEGRepresentation([UIImage imageWithData:png], 0.85);
+        }
+    }
+    if (jpeg.length == 0) {
+        NSLog(@"[AvatarDebug] uploadAvatarImage: jpeg data empty, skip");
+        return;
+    }
+    NSLog(@"[AvatarDebug] uploadAvatarImage: start upload, jpegLength=%lu", (unsigned long)jpeg.length);
+    // 显示上传中提示
+    [[LoadingManager sharedManager] showLoadingInView:self.view];
+    __weak typeof(self) weakSelf = self;
+    [[FileRequest shared] uploadImage:jpeg type:ImageObjectTypeProfile success:^(HTTPResponse * _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        NSString *key = [responseObject.dataObject isKindOfClass:[NSString class]] ? responseObject.dataObject : nil;
+        NSLog(@"[AvatarDebug] uploadAvatarImage: success, key=%@", key ?: @"nil");
+        [[LoadingManager sharedManager] hideLoadingInView:self.view];
+        if (key.length > 0) {
+            self.uploadedAvatarKey = key;
+            self.avatarNeedsUpload = NO; // 已上传，onSave 时直接用缓存的 key
+        } else {
+            [[LoadingManager sharedManager] showError:@"头像上传失败，请重试" inView:self.view];
+        }
+    } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        NSLog(@"[AvatarDebug] uploadAvatarImage: failed, error=%@", error);
+        [[LoadingManager sharedManager] hideLoadingInView:self.view];
+        [[LoadingManager sharedManager] showError:@"头像上传失败，请重试" inView:self.view];
+        // 上传失败，保留 avatarNeedsUpload=YES，onSave 时重试
+    }];
 }
 
 - (void)onBack { [self.navigationController popViewControllerAnimated:YES]; }
@@ -903,26 +950,56 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
         }];
     };
 
+    if (self.uploadedAvatarKey.length > 0) {
+        // 已提前上传成功，直接用缓存的 objectKey
+        NSLog(@"[AvatarDebug] onSave: using cached uploadedAvatarKey=%@", self.uploadedAvatarKey);
+        p.avatar = self.uploadedAvatarKey;
+        putProfile();
+        return;
+    }
+
     if (self.avatarNeedsUpload) {
-        NSData *jpeg = UIImageJPEGRepresentation(self.avatarView.image, 0.85);
+        UIImage *avatarImage = self.avatarView.image;
+        NSData *jpeg = UIImageJPEGRepresentation(avatarImage, 0.85);
+        NSLog(@"[AvatarDebug] onSave: avatarNeedsUpload=YES, image=%@, jpegLength=%lu",
+              avatarImage ? [NSString stringWithFormat:@"%.0fx%.0f", avatarImage.size.width, avatarImage.size.height] : @"nil",
+              (unsigned long)jpeg.length);
+        // 如果 JPEG 转换失败，尝试 PNG 再转 JPEG
+        if (jpeg.length == 0 && avatarImage) {
+            NSData *png = UIImagePNGRepresentation(avatarImage);
+            if (png.length > 0) {
+                UIImage *fromPNG = [UIImage imageWithData:png];
+                jpeg = UIImageJPEGRepresentation(fromPNG, 0.85);
+            }
+            NSLog(@"[AvatarDebug] PNG fallback jpegLength=%lu", (unsigned long)jpeg.length);
+        }
         if (jpeg.length > 0) {
+            NSLog(@"[AvatarDebug] starting OSS upload, jpegLength=%lu", (unsigned long)jpeg.length);
             [[FileRequest shared] uploadImage:jpeg type:ImageObjectTypeProfile success:^(HTTPResponse * _Nullable responseObject) {
                 NSString *url = [responseObject.dataObject isKindOfClass:[NSString class]] ? responseObject.dataObject : nil;
+                NSLog(@"[AvatarDebug] OSS upload success, url=%@", url ?: @"nil");
                 if (url.length == 0) {
                     [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
-                    [[LoadingManager sharedManager] showError:NSLocalizedString(@"profile_save_fail", nil) inView:weakSelf.view];
+                    [[LoadingManager sharedManager] showError:NSLocalizedString(@"profile_avatar_upload_fail", nil) ?: @"头像上传失败，请重试" inView:weakSelf.view];
                     return;
                 }
                 p.avatar = url;
                 putProfile();
             } failure:^(NSError * _Nonnull error) {
+                NSLog(@"[AvatarDebug] OSS upload failed: %@", error);
                 [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
-                NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"profile_save_fail", nil);
+                NSString *msg = error.localizedDescription.length ? error.localizedDescription : (NSLocalizedString(@"profile_avatar_upload_fail", nil) ?: @"头像上传失败，请重试");
                 [[LoadingManager sharedManager] showError:msg inView:weakSelf.view];
             }];
             return;
+        } else {
+            // 图片数据为空，提示用户重新选择
+            [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+            [[LoadingManager sharedManager] showError:@"头像图片无效，请重新选择" inView:weakSelf.view];
+            return;
         }
     }
+    NSLog(@"[AvatarDebug] onSave: avatarNeedsUpload=NO, skip upload");
     putProfile();
 }
 

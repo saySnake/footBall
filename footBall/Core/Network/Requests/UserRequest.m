@@ -101,7 +101,9 @@
             avatarToSend = components.URL.absoluteString ?: avatarToSend;
         }
     }
-    dict[@"avatar"] = avatarToSend;
+    if (avatarToSend.length > 0) {
+        dict[@"avatar"] = avatarToSend;
+    }
     if (user.phone.length > 0) dict[@"phone"] = user.phone;
     dict[@"gender"] = @(user.gender);
     dict[@"birthDate"] = user.birthDate;
