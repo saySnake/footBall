@@ -106,7 +106,7 @@
 
     // 底部左侧编辑图标
     UIButton *editBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    UIImage *editImg = [UIImage imageNamed:@"edit_icon"];
+    UIImage *editImg = [UIImage imageNamed:@"team_edit"];
     if (!editImg && @available(iOS 13.0, *)) {
         editImg = [[UIImage systemImageNamed:@"pencil"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
     }
@@ -391,7 +391,7 @@
     }];
 
     UIImageView *notesEditIcon = [[UIImageView alloc] init];
-    UIImage *editIco = [UIImage imageNamed:@"edit_icon"];
+    UIImage *editIco = [UIImage imageNamed:@"team_edit"];
     if (!editIco && @available(iOS 13.0, *)) {
         editIco = [[UIImage systemImageNamed:@"pencil"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
         notesEditIcon.tintColor = [UIColor grayColor];
@@ -617,8 +617,8 @@
     NSDate *d = [self parseDateFromRaw:raw];
     if (!d) return @"-";
     NSDateFormatter *f = [[NSDateFormatter alloc] init];
-    f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    f.dateFormat = @"EEE, d MMM yy";
+    f.locale = [NSLocale localeWithLocaleIdentifier:@"zh_Hans_CN"];
+    f.dateFormat = @"yyyy年M月d日";
     return [f stringFromDate:d];
 }
 
