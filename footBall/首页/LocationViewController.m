@@ -166,6 +166,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         }];
         [_idLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_nameLabel);
+            make.height.mas_equalTo(22);
             make.top.equalTo(_nameLabel.mas_bottom).offset(1);
         }];
         [_statusDot mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -174,8 +175,8 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
             make.bottom.equalTo(_avatarView).offset(-1);
         }];
         [_statusLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_statusDot.mas_trailing).offset(6);
-            make.centerY.equalTo(_statusDot);
+            make.leading.equalTo(_nameLabel);
+            make.top.equalTo(_idLabel.mas_bottom).offset(3);
         }];
         [_stampBtn mas_makeConstraints:^(MASConstraintMaker *make) {
             make.trailing.equalTo(_cardView).offset(-10);
