@@ -1611,6 +1611,7 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
     }
     PNMatchVerifyViewController *vc = [[PNMatchVerifyViewController alloc] init];
     vc.recordId = match.recordId;
+    vc.matchId = match.matchId;
     vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
     __weak typeof(self) weakSelf = self;
     vc.completion = ^{
@@ -1626,6 +1627,7 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
 
 - (void)showMatchDetailForMatch:(DiscoverMatch *)match {
     PNMatchDetailViewController *vc = [[PNMatchDetailViewController alloc] init];
+    vc.recordId = match.recordId;
     vc.matchId = match.matchId;
     vc.homeName = match.homeName;
     vc.awayName = match.awayName;
