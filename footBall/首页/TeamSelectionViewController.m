@@ -12,25 +12,42 @@
 /// 选择球队确认后展示的「欢迎来到 Pass Nomad」中间页，点击「立即探索」后执行 onExploreBlock 并关闭
 @interface PassNomadWelcomeViewController : UIViewController
 @property (nonatomic, copy) void (^onExploreBlock)(void);
+@property (nonatomic, strong) UIControl *dimmingControl;
+@property (nonatomic, strong) UIView *sheetView;
+@property (nonatomic, assign) BOOL didPlayPresentAnimation;
 @end
 
 @implementation PassNomadWelcomeViewController
 
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        // 按设计稿使用底部抽屉，不使用系统 pageSheet。
+        self.modalPresentationStyle = UIModalPresentationOverFullScreen;
+    }
+    return self;
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = [ColorManager colorWithHexString:@"#F7F7F7"];
-    self.view.layer.cornerRadius = 10;
-    self.view.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
-    self.view.layer.masksToBounds = YES;
-    self.modalPresentationStyle = UIModalPresentationPageSheet;
-    self.modalTransitionStyle = UIModalTransitionStyleCoverVertical;
-    if (@available(iOS 15.0, *)) {
-        UISheetPresentationController *sheet = self.sheetPresentationController;
-        if (sheet) {
-            sheet.detents = @[ [UISheetPresentationControllerDetent mediumDetent], [UISheetPresentationControllerDetent largeDetent] ];
-            sheet.prefersGrabberVisible = YES;
-        }
-    }
+    self.view.backgroundColor = [UIColor clearColor];
+
+    self.dimmingControl = [[UIControl alloc] init];
+    self.dimmingControl.backgroundColor = [UIColor colorWithWhite:0 alpha:0.45];
+    self.dimmingControl.alpha = 1.0;
+    [self.view addSubview:self.dimmingControl];
+
+    self.sheetView = [[UIView alloc] init];
+    self.sheetView.backgroundColor = [ColorManager colorWithHexString:@"#F9F9F9"];
+    self.sheetView.layer.cornerRadius = 24.0;
+    self.sheetView.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+    self.sheetView.layer.masksToBounds = YES;
+    [self.view addSubview:self.sheetView];
+
+    UIView *grabberView = [[UIView alloc] init];
+    grabberView.backgroundColor = [ColorManager colorWithHexString:@"#D4D4D4"];
+    grabberView.layer.cornerRadius = 3.0;
+    [self.sheetView addSubview:grabberView];
 
     // 设计图：上方为 discover 地图图（队徽与地点名）
     UIImageView *discoverImageView = [[UIImageView alloc] init];
@@ -38,7 +55,7 @@
     discoverImageView.contentMode = UIViewContentModeScaleAspectFill;
     discoverImageView.clipsToBounds = YES;
     discoverImageView.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:discoverImageView];
+    [self.sheetView addSubview:discoverImageView];
 
     UILabel *titleLabel = [[UILabel alloc] init];
     titleLabel.text = NSLocalizedString(@"login_welcome_title", nil);
@@ -46,7 +63,7 @@
     titleLabel.textColor = [UIColor blackColor];
     titleLabel.textAlignment = NSTextAlignmentCenter;
     titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:titleLabel];
+    [self.sheetView addSubview:titleLabel];
 
     UILabel *subtitleLabel = [[UILabel alloc] init];
     subtitleLabel.text = NSLocalizedString(@"welcome_subtitle", nil);
@@ -57,7 +74,7 @@
     subtitleLabel.preferredMaxLayoutWidth = UIScreen.mainScreen.bounds.size.width - 48;
     subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [subtitleLabel setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisVertical];
-    [self.view addSubview:subtitleLabel];
+    [self.sheetView addSubview:subtitleLabel];
 
     UIButton *exploreBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     [exploreBtn setTitle:NSLocalizedString(@"welcome_explore_button", nil) forState:UIControlStateNormal];
@@ -66,38 +83,79 @@
     exploreBtn.layer.cornerRadius = 26;
     exploreBtn.translatesAutoresizingMaskIntoConstraints = NO;
     [exploreBtn addTarget:self action:@selector(exploreTapped) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:exploreBtn];
+    [self.sheetView addSubview:exploreBtn];
+
+    [self.dimmingControl mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.view);
+    }];
+
+    [self.sheetView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.trailing.bottom.equalTo(self.view);
+        make.height.mas_equalTo(521);
+    }];
+
+    [grabberView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.sheetView).offset(16);
+        make.centerX.equalTo(self.sheetView);
+        make.width.mas_equalTo(80);
+        make.height.mas_equalTo(6);
+    }];
 
     [discoverImageView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.view.mas_safeAreaLayoutGuideTop).offset(38);
-        make.leading.equalTo(self.view).offset(24);
-        make.trailing.equalTo(self.view).offset(-24);
+        make.top.equalTo(grabberView.mas_bottom).offset(22);
+        make.leading.equalTo(self.sheetView).offset(24);
+        make.trailing.equalTo(self.sheetView).offset(-24);
         make.height.mas_equalTo(255);
     }];
     [titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(discoverImageView.mas_bottom).offset(23);
-        make.leading.equalTo(self.view).offset(24);
-        make.trailing.equalTo(self.view).offset(-24);
+        make.leading.equalTo(self.sheetView).offset(24);
+        make.trailing.equalTo(self.sheetView).offset(-24);
         make.height.mas_equalTo(28);
     }];
     [subtitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(titleLabel.mas_bottom).offset(10);
-        make.leading.equalTo(self.view).offset(24);
-        make.trailing.equalTo(self.view).offset(-24);
+        make.leading.equalTo(self.sheetView).offset(24);
+        make.trailing.equalTo(self.sheetView).offset(-24);
         make.height.mas_greaterThanOrEqualTo(36);
     }];
     [exploreBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(subtitleLabel.mas_bottom).offset(30.5);
-        make.leading.equalTo(self.view).offset(24);
-        make.trailing.equalTo(self.view).offset(-24);
+        make.leading.equalTo(self.sheetView).offset(24);
+        make.trailing.equalTo(self.sheetView).offset(-24);
         make.height.mas_equalTo(52);
-        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-42);
+        make.bottom.equalTo(self.sheetView.mas_safeAreaLayoutGuideBottom).offset(-12);
     }];
 }
 
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    if (self.didPlayPresentAnimation) {
+        return;
+    }
+    self.didPlayPresentAnimation = YES;
+
+    [self.view layoutIfNeeded];
+    self.sheetView.transform = CGAffineTransformMakeTranslation(0, 521);
+
+    [UIView animateWithDuration:0.26
+                          delay:0
+                        options:UIViewAnimationOptionCurveEaseOut
+                     animations:^{
+        self.sheetView.transform = CGAffineTransformIdentity;
+    } completion:nil];
+}
+
 - (void)exploreTapped {
-    if (self.onExploreBlock) self.onExploreBlock();
-    [self.presentingViewController dismissViewControllerAnimated:YES completion:nil];
+    [UIView animateWithDuration:0.22
+                          delay:0
+                        options:UIViewAnimationOptionCurveEaseIn
+                     animations:^{
+        self.sheetView.transform = CGAffineTransformMakeTranslation(0, 521);
+    } completion:^(BOOL finished) {
+        if (self.onExploreBlock) self.onExploreBlock();
+        [self.presentingViewController dismissViewControllerAnimated:NO completion:nil];
+    }];
 }
 
 @end
@@ -705,7 +763,7 @@
         welcomeVC.onExploreBlock = ^{
             [wself goToHome];
         };
-        [wself presentViewController:welcomeVC animated:YES completion:nil];
+        [wself presentViewController:welcomeVC animated:NO completion:nil];
     } failure:^(NSError * _Nonnull error) {
         [MBProgressHUD hideHUDForView:wself.view animated:YES];
         NSString *msg = error.localizedDescription ?: @"";
