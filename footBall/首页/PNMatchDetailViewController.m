@@ -11,6 +11,7 @@
 #import "MatchRecordModels.h"
 #import "Match.h"
 #import "HTTPResponse.h"
+#import <QMUIKit/QMUITips.h>
 
 #define kDetailGreen  [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0]
 #define kDetailBg     [UIColor colorWithRed:0.965 green:0.965 blue:0.965 alpha:1.0]
@@ -40,6 +41,10 @@
 @property (nonatomic, strong) UITextView *notesTextView;
 // 底部栏
 @property (nonatomic, strong) UIView *bottomBar;
+@property (nonatomic, strong) UIButton *editBtn;
+@property (nonatomic, strong) UIButton *confirmBtn;
+@property (nonatomic, assign) BOOL isEditingNotes;
+@property (nonatomic, strong) PNMatchRecordDetail *currentDetail;
 @end
 
 @implementation PNMatchDetailViewController
@@ -114,6 +119,7 @@
     editBtn.tintColor = [UIColor blackColor];
     [editBtn addTarget:self action:@selector(onEdit) forControlEvents:UIControlEventTouchUpInside];
     [bottomBar addSubview:editBtn];
+    self.editBtn = editBtn;
     [editBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(bottomBar).offset(24);
         make.centerY.equalTo(bottomBar);
@@ -129,6 +135,7 @@
     confirmBtn.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
     [confirmBtn addTarget:self action:@selector(onConfirm) forControlEvents:UIControlEventTouchUpInside];
     [bottomBar addSubview:confirmBtn];
+    self.confirmBtn = confirmBtn;
     [confirmBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(editBtn.mas_trailing).offset(16);
         make.trailing.equalTo(bottomBar).offset(-24);
@@ -412,6 +419,7 @@
     notesTV.textColor = [UIColor blackColor];
     notesTV.textContainerInset = UIEdgeInsetsMake(12, 12, 12, 12);
     notesTV.editable = NO;
+    notesTV.selectable = YES;
     notesTV.scrollEnabled = NO;
     notesTV.text = @"";
     [content addSubview:notesTV];
@@ -515,6 +523,7 @@
 }
 
 - (void)applyDetail:(PNMatchRecordDetail *)d {
+    self.currentDetail = d;
     // 顶部卡片
     _homeNameLabel.text = d.homeTeamName.length ? d.homeTeamName : (self.homeName ?: @"-");
     _awayNameLabel.text = d.awayTeamName.length ? d.awayTeamName : (self.awayName ?: @"-");
@@ -647,11 +656,57 @@
 }
 
 - (void)onEdit {
-    // 预留：跳转到编辑观赛信息页
+    self.isEditingNotes = YES;
+    self.notesTextView.editable = YES;
+    self.notesTextView.selectable = YES;
+    self.notesTextView.layer.borderWidth = 1;
+    self.notesTextView.layer.borderColor = kDetailGreen.CGColor;
+    self.confirmBtn.backgroundColor = kDetailGreen;
+    [self.confirmBtn setTitle:@"保存" forState:UIControlStateNormal];
+    [self.notesTextView becomeFirstResponder];
 }
 
 - (void)onConfirm {
-    [self.navigationController popViewControllerAnimated:YES];
+    if (!self.isEditingNotes) {
+        [self.navigationController popViewControllerAnimated:YES];
+        return;
+    }
+    [self.view endEditing:YES];
+    if (self.recordId.length == 0) {
+        [QMUITips showError:@"记录ID缺失，无法保存"];
+        return;
+    }
+    NSString *notes = [self.notesTextView.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSMutableDictionary *body = [NSMutableDictionary dictionary];
+    body[@"notes"] = notes ?: @"";
+    if (self.currentDetail.postMatchEmotion.length > 0) {
+        body[@"postMatchEmotion"] = self.currentDetail.postMatchEmotion;
+    }
+    [QMUITips showLoadingInView:self.view];
+    __weak typeof(self) weakSelf = self;
+    [[MatchRequest shared] updateMatchRecord:self.recordId body:body success:^(HTTPResponse * _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [QMUITips hideAllTipsInView:self.view];
+        self.isEditingNotes = NO;
+        self.notesTextView.editable = NO;
+        self.notesTextView.layer.borderWidth = 0;
+        [self.confirmBtn setTitle:@"确定" forState:UIControlStateNormal];
+        if (self.currentDetail) {
+            self.currentDetail.notes = notes ?: @"";
+        }
+        [self.navigationController popViewControllerAnimated:YES];
+    } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [QMUITips hideAllTipsInView:self.view];
+        NSString *msg = error.localizedDescription ?: @"保存失败";
+        if ([error isKindOfClass:[APIError class]]) {
+            APIError *ae = (APIError *)error;
+            if (ae.businessMessage.length > 0) msg = ae.businessMessage;
+        }
+        [QMUITips showError:msg];
+    }];
 }
 
 @end
