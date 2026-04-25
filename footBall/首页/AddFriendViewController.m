@@ -707,7 +707,7 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
     [self.tableView reloadRowsAtIndexPaths:@[tappedIndexPath]
                           withRowAnimation:UITableViewRowAnimationNone];
 
-    NSDictionary *body = @{@"targetUserId": @([result.userId longLongValue])};
+    NSDictionary *body = @{@"toUserId": result.userId};
     __weak typeof(self) weakSelf = self;
     [SocialRequest.shared sendFriendRequestWithBody:body success:^(HTTPResponse * _Nullable responseObject) {
         __strong typeof(weakSelf) self = weakSelf;
@@ -857,7 +857,7 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
             [self showError:NSLocalizedString(@"community_search_failed", nil)];
         }
     });
-    NSDictionary *payload = @{@"targetUserId": @([targetUserId longLongValue])};
+    NSDictionary *payload = @{@"toUserId": targetUserId};
     [SocialRequest.shared scanAddFriendWithPayload:payload success:^(HTTPResponse * _Nullable responseObject) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
