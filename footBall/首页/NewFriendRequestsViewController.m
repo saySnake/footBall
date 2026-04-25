@@ -340,26 +340,33 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
 }
 
 - (void)loadRemoteData {
-    self.recentRequests = NSMutableArray.array;
-    self.olderRequests = NSMutableArray.array;
     self.filteredSearchResults = @[];
     self.isSearching = NO;
     __weak typeof(self) weakSelf = self;
     [SocialRequest.shared getFriendRequestsSuccess:^(HTTPResponse * _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
         PNFriendRequestPage *page = [responseObject.dataObject isKindOfClass:PNFriendRequestPage.class] ? responseObject.dataObject : nil;
         NSArray<PNFriendRequest *> *list = page.list ?: @[];
-        [weakSelf applyFriendRequestsFromList:list];
-        [weakSelf syncPendingCountWithCurrentRequests];
-        [weakSelf.tableView reloadData];
+        // 数据就绪后再替换，避免清空数组与 reloadData 之间的竞态越界
+        [self applyFriendRequestsFromList:list];
+        [self syncPendingCountWithCurrentRequests];
+        [self.tableView reloadData];
     } failure:^(NSError * _Nonnull error) {
-        [weakSelf.tableView reloadData];
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [self.tableView reloadData];
     }];
 
     [SocialRequest.shared getFriendsSuccess:^(HTTPResponse * _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
         PNFriendPage *page = [responseObject.dataObject isKindOfClass:PNFriendPage.class] ? responseObject.dataObject : nil;
-        weakSelf.searchCandidates = page.list ?: @[];
+        self.searchCandidates = page.list ?: @[];
     } failure:^(NSError * _Nonnull error) {
-        weakSelf.searchCandidates = @[];
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        self.searchCandidates = @[];
     }];
 
     [self refreshPendingCountFromServer];
@@ -597,16 +604,10 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     [SocialRequest.shared processFriendRequest:request.requestId accept:accept success:^(HTTPResponse * _Nullable responseObject) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
-        // 重新取数组引用，避免 loadRemoteData 替换后 arr 指向旧数组越界
-        NSMutableArray<PNFriendRequest *> *currentArr = section == 0 ? self.recentRequests : self.olderRequests;
-        if (row >= 0 && row < (NSInteger)currentArr.count) {
-            [currentArr removeObjectAtIndex:row];
-        }
-        [self.tableView reloadData];
-        [self refreshPendingCountFromServer];
         if (accept) {
             [[NSNotificationCenter defaultCenter] postNotificationName:kCommunityFriendsDidChangeNotification object:nil];
         }
+        // 直接重新拉数据，避免手动操作数组与 reloadData 之间的竞态导致越界
         [self loadRemoteData];
     } failure:^(NSError * _Nonnull error) {
         __strong typeof(weakSelf) self = weakSelf;
