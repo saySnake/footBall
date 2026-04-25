@@ -32,6 +32,7 @@ static UIColor *PNFigmaSocialCircleBG(void) {
 
 @interface PhoneInputViewController () <UITextFieldDelegate>
 
+@property (nonatomic, strong) UIView *customNavBar;
 @property (nonatomic, strong) UIView *logoCardView;
 @property (nonatomic, strong) UIImageView *logoImageView;
 @property (nonatomic, strong) UILabel *titleLabel;
@@ -58,26 +59,55 @@ static UIColor *PNFigmaSocialCircleBG(void) {
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = [UIColor whiteColor];
-    self.title = NSLocalizedString(@"login_nav_title", nil);
-    
-    UIImage *backImage = [UIImage imageNamed:@"left"];
-    if (backImage) {
-        UIImage *tintedImage = [backImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-        UIBarButtonItem *backItem = [[UIBarButtonItem alloc] initWithImage:tintedImage
-                                                                     style:UIBarButtonItemStylePlain
-                                                                    target:self
-                                                                    action:@selector(handleBack)];
-        backItem.tintColor = [UIColor blackColor];
-        self.navigationItem.leftBarButtonItem = backItem;
-        self.navigationItem.hidesBackButton = YES;
-        self.navigationController.navigationBar.tintColor = [UIColor blackColor];
-    }
-    
+
     [self setupUI];
     [self updateButtonState];
 }
 
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self.navigationController setNavigationBarHidden:YES animated:animated];
+}
+
 - (void)setupUI {
+    UIView *navBar = [[UIView alloc] init];
+    navBar.backgroundColor = [UIColor whiteColor];
+    [self.view addSubview:navBar];
+    self.customNavBar = navBar;
+    [navBar mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.leading.trailing.equalTo(self.view);
+        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideTop).offset(44);
+    }];
+    
+    UIButton *backBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    UIImage *backImage = [UIImage imageNamed:@"left"];
+    if (!backImage && @available(iOS 13.0, *)) {
+        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:18 weight:UIImageSymbolWeightSemibold];
+        backImage = [UIImage systemImageNamed:@"chevron.left" withConfiguration:cfg];
+    }
+    [backBtn setImage:[backImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+    backBtn.tintColor = [UIColor blackColor];
+    backBtn.backgroundColor = [UIColor clearColor];
+    backBtn.adjustsImageWhenHighlighted = NO;
+    [backBtn addTarget:self action:@selector(handleBack) forControlEvents:UIControlEventTouchUpInside];
+    [navBar addSubview:backBtn];
+    [backBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(navBar).offset(16);
+        make.bottom.equalTo(navBar).offset(-10);
+        make.width.height.mas_equalTo(24);
+    }];
+    
+    UILabel *navTitle = [[UILabel alloc] init];
+    NSString *navTitleText = NSLocalizedString(@"login_nav_title", nil);
+    navTitle.text = navTitleText.length > 0 ? navTitleText : @"登录注册";
+    navTitle.font = [UIFont boldSystemFontOfSize:17];
+    navTitle.textColor = [UIColor blackColor];
+    [navBar addSubview:navTitle];
+    [navTitle mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(navBar);
+        make.centerY.equalTo(backBtn);
+    }];
+
     self.logoCardView = [[UIView alloc] init];
     self.logoCardView.backgroundColor = [UIColor whiteColor];
     self.logoCardView.layer.cornerRadius = 16;
@@ -241,7 +271,7 @@ static UIColor *PNFigmaSocialCircleBG(void) {
     }];
     
     [self.logoCardView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.view.mas_safeAreaLayoutGuideTop).offset(16);
+        make.top.equalTo(navBar.mas_bottom).offset(50);
         make.centerX.equalTo(self.view);
         make.width.height.mas_equalTo(160);
     }];
@@ -252,7 +282,7 @@ static UIColor *PNFigmaSocialCircleBG(void) {
     }];
     
     [self.titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.logoCardView.mas_bottom).offset(24);
+        make.top.equalTo(self.logoCardView.mas_bottom).offset(22);
         make.leading.trailing.equalTo(self.view).inset(24);
     }];
     
