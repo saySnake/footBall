@@ -41,6 +41,19 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
     return keys;
 }
 
+/// 头像字段可能返回 objectKey（如 c/profile/...），统一转成可访问 URL。
+static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
+    if (raw.length == 0) return nil;
+    NSString *t = [raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (t.length == 0) return nil;
+    if ([t hasPrefix:@"http://"] || [t hasPrefix:@"https://"]) return t;
+    if ([t hasPrefix:@"//"]) return [NSString stringWithFormat:@"https:%@", t];
+    static NSString *const kOSSBase = @"https://passnomad.oss-cn-beijing.aliyuncs.com";
+    NSString *encoded = [t stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLPathAllowedCharacterSet]];
+    if (encoded.length == 0) encoded = t;
+    return [NSString stringWithFormat:@"%@/%@", kOSSBase, encoded];
+}
+
 @interface PICheckOption : UIControl
 @property (nonatomic, strong) UIView *circle;
 @property (nonatomic, strong) UIImageView *checkView;
@@ -153,6 +166,8 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
 @property (nonatomic, assign) BOOL avatarNeedsUpload;
 /// 选完照片后立即上传，成功后缓存 objectKey，onSave 时直接使用
 @property (nonatomic, copy, nullable) NSString *uploadedAvatarKey;
+/// 相机 dismiss 会触发 viewWillAppear；上传中避免旧头像覆盖当前预览图。
+@property (nonatomic, assign) BOOL avatarUploadInProgress;
 @end
 
 @implementation PersonalInfoViewController
@@ -714,8 +729,14 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
     }
     [self layoutChips];
 
-    if (p.avatar.length > 0) {
-        NSURL *url = [NSURL URLWithString:p.avatar];
+    if (self.avatarNeedsUpload || self.avatarUploadInProgress) {
+        // 本地头像尚未完成上传/同步时，不用服务端旧值覆盖本地预览。
+        return;
+    }
+
+    NSString *avatarURLString = PNAvatarAbsoluteURLString(p.avatar);
+    if (avatarURLString.length > 0) {
+        NSURL *url = [NSURL URLWithString:avatarURLString];
         __weak typeof(self) weakSelf = self;
         [self.avatarView sd_setImageWithURL:url placeholderImage:self.avatarView.image completed:^(UIImage * _Nullable image, NSError * _Nullable error, SDImageCacheType cacheType, NSURL * _Nullable imageURL) {
             if (image) weakSelf.avatarNeedsUpload = NO;
@@ -869,6 +890,7 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
         return;
     }
     NSLog(@"[AvatarDebug] uploadAvatarImage: start upload, jpegLength=%lu", (unsigned long)jpeg.length);
+    self.avatarUploadInProgress = YES;
     // 显示上传中提示
     [[LoadingManager sharedManager] showLoadingInView:self.view];
     __weak typeof(self) weakSelf = self;
@@ -878,9 +900,12 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
         NSString *key = [responseObject.dataObject isKindOfClass:[NSString class]] ? responseObject.dataObject : nil;
         NSLog(@"[AvatarDebug] uploadAvatarImage: success, key=%@", key ?: @"nil");
         [[LoadingManager sharedManager] hideLoadingInView:self.view];
+        self.avatarUploadInProgress = NO;
         if (key.length > 0) {
             self.uploadedAvatarKey = key;
-            self.avatarNeedsUpload = NO; // 已上传，onSave 时直接用缓存的 key
+            self.avatarNeedsUpload = NO;
+            // 立即把头像 key 更新到服务端，不等用户点保存
+            [self syncAvatarKeyToServer:key];
         } else {
             [[LoadingManager sharedManager] showError:@"头像上传失败，请重试" inView:self.view];
         }
@@ -889,8 +914,34 @@ static NSArray<NSString *> *kProfileChipTagKeys(void) {
         if (!self) return;
         NSLog(@"[AvatarDebug] uploadAvatarImage: failed, error=%@", error);
         [[LoadingManager sharedManager] hideLoadingInView:self.view];
+        self.avatarUploadInProgress = NO;
         [[LoadingManager sharedManager] showError:@"头像上传失败，请重试" inView:self.view];
         // 上传失败，保留 avatarNeedsUpload=YES，onSave 时重试
+    }];
+}
+
+- (void)syncAvatarKeyToServer:(NSString *)key {
+    UserProfile *cur = AuthManager.sharedManager.user.profile;
+    UserProfile *p = nil;
+    if (cur) {
+        NSDictionary *json = [cur yy_modelToJSONObject];
+        if ([json isKindOfClass:[NSDictionary class]]) {
+            p = [UserProfile yy_modelWithJSON:json];
+        }
+    }
+    if (!p) p = [[UserProfile alloc] init];
+    p.avatar = key;
+    __weak typeof(self) weakSelf = self;
+    [[UserRequest shared] updateUserInfo:p success:^(HTTPResponse * _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        NSLog(@"[AvatarDebug] syncAvatarKeyToServer: success");
+        // 刷新本地用户信息
+        [[UserRequest shared] getLoginUserInfoSuccess:^(HTTPResponse * _Nullable r2) {} failure:nil];
+        [[LoadingManager sharedManager] showSuccess:@"头像已更新" inView:self.view];
+    } failure:^(NSError * _Nonnull error) {
+        NSLog(@"[AvatarDebug] syncAvatarKeyToServer: failed, error=%@", error);
+        // 同步失败不影响 onSave，onSave 时会再次尝试
     }];
 }
 
