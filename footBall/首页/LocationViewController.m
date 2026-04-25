@@ -41,6 +41,66 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
 @implementation CommunityFriendCell
 
+- (NSDate *)pn_parseLastOnlineDate:(NSString *)raw {
+    if (raw.length == 0) return nil;
+    NSString *s = [raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (s.length == 0) return nil;
+    BOOL allDigits = YES;
+    for (NSUInteger i = 0; i < s.length; i++) {
+        unichar ch = [s characterAtIndex:i];
+        if (ch < '0' || ch > '9') { allDigits = NO; break; }
+    }
+    if (allDigits && s.length >= 10) {
+        long long n = [s longLongValue];
+        if (n > 1000000000000LL) return [NSDate dateWithTimeIntervalSince1970:n / 1000.0];
+        if (n > 1000000000LL) return [NSDate dateWithTimeIntervalSince1970:(NSTimeInterval)n];
+    }
+    if (@available(iOS 11.0, *)) {
+        NSISO8601DateFormatter *iso = [[NSISO8601DateFormatter alloc] init];
+        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
+        NSDate *d = [iso dateFromString:s];
+        if (d) return d;
+        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime;
+        d = [iso dateFromString:s];
+        if (d) return d;
+    }
+    NSDateFormatter *f = [[NSDateFormatter alloc] init];
+    f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    for (NSString *fmt in @[@"yyyy-MM-dd'T'HH:mm:ssZ", @"yyyy-MM-dd'T'HH:mm:ss", @"yyyy-MM-dd HH:mm:ss", @"yyyy-MM-dd HH:mm"]) {
+        f.dateFormat = fmt;
+        NSDate *d = [f dateFromString:s];
+        if (d) return d;
+    }
+    return nil;
+}
+
+- (NSString *)pn_offlineTextFromLastOnline:(NSString *)lastOnlineTime {
+    NSDate *d = [self pn_parseLastOnlineDate:lastOnlineTime];
+    if (!d) return NSLocalizedString(@"community_online_5m_ago", nil);
+    NSTimeInterval delta = [[NSDate date] timeIntervalSinceDate:d];
+    if (delta < 0) delta = 0;
+    NSInteger mins = (NSInteger)floor(delta / 60.0);
+    if (mins < 1) mins = 1;
+    if (mins <= 59) {
+        if ([[NSLocale preferredLanguages].firstObject.lowercaseString hasPrefix:@"zh"]) {
+            return [NSString stringWithFormat:@"%ld分钟前在线", (long)mins];
+        }
+        return [NSString stringWithFormat:@"Online %ld mins ago", (long)mins];
+    }
+    NSInteger hours = (NSInteger)floor((double)mins / 60.0);
+    if (hours <= 23) {
+        if ([[NSLocale preferredLanguages].firstObject.lowercaseString hasPrefix:@"zh"]) {
+            return [NSString stringWithFormat:@"%ld小时前在线", (long)hours];
+        }
+        return [NSString stringWithFormat:@"Online %ld hours ago", (long)hours];
+    }
+    NSInteger days = (NSInteger)floor((double)hours / 24.0);
+    if ([[NSLocale preferredLanguages].firstObject.lowercaseString hasPrefix:@"zh"]) {
+        return [NSString stringWithFormat:@"%ld天前在线", (long)days];
+    }
+    return [NSString stringWithFormat:@"Online %ld days ago", (long)days];
+}
+
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
     if (self = [super initWithStyle:style reuseIdentifier:reuseIdentifier]) {
         self.selectionStyle = UITableViewCellSelectionStyleNone;
@@ -142,7 +202,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 - (void)configureWithFriend:(PNFriend *)f {
     self.nameLabel.text = f.nickname.length > 0 ? f.nickname : @"-";
     self.idLabel.text = [NSString stringWithFormat:NSLocalizedString(@"community_id_format", nil), f.userId];
-    self.statusLabel.text = f.online ? NSLocalizedString(@"community_online_15m", nil) : NSLocalizedString(@"community_online_5m_ago", nil);
+    self.statusLabel.text = f.online ? NSLocalizedString(@"community_online_15m", nil) : [self pn_offlineTextFromLastOnline:f.lastOnlineTime];
     self.statusLabel.textColor = f.online ? [UIColor colorWithRed:0.10 green:0.70 blue:0.30 alpha:1.0] : [UIColor grayColor];
     self.statusDot.backgroundColor = f.online ? [UIColor colorWithRed:0.0 green:0.71 blue:0.12 alpha:1.0] : [UIColor colorWithWhite:0.65 alpha:1.0];
     [self.stampBtn setTitle:NSLocalizedString(@"community_view_stamps", nil) forState:UIControlStateNormal];
