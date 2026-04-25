@@ -222,7 +222,7 @@
     _kickTimeLabel.textColor = kDetailGreen;
     _kickTimeLabel.textAlignment = NSTextAlignmentCenter;
     _kickTimeLabel.layer.cornerRadius = 15;
-    _kickTimeLabel.layer.borderWidth = 1.2;
+    _kickTimeLabel.layer.borderWidth = 0.5;
     _kickTimeLabel.layer.borderColor = kDetailGreen.CGColor;
     _kickTimeLabel.clipsToBounds = YES;
     _kickTimeLabel.text = @"--:--";
@@ -518,8 +518,9 @@
     // 顶部卡片
     _homeNameLabel.text = d.homeTeamName.length ? d.homeTeamName : (self.homeName ?: @"-");
     _awayNameLabel.text = d.awayTeamName.length ? d.awayTeamName : (self.awayName ?: @"-");
-    _matchDateLabel.text = [self weekdayDateText:d.matchDate];
-    _kickTimeLabel.text  = [self timeText:d.matchDate];
+    NSString *topDateRaw = d.matchDate.length ? d.matchDate : d.matchDateTime;
+    _matchDateLabel.text = [self weekdayDateText:topDateRaw];
+    _kickTimeLabel.text  = [self timeText:topDateRaw];
 
     // 比赛信息行
     _watchLocationValue.text = d.viewingLocation.length ? d.viewingLocation : @"-";
@@ -583,6 +584,18 @@
 
 - (NSDate *)parseDateFromRaw:(NSString *)raw {
     if (raw.length == 0) return nil;
+    NSString *s = [raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (s.length == 0) return nil;
+    BOOL allDigits = YES;
+    for (NSUInteger i = 0; i < s.length; i++) {
+        unichar ch = [s characterAtIndex:i];
+        if (ch < '0' || ch > '9') { allDigits = NO; break; }
+    }
+    if (allDigits && s.length >= 10) {
+        long long n = [s longLongValue];
+        if (n > 1000000000000LL) return [NSDate dateWithTimeIntervalSince1970:n / 1000.0];
+        if (n > 1000000000LL) return [NSDate dateWithTimeIntervalSince1970:(NSTimeInterval)n];
+    }
     if (@available(iOS 11.0, *)) {
         NSISO8601DateFormatter *iso = [[NSISO8601DateFormatter alloc] init];
         iso.formatOptions = NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
@@ -592,7 +605,7 @@
     }
     NSDateFormatter *f = [[NSDateFormatter alloc] init];
     f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    for (NSString *fmt in @[@"yyyy-MM-dd'T'HH:mm:ssZ", @"yyyy-MM-dd HH:mm:ss", @"yyyy-MM-dd HH:mm", @"yyyy-MM-dd"]) {
+    for (NSString *fmt in @[@"yyyy-MM-dd'T'HH:mm:ssZ", @"yyyy-MM-dd'T'HH:mm:ss", @"yyyy-MM-dd'T'HH:mm:ss.SSS", @"yyyy-MM-dd HH:mm:ss", @"yyyy-MM-dd HH:mm", @"yyyy-MM-dd"]) {
         f.dateFormat = fmt;
         NSDate *d = [f dateFromString:raw]; if (d) return d;
     }
