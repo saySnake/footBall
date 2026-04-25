@@ -52,8 +52,8 @@
     // 设计图：上方为 discover 地图图（队徽与地点名）
     UIImageView *discoverImageView = [[UIImageView alloc] init];
     discoverImageView.image = [UIImage imageNamed:@"discover"];
-    discoverImageView.contentMode = UIViewContentModeScaleAspectFill;
-    discoverImageView.clipsToBounds = YES;
+    discoverImageView.contentMode = UIViewContentModeScaleAspectFit;
+    discoverImageView.clipsToBounds = NO;
     discoverImageView.translatesAutoresizingMaskIntoConstraints = NO;
     [self.sheetView addSubview:discoverImageView];
 
