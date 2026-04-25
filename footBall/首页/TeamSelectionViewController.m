@@ -378,10 +378,10 @@
         // 外层：只负责圆形阴影，不裁剪子视图
         _shadowContainerView = [[UIView alloc] init];
         _shadowContainerView.backgroundColor = [UIColor clearColor];
-        _shadowContainerView.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.08].CGColor;
-        _shadowContainerView.layer.shadowOpacity = 0.16;
+        _shadowContainerView.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.12].CGColor;
+        _shadowContainerView.layer.shadowOpacity = 0.4;
         _shadowContainerView.layer.shadowRadius = 12;
-        _shadowContainerView.layer.shadowOffset = CGSizeMake(0, 4);
+        _shadowContainerView.layer.shadowOffset = CGSizeMake(0, 5);
         
         // 内层：白底圆形容器，裁剪为圆（与设计图一致）
         _circleBackgroundView = [[UIView alloc] init];
@@ -579,7 +579,7 @@
     [self.view addSubview:self.confirmButton];
     
     [self.pageTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.view.mas_safeAreaLayoutGuideTop).offset(36);
+        make.top.equalTo(self.view.mas_safeAreaLayoutGuideTop).offset(0);
         make.leading.equalTo(self.view).offset(24);
         make.trailing.equalTo(self.view).offset(-24);
     }];
