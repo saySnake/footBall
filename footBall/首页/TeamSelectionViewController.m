@@ -116,10 +116,10 @@
         self.circleView = [[UIView alloc] init];
         self.circleView.backgroundColor = [UIColor whiteColor];
         self.circleView.layer.cornerRadius = 29.0;
-        self.circleView.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.06].CGColor;
-        self.circleView.layer.shadowOpacity = 1.0;
+//        self.circleView.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.06].CGColor;
+//        self.circleView.layer.shadowOpacity = 1.0;
         self.circleView.layer.shadowRadius = 18.0;
-        self.circleView.layer.shadowOffset = CGSizeMake(0, 6);
+//        self.circleView.layer.shadowOffset = CGSizeMake(0, 6);
 
         self.logoView = [[UIImageView alloc] init];
         self.logoView.contentMode = UIViewContentModeScaleAspectFit;
@@ -217,11 +217,13 @@
     self.titleLabel.textColor = [ColorManager colorWithHexString:@"#353335"];
 
     self.scrollView = [[UIScrollView alloc] init];
+    self.scrollView.backgroundColor = [ColorManager colorWithHexString:@"#f9f9f9"];
     self.scrollView.showsHorizontalScrollIndicator = NO;
 
     self.teamsStackView = [[UIStackView alloc] init];
     self.teamsStackView.axis = UILayoutConstraintAxisHorizontal;
     self.teamsStackView.alignment = UIStackViewAlignmentCenter;
+    self.teamsStackView.backgroundColor = [ColorManager colorWithHexString:@"#f9f9f9"];
     self.teamsStackView.spacing = 13.0;
 
     self.cancelButton = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -263,7 +265,7 @@
 
     [self.sheetView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.trailing.equalTo(self.view);
-        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom);
+        make.bottom.equalTo(self.view);
         make.height.mas_equalTo(275);
     }];
 
@@ -286,7 +288,6 @@
         make.height.mas_equalTo(58);
     }];
 
-    // 注意：Masonry 直接约束到 UIScrollView 的 contentLayoutGuide / frameLayoutGuide
     // 在部分系统上会触发 "attempting to add unsupported attribute: _UIScrollViewLayoutGuide" 崩溃。
     // 这里统一使用 scrollView 本体约束，配合 stackView 自身内容宽度撑开横向滚动区域。
     [self.teamsStackView mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -479,26 +480,7 @@
     [self setupUI];
 }
 
-- (void)buildData {
-//    NSMutableArray *arr = [NSMutableArray array];
-//    NSArray *names = @[
-//        NSLocalizedString(@"team_name_manutd", nil),
-//        NSLocalizedString(@"team_name_liverpool", nil),
-//        NSLocalizedString(@"team_name_chelsea", nil),
-//        NSLocalizedString(@"team_name_arsenal", nil),
-//        NSLocalizedString(@"team_name_mancity", nil),
-//        NSLocalizedString(@"team_name_spurs", nil),
-//        NSLocalizedString(@"team_name_brentford", nil),
-//        NSLocalizedString(@"team_name_wolves", nil),
-//        NSLocalizedString(@"team_name_brighton", nil)
-//    ];
-//    for (NSString *name in names) {
-//        TeamModel *m = [TeamModel new];
-//        m.name = name;
-//        m.logoName = @"team_placeholder";
-//        [arr addObject:m];
-//    }
-    
+- (void)buildData {    
     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
     [TeamsRequest.shared searchTeams:@"" leagueId:nil page:1 pageSize:20 success:^(HTTPResponse <NSArray<Team*>*>* _Nullable responseObject) {
         [MBProgressHUD hideHUDForView:self.view animated:YES];
@@ -605,13 +587,13 @@
     [self.collectionView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.searchContainerView.mas_bottom).offset(24);
         make.leading.trailing.equalTo(self.view);
-        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom);
+        make.bottom.equalTo(self.view);
     }];
     
     [self.confirmButton mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self.view);
         make.width.mas_equalTo(168);
-        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-20);
+        make.bottom.equalTo(self.view).offset(-35);
         make.height.mas_equalTo(52);
     }];
 }
