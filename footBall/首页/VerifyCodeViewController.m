@@ -258,7 +258,7 @@ static UIColor *kVCCaretGray(void) {
     [self.view addSubview:self.loginButton];
 
     [self.titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(navBar.mas_bottom).offset(16);
+        make.top.equalTo(navBar.mas_bottom).offset(48);
         make.leading.equalTo(self.view).offset(24);
         make.trailing.lessThanOrEqualTo(self.view).offset(-24);
     }];

@@ -18,7 +18,7 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = [UIColor whiteColor];
+    self.view.backgroundColor = [ColorManager colorWithHexString:@"#F7F7F7"];
     self.view.layer.cornerRadius = 10;
     self.view.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
     self.view.layer.masksToBounds = YES;
@@ -262,7 +262,8 @@
     }];
 
     [self.sheetView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.trailing.bottom.equalTo(self.view);
+        make.leading.trailing.equalTo(self.view);
+        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom);
         make.height.mas_equalTo(275);
     }];
 
@@ -285,17 +286,13 @@
         make.height.mas_equalTo(58);
     }];
 
-    if (@available(iOS 11.0, *)) {
-        [self.teamsStackView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.scrollView.contentLayoutGuide).insets(UIEdgeInsetsMake(0, 16, 0, 16));
-            make.height.equalTo(self.scrollView.frameLayoutGuide);
-        }];
-    } else {
-        [self.teamsStackView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.scrollView).insets(UIEdgeInsetsMake(0, 16, 0, 16));
-            make.height.equalTo(self.scrollView);
-        }];
-    }
+    // 注意：Masonry 直接约束到 UIScrollView 的 contentLayoutGuide / frameLayoutGuide
+    // 在部分系统上会触发 "attempting to add unsupported attribute: _UIScrollViewLayoutGuide" 崩溃。
+    // 这里统一使用 scrollView 本体约束，配合 stackView 自身内容宽度撑开横向滚动区域。
+    [self.teamsStackView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.scrollView).insets(UIEdgeInsetsMake(0, 16, 0, 16));
+        make.height.equalTo(self.scrollView);
+    }];
 
     [self.cancelButton mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(self.sheetView).offset(16);
@@ -381,10 +378,10 @@
         // 外层：只负责圆形阴影，不裁剪子视图
         _shadowContainerView = [[UIView alloc] init];
         _shadowContainerView.backgroundColor = [UIColor clearColor];
-        _shadowContainerView.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.06].CGColor;
-        _shadowContainerView.layer.shadowOpacity = 1.0;
-        _shadowContainerView.layer.shadowRadius = 39;
-        _shadowContainerView.layer.shadowOffset = CGSizeMake(0, 9);
+        _shadowContainerView.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.08].CGColor;
+        _shadowContainerView.layer.shadowOpacity = 0.16;
+        _shadowContainerView.layer.shadowRadius = 12;
+        _shadowContainerView.layer.shadowOffset = CGSizeMake(0, 4);
         
         // 内层：白底圆形容器，裁剪为圆（与设计图一致）
         _circleBackgroundView = [[UIView alloc] init];
@@ -432,8 +429,8 @@
         
         // 对勾在圆形右上角，略微压住绿色描边
         [_checkmarkView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(self.shadowContainerView).offset(-4);
-            make.trailing.equalTo(self.shadowContainerView).offset(4);
+            make.top.equalTo(self.shadowContainerView);
+            make.trailing.equalTo(self.shadowContainerView);
             make.width.height.mas_equalTo(20);
         }];
     }
@@ -594,13 +591,13 @@
     }];
 
     [self.searchIconView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.searchContainerView).offset(8);
+        make.leading.equalTo(self.searchContainerView).offset(12);
         make.centerY.equalTo(self.searchContainerView);
-        make.width.height.mas_equalTo(24);
+        make.width.height.mas_equalTo(16);
     }];
 
     [self.searchTextField mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.searchIconView.mas_trailing).offset(4);
+        make.leading.equalTo(self.searchIconView.mas_trailing).offset(8);
         make.trailing.equalTo(self.searchContainerView).offset(-12);
         make.top.bottom.equalTo(self.searchContainerView);
     }];
@@ -608,13 +605,13 @@
     [self.collectionView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.searchContainerView.mas_bottom).offset(24);
         make.leading.trailing.equalTo(self.view);
-        make.bottom.equalTo(self.confirmButton.mas_top).offset(-8);
+        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom);
     }];
     
     [self.confirmButton mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self.view);
         make.width.mas_equalTo(168);
-        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-1);
+        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-20);
         make.height.mas_equalTo(52);
     }];
 }
@@ -635,7 +632,7 @@
     // 按设计图：选中 = 圆形加粗绿色描边；未选中 = 圆形细浅灰描边（描边在圆形容器上）
     UIColor *greenColor = [ColorManager sharedManager].primaryColor;
     UIColor *lightGrayColor = [UIColor colorWithWhite:0.85 alpha:1.0];
-    cell.circleBackgroundView.layer.borderWidth = selected ? 3.0 : 1.0;
+    cell.circleBackgroundView.layer.borderWidth = 1.0;
     cell.circleBackgroundView.layer.borderColor = selected ? greenColor.CGColor : lightGrayColor.CGColor;
     [cell setNeedsLayout];
     [cell layoutIfNeeded]; // 确保圆角已应用再显示
