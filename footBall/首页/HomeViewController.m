@@ -332,6 +332,11 @@ static NSString *kHomeTeamIdString(id raw) {
 @property (nonatomic, strong) MASConstraint *tableHeightConstraint;
 /// 防止切 tab 时反复触发全量请求，记录上次加载时间
 @property (nonatomic, assign) NSTimeInterval lastLoadTime;
+/// 是否正在加载中，防止并发请求
+@property (nonatomic, assign) BOOL isLoadingSchedule;
+/// 预计算的分组缓存：按月份分组，key=月份字符串，value=该月比赛数组，顺序与 sortedDateKeys 一致
+@property (nonatomic, strong) NSArray<NSString *> *sortedDateKeys;
+@property (nonatomic, strong) NSDictionary<NSString *, NSArray<Match *> *> *groupedMatches;
 @end
 
 @implementation HomeViewController
@@ -404,12 +409,35 @@ static NSString *kHomeTeamIdString(id raw) {
         }
         _filteredData = arr;
     }
+    // 预计算分组缓存，避免 tableView 回调里反复遍历
+    [self rebuildGroupCache];
     [_tableView reloadData];
-    if (_tableView) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [self updateTableHeight];
-        });
+    // 用 performSelector 防抖，避免短时间内多次触发布局计算
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(updateTableHeight) object:nil];
+    [self performSelector:@selector(updateTableHeight) withObject:nil afterDelay:0.05];
+}
+
+- (void)rebuildGroupCache {
+    NSMutableDictionary<NSString *, NSMutableArray<Match *> *> *dict = [NSMutableDictionary dictionary];
+    NSMutableArray<NSString *> *keys = [NSMutableArray array];
+    for (Match *m in _filteredData) {
+        NSString *key = [self monthTextFromRaw:m.matchDate];
+        if (!dict[key]) {
+            dict[key] = [NSMutableArray array];
+            [keys addObject:key];
+        }
+        [dict[key] addObject:m];
     }
+    // 按月份倒序
+    [keys sortUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
+        return [b compare:a];
+    }];
+    self.sortedDateKeys = [keys copy];
+    NSMutableDictionary *immutable = [NSMutableDictionary dictionary];
+    for (NSString *k in dict) {
+        immutable[k] = [dict[k] copy];
+    }
+    self.groupedMatches = [immutable copy];
 }
 
 - (void)setupUI {
@@ -573,21 +601,16 @@ static NSString *kHomeTeamIdString(id raw) {
 }
 
 - (void)updateTableHeight {
-    if (!_tableView || !_filteredData.count) return;
-    NSArray *dates = [self sortedDates];
+    if (!_tableView || !self.sortedDateKeys.count) return;
     CGFloat headerH = 40.f, footerH = 0.01f, rowH = 103.f;
     CGFloat total = 0;
-    for (NSString *date in dates) {
-        NSPredicate *p = [NSPredicate predicateWithBlock:^BOOL(Match *evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
-            return [[self monthTextFromRaw:evaluatedObject.matchDate] isEqualToString:date];
-        }];
-        NSInteger rows = [[_filteredData filteredArrayUsingPredicate:p] count];
+    for (NSString *key in self.sortedDateKeys) {
+        NSInteger rows = self.groupedMatches[key].count;
         total += headerH + footerH + rows * rowH;
     }
     if (total <= 0) return;
     self.tableHeightConstraint.offset = total;
     [self.view setNeedsLayout];
-    // 不用 layoutIfNeeded（同步阻塞主线程），让系统在下一个 runloop 自动布局
 }
 
 - (void)updateLocalizedStrings {
@@ -872,6 +895,10 @@ static NSString *kHomeTeamIdString(id raw) {
 }
 
 - (void)fetchScheduleMatches {
+    // 防止并发：上一次请求还未完成时不重复发起
+    if (self.isLoadingSchedule) return;
+    self.isLoadingSchedule = YES;
+    __weak typeof(self) weakSelf = self;
     NSDateFormatter *dateFmt = [[NSDateFormatter alloc] init];
     dateFmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
     dateFmt.dateFormat = @"yyyy-MM-dd";
@@ -881,8 +908,6 @@ static NSString *kHomeTeamIdString(id raw) {
     monthFmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
     monthFmt.dateFormat = @"yyyy-MM";
     NSString *monthStr = [monthFmt stringFromDate:[NSDate date]];
-
-    __weak typeof(self) weakSelf = self;
 
     // 先查当月所有有比赛的日期，然后并发拉每个日期的日程，合并展示
     [[MatchRequest shared] getMatchScheduleDatesWithMonth:monthStr success:^(HTTPResponse * _Nullable responseObject) {
@@ -915,6 +940,7 @@ static NSString *kHomeTeamIdString(id raw) {
         dispatch_group_notify(group, dispatch_get_main_queue(), ^{
             __strong typeof(weakSelf) self = weakSelf;
             if (!self) return;
+            self.isLoadingSchedule = NO;
             // 按日期倒序排列
             NSArray<Match *> *sorted = [allMatches sortedArrayUsingComparator:^NSComparisonResult(Match *a, Match *b) {
                 NSDate *da = [self dateFromRaw:a.matchDate];
@@ -931,15 +957,19 @@ static NSString *kHomeTeamIdString(id raw) {
     } failure:^(NSError * _Nonnull error) {
         // 日历接口失败，直接用今天查
         __strong typeof(weakSelf) self = weakSelf;
-        if (!self) return;
+        if (!self) { return; }
         [[MatchRequest shared] getMatchScheduleWithDate:todayStr myTeamOnly:NO page:1 pageSize:50 success:^(HTTPResponse<NSArray<Match *> *> * _Nullable r2) {
             __strong typeof(weakSelf) self = weakSelf;
             if (!self) return;
+            self.isLoadingSchedule = NO;
             NSArray<Match *> *list = [r2.dataObject isKindOfClass:NSArray.class] ? r2.dataObject : @[];
             self.dataSource = [list mutableCopy];
             [self filterData];
             [self updateTableHeight];
-        } failure:nil];
+        } failure:^(NSError *e) {
+            __strong typeof(weakSelf) self = weakSelf;
+            if (self) self.isLoadingSchedule = NO;
+        }];
     }];
 }
 
@@ -1131,15 +1161,15 @@ static NSString *kHomeTeamIdString(id raw) {
         return [b compare:a];
     }];
 }
+- (NSArray *)sortedDates {
+    return self.sortedDateKeys ?: @[];
+}
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return [self sortedDates].count;
+    return self.sortedDateKeys.count;
 }
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    NSString *date = [self sortedDates][section];
-    NSPredicate *p = [NSPredicate predicateWithBlock:^BOOL(Match *evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
-        return [[self monthTextFromRaw:evaluatedObject.matchDate] isEqualToString:date];
-    }];
-    return [[_filteredData filteredArrayUsingPredicate:p] count];
+    NSString *key = self.sortedDateKeys[section];
+    return self.groupedMatches[key].count;
 }
 - (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
     UIView *v = [[UIView alloc] init];
@@ -1156,7 +1186,7 @@ static NSString *kHomeTeamIdString(id raw) {
     cal.contentMode = UIViewContentModeScaleAspectFit;
     [v addSubview:cal];
     UILabel *lab = [[UILabel alloc] init];
-    NSString *monthKey = [self sortedDates][section];
+    NSString *monthKey = self.sortedDateKeys[section];
     lab.text = [NSString stringWithFormat:@" %@", monthKey];
     lab.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
     lab.textColor = [UIColor blackColor];
@@ -1176,12 +1206,8 @@ static NSString *kHomeTeamIdString(id raw) {
     return 103;
 }
 - (Match *)modelAtIndexPath:(NSIndexPath *)indexPath {
-    NSString *date = [self sortedDates][indexPath.section];
-    NSPredicate *p = [NSPredicate predicateWithBlock:^BOOL(Match *evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
-        return [[self monthTextFromRaw:evaluatedObject.matchDate] isEqualToString:date];
-    }];
-    NSArray *arr = [_filteredData filteredArrayUsingPredicate:p];
-    return arr[indexPath.row];
+    NSString *key = self.sortedDateKeys[indexPath.section];
+    return self.groupedMatches[key][indexPath.row];
 }
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     MatchCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MatchCell"];
