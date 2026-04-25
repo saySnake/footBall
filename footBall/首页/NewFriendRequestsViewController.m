@@ -581,18 +581,24 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     NSInteger section = tag / 1000;
     NSInteger row = tag % 1000;
     NSMutableArray<PNFriendRequest *> *arr = section == 0 ? self.recentRequests : self.olderRequests;
-    if (row < 0 || row >= arr.count) return;
+    if (row < 0 || row >= (NSInteger)arr.count) return;
     PNFriendRequest *request = arr[row];
     if ([self statusForFriendRequest:request] != FriendRequestStatusPending) return;
     __weak typeof(self) weakSelf = self;
     [SocialRequest.shared processFriendRequest:request.requestId accept:accept success:^(HTTPResponse * _Nullable responseObject) {
-        [arr removeObjectAtIndex:row];
-        [weakSelf.tableView reloadData];
-        [weakSelf refreshPendingCountFromServer];
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        // 重新取数组引用，避免 loadRemoteData 替换后 arr 指向旧数组越界
+        NSMutableArray<PNFriendRequest *> *currentArr = section == 0 ? self.recentRequests : self.olderRequests;
+        if (row >= 0 && row < (NSInteger)currentArr.count) {
+            [currentArr removeObjectAtIndex:row];
+        }
+        [self.tableView reloadData];
+        [self refreshPendingCountFromServer];
         if (accept) {
             [[NSNotificationCenter defaultCenter] postNotificationName:kCommunityFriendsDidChangeNotification object:nil];
         }
-        [weakSelf loadRemoteData];
+        [self loadRemoteData];
     } failure:^(NSError * _Nonnull error) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
