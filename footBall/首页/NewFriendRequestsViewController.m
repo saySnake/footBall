@@ -20,7 +20,8 @@ static NSString * const kCommunityFriendsDidChangeNotification = @"community_fri
 typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     FriendRequestStatusPending,
     FriendRequestStatusExpired,
-    FriendRequestStatusAdded
+    FriendRequestStatusAdded,
+    FriendRequestStatusRejected  // 我方主动拒绝
 };
 
 @interface FriendRequestCell : UITableViewCell
@@ -215,6 +216,14 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
             self.rejectBtn.hidden = YES;
             self.statusBtn.hidden = NO;
             [self.statusBtn setTitle:NSLocalizedString(@"community_request_added", nil) forState:UIControlStateNormal];
+            [self.statusBtn setTitleColor:[UIColor colorWithRed:0.451 green:0.451 blue:0.451 alpha:1.0] forState:UIControlStateNormal];
+            self.statusBtn.layer.borderColor = [UIColor colorWithRed:0.62 green:0.62 blue:0.62 alpha:1.0].CGColor;
+            break;
+        case FriendRequestStatusRejected:
+            self.acceptBtn.hidden = YES;
+            self.rejectBtn.hidden = YES;
+            self.statusBtn.hidden = NO;
+            [self.statusBtn setTitle:NSLocalizedString(@"community_request_rejected", nil) ?: @"已拒绝" forState:UIControlStateNormal];
             [self.statusBtn setTitleColor:[UIColor colorWithRed:0.451 green:0.451 blue:0.451 alpha:1.0] forState:UIControlStateNormal];
             self.statusBtn.layer.borderColor = [UIColor colorWithRed:0.62 green:0.62 blue:0.62 alpha:1.0].CGColor;
             break;
@@ -610,8 +619,12 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
 - (FriendRequestStatus)statusForFriendRequest:(PNFriendRequest *)request {
     NSString *status = (request.status ?: @"PENDING").uppercaseString;
     if ([status isEqualToString:@"ACCEPTED"] || [status isEqualToString:@"ADDED"]) return FriendRequestStatusAdded;
-    if ([status isEqualToString:@"EXPIRED"] || [status isEqualToString:@"REJECTED"] || [status isEqualToString:@"DECLINED"] || [status isEqualToString:@"REFUSED"]) {
-        // 3天内处理过的请求（handleTime 有值且在3天内）视为"已添加"，而非"已过期"
+    // 主动拒绝：直接显示"已拒绝"，不受时间影响
+    if ([status isEqualToString:@"REJECTED"] || [status isEqualToString:@"DECLINED"] || [status isEqualToString:@"REFUSED"]) {
+        return FriendRequestStatusRejected;
+    }
+    if ([status isEqualToString:@"EXPIRED"]) {
+        // EXPIRED 状态：3天内处理过的视为"已添加"（服务端对已接受请求也返回EXPIRED的兼容处理）
         NSDate *handleDate = [self dateFromFriendAPIString:request.handleTime];
         if (handleDate) {
             NSCalendar *cal = [NSCalendar currentCalendar];
