@@ -330,6 +330,8 @@ static NSString *kHomeTeamIdString(id raw) {
 @property (nonatomic, strong) UIView *twoCardsContainer;
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) MASConstraint *tableHeightConstraint;
+/// 防止切 tab 时反复触发全量请求，记录上次加载时间
+@property (nonatomic, assign) NSTimeInterval lastLoadTime;
 @end
 
 @implementation HomeViewController
@@ -352,7 +354,12 @@ static NSString *kHomeTeamIdString(id raw) {
 }
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    [self loadHomeDataAndEndRefreshing:NO];
+    // 防抖：30秒内切 tab 不重复触发全量请求，避免收藏回调与数据刷新并发导致死锁
+    NSTimeInterval now = [NSDate date].timeIntervalSince1970;
+    if (now - self.lastLoadTime > 30.0) {
+        self.lastLoadTime = now;
+        [self loadHomeDataAndEndRefreshing:NO];
+    }
 }
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
@@ -891,16 +898,14 @@ static NSString *kHomeTeamIdString(id raw) {
         // 并发请求所有日期的日程，合并结果
         dispatch_group_t group = dispatch_group_create();
         NSMutableArray<Match *> *allMatches = [NSMutableArray array];
-        NSLock *lock = [[NSLock alloc] init];
 
         for (NSString *date in dates) {
             if (![date isKindOfClass:NSString.class]) continue;
             dispatch_group_enter(group);
             [[MatchRequest shared] getMatchScheduleWithDate:date myTeamOnly:NO page:1 pageSize:50 success:^(HTTPResponse<NSArray<Match *> *> * _Nullable r) {
+                // success block 在主线程回调，无需加锁
                 NSArray<Match *> *list = [r.dataObject isKindOfClass:NSArray.class] ? r.dataObject : @[];
-                [lock lock];
                 [allMatches addObjectsFromArray:list];
-                [lock unlock];
                 dispatch_group_leave(group);
             } failure:^(NSError * _Nonnull error) {
                 dispatch_group_leave(group);
@@ -1284,11 +1289,10 @@ static NSString *kHomeTeamIdString(id raw) {
     __weak UIButton *weakBtn = sender;
     void (^reloadRow)(void) = ^{
         __strong typeof(weakSelf) self = weakSelf;
-        if (!self) {
-            return;
-        }
+        if (!self) return;
         weakBtn.enabled = YES;
-        [self.tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationNone];
+        // 用 reloadData 替代 reloadRowsAtIndexPaths，避免切 tab 后 indexPath 失效导致死锁
+        [self.tableView reloadData];
     };
     if (match.favorited) {
         [[MatchRequest shared] unfavoriteMatch:match.matchId success:^(HTTPResponse * _Nullable responseObject) {
