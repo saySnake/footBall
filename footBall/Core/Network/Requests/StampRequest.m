@@ -40,16 +40,25 @@
     }];
 }
 - (void)addStamp:(NSString *)stampId position:(NSString *)position success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
-    [[APIManager sharedManager] POST:APIPathValueStampsSelect(stampId) parameters:@{@"position":position} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+    [self selectStamp:stampId position:position success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            responseObject.dataObject = responseObject.data;
-            if (success) success(responseObject);
+            [[APIManager sharedManager] POST:APIPathValueAddStamps(stampId) parameters:@{@"position":position} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+                if (responseObject.success) {
+                    responseObject.dataObject = responseObject.data;
+                    if (success) success(responseObject);
+                } else {
+                    if (failure) failure([APIError errorWithResponse:responseObject]);
+                }
+            } failure:^(NSError * _Nonnull error) {
+                if (failure) failure(error);
+            }];
         } else {
             if (failure) failure([APIError errorWithResponse:responseObject]);
         }
     } failure:^(NSError * _Nonnull error) {
         if (failure) failure(error);
     }];
+    
 }
 -(void)updateOldStamp:(NSString *)stampId newStamp:(NSString *)newStampId success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     if (!stampId || !newStampId) {

@@ -56,7 +56,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)getStampQuotaSuccess:(nullable APISuccessBlock)success
                      failure:(nullable APIFailureBlock)failure;
 
-/// POST `/api/v1/stamps/select/{stampId}` 用户选择添加邮票；position 可选，格式 "1,5"
+///无用 POST `/api/v1/stamps/select/{stampId}` 用户选择添加邮票；position 可选，格式 "1,5"
 - (void)selectStamp:(NSString *)stampId
            position:(nullable NSString *)position
             success:(nullable APISuccessBlock)success

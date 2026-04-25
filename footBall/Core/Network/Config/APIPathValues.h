@@ -126,6 +126,8 @@ FOUNDATION_EXPORT NSString * const APIPathValueMatchVerify(NSString *matchId);
 FOUNDATION_EXPORT NSString * const APIPathValueStampsList;
 /// 可选择邮票（按分类分组）
 FOUNDATION_EXPORT NSString * const APIPathValueStampsSelectable;
+/// POST 添加主页邮票
+FOUNDATION_EXPORT NSString * const APIPathValueAddStamps(NSString *stampId);
 /// PUT 更新主页邮票
 FOUNDATION_EXPORT NSString * const APIPathValueUpdateStamps(NSString *stampId);
 /// DELETE 删除主页邮票
