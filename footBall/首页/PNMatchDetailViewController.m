@@ -193,6 +193,7 @@
     _homeNameLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
     _homeNameLabel.textColor = [UIColor blackColor];
     _homeNameLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    _homeNameLabel.adjustsFontSizeToFitWidth = YES;
     _homeNameLabel.text = self.homeName ?: @"-";
     [topCard addSubview:_homeNameLabel];
 
@@ -208,6 +209,7 @@
     _awayNameLabel.textColor = [UIColor blackColor];
     _awayNameLabel.textAlignment = NSTextAlignmentRight;
     _awayNameLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    _awayNameLabel.adjustsFontSizeToFitWidth = YES;
     _awayNameLabel.text = self.awayName ?: @"-";
     [topCard addSubview:_awayNameLabel];
 
@@ -238,19 +240,22 @@
     // 布局：队名 → 队徽 → VS → 队徽 → 队名（与原型一致）
     [_homeNameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(topCard).offset(18);
-        make.top.equalTo(topCard).offset(22);
+        make.centerY.equalTo(_homeLogoView);
         make.trailing.lessThanOrEqualTo(_homeLogoView.mas_leading).offset(-10);
     }];
+    
     [_homeLogoView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(topCard.mas_centerX).offset(-60);
         make.top.equalTo(topCard).offset(16);
         make.width.height.mas_equalTo(38);
     }];
+    
     [vsLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(topCard);
         make.centerY.equalTo(_homeLogoView);
         make.width.mas_equalTo(52);
     }];
+    
     [_awayLogoView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(topCard.mas_centerX).offset(60);
         make.centerY.equalTo(_homeLogoView);
@@ -261,6 +266,8 @@
         make.trailing.equalTo(topCard).offset(-18);
         make.centerY.equalTo(_homeLogoView);
     }];
+    
+    
     [_matchDateLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(topCard).offset(18);
         make.centerY.equalTo(_kickTimeLabel);
