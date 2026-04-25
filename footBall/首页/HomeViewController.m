@@ -567,7 +567,6 @@ static NSString *kHomeTeamIdString(id raw) {
 
 - (void)updateTableHeight {
     if (!_tableView || !_filteredData.count) return;
-    // 不依赖 contentSize（scrollEnabled=NO 时可能不准确），按分组与行数手动算高
     NSArray *dates = [self sortedDates];
     CGFloat headerH = 40.f, footerH = 0.01f, rowH = 103.f;
     CGFloat total = 0;
@@ -581,7 +580,7 @@ static NSString *kHomeTeamIdString(id raw) {
     if (total <= 0) return;
     self.tableHeightConstraint.offset = total;
     [self.view setNeedsLayout];
-    [self.view layoutIfNeeded];
+    // 不用 layoutIfNeeded（同步阻塞主线程），让系统在下一个 runloop 自动布局
 }
 
 - (void)updateLocalizedStrings {
