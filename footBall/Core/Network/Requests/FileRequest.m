@@ -116,26 +116,30 @@ static NSString *const AliYunHost = @"oss-cn-beijing.aliyuncs.com";
 - (void)uploadImage:(NSData *)data type:(ImageObjectType)type success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     if (!data) {
         NSError *error = [NSError errorWithDomain:NSInvalidArgumentException code:0 userInfo:@{NSLocalizedDescriptionKey: @"头像不能为空"}];
-        failure(error);
+        if (failure) failure(error);
         return;
     }
-//    if (!self.stsToken || !self.defaultClient) {
-//        __weak typeof(self) weakSelf = self;
-//        [self getOSSTokenSuccess:^(HTTPResponse * _Nullable responseObject) {
-//            [weakSelf setupSTSToken];
-//            [weakSelf uploadImage:data type:type success:success failure:failure];
-//        } failure:failure];
-//        return;
-//    }
+    if (!self.defaultClient) {
+        [self setupSTSToken];
+    }
+    if (!self.defaultClient) {
+        NSError *error = [NSError errorWithDomain:@"FileRequestErrorDomain"
+                                             code:-1
+                                         userInfo:@{NSLocalizedDescriptionKey: @"上传服务未初始化，请稍后重试"}];
+        if (failure) failure(error);
+        return;
+    }
 
     NSString *objectKey = [NSString stringWithFormat:@"c/%@/%@/%.0f.jpg",
                            [self objectType:type],AuthManager.sharedManager.user.userId,
                            [NSDate date].timeIntervalSince1970 * 1000.0];
+    NSLog(@"[OSSDebug] uploading objectKey=%@, dataLength=%lu", objectKey, (unsigned long)data.length);
 
     OSSPutObjectRequest *_normalUploadRequest = [OSSPutObjectRequest new];
-    _normalUploadRequest.bucketName = BucketName;//self.stsToken.bucket;
+    _normalUploadRequest.bucketName = BucketName;
     _normalUploadRequest.objectKey = objectKey;
     _normalUploadRequest.uploadingData = data;
+    _normalUploadRequest.contentType = @"image/jpeg";
     _normalUploadRequest.isAuthenticationRequired = YES;
     _normalUploadRequest.uploadProgress = ^(int64_t bytesSent, int64_t totalByteSent, int64_t totalBytesExpectedToSend) {
         float progress = 1.f * totalByteSent / totalBytesExpectedToSend;
@@ -146,7 +150,8 @@ static NSString *const AliYunHost = @"oss-cn-beijing.aliyuncs.com";
         [task continueWithBlock:^id(OSSTask *task) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (task.error) {
-                    failure(task.error);
+                    NSLog(@"[OSS] upload error: %@", task.error);
+                    if (failure) failure(task.error);
                 } else {
                     NSLog(@"[OSS] upload result: %@",task.result);
                     NSString *bucket = BucketName;//self.stsToken.bucket ?: @"";
