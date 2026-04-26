@@ -266,7 +266,7 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     m.growthSubtitle = [self awakeWatchPercentDisplay:passport ? passport.awakeWatchPercent : nil];
 
     // 柱状图：用 locationDist 各点 count 作为 Y 值（与设计注释「地点频次」一致）
-    m.goalTrendTitle = NSLocalizedString(@"passport_location_frequency_title", nil) ?: @"观赛地点频次";
+    m.goalTrendTitle = [NSString stringWithFormat:@"%ld年观赛数据", (long)y];
     NSMutableArray<NSNumber *> *locTrend = [NSMutableArray array];
     for (PNLocationDist *ld in locationList) {
         [locTrend addObject:@(MAX(0, ld.count))];
