@@ -1486,6 +1486,7 @@
             }
             NSString *retAppleProductId = data[@"appleProductId"];
             NSString *retPlanId = data[@"planId"] ? [NSString stringWithFormat:@"%@", data[@"planId"]] : nil;
+            NSLog(@"[Redeem] data=%@, appleProductId=%@, planId=%@", data, retAppleProductId, retPlanId);
             if (retAppleProductId.length > 0) {
                 weakSelf.redeemAppleProductId = retAppleProductId;
             }
@@ -1576,6 +1577,7 @@
     if (self.hasAppliedRedeemDiscount && self.redeemAppleProductId.length > 0) {
         appleProductId = self.redeemAppleProductId;
         planId = self.redeemPlanId;
+        NSLog(@"[Pay] 折扣模式: appleProductId=%@, planId=%@", appleProductId, planId);
     } else if (self.apiPlans.count > (NSUInteger)self.currentIndex) {
         NSArray<PNMemberPlan *> *sorted = [self.apiPlans sortedArrayUsingComparator:^NSComparisonResult(PNMemberPlan *a, PNMemberPlan *b) {
             return [a.planId compare:b.planId options:NSNumericSearch];
