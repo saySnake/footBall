@@ -319,6 +319,8 @@ static CGFloat PCAbilityMaxLabelWidthForTitles(NSArray<NSString *> *titles, UIFo
     UIView *_card;
     UILabel *_title;
     PassportBarChartView *_chart;
+    UIView *_bottomDashView;
+    CAShapeLayer *_bottomDashLayer;
 }
 
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
@@ -339,8 +341,25 @@ static CGFloat PCAbilityMaxLabelWidthForTitles(NSArray<NSString *> *titles, UIFo
         [_card addSubview:_title];
         [_card addSubview:_chart];
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 0, 0, 0));
+            make.top.leading.trailing.equalTo(self.contentView);
+            make.bottom.equalTo(self.contentView).offset(-2);
         }];
+        // 底部虚线
+        UIView *bottomDashView = [[UIView alloc] init];
+        bottomDashView.backgroundColor = [UIColor clearColor];
+        _bottomDashView = bottomDashView;
+        [self.contentView addSubview:bottomDashView];
+        [bottomDashView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.equalTo(_card.mas_bottom);
+            make.leading.trailing.bottom.equalTo(self.contentView);
+        }];
+        CAShapeLayer *dashLayer = [CAShapeLayer layer];
+        dashLayer.strokeColor = [UIColor colorWithWhite:0.75 alpha:1.0].CGColor;
+        dashLayer.fillColor = [UIColor clearColor].CGColor;
+        dashLayer.lineWidth = 1;
+        dashLayer.lineDashPattern = @[@6, @4];
+        [bottomDashView.layer addSublayer:dashLayer];
+        _bottomDashLayer = dashLayer;
         [_title mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.leading.equalTo(_card).offset(16);
             make.trailing.equalTo(_card).offset(-16);
@@ -352,6 +371,19 @@ static CGFloat PCAbilityMaxLabelWidthForTitles(NSArray<NSString *> *titles, UIFo
         }];
     }
     return self;
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    if (_bottomDashView && _bottomDashLayer) {
+        CGFloat w = CGRectGetWidth(_bottomDashView.bounds);
+        if (w > 0) {
+            UIBezierPath *path = [UIBezierPath bezierPath];
+            [path moveToPoint:CGPointMake(16, 1)];
+            [path addLineToPoint:CGPointMake(w - 16, 1)];
+            _bottomDashLayer.path = path.CGPath;
+        }
+    }
 }
 
 - (void)configureWithModel:(PassportViewModel *)model {

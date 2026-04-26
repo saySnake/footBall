@@ -373,7 +373,7 @@ static UIColor *PassportPageBg(void) {
     }
     // BarChartCardCell 设计稿固定高度
     if (indexPath.row == 2) {
-        return 341;
+        return 343;
     }
     // PassportPossessionCardCell 设计稿固定高度
     if (indexPath.row == 3) {
@@ -407,7 +407,7 @@ static UIColor *PassportPageBg(void) {
         return 197;
     }
     if (indexPath.row == 2) {
-        return 341;
+        return 343;
     }
     if (indexPath.row == 3) {
         return 254;
