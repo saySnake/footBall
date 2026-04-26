@@ -381,7 +381,7 @@ static UIColor *PassportPageBg(void) {
     }
     // PassportPositionStrengthCell 设计稿固定高度
     if (indexPath.row == 4) {
-        return 413;
+        return 412;
     }
     // PassportAbilityBlockCell 设计稿固定高度
     if (indexPath.row == 5) {
@@ -413,7 +413,7 @@ static UIColor *PassportPageBg(void) {
         return 254;
     }
     if (indexPath.row == 4) {
-        return 413;
+        return 412;
     }
     if (indexPath.row == 5) {
         return 522;

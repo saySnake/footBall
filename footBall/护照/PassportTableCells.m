@@ -628,7 +628,7 @@ static UIView *PCPositionRow(UILabel **outL, UILabel **outV, bool last) {
 
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.leading.trailing.equalTo(self.contentView);
-            make.bottom.equalTo(self.contentView).offset(-2);
+            make.bottom.equalTo(self.contentView).offset(-1);
         }];
         // 底部虚线
         UIView *bottomDashView = [[UIView alloc] init];
@@ -668,7 +668,7 @@ static UIView *PCPositionRow(UILabel **outL, UILabel **outV, bool last) {
         [_row3 mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.right.equalTo(_card);
             make.top.equalTo(_row2.mas_bottom).offset(-26);
-            make.height.mas_equalTo(106);
+            make.bottom.equalTo(_card);
         }];
     }
     return self;
