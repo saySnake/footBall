@@ -12,6 +12,8 @@
 #import "ProfileRequest.h"
 #import "HTTPResponse.h"
 #import "AuthManager.h"
+#import "CommunityRequest.h"
+#import "StatisticsModels.h"
 #import <Masonry/Masonry.h>
 
 static UIColor *PassportPageBg(void) {
@@ -287,11 +289,30 @@ static UIColor *PassportPageBg(void) {
         [weakSelf.view setNeedsLayout];
     };
     if (isOther) {
-        [[ProfileRequest shared] getPassportForUserId:self.targetUserId year:y success:^(HTTPResponse * _Nullable responseObject) {
-            PNPassport *p = [responseObject.dataObject isKindOfClass:PNPassport.class] ? responseObject.dataObject : nil;
-            handleSuccess(p);
+        // 查看好友数据 - 使用社区接口
+        [[CommunityRequest shared] getFriendData:self.targetUserId success:^(HTTPResponse * _Nullable responseObject) {
+            // 将统计数据转换为护照数据格式
+            PNStatistics *stats = [responseObject.dataObject isKindOfClass:PNStatistics.class] ? responseObject.dataObject : nil;
+            if (stats) {
+                PNPassport *p = [weakSelf convertStatisticsToPassport:stats];
+                handleSuccess(p);
+            } else {
+                // 如果统计数据转换失败，回退到护照接口
+                [[ProfileRequest shared] getPassportForUserId:weakSelf.targetUserId year:y success:^(HTTPResponse * _Nullable responseObject) {
+                    PNPassport *p = [responseObject.dataObject isKindOfClass:PNPassport.class] ? responseObject.dataObject : nil;
+                    handleSuccess(p);
+                } failure:^(NSError * _Nonnull error) {
+                    handleFailure(error);
+                }];
+            }
         } failure:^(NSError * _Nonnull error) {
-            handleFailure(error);
+            // 如果好友数据接口失败，回退到护照接口
+            [[ProfileRequest shared] getPassportForUserId:weakSelf.targetUserId year:y success:^(HTTPResponse * _Nullable responseObject) {
+                PNPassport *p = [responseObject.dataObject isKindOfClass:PNPassport.class] ? responseObject.dataObject : nil;
+                handleSuccess(p);
+            } failure:^(NSError * _Nonnull error) {
+                handleFailure(error);
+            }];
         }];
     } else {
         [[ProfileRequest shared] getMyPassportWithYear:y success:^(HTTPResponse * _Nullable responseObject) {
@@ -301,6 +322,41 @@ static UIColor *PassportPageBg(void) {
             handleFailure(error);
         }];
     }
+}
+
+/// 将统计数据转换为护照数据格式
+- (PNPassport *)convertStatisticsToPassport:(PNStatistics *)stats {
+    if (!stats) return nil;
+    
+    PNPassport *passport = [[PNPassport alloc] init];
+    passport.userId = self.targetUserId;
+    passport.nickname = self.targetNickname.length > 0 ? self.targetNickname : @"";
+    
+    // 基础统计
+    if (stats.basicStats) {
+        passport.yearTotalMatches = stats.basicStats.totalMatches;
+        if (stats.basicStats.mostVisitedStadium) {
+            passport.topLocation = stats.basicStats.mostVisitedStadium.name;
+        }
+    }
+    
+    // 累计观赛时长
+    passport.careerTotalWatchTime = stats.cumulativeWatchTime ?: 0;
+    
+    // 国家数和球场数
+    passport.yearCountryCount = stats.countryCount ?: 0;
+    passport.yearStadiumCount = stats.totalStadiumCount ?: 0;
+    passport.yearCityCount = stats.basicStats.mostVisitedStadium.city.length > 0 ? 1 : 0;
+    
+    // 主队战绩
+    if (stats.teamRecord) {
+        passport.teamRecord = [[PNPassportTeamRecord alloc] init];
+        passport.teamRecord.wins = stats.teamRecord.wins;
+        passport.teamRecord.draws = stats.teamRecord.draws;
+        passport.teamRecord.losses = stats.teamRecord.losses;
+    }
+    
+    return passport;
 }
 
 - (void)onBack {
