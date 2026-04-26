@@ -458,9 +458,9 @@ static NSString *kHomeTeamIdString(id raw) {
         }
         [dict[key] addObject:m];
     }
-    // 按月份倒序
+    // 按月份升序（小到大）：例如 2026-04 在 2026-05 前
     [keys sortUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
-        return [b compare:a];
+        return [a compare:b];
     }];
     self.sortedDateKeys = [keys copy];
     NSMutableDictionary *immutable = [NSMutableDictionary dictionary];
@@ -946,96 +946,129 @@ static NSString *kHomeTeamIdString(id raw) {
     NSDateFormatter *monthFmt = [[NSDateFormatter alloc] init];
     monthFmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
     monthFmt.dateFormat = @"yyyy-MM";
-    NSString *monthStr = [monthFmt stringFromDate:[NSDate date]];
+    NSString *currentMonthStr = [monthFmt stringFromDate:[NSDate date]];
+    NSCalendar *calendar = [NSCalendar currentCalendar];
+    NSDate *nextMonthDate = [calendar dateByAddingUnit:NSCalendarUnitMonth value:1 toDate:[NSDate date] options:0];
+    NSString *nextMonthStr = [monthFmt stringFromDate:nextMonthDate ?: [NSDate date]];
 
-    // 首页定位版：优先保证首屏可用，避免并发多日期请求导致长时间等待。
-    // 先查当月有比赛的日期，但仅请求一个日期（优先今天），降低阻塞风险。
-    [[MatchRequest shared] getMatchScheduleDatesWithMonth:monthStr success:^(HTTPResponse * _Nullable responseObject) {
+    dispatch_group_t monthsGroup = dispatch_group_create();
+    NSMutableArray<NSString *> *allDateStrings = [NSMutableArray array];
+
+    void (^fetchDatesForMonth)(NSString *) = ^(NSString *month) {
+        if (month.length == 0) return;
+        dispatch_group_enter(monthsGroup);
+        [[MatchRequest shared] getMatchScheduleDatesWithMonth:month success:^(HTTPResponse * _Nullable responseObject) {
+            NSArray *dates = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+            for (id d in dates) {
+                if ([d isKindOfClass:NSString.class]) {
+                    [allDateStrings addObject:(NSString *)d];
+                }
+            }
+            dispatch_group_leave(monthsGroup);
+        } failure:^(NSError * _Nonnull error) {
+            dispatch_group_leave(monthsGroup);
+        }];
+    };
+
+    fetchDatesForMonth(currentMonthStr);
+    if (![nextMonthStr isEqualToString:currentMonthStr]) {
+        fetchDatesForMonth(nextMonthStr);
+    }
+
+    dispatch_group_notify(monthsGroup, dispatch_get_main_queue(), ^{
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
 
-        NSArray *dates = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
-        if (dates.count == 0) {
-            // 当月没有比赛，用今天查一次兜底
-            dates = @[todayStr];
+        // 去重 + 仅保留今天及之后（字符串格式 yyyy-MM-dd，可直接比较）
+        NSOrderedSet<NSString *> *unique = [NSOrderedSet orderedSetWithArray:allDateStrings];
+        NSMutableArray<NSString *> *targetDates = [NSMutableArray array];
+        for (NSString *d in unique) {
+            if (![d isKindOfClass:NSString.class]) continue;
+            if ([d compare:todayStr options:NSNumericSearch] != NSOrderedAscending) {
+                [targetDates addObject:d];
+            }
         }
-        NSString *targetDate = [dates containsObject:todayStr] ? todayStr : ([[dates firstObject] isKindOfClass:NSString.class] ? dates.firstObject : todayStr);
-        NSLog(@"[HomeDebug] schedule dates callback count=%ld target=%@ elapsed=%.3f",
-              (long)dates.count, targetDate, CACurrentMediaTime() - self.homeDebugLoadStartAt);
+        [targetDates sortUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
+            return [a compare:b options:NSNumericSearch];
+        }];
+        if (targetDates.count == 0) {
+            [targetDates addObject:todayStr];
+        }
+        // 防卡保护：最多拉 45 天。
+        if (targetDates.count > 45) {
+            targetDates = [[targetDates subarrayWithRange:NSMakeRange(0, 45)] mutableCopy];
+        }
+        NSLog(@"[HomeDebug] schedule dates merged count=%ld elapsed=%.3f", (long)targetDates.count, CACurrentMediaTime() - self.homeDebugLoadStartAt);
 
-        [[MatchRequest shared] getMatchScheduleWithDate:targetDate myTeamOnly:NO page:1 pageSize:20 success:^(HTTPResponse<NSArray<Match *> *> * _Nullable r) {
+        NSString *base = [APIEnvironmentManager sharedManager].currentBaseURL ?: @"";
+        if ([base hasSuffix:@"/"]) base = [base substringToIndex:base.length - 1];
+        NSString *token = AuthManager.sharedManager.user.accessToken ?: @"<token>";
+        NSString *firstDate = targetDates.firstObject ?: todayStr;
+        NSString *url = [NSString stringWithFormat:@"%@/api/v1/home/schedule?date=%@&myTeamOnly=0&pageNum=1&pageSize=20", base, firstDate];
+        NSString *curl = [NSString stringWithFormat:
+                          @"curl '%@' \\\n"
+                          "  -X 'GET' \\\n"
+                          "  -H 'Accept: application/json, text/plain, */*' \\\n"
+                          "  -H 'Accept-Language: zh-CN,zh;q=0.9' \\\n"
+                          "  -H 'Authorization: Bearer %@' \\\n"
+                          "  -H 'Connection: keep-alive' \\\n"
+                          "  -H 'Origin: %@' \\\n"
+                          "  -H 'Referer: %@/' \\\n"
+                          "  -H 'Sec-Fetch-Dest: empty' \\\n"
+                          "  -H 'Sec-Fetch-Mode: cors' \\\n"
+                          "  -H 'Sec-Fetch-Site: same-origin' \\\n"
+                          "  -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36' \\\n"
+                          "  -H 'sec-ch-ua: \"Not:A-Brand\";v=\"99\", \"Google Chrome\";v=\"145\", \"Chromium\";v=\"145\"' \\\n"
+                          "  -H 'sec-ch-ua-mobile: ?0' \\\n"
+                          "  -H 'sec-ch-ua-platform: \"macOS\"'",
+                          url, token, base, base];
+        NSLog(@"[HomeDebug] schedule curl(first date): %@", curl);
+
+        NSSet<NSString *> *allowedDates = [NSSet setWithArray:targetDates];
+        dispatch_group_t scheduleGroup = dispatch_group_create();
+        NSMutableArray<Match *> *allMatches = [NSMutableArray array];
+        NSDateFormatter *dayFmt = [[NSDateFormatter alloc] init];
+        dayFmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+        dayFmt.dateFormat = @"yyyy-MM-dd";
+
+        for (NSString *date in targetDates) {
+            dispatch_group_enter(scheduleGroup);
+            [[MatchRequest shared] getMatchScheduleWithDate:date myTeamOnly:NO page:1 pageSize:20 success:^(HTTPResponse<NSArray<Match *> *> * _Nullable r) {
+                NSArray<Match *> *list = [r.dataObject isKindOfClass:NSArray.class] ? r.dataObject : @[];
+                for (Match *m in list) {
+                    NSDate *md = [self dateFromRaw:m.matchDate];
+                    NSString *matchDay = md ? [dayFmt stringFromDate:md] : @"";
+                    if (matchDay.length == 0 || [allowedDates containsObject:matchDay]) {
+                        [allMatches addObject:m];
+                    }
+                }
+                dispatch_group_leave(scheduleGroup);
+            } failure:^(NSError * _Nonnull error) {
+                dispatch_group_leave(scheduleGroup);
+            }];
+        }
+
+        dispatch_group_notify(scheduleGroup, dispatch_get_main_queue(), ^{
             __strong typeof(weakSelf) self = weakSelf;
             if (!self) return;
             self.isLoadingSchedule = NO;
-            NSArray<Match *> *list = [r.dataObject isKindOfClass:NSArray.class] ? r.dataObject : @[];
-            NSArray<Match *> *sorted = [list sortedArrayUsingComparator:^NSComparisonResult(Match *a, Match *b) {
+            NSArray<Match *> *sorted = [allMatches sortedArrayUsingComparator:^NSComparisonResult(Match *a, Match *b) {
                 NSDate *da = [self dateFromRaw:a.matchDate];
                 NSDate *db = [self dateFromRaw:b.matchDate];
                 if (!da && !db) return NSOrderedSame;
                 if (!da) return NSOrderedDescending;
                 if (!db) return NSOrderedAscending;
-                return [db compare:da];
+                return [da compare:db];
             }];
-            NSArray<Match *> *sanitized = [self home_sanitizedMatchesForHome:sorted maxCount:120];
+            NSArray<Match *> *sanitized = [self home_sanitizedMatchesForHome:sorted maxCount:180];
             NSLog(@"[HomeDebug] schedule merged raw=%ld sanitized=%ld elapsed=%.3f",
                   (long)sorted.count, (long)sanitized.count, CACurrentMediaTime() - self.homeDebugLoadStartAt);
-            NSString *base = [APIEnvironmentManager sharedManager].currentBaseURL ?: @"";
-            if ([base hasSuffix:@"/"]) {
-                base = [base substringToIndex:base.length - 1];
-            }
-            NSString *token = AuthManager.sharedManager.user.accessToken ?: @"<token>";
-            NSString *url = [NSString stringWithFormat:@"%@/api/v1/home/schedule?date=%@&myTeamOnly=0&pageNum=1&pageSize=20", base, targetDate ?: @""];
-            NSString *curl = [NSString stringWithFormat:
-                              @"curl '%@' \\\n"
-                              "  -X 'GET' \\\n"
-                              "  -H 'Accept: application/json, text/plain, */*' \\\n"
-                              "  -H 'Accept-Language: zh-CN,zh;q=0.9' \\\n"
-                              "  -H 'Authorization: Bearer %@' \\\n"
-                              "  -H 'Connection: keep-alive' \\\n"
-                              "  -H 'Origin: %@' \\\n"
-                              "  -H 'Referer: %@/' \\\n"
-                              "  -H 'Sec-Fetch-Dest: empty' \\\n"
-                              "  -H 'Sec-Fetch-Mode: cors' \\\n"
-                              "  -H 'Sec-Fetch-Site: same-origin' \\\n"
-                              "  -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36' \\\n"
-                              "  -H 'sec-ch-ua: \"Not:A-Brand\";v=\"99\", \"Google Chrome\";v=\"145\", \"Chromium\";v=\"145\"' \\\n"
-                              "  -H 'sec-ch-ua-mobile: ?0' \\\n"
-                              "  -H 'sec-ch-ua-platform: \"macOS\"'",
-                              url, token, base, base];
-            NSLog(@"[HomeDebug] schedule curl: %@", curl);
             self.dataSource = sanitized.mutableCopy;
             [self filterData];
             [self updateTableHeight];
             NSLog(@"[HomeDebug] schedule apply done elapsed=%.3f", CACurrentMediaTime() - self.homeDebugLoadStartAt);
-        } failure:^(NSError * _Nonnull error) {
-            __strong typeof(weakSelf) self = weakSelf;
-            if (!self) return;
-            self.isLoadingSchedule = NO;
-            NSLog(@"[HomeDebug] schedule target failed elapsed=%.3f error=%@", CACurrentMediaTime() - self.homeDebugLoadStartAt, error);
-            self.dataSource = NSMutableArray.array;
-            [self filterData];
-            [self updateTableHeight];
-        }];
-    } failure:^(NSError * _Nonnull error) {
-        // 日历接口失败，直接用今天查
-        __strong typeof(weakSelf) self = weakSelf;
-        if (!self) { return; }
-        [[MatchRequest shared] getMatchScheduleWithDate:todayStr myTeamOnly:NO page:1 pageSize:20 success:^(HTTPResponse<NSArray<Match *> *> * _Nullable r2) {
-            __strong typeof(weakSelf) self = weakSelf;
-            if (!self) return;
-            self.isLoadingSchedule = NO;
-            NSArray<Match *> *list = [r2.dataObject isKindOfClass:NSArray.class] ? r2.dataObject : @[];
-            NSArray<Match *> *sanitized = [self home_sanitizedMatchesForHome:list maxCount:120];
-            NSLog(@"[HomeDebug] schedule fallback raw=%ld sanitized=%ld elapsed=%.3f",
-                  (long)list.count, (long)sanitized.count, CACurrentMediaTime() - self.homeDebugLoadStartAt);
-            self.dataSource = sanitized.mutableCopy;
-            [self filterData];
-            [self updateTableHeight];
-        } failure:^(NSError *e) {
-            __strong typeof(weakSelf) self = weakSelf;
-            if (self) self.isLoadingSchedule = NO;
-        }];
-    }];
+        });
+    });
 }
 
 - (void)fetchUserProfile {
