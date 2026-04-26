@@ -9,6 +9,7 @@
 #import "ProfileRequest.h"
 #import "HTTPResponse.h"
 #import "Passport.h"
+#import "AuthManager.h"
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
 #import "StampRequest.h"
@@ -603,8 +604,12 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     }
     [self.tableView reloadData];
 }
-// 获取自己已添加到主页的邮票
+// 获取自己已添加到主页的邮票（查看他人邮票夹时不加载）
 - (void)loadStampCollection {
+    if (self.targetUserId.length > 0) {
+        // TODO: 后端需补充查看他人邮票的接口 GET /api/v1/stamps/list?userId=xxx
+        return;
+    }
     __weak typeof(self) weakSelf = self;
     [StampRequest.shared getStampListSuccess:^(HTTPResponse * _Nullable responseObject) {
         [weakSelf reloadStamps:responseObject.dataObject];
@@ -616,18 +621,41 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     __weak typeof(self) weakSelf = self;
     [self showLoading];
     NSString *y = [NSString stringWithFormat:@"%ld", (long)self.year];
-    [[ProfileRequest shared] getMyPassportWithYear:y success:^(HTTPResponse * _Nullable responseObject) {
+    BOOL isOther = self.targetUserId.length > 0;
+    void (^handleSuccess)(PNPassport *) = ^(PNPassport *p) {
         [weakSelf hideLoading];
-        PNPassport *p = responseObject.dataObject;
         weakSelf.viewModel = [PassportViewModel viewModelWithPassport:p year:weakSelf.year];
+        // 查看自己时用本地头像和城市
+        if (!isOther) {
+            NSString *localAvatar = AuthManager.sharedManager.user.profile.avatar;
+            if (!localAvatar.length) localAvatar = AuthManager.sharedManager.user.avatar;
+            if (localAvatar.length) weakSelf.viewModel.avatarURL = localAvatar;
+            NSString *localCity = AuthManager.sharedManager.user.profile.city;
+            if (localCity.length) weakSelf.viewModel.userCity = localCity;
+        }
         [weakSelf.headerCard configureWithModel:weakSelf.viewModel];
         [weakSelf.tableView reloadData];
         [weakSelf.view setNeedsLayout];
-    } failure:^(NSError * _Nonnull error) {
+    };
+    void (^handleFailure)(NSError *) = ^(NSError *error) {
         [weakSelf hideLoading];
         [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
         weakSelf.viewModel = [PassportViewModel viewModelWithPassport:nil year:weakSelf.year];
-    }];
+    };
+    if (isOther) {
+        [[ProfileRequest shared] getPassportForUserId:self.targetUserId year:y success:^(HTTPResponse * _Nullable responseObject) {
+            PNPassport *p = [responseObject.dataObject isKindOfClass:PNPassport.class] ? responseObject.dataObject : nil;
+            handleSuccess(p);
+        } failure:^(NSError * _Nonnull error) {
+            handleFailure(error);
+        }];
+    } else {
+        [[ProfileRequest shared] getMyPassportWithYear:y success:^(HTTPResponse * _Nullable responseObject) {
+            handleSuccess(responseObject.dataObject);
+        } failure:^(NSError * _Nonnull error) {
+            handleFailure(error);
+        }];
+    }
 }
 // 分享
 - (void)share {
