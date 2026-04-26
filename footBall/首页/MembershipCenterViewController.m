@@ -7,6 +7,7 @@
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
 #import <math.h>
+#import <StoreKit/StoreKit.h>
 #import "AuthManager.h"
 #import "FontManager.h"
 #import "MembershipRequest.h"
@@ -35,7 +36,7 @@
 @end
 @implementation MCPlan @end
 
-@interface MembershipCenterViewController () <UIScrollViewDelegate>
+@interface MembershipCenterViewController () <UIScrollViewDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver>
 @property (nonatomic, strong) UIView *topGlowView;
 @property (nonatomic, strong) CAGradientLayer *topGlowLayer;
 @property (nonatomic, strong) UIView *navBar;
@@ -100,10 +101,19 @@
 @property (nonatomic, assign) NSInteger currentIndex;
 @property (nonatomic, assign) BOOL redeemDialogShowingSuccess;
 @property (nonatomic, assign) BOOL hasAppliedRedeemDiscount;
+/// 兑换码(EXCHANGE_CODE)成功后，服务端返回的折扣商品 ID 和方案 ID
+@property (nonatomic, copy) NSString *redeemAppleProductId;
+@property (nonatomic, copy) NSString *redeemPlanId;
 /// 服务端返回的方案列表，用于获取 appleProductId 和 planId
 @property (nonatomic, strong) NSArray<PNMemberPlan *> *apiPlans;
 /// 当前会员状态
 @property (nonatomic, strong) PNMembershipStatus *membershipStatus;
+/// IAP：当前正在请求的 SKProductsRequest
+@property (nonatomic, strong) SKProductsRequest *productsRequest;
+/// IAP：从 App Store 拉取到的产品列表（productIdentifier → SKProduct）
+@property (nonatomic, strong) NSMutableDictionary<NSString *, SKProduct *> *skProducts;
+/// IAP：当前正在购买的 planId（用于购买成功后上报服务端）
+@property (nonatomic, copy) NSString *pendingPlanId;
 @end
 
 @implementation MembershipCenterViewController
@@ -114,10 +124,18 @@
     self.view.backgroundColor = kMCPageBg;
     self.initialPlanIndex = MAX(0, MIN(self.initialPlanIndex, 3));
     self.currentIndex = self.initialPlanIndex;
+    self.skProducts = [NSMutableDictionary dictionary];
     [self buildPlanData];
     [self setupUI];
     [self refreshUserProfile];
     [self loadRemoteData];
+    // 注册 StoreKit 支付队列观察者
+    [[SKPaymentQueue defaultQueue] addTransactionObserver:self];
+}
+
+- (void)dealloc {
+    [[SKPaymentQueue defaultQueue] removeTransactionObserver:self];
+    [self.productsRequest cancel];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -1098,10 +1116,9 @@
 /// 用服务端方案数据更新本地 MCPlan 的价格和 appleProductId
 - (void)applyAPIPlansToUI:(NSArray<PNMemberPlan *> *)apiPlans {
     if (apiPlans.count == 0 || self.plans.count == 0) return;
-    // 按顺序映射：月卡→plans[0]，季卡→plans[1]，年卡/终身→plans[2/3]
-    // 服务端目前只有月卡、季卡、年卡三种，按 durationDays 排序
+    // 按 planId 升序排列（1=月, 2=年, 3=永久, 4=创始人），与本地 plans 数组顺序一致
     NSArray<PNMemberPlan *> *sorted = [apiPlans sortedArrayUsingComparator:^NSComparisonResult(PNMemberPlan *a, PNMemberPlan *b) {
-        return [@(a.durationDays) compare:@(b.durationDays)];
+        return [a.planId compare:b.planId options:NSNumericSearch];
     }];
     for (NSInteger i = 0; i < (NSInteger)sorted.count && i < (NSInteger)self.plans.count; i++) {
         PNMemberPlan *api = sorted[i];
@@ -1460,6 +1477,21 @@
         dispatch_async(dispatch_get_main_queue(), ^{
             [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
             weakSelf.hasAppliedRedeemDiscount = YES;
+            // 解析兑换码返回的折扣商品 ID 和方案 ID，用于后续 IAP 支付
+            NSDictionary *data = nil;
+            if ([responseObject.dataObject isKindOfClass:NSDictionary.class]) {
+                data = responseObject.dataObject;
+            } else if ([responseObject.data isKindOfClass:NSDictionary.class]) {
+                data = responseObject.data;
+            }
+            NSString *retAppleProductId = data[@"appleProductId"];
+            NSString *retPlanId = data[@"planId"] ? [NSString stringWithFormat:@"%@", data[@"planId"]] : nil;
+            if (retAppleProductId.length > 0) {
+                weakSelf.redeemAppleProductId = retAppleProductId;
+            }
+            if (retPlanId.length > 0) {
+                weakSelf.redeemPlanId = retPlanId;
+            }
             weakSelf.redeemDialogShowingSuccess = YES;
             weakSelf.redeemDialogTicketIconView.hidden = YES;
             weakSelf.redeemInputWrapView.hidden = YES;
@@ -1536,12 +1568,17 @@
     }
 
     // 找到当前方案对应的 appleProductId 和 planId
+    // 按 planId 升序排列（1=月, 2=年, 3=永久, 4=创始人），与本地 plans 数组顺序一致
     NSString *appleProductId = nil;
     NSString *planId = nil;
-    if (self.apiPlans.count > (NSUInteger)self.currentIndex) {
-        // 按 durationDays 排序后取对应位置
+
+    // 折扣场景：优先使用兑换码返回的折扣商品 ID（对应 App Store 里的折扣价商品）
+    if (self.hasAppliedRedeemDiscount && self.redeemAppleProductId.length > 0) {
+        appleProductId = self.redeemAppleProductId;
+        planId = self.redeemPlanId;
+    } else if (self.apiPlans.count > (NSUInteger)self.currentIndex) {
         NSArray<PNMemberPlan *> *sorted = [self.apiPlans sortedArrayUsingComparator:^NSComparisonResult(PNMemberPlan *a, PNMemberPlan *b) {
-            return [@(a.durationDays) compare:@(b.durationDays)];
+            return [a.planId compare:b.planId options:NSNumericSearch];
         }];
         if ((NSUInteger)self.currentIndex < sorted.count) {
             PNMemberPlan *api = sorted[self.currentIndex];
@@ -1551,30 +1588,186 @@
     }
 
     if (appleProductId.length == 0) {
-        // 没有 appleProductId，提示暂不支持
         [[LoadingManager sharedManager] showError:@"该方案暂不支持购买" inView:self.view];
         return;
     }
 
-    // TODO: 接入 StoreKit，发起 IAP 购买
-    // 购买成功后调用：
-    // [[MembershipRequest shared] verifyPurchaseWithBody:@{
-    //     @"transactionId": transactionId,
-    //     @"signedTransaction": signedTransaction,
-    //     @"planId": planId,
-    //     @"agreementAccepted": @YES
-    // } success:^(...) { ... } failure:^(...) { ... }];
+    if (![SKPaymentQueue canMakePayments]) {
+        [[LoadingManager sharedManager] showError:@"当前设备不支持应用内购买，请检查家长控制设置" inView:self.view];
+        return;
+    }
 
-    MCPlan *plan = self.plans[self.currentIndex];
-    NSString *pay = plan.payPrice.length ? plan.payPrice : plan.price;
-    NSString *msg = [NSString stringWithFormat:@"已选择 %@，支付金额 ¥%@\n（IAP 购买流程待接入）",
-                     self.planTitleLabel.text ?: @"会员方案", pay];
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"支付确认"
-                                                                   message:msg
-                                                            preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"继续支付" style:UIAlertActionStyleDefault handler:nil]];
-    [self presentViewController:alert animated:YES completion:nil];
+    self.pendingPlanId = planId;
+
+    // 如果已缓存该产品，直接发起购买；否则先向 App Store 请求产品信息
+    SKProduct *cachedProduct = self.skProducts[appleProductId];
+    if (cachedProduct) {
+        [self startPaymentWithProduct:cachedProduct];
+    } else {
+        [self fetchProductAndPay:appleProductId];
+    }
+}
+
+/// 向 App Store 请求产品信息，成功后发起购买
+- (void)fetchProductAndPay:(NSString *)productId {
+    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+    [self.productsRequest cancel];
+    self.productsRequest = [[SKProductsRequest alloc] initWithProductIdentifiers:[NSSet setWithObject:productId]];
+    self.productsRequest.delegate = self;
+    [self.productsRequest start];
+}
+
+/// 拿到 SKProduct 后发起支付
+- (void)startPaymentWithProduct:(SKProduct *)product {
+    SKMutablePayment *payment = [SKMutablePayment paymentWithProduct:product];
+    payment.quantity = 1;
+    [[SKPaymentQueue defaultQueue] addPayment:payment];
+}
+
+#pragma mark - SKProductsRequestDelegate
+
+- (void)productsRequest:(SKProductsRequest *)request didReceiveResponse:(SKProductsResponse *)response {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [MBProgressHUD hideHUDForView:self.view animated:YES];
+        // 缓存所有返回的产品
+        for (SKProduct *product in response.products) {
+            self.skProducts[product.productIdentifier] = product;
+        }
+        if (response.products.count == 0) {
+            [[LoadingManager sharedManager] showError:@"未找到对应商品，请稍后重试" inView:self.view];
+            return;
+        }
+        [self startPaymentWithProduct:response.products.firstObject];
+    });
+}
+
+- (void)request:(SKRequest *)request didFailWithError:(NSError *)error {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [MBProgressHUD hideHUDForView:self.view animated:YES];
+        NSString *msg = error.localizedDescription ?: @"获取商品信息失败，请稍后重试";
+        [[LoadingManager sharedManager] showError:msg inView:self.view];
+    });
+}
+
+#pragma mark - SKPaymentTransactionObserver
+
+- (void)paymentQueue:(SKPaymentQueue *)queue updatedTransactions:(NSArray<SKPaymentTransaction *> *)transactions {
+    for (SKPaymentTransaction *transaction in transactions) {
+        switch (transaction.transactionState) {
+            case SKPaymentTransactionStatePurchasing: {
+                // 购买中，展示 loading
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+                });
+                break;
+            }
+
+            case SKPaymentTransactionStatePurchased: {
+                // 购买成功，上报服务端验证
+                [self handlePurchasedTransaction:transaction];
+                break;
+            }
+
+            case SKPaymentTransactionStateRestored: {
+                // 恢复购买（此处仅结束事务，不做额外处理）
+                [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
+                break;
+            }
+
+            case SKPaymentTransactionStateFailed: {
+                [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [MBProgressHUD hideHUDForView:self.view animated:YES];
+                    // 用户主动取消不弹错误提示
+                    if (transaction.error.code != SKErrorPaymentCancelled) {
+                        NSString *msg = transaction.error.localizedDescription ?: @"购买失败，请稍后重试";
+                        [[LoadingManager sharedManager] showError:msg inView:self.view];
+                    }
+                });
+                break;
+            }
+
+            case SKPaymentTransactionStateDeferred: {
+                // 等待家长审批等延迟状态，不做处理
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [MBProgressHUD hideHUDForView:self.view animated:YES];
+                    [[LoadingManager sharedManager] showError:@"购买待审批，请等待家长确认" inView:self.view];
+                });
+                break;
+            }
+
+            default:
+                break;
+        }
+    }
+}
+
+/// 购买成功后，将 transactionId 和 signedTransaction 上报服务端验证
+- (void)handlePurchasedTransaction:(SKPaymentTransaction *)transaction {
+    NSString *transactionId = transaction.transactionIdentifier ?: @"";
+    // iOS 15+ 优先使用 JWS signedTransaction；低版本回退到 base64 收据
+    NSString *signedTransaction = @"";
+    if (@available(iOS 15.0, *)) {
+        // 通过 StoreKit 2 的 Transaction.all 获取 JWS 需要 Swift async，
+        // 此处使用 originalTransaction 的 transactionIdentifier 作为凭证，
+        // 服务端可通过 Apple verifyReceipt 或 App Store Server API 验证。
+        // 如需 JWS，可在 Swift 层封装后回调。
+        signedTransaction = transactionId;
+    }
+    // 低版本：使用 appStoreReceiptURL 的 base64 收据
+    if (signedTransaction.length == 0) {
+        NSURL *receiptURL = [[NSBundle mainBundle] appStoreReceiptURL];
+        NSData *receiptData = receiptURL ? [NSData dataWithContentsOfURL:receiptURL] : nil;
+        signedTransaction = receiptData ? [receiptData base64EncodedStringWithOptions:0] : @"";
+    }
+
+    NSString *planId = self.pendingPlanId ?: @"";
+    NSDictionary *body = @{
+        @"transactionId": transactionId,
+        @"signedTransaction": signedTransaction,
+        @"planId": planId,
+        @"agreementAccepted": @YES
+    };
+
+    __weak typeof(self) weakSelf = self;
+    [[MembershipRequest shared] verifyPurchaseWithBody:body success:^(HTTPResponse * _Nullable responseObject) {
+        // 服务端验证成功，结束事务
+        [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+            weakSelf.pendingPlanId = nil;
+            // 刷新会员状态
+            [weakSelf loadRemoteData];
+            // 弹出成功提示
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"开通成功"
+                                                                           message:@"会员权益已激活，尽情享受吧！"
+                                                                    preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"好的" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+                [weakSelf.navigationController popViewControllerAnimated:YES];
+            }]];
+            [weakSelf presentViewController:alert animated:YES completion:nil];
+        });
+    } failure:^(NSError * _Nonnull error) {
+        // 服务端验证失败：不 finish 事务，保留收据，下次启动可重试
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+            NSString *msg = @"购买成功，但服务器验证失败，请联系客服处理";
+            if ([error isKindOfClass:[APIError class]]) {
+                APIError *ae = (APIError *)error;
+                if (ae.businessMessage.length) msg = ae.businessMessage;
+            }
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"验证失败"
+                                                                           message:msg
+                                                                    preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"知道了" style:UIAlertActionStyleDefault handler:nil]];
+            [weakSelf presentViewController:alert animated:YES completion:nil];
+        });
+    }];
+}
+
+/// App 启动或进入前台时，处理上次未完成的事务（断网重连等场景）
+- (void)paymentQueue:(SKPaymentQueue *)queue removedTransactions:(NSArray<SKPaymentTransaction *> *)transactions {
+    // 事务移除后无需额外处理
 }
 
 - (void)onGiftCodeChanged {
