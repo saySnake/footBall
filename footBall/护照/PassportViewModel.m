@@ -230,6 +230,8 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     NSArray<PNOnlineMethodDist *> *onlineList = passport ? (passport.onlineMethodDist ?: @[]) : @[];
 
     m.codeDigitTexts = [box copy];
+    // 头像：直接用接口返回的头像 URL（自己/他人护照都走接口数据）
+    // 调用方（PassportViewController）负责在查看自己护照时，用本地 AuthManager 头像覆盖
     m.avatarURL = passport ? passport.avatar : nil;
     m.nickname = (passport && passport.nickname.length) ? passport.nickname : @"";
     NSInteger ym = passport ? passport.yearTotalMatches : 0;

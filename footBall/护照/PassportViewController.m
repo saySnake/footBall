@@ -11,6 +11,7 @@
 #import "PassportSheetsViewController.h"
 #import "ProfileRequest.h"
 #import "HTTPResponse.h"
+#import "AuthManager.h"
 #import <Masonry/Masonry.h>
 
 static UIColor *PassportPageBg(void) {
@@ -256,6 +257,16 @@ static UIColor *PassportPageBg(void) {
     void (^handleSuccess)(PNPassport *) = ^(PNPassport *p) {
         [weakSelf hideLoading];
         weakSelf.viewModel = [PassportViewModel viewModelWithPassport:p year:weakSelf.selectedYear];
+        // 查看自己的护照时，用本地 AuthManager 的真实头像覆盖接口返回的占位头像
+        if (!isOther) {
+            NSString *localAvatar = AuthManager.sharedManager.user.profile.avatar;
+            if (!localAvatar.length) {
+                localAvatar = AuthManager.sharedManager.user.avatar;
+            }
+            if (localAvatar.length) {
+                weakSelf.viewModel.avatarURL = localAvatar;
+            }
+        }
         [weakSelf.passportHeader configureWithModel:weakSelf.viewModel];
         [weakSelf.yearStrip setYears:[weakSelf recentFiveYears] selectedYear:weakSelf.selectedYear];
         [weakSelf.tableView reloadData];
