@@ -10,6 +10,7 @@
 #import "ColorManager.h"
 #import "MatchRequest.h"
 #import "APIError.h"
+#import "APIEnvironmentManager.h"
 #import <QMUIKit/QMUITips.h>
 #import <SDWebImage/SDWebImage.h>
 
@@ -337,9 +338,33 @@ static NSString *kHomeTeamIdString(id raw) {
 /// 预计算的分组缓存：按月份分组，key=月份字符串，value=该月比赛数组，顺序与 sortedDateKeys 一致
 @property (nonatomic, strong) NSArray<NSString *> *sortedDateKeys;
 @property (nonatomic, strong) NSDictionary<NSString *, NSArray<Match *> *> *groupedMatches;
+/// 首页定位版：记录一次加载链路起点（用于打印各阶段耗时）
+@property (nonatomic, assign) CFTimeInterval homeDebugLoadStartAt;
 @end
 
 @implementation HomeViewController
+
+/// 首页数据防护：按 matchId+matchDate 去重并限制最大数量，避免异常大包导致首屏卡死。
+- (NSArray<Match *> *)home_sanitizedMatchesForHome:(NSArray<Match *> *)input maxCount:(NSInteger)maxCount {
+    if (![input isKindOfClass:NSArray.class] || input.count == 0) return @[];
+    NSMutableArray<Match *> *out = [NSMutableArray array];
+    NSMutableSet<NSString *> *seen = [NSMutableSet set];
+    for (id obj in input) {
+        if (![obj isKindOfClass:Match.class]) continue;
+        Match *m = (Match *)obj;
+        NSString *mid = [m.matchId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        NSString *md = [m.matchDate stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        NSString *key = [NSString stringWithFormat:@"%@#%@", mid ?: @"", md ?: @""];
+        // 仅跳过“有稳定主键”的重复项；无主键项仍保留，避免误删。
+        if (mid.length > 0 && md.length > 0) {
+            if ([seen containsObject:key]) continue;
+            [seen addObject:key];
+        }
+        [out addObject:m];
+        if (maxCount > 0 && out.count >= maxCount) break;
+    }
+    return out;
+}
 
 - (void)viewDidLoad {
     // 先准备好赛程数据源：QMBaseViewController 会在 [super viewDidLoad] 里调用 -setupUI，本页若晚于 super 再建数据，第一次建 UI 时 table 无有效数据
@@ -356,9 +381,11 @@ static NSString *kHomeTeamIdString(id raw) {
     self.shouldShowNavigationBar = NO;
     [self filterData];
     [self setupRefresh];
+    NSLog(@"[HomeDebug] viewDidLoad done");
 }
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    NSLog(@"[HomeDebug] viewWillAppear");
     // 防抖：30秒内切 tab 不重复触发全量请求，避免收藏回调与数据刷新并发导致死锁
     NSTimeInterval now = [NSDate date].timeIntervalSince1970;
     if (now - self.lastLoadTime > 30.0) {
@@ -399,6 +426,7 @@ static NSString *kHomeTeamIdString(id raw) {
 }
 
 - (void)filterData {
+    CFTimeInterval t0 = CACurrentMediaTime();
     if (!_selectedTeamId.length) {
         _filteredData = [_dataSource mutableCopy];
     } else {
@@ -415,6 +443,8 @@ static NSString *kHomeTeamIdString(id raw) {
     // 用 performSelector 防抖，避免短时间内多次触发布局计算
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(updateTableHeight) object:nil];
     [self performSelector:@selector(updateTableHeight) withObject:nil afterDelay:0.05];
+    NSLog(@"[HomeDebug] filterData done data=%ld filtered=%ld sections=%ld cost=%.3f",
+          (long)self.dataSource.count, (long)self.filteredData.count, (long)self.sortedDateKeys.count, CACurrentMediaTime() - t0);
 }
 
 - (void)rebuildGroupCache {
@@ -601,6 +631,7 @@ static NSString *kHomeTeamIdString(id raw) {
 }
 
 - (void)updateTableHeight {
+    CFTimeInterval t0 = CACurrentMediaTime();
     if (!_tableView || !self.sortedDateKeys.count) return;
     CGFloat headerH = 40.f, footerH = 0.01f, rowH = 103.f;
     CGFloat total = 0;
@@ -611,6 +642,7 @@ static NSString *kHomeTeamIdString(id raw) {
     if (total <= 0) return;
     self.tableHeightConstraint.offset = total;
     [self.view setNeedsLayout];
+    NSLog(@"[HomeDebug] updateTableHeight total=%.1f sections=%ld cost=%.3f", total, (long)self.sortedDateKeys.count, CACurrentMediaTime() - t0);
 }
 
 - (void)updateLocalizedStrings {
@@ -807,6 +839,8 @@ static NSString *kHomeTeamIdString(id raw) {
 }
 
 - (void)loadHomeDataAndEndRefreshing:(BOOL)endRefreshing {
+    self.homeDebugLoadStartAt = CACurrentMediaTime();
+    NSLog(@"[HomeDebug] loadHomeData begin loggedIn=%d", AuthManager.sharedManager.isLoggedIn);
     if (AuthManager.sharedManager.isLoggedIn) {
         [self fetchUserProfile];
         [self fetchFollowTeams];
@@ -842,6 +876,11 @@ static NSString *kHomeTeamIdString(id raw) {
 - (void)fetchFeatureMatchs {
     [MatchRequest.shared getFeaturesMatchsSuccess:^(HTTPResponse <NSArray <Match*> *>* _Nullable responseObject) {
         NSArray<Match *> *list = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+        if (list.count > 30) {
+            list = [list subarrayWithRange:NSMakeRange(0, 30)];
+        }
+        NSLog(@"[HomeDebug] featured callback count=%ld elapsed=%.3f",
+              (long)list.count, CACurrentMediaTime() - self.homeDebugLoadStartAt);
 #if DEBUG
         NSLog(@"[HomeFeatured] success=%d rawDataClass=%@ rawData=%@",
               responseObject.success,
@@ -909,7 +948,8 @@ static NSString *kHomeTeamIdString(id raw) {
     monthFmt.dateFormat = @"yyyy-MM";
     NSString *monthStr = [monthFmt stringFromDate:[NSDate date]];
 
-    // 先查当月所有有比赛的日期，然后并发拉每个日期的日程，合并展示
+    // 首页定位版：优先保证首屏可用，避免并发多日期请求导致长时间等待。
+    // 先查当月有比赛的日期，但仅请求一个日期（优先今天），降低阻塞风险。
     [[MatchRequest shared] getMatchScheduleDatesWithMonth:monthStr success:^(HTTPResponse * _Nullable responseObject) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
@@ -919,30 +959,16 @@ static NSString *kHomeTeamIdString(id raw) {
             // 当月没有比赛，用今天查一次兜底
             dates = @[todayStr];
         }
+        NSString *targetDate = [dates containsObject:todayStr] ? todayStr : ([[dates firstObject] isKindOfClass:NSString.class] ? dates.firstObject : todayStr);
+        NSLog(@"[HomeDebug] schedule dates callback count=%ld target=%@ elapsed=%.3f",
+              (long)dates.count, targetDate, CACurrentMediaTime() - self.homeDebugLoadStartAt);
 
-        // 并发请求所有日期的日程，合并结果
-        dispatch_group_t group = dispatch_group_create();
-        NSMutableArray<Match *> *allMatches = [NSMutableArray array];
-
-        for (NSString *date in dates) {
-            if (![date isKindOfClass:NSString.class]) continue;
-            dispatch_group_enter(group);
-            [[MatchRequest shared] getMatchScheduleWithDate:date myTeamOnly:NO page:1 pageSize:50 success:^(HTTPResponse<NSArray<Match *> *> * _Nullable r) {
-                // success block 在主线程回调，无需加锁
-                NSArray<Match *> *list = [r.dataObject isKindOfClass:NSArray.class] ? r.dataObject : @[];
-                [allMatches addObjectsFromArray:list];
-                dispatch_group_leave(group);
-            } failure:^(NSError * _Nonnull error) {
-                dispatch_group_leave(group);
-            }];
-        }
-
-        dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+        [[MatchRequest shared] getMatchScheduleWithDate:targetDate myTeamOnly:NO page:1 pageSize:20 success:^(HTTPResponse<NSArray<Match *> *> * _Nullable r) {
             __strong typeof(weakSelf) self = weakSelf;
             if (!self) return;
             self.isLoadingSchedule = NO;
-            // 按日期倒序排列
-            NSArray<Match *> *sorted = [allMatches sortedArrayUsingComparator:^NSComparisonResult(Match *a, Match *b) {
+            NSArray<Match *> *list = [r.dataObject isKindOfClass:NSArray.class] ? r.dataObject : @[];
+            NSArray<Match *> *sorted = [list sortedArrayUsingComparator:^NSComparisonResult(Match *a, Match *b) {
                 NSDate *da = [self dateFromRaw:a.matchDate];
                 NSDate *db = [self dateFromRaw:b.matchDate];
                 if (!da && !db) return NSOrderedSame;
@@ -950,20 +976,59 @@ static NSString *kHomeTeamIdString(id raw) {
                 if (!db) return NSOrderedAscending;
                 return [db compare:da];
             }];
-            self.dataSource = sorted.mutableCopy;
+            NSArray<Match *> *sanitized = [self home_sanitizedMatchesForHome:sorted maxCount:120];
+            NSLog(@"[HomeDebug] schedule merged raw=%ld sanitized=%ld elapsed=%.3f",
+                  (long)sorted.count, (long)sanitized.count, CACurrentMediaTime() - self.homeDebugLoadStartAt);
+            NSString *base = [APIEnvironmentManager sharedManager].currentBaseURL ?: @"";
+            if ([base hasSuffix:@"/"]) {
+                base = [base substringToIndex:base.length - 1];
+            }
+            NSString *token = AuthManager.sharedManager.user.accessToken ?: @"<token>";
+            NSString *url = [NSString stringWithFormat:@"%@/api/v1/home/schedule?date=%@&myTeamOnly=0&pageNum=1&pageSize=20", base, targetDate ?: @""];
+            NSString *curl = [NSString stringWithFormat:
+                              @"curl '%@' \\\n"
+                              "  -X 'GET' \\\n"
+                              "  -H 'Accept: application/json, text/plain, */*' \\\n"
+                              "  -H 'Accept-Language: zh-CN,zh;q=0.9' \\\n"
+                              "  -H 'Authorization: Bearer %@' \\\n"
+                              "  -H 'Connection: keep-alive' \\\n"
+                              "  -H 'Origin: %@' \\\n"
+                              "  -H 'Referer: %@/' \\\n"
+                              "  -H 'Sec-Fetch-Dest: empty' \\\n"
+                              "  -H 'Sec-Fetch-Mode: cors' \\\n"
+                              "  -H 'Sec-Fetch-Site: same-origin' \\\n"
+                              "  -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36' \\\n"
+                              "  -H 'sec-ch-ua: \"Not:A-Brand\";v=\"99\", \"Google Chrome\";v=\"145\", \"Chromium\";v=\"145\"' \\\n"
+                              "  -H 'sec-ch-ua-mobile: ?0' \\\n"
+                              "  -H 'sec-ch-ua-platform: \"macOS\"'",
+                              url, token, base, base];
+            NSLog(@"[HomeDebug] schedule curl: %@", curl);
+            self.dataSource = sanitized.mutableCopy;
             [self filterData];
             [self updateTableHeight];
-        });
+            NSLog(@"[HomeDebug] schedule apply done elapsed=%.3f", CACurrentMediaTime() - self.homeDebugLoadStartAt);
+        } failure:^(NSError * _Nonnull error) {
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) return;
+            self.isLoadingSchedule = NO;
+            NSLog(@"[HomeDebug] schedule target failed elapsed=%.3f error=%@", CACurrentMediaTime() - self.homeDebugLoadStartAt, error);
+            self.dataSource = NSMutableArray.array;
+            [self filterData];
+            [self updateTableHeight];
+        }];
     } failure:^(NSError * _Nonnull error) {
         // 日历接口失败，直接用今天查
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) { return; }
-        [[MatchRequest shared] getMatchScheduleWithDate:todayStr myTeamOnly:NO page:1 pageSize:50 success:^(HTTPResponse<NSArray<Match *> *> * _Nullable r2) {
+        [[MatchRequest shared] getMatchScheduleWithDate:todayStr myTeamOnly:NO page:1 pageSize:20 success:^(HTTPResponse<NSArray<Match *> *> * _Nullable r2) {
             __strong typeof(weakSelf) self = weakSelf;
             if (!self) return;
             self.isLoadingSchedule = NO;
             NSArray<Match *> *list = [r2.dataObject isKindOfClass:NSArray.class] ? r2.dataObject : @[];
-            self.dataSource = [list mutableCopy];
+            NSArray<Match *> *sanitized = [self home_sanitizedMatchesForHome:list maxCount:120];
+            NSLog(@"[HomeDebug] schedule fallback raw=%ld sanitized=%ld elapsed=%.3f",
+                  (long)list.count, (long)sanitized.count, CACurrentMediaTime() - self.homeDebugLoadStartAt);
+            self.dataSource = sanitized.mutableCopy;
             [self filterData];
             [self updateTableHeight];
         } failure:^(NSError *e) {
