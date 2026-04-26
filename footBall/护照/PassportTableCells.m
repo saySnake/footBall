@@ -1186,7 +1186,7 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
         }];
         [asideStack mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_bigNumber.mas_trailing).offset(12);
-            make.bottom.equalTo(_bigNumber).offset(-20);
+            make.bottom.equalTo(_bigNumber).offset(-26);
             make.trailing.lessThanOrEqualTo(_headerRow);
         }];
         [_prompt mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -1229,7 +1229,7 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
     //6种情绪 在填写比赛信息里写 然后一样是做统计图
     _bigNumber.text = [NSString stringWithFormat:@"%ld", (long)model.metricEmotionCount];
     _asideLine1.text = @"我出现了";
-    _asideLine2.text = [NSString stringWithFormat:@"%ld种赛后情绪", (long)model.metricEmotionCount];
+    _asideLine2.text = [NSString stringWithFormat:@"种赛后情绪"];
     _prompt.text = model.metricBarsPrompt;
     
     /**
