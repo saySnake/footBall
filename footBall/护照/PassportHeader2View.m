@@ -100,7 +100,7 @@ static UIColor *PassportCircleStrokeColor(void) {
         strongSelf.avatarView.contentMode = UIViewContentModeScaleAspectFill;
     }];
 
-    self.cityLabel.text = model.userCity.length ? model.userCity : @"—-";
+    self.cityLabel.text = model.userCity.length ? model.userCity : @"—";
 
     self.matchesLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, model.header2YearMatchCount)];
     NSString *matchUnit = NSLocalizedString(@"passport_unit_matches", nil);
