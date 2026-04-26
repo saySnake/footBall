@@ -319,6 +319,8 @@ static CGFloat PCAbilityMaxLabelWidthForTitles(NSArray<NSString *> *titles, UIFo
     UIView *_card;
     UILabel *_title;
     PassportBarChartView *_chart;
+    UIView *_bottomDashView;
+    CAShapeLayer *_bottomDashLayer;
 }
 
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
@@ -339,8 +341,25 @@ static CGFloat PCAbilityMaxLabelWidthForTitles(NSArray<NSString *> *titles, UIFo
         [_card addSubview:_title];
         [_card addSubview:_chart];
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 0, 0, 0));
+            make.top.leading.trailing.equalTo(self.contentView);
+            make.bottom.equalTo(self.contentView).offset(-2);
         }];
+        // 底部虚线
+        UIView *bottomDashView = [[UIView alloc] init];
+        bottomDashView.backgroundColor = [UIColor clearColor];
+        _bottomDashView = bottomDashView;
+        [self.contentView addSubview:bottomDashView];
+        [bottomDashView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.equalTo(_card.mas_bottom);
+            make.leading.trailing.bottom.equalTo(self.contentView);
+        }];
+        CAShapeLayer *dashLayer = [CAShapeLayer layer];
+        dashLayer.strokeColor = [UIColor colorWithWhite:0.75 alpha:1.0].CGColor;
+        dashLayer.fillColor = [UIColor clearColor].CGColor;
+        dashLayer.lineWidth = 1;
+        dashLayer.lineDashPattern = @[@6, @4];
+        [bottomDashView.layer addSublayer:dashLayer];
+        _bottomDashLayer = dashLayer;
         [_title mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.leading.equalTo(_card).offset(16);
             make.trailing.equalTo(_card).offset(-16);
@@ -352,6 +371,19 @@ static CGFloat PCAbilityMaxLabelWidthForTitles(NSArray<NSString *> *titles, UIFo
         }];
     }
     return self;
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    if (_bottomDashView && _bottomDashLayer) {
+        CGFloat w = CGRectGetWidth(_bottomDashView.bounds);
+        if (w > 0) {
+            UIBezierPath *path = [UIBezierPath bezierPath];
+            [path moveToPoint:CGPointMake(16, 1)];
+            [path addLineToPoint:CGPointMake(w - 16, 1)];
+            _bottomDashLayer.path = path.CGPath;
+        }
+    }
 }
 
 - (void)configureWithModel:(PassportViewModel *)model {
@@ -514,6 +546,8 @@ static CGFloat PCAbilityMaxLabelWidthForTitles(NSArray<NSString *> *titles, UIFo
     UILabel *_v2;
     UILabel *_l3;
     UILabel *_v3;
+    UIView *_bottomDashView;
+    CAShapeLayer *_bottomDashLayer;
 }
 
 /// 叠压卡片圆角：仅顶部 / 仅底部 / 四角（iOS 11+ 用 maskedCorners）
@@ -593,8 +627,25 @@ static UIView *PCPositionRow(UILabel **outL, UILabel **outV, bool last) {
         [_card addSubview:_row3];
 
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 0, 0, 0));
+            make.top.leading.trailing.equalTo(self.contentView);
+            make.bottom.equalTo(self.contentView).offset(-1);
         }];
+        // 底部虚线
+        UIView *bottomDashView = [[UIView alloc] init];
+        bottomDashView.backgroundColor = [UIColor clearColor];
+        _bottomDashView = bottomDashView;
+        [self.contentView addSubview:bottomDashView];
+        [bottomDashView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.equalTo(_card.mas_bottom);
+            make.leading.trailing.bottom.equalTo(self.contentView);
+        }];
+        CAShapeLayer *dashLayer = [CAShapeLayer layer];
+        dashLayer.strokeColor = [UIColor colorWithWhite:0.75 alpha:1.0].CGColor;
+        dashLayer.fillColor = [UIColor clearColor].CGColor;
+        dashLayer.lineWidth = 1;
+        dashLayer.lineDashPattern = @[@6, @4];
+        [bottomDashView.layer addSublayer:dashLayer];
+        _bottomDashLayer = dashLayer;
         [_headerStrip mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.left.right.equalTo(_card);
             make.height.mas_equalTo(116);
@@ -617,10 +668,23 @@ static UIView *PCPositionRow(UILabel **outL, UILabel **outV, bool last) {
         [_row3 mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.right.equalTo(_card);
             make.top.equalTo(_row2.mas_bottom).offset(-26);
-            make.height.mas_equalTo(106);
+            make.bottom.equalTo(_card);
         }];
     }
     return self;
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    if (_bottomDashView && _bottomDashLayer) {
+        CGFloat w = CGRectGetWidth(_bottomDashView.bounds);
+        if (w > 0) {
+            UIBezierPath *path = [UIBezierPath bezierPath];
+            [path moveToPoint:CGPointMake(16, 0)];
+            [path addLineToPoint:CGPointMake(w - 16, 0)];
+            _bottomDashLayer.path = path.CGPath;
+        }
+    }
 }
 
 - (void)configureWithModel:(PassportViewModel *)model {
@@ -771,7 +835,7 @@ static NSAttributedString *PCAbilitySummaryAttributed(CGFloat level) {
         [_card addSubview:_subtitle];
         [_card addSubview:_rowStack];
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 0, 0, 0));
+            make.edges.equalTo(self.contentView);
         }];
         [_title mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(_card).offset(30);
@@ -1112,6 +1176,8 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
     UILabel *_asideLine2;
     UILabel *_prompt;
     UIStackView *_stack;
+    UIView *_bottomDashView;
+    CAShapeLayer *_bottomDashLayer;
 }
 
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
@@ -1153,8 +1219,27 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
         [_card addSubview:_prompt];
         [_card addSubview:_stack];
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 0, 0, 0));
+            make.top.leading.trailing.equalTo(self.contentView);
+            make.bottom.equalTo(self.contentView).offset(-2);
         }];
+
+        // 底部虚线区域（card 底部到 cell 底部之间，居中画虚线）
+        UIView *bottomDashView = [[UIView alloc] init];
+        bottomDashView.backgroundColor = [UIColor clearColor];
+        _bottomDashView = bottomDashView;
+        [self.contentView addSubview:bottomDashView];
+        [bottomDashView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.equalTo(_card.mas_bottom);
+            make.leading.trailing.bottom.equalTo(self.contentView);
+        }];
+        CAShapeLayer *dashLayer = [CAShapeLayer layer];
+        dashLayer.strokeColor = [UIColor colorWithWhite:0.75 alpha:1.0].CGColor;
+        dashLayer.fillColor = [UIColor clearColor].CGColor;
+        dashLayer.lineWidth = 1;
+        dashLayer.lineDashPattern = @[@6, @4];
+        [bottomDashView.layer addSublayer:dashLayer];
+        _bottomDashLayer = dashLayer;
+
         [_headerRow mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(_card).offset(16);
             make.leading.equalTo(_card).offset(16);
@@ -1165,7 +1250,7 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
         }];
         [asideStack mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(_bigNumber.mas_trailing).offset(12);
-            make.bottom.equalTo(_bigNumber).offset(-20);
+            make.bottom.equalTo(_bigNumber).offset(-26);
             make.trailing.lessThanOrEqualTo(_headerRow);
         }];
         [_prompt mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -1190,12 +1275,25 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
     }
 }
 
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    if (_bottomDashView && _bottomDashLayer) {
+        CGFloat w = CGRectGetWidth(_bottomDashView.bounds);
+        if (w > 0) {
+            UIBezierPath *path = [UIBezierPath bezierPath];
+            [path moveToPoint:CGPointMake(16, 1)];
+            [path addLineToPoint:CGPointMake(w - 16, 1)];
+            _bottomDashLayer.path = path.CGPath;
+        }
+    }
+}
+
 - (void)configureWithModel:(PassportViewModel *)model {
     [self prepareForReuse];
     //6种情绪 在填写比赛信息里写 然后一样是做统计图
     _bigNumber.text = [NSString stringWithFormat:@"%ld", (long)model.metricEmotionCount];
-    _asideLine1.text = model.metricHeaderAsideLine1;
-    _asideLine2.text = model.metricHeaderAsideLine2;
+    _asideLine1.text = @"我出现了";
+    _asideLine2.text = [NSString stringWithFormat:@"种赛后情绪"];
     _prompt.text = model.metricBarsPrompt;
     
     /**
@@ -1279,6 +1377,8 @@ static UIView *PCOutcomeLegendItemView(NSString *title, NSString *numStr, UIColo
     UILabel *_title;
     PassportDonutChartView *_donut;
     UIStackView *_legend;
+    UIView *_dashedLineView;
+    CAShapeLayer *_dashLayer;
 }
 
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
@@ -1290,6 +1390,10 @@ static UIView *PCOutcomeLegendItemView(NSString *title, NSString *numStr, UIColo
         _card.backgroundColor = PCLightCard();
         _card.layer.cornerRadius = 24;
         [self.contentView addSubview:_card];
+
+        [_card mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.edges.equalTo(self.contentView);
+        }];
         _title = [[UILabel alloc] init];
         _title.font = [UIFont systemFontOfSize:18 weight:UIFontWeightBold];
         _title.textColor = [UIColor colorWithWhite:0 alpha:1.0];
@@ -1301,9 +1405,6 @@ static UIView *PCOutcomeLegendItemView(NSString *title, NSString *numStr, UIColo
         [_card addSubview:_title];
         [_card addSubview:_donut];
         [_card addSubview:_legend];
-        [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 0, 0, 0));
-        }];
         [_title mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(_card).offset(30);
             make.leading.equalTo(_card).offset(16);
@@ -1328,6 +1429,19 @@ static UIView *PCOutcomeLegendItemView(NSString *title, NSString *numStr, UIColo
     for (UIView *v in _legend.arrangedSubviews) {
         [_legend removeArrangedSubview:v];
         [v removeFromSuperview];
+    }
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    if (_dashedLineView && _dashLayer) {
+        CGFloat w = CGRectGetWidth(_dashedLineView.bounds);
+        if (w > 0) {
+            UIBezierPath *path = [UIBezierPath bezierPath];
+            [path moveToPoint:CGPointMake(16, 16)];
+            [path addLineToPoint:CGPointMake(w - 16, 16)];
+            _dashLayer.path = path.CGPath;
+        }
     }
 }
 

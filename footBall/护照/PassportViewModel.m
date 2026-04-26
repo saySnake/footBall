@@ -230,6 +230,8 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     NSArray<PNOnlineMethodDist *> *onlineList = passport ? (passport.onlineMethodDist ?: @[]) : @[];
 
     m.codeDigitTexts = [box copy];
+    // 头像：直接用接口返回的头像 URL（自己/他人护照都走接口数据）
+    // 调用方（PassportViewController）负责在查看自己护照时，用本地 AuthManager 头像覆盖
     m.avatarURL = passport ? passport.avatar : nil;
     m.nickname = (passport && passport.nickname.length) ? passport.nickname : @"";
     NSInteger ym = passport ? passport.yearTotalMatches : 0;
@@ -264,7 +266,7 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     m.growthSubtitle = [self awakeWatchPercentDisplay:passport ? passport.awakeWatchPercent : nil];
 
     // 柱状图：用 locationDist 各点 count 作为 Y 值（与设计注释「地点频次」一致）
-    m.goalTrendTitle = NSLocalizedString(@"passport_location_frequency_title", nil) ?: @"观赛地点频次";
+    m.goalTrendTitle = [NSString stringWithFormat:@"%ld年观赛数据", (long)y];
     NSMutableArray<NSNumber *> *locTrend = [NSMutableArray array];
     for (PNLocationDist *ld in locationList) {
         [locTrend addObject:@(MAX(0, ld.count))];

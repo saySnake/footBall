@@ -29,11 +29,16 @@
 
 - (void)configureGlobalDefaultTextAppearance {
     UIColor *defaultTextColor = [UIColor blackColor];
+    UIColor *primaryColor = [UIColor colorWithRed:0x1A/255.0 green:0x5B/255.0 blue:0x47/255.0 alpha:1.0]; // #1A5B47
 
     // 只覆盖依赖系统默认文字色的控件，不干预已显式设置的业务配色。
     [[UILabel appearance] setTextColor:defaultTextColor];
     [[UITextField appearance] setTextColor:defaultTextColor];
     [[UITextView appearance] setTextColor:defaultTextColor];
+
+    // 全局设置 UITextField / UITextView 的光标和选中高亮颜色为主色调
+    [[UITextField appearance] setTintColor:primaryColor];
+    [[UITextView appearance] setTintColor:primaryColor];
 }
 
 // 重写 window 的 getter，返回 SceneDelegate 的 window（兼容 DoKit）

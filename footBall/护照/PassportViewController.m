@@ -11,6 +11,7 @@
 #import "PassportSheetsViewController.h"
 #import "ProfileRequest.h"
 #import "HTTPResponse.h"
+#import "AuthManager.h"
 #import <Masonry/Masonry.h>
 
 static UIColor *PassportPageBg(void) {
@@ -256,6 +257,20 @@ static UIColor *PassportPageBg(void) {
     void (^handleSuccess)(PNPassport *) = ^(PNPassport *p) {
         [weakSelf hideLoading];
         weakSelf.viewModel = [PassportViewModel viewModelWithPassport:p year:weakSelf.selectedYear];
+        // 查看自己的护照时，用本地 AuthManager 的真实头像和城市覆盖接口返回的占位数据
+        if (!isOther) {
+            NSString *localAvatar = AuthManager.sharedManager.user.profile.avatar;
+            if (!localAvatar.length) {
+                localAvatar = AuthManager.sharedManager.user.avatar;
+            }
+            if (localAvatar.length) {
+                weakSelf.viewModel.avatarURL = localAvatar;
+            }
+            NSString *localCity = AuthManager.sharedManager.user.profile.city;
+            if (localCity.length) {
+                weakSelf.viewModel.userCity = localCity;
+            }
+        }
         [weakSelf.passportHeader configureWithModel:weakSelf.viewModel];
         [weakSelf.yearStrip setYears:[weakSelf recentFiveYears] selectedYear:weakSelf.selectedYear];
         [weakSelf.tableView reloadData];
@@ -358,7 +373,7 @@ static UIColor *PassportPageBg(void) {
     }
     // BarChartCardCell 设计稿固定高度
     if (indexPath.row == 2) {
-        return 341;
+        return 343;
     }
     // PassportPossessionCardCell 设计稿固定高度
     if (indexPath.row == 3) {
@@ -366,7 +381,7 @@ static UIColor *PassportPageBg(void) {
     }
     // PassportPositionStrengthCell 设计稿固定高度
     if (indexPath.row == 4) {
-        return 411;
+        return 412;
     }
     // PassportAbilityBlockCell 设计稿固定高度
     if (indexPath.row == 5) {
@@ -378,7 +393,7 @@ static UIColor *PassportPageBg(void) {
     }
     // PassportMetricBarsCell 设计稿（90pt 数字 + 7 条情绪 bar）
     if (indexPath.row == 7) {
-        return 368;
+        return 368 + 2;
     }
     // PassportOutcomeCell 设计稿（标题 + 圆环 + 2x2 图例）
     if (indexPath.row == 8) {
@@ -392,13 +407,13 @@ static UIColor *PassportPageBg(void) {
         return 197;
     }
     if (indexPath.row == 2) {
-        return 341;
+        return 343;
     }
     if (indexPath.row == 3) {
         return 254;
     }
     if (indexPath.row == 4) {
-        return 411;
+        return 412;
     }
     if (indexPath.row == 5) {
         return 522;
@@ -407,7 +422,7 @@ static UIColor *PassportPageBg(void) {
         return 520;
     }
     if (indexPath.row == 7) {
-        return 368;
+        return 370;
     }
     if (indexPath.row == 8) {
         return 416;
@@ -417,7 +432,12 @@ static UIColor *PassportPageBg(void) {
 
 - (void)updateLocalizedStrings {
     [super updateLocalizedStrings];
-    _titleLabel.text = NSLocalizedString(@"passport_nav_title", nil) ?: @"我的护照";
+    if (self.targetUserId.length > 0) {
+        NSString *name = self.targetNickname.length > 0 ? self.targetNickname : (NSLocalizedString(@"passport_nav_title_friend", nil) ?: @"TA的护照");
+        _titleLabel.text = name;
+    } else {
+        _titleLabel.text = NSLocalizedString(@"passport_nav_title", nil) ?: @"我的护照";
+    }
 }
 
 @end

@@ -413,3 +413,9 @@
 "language_system" = "跟隨系統";
 "language_chinese" = "簡體中文";
 "language_traditional_chinese" = "繁體中文";
+
+/* Passport */
+"passport_nav_title" = "我的護照";
+"passport_nav_title_friend" = "TA的護照";
+"passport_suffix" = "的護照";
+"stamp_album_suffix" = "的郵票夾";

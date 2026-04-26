@@ -525,13 +525,17 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
     [self buildBody];
     [self refreshDiscoverHeader];
     [self switchToType:DiscoverMatchTypeUpcoming];
+    // 首次加载数据放在 viewDidLoad，避免 viewWillAppear 每次重拉导致闪烁
+    [self loadRemoteData];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     [self refreshDiscoverHeader];
-    /// 每次进入发现页并行拉取 upcoming / finished，保证列表与后端筛选排序一致（如刚关注球队后返回）
-    [self loadRemoteData];
+    // 非首次进入时才刷新（已有数据则静默刷新，不会产生高度跳变）
+    if (self.upcomingMatches.count > 0 || self.finishedMatches.count > 0) {
+        [self loadRemoteData];
+    }
 }
 
 - (void)viewDidLayoutSubviews {
