@@ -183,8 +183,8 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     if (self.onClickDelete) {
         self.onClickDelete(idx, itemView.item);
     }
-    itemView.item.stamp = nil;
-    [itemView setItem:itemView.item];
+//    itemView.item.stamp = nil;
+//    [itemView setItem:itemView.item];
 }
 - (void)itemLongPressAction:(UILongPressGestureRecognizer *)sender {
     PassportStampGridItemView *itemView = (PassportStampGridItemView *)sender.view;
@@ -505,9 +505,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
             //header只有一组,坐标分组从1开始
             NSString *position = [NSString stringWithFormat:@"1,%ld",index];
             [StampRequest.shared addStamp:stamp.stampId position:position success:^(HTTPResponse * _Nullable responseObject) {
-                            
+                [weakSelf loadStampCollection];
             } failure:^(NSError * _Nonnull error) {
-                
+                [QMUITips showError:error.localizedDescription];
             }];
         };
         [weakSelf.navigationController pushViewController:album animated:YES];
@@ -516,9 +516,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         StampAlbumViewController *album = StampAlbumViewController.alloc.init;
         album.didSelected = ^(PNStampAlbumItem * _Nonnull stamp) {
             [StampRequest.shared updateOldStamp:item.stamp.stampId newStamp:stamp.stampId success:^(HTTPResponse * _Nullable responseObject) {
-                
+                [weakSelf loadStampCollection];
             } failure:^(NSError * _Nonnull error) {
-                
+                [QMUITips showError:error.localizedDescription];
             }];
         };
         [weakSelf.navigationController pushViewController:album animated:YES];
@@ -529,9 +529,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     header.bottomGridView.onClickDelete = ^(NSInteger index, PassportStampGridItem *item) {
         // 删除
         [StampRequest.shared deleteStamp:item.stamp.stampId success:^(HTTPResponse * _Nullable responseObject) {
-                    
+            [weakSelf loadStampCollection];
         } failure:^(NSError * _Nonnull error) {
-            
+            [QMUITips showError:error.localizedDescription];
         }];
     };
     self.headerCard = header;
@@ -654,9 +654,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
             NSInteger section = indexPath.row*2 + 2;
             NSString *position = [NSString stringWithFormat:@"%ld,%ld",section,index];
             [StampRequest.shared addStamp:stamp.stampId position:position success:^(HTTPResponse * _Nullable responseObject) {
-                            
+                [weakSelf loadStampCollection];
             } failure:^(NSError * _Nonnull error) {
-                
+                [QMUITips showError:error.localizedDescription];
             }];
         };
         [weakSelf.navigationController pushViewController:album animated:YES];
@@ -670,9 +670,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
                 return;
             }
             [StampRequest.shared updateOldStamp:oldId newStamp:newId success:^(HTTPResponse * _Nullable responseObject) {
-                
+                [weakSelf loadStampCollection];
             } failure:^(NSError * _Nonnull error) {
-                
+                [QMUITips showError:error.localizedDescription];
             }];
         };
         [weakSelf.navigationController pushViewController:album animated:YES];
@@ -686,9 +686,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
             return;
         }
         [StampRequest.shared deleteStamp:sid success:^(HTTPResponse * _Nullable responseObject) {
-            
+            [weakSelf loadStampCollection];
         } failure:^(NSError * _Nonnull error) {
-            
+            [QMUITips showError:error.localizedDescription];
         }];
     };
     c.bottomGridView.onClickAdd = ^(NSInteger index, PassportStampGridItem *item) {
@@ -698,9 +698,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
             NSInteger section = indexPath.row*2 + 2 + 1;
             NSString *position = [NSString stringWithFormat:@"%ld,%ld",section,index];
             [StampRequest.shared addStamp:stamp.stampId position:position success:^(HTTPResponse * _Nullable responseObject) {
-                            
+                [weakSelf loadStampCollection];
             } failure:^(NSError * _Nonnull error) {
-                
+                [QMUITips showError:error.localizedDescription];
             }];
         };
         [weakSelf.navigationController pushViewController:album animated:YES];
@@ -714,9 +714,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
                 return;
             }
             [StampRequest.shared updateOldStamp:oldId newStamp:newId success:^(HTTPResponse * _Nullable responseObject) {
-                
+                [weakSelf loadStampCollection];
             } failure:^(NSError * _Nonnull error) {
-                
+                [QMUITips showError:error.localizedDescription];
             }];
         };
         [weakSelf.navigationController pushViewController:album animated:YES];
@@ -730,9 +730,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
             return;
         }
         [StampRequest.shared deleteStamp:sid success:^(HTTPResponse * _Nullable responseObject) {
-            
+            [weakSelf loadStampCollection];
         } failure:^(NSError * _Nonnull error) {
-            
+            [QMUITips showError:error.localizedDescription];
         }];
     };
     [c configureWithSectionItem:self.items[indexPath.row]];
