@@ -413,3 +413,9 @@
 "language_system" = "Follow System";
 "language_chinese" = "Simplified Chinese";
 "language_traditional_chinese" = "Traditional Chinese";
+
+/* Passport */
+"passport_nav_title" = "My Passport";
+"passport_nav_title_friend" = "Their Passport";
+"passport_suffix" = "'s Passport";
+"stamp_album_suffix" = "'s Stamp Album";

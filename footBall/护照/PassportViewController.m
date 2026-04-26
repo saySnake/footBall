@@ -432,7 +432,12 @@ static UIColor *PassportPageBg(void) {
 
 - (void)updateLocalizedStrings {
     [super updateLocalizedStrings];
-    _titleLabel.text = NSLocalizedString(@"passport_nav_title", nil) ?: @"我的护照";
+    if (self.targetUserId.length > 0) {
+        NSString *name = self.targetNickname.length > 0 ? self.targetNickname : (NSLocalizedString(@"passport_nav_title_friend", nil) ?: @"TA的护照");
+        _titleLabel.text = name;
+    } else {
+        _titleLabel.text = NSLocalizedString(@"passport_nav_title", nil) ?: @"我的护照";
+    }
 }
 
 @end
