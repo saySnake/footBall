@@ -385,7 +385,7 @@ static UIColor *PassportPageBg(void) {
     }
     // PassportAbilityBlockCell 设计稿固定高度
     if (indexPath.row == 5) {
-        return 523;
+        return 522;
     }
     // PassportTacticalCell（图例每行 3 个，最多 6 种身份为 2 行）
     if (indexPath.row == 6) {
@@ -416,7 +416,7 @@ static UIColor *PassportPageBg(void) {
         return 413;
     }
     if (indexPath.row == 5) {
-        return 523;
+        return 522;
     }
     if (indexPath.row == 6) {
         return 520;

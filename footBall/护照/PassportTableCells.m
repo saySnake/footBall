@@ -680,8 +680,8 @@ static UIView *PCPositionRow(UILabel **outL, UILabel **outV, bool last) {
         CGFloat w = CGRectGetWidth(_bottomDashView.bounds);
         if (w > 0) {
             UIBezierPath *path = [UIBezierPath bezierPath];
-            [path moveToPoint:CGPointMake(16, 1)];
-            [path addLineToPoint:CGPointMake(w - 16, 1)];
+            [path moveToPoint:CGPointMake(16, 0)];
+            [path addLineToPoint:CGPointMake(w - 16, 0)];
             _bottomDashLayer.path = path.CGPath;
         }
     }
@@ -835,8 +835,7 @@ static NSAttributedString *PCAbilitySummaryAttributed(CGFloat level) {
         [_card addSubview:_subtitle];
         [_card addSubview:_rowStack];
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(self.contentView).offset(-1);
-            make.leading.trailing.bottom.equalTo(self.contentView);
+            make.edges.equalTo(self.contentView);
         }];
         [_title mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(_card).offset(30);
