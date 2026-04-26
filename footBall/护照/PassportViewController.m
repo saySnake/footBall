@@ -257,7 +257,7 @@ static UIColor *PassportPageBg(void) {
     void (^handleSuccess)(PNPassport *) = ^(PNPassport *p) {
         [weakSelf hideLoading];
         weakSelf.viewModel = [PassportViewModel viewModelWithPassport:p year:weakSelf.selectedYear];
-        // 查看自己的护照时，用本地 AuthManager 的真实头像覆盖接口返回的占位头像
+        // 查看自己的护照时，用本地 AuthManager 的真实头像和城市覆盖接口返回的占位数据
         if (!isOther) {
             NSString *localAvatar = AuthManager.sharedManager.user.profile.avatar;
             if (!localAvatar.length) {
@@ -265,6 +265,10 @@ static UIColor *PassportPageBg(void) {
             }
             if (localAvatar.length) {
                 weakSelf.viewModel.avatarURL = localAvatar;
+            }
+            NSString *localCity = AuthManager.sharedManager.user.profile.city;
+            if (localCity.length) {
+                weakSelf.viewModel.userCity = localCity;
             }
         }
         [weakSelf.passportHeader configureWithModel:weakSelf.viewModel];
