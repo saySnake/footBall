@@ -1658,6 +1658,9 @@
         for (SKProduct *product in response.products) {
             self.skProducts[product.productIdentifier] = product;
         }
+        NSLog(@"[IAP] products=%@, invalidProductIdentifiers=%@",
+              [response.products valueForKey:@"productIdentifier"],
+              response.invalidProductIdentifiers);
         if (response.products.count == 0) {
             [[LoadingManager sharedManager] showError:@"未找到对应商品，请稍后重试" inView:self.view];
             return;
