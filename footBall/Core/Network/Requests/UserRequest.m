@@ -6,7 +6,23 @@
 //
 
 #import "UserRequest.h"
+// PNURLUtils.h
+@interface PNURLUtils : NSObject
+/// 从签名URL或objectKey中提取纯路径，去掉 ?Expires=... 等查询参数
++ (NSString *)stripQueryParams:(NSString *)urlOrKey;
+@end
 
+// PNURLUtils.m
+@implementation PNURLUtils
++ (NSString *)stripQueryParams:(NSString *)urlOrKey {
+    if (urlOrKey.length == 0) return urlOrKey;
+    NSRange range = [urlOrKey rangeOfString:@"?"];
+    if (range.location != NSNotFound) {
+        return [urlOrKey substringToIndex:range.location];
+    }
+    return urlOrKey;
+}
+@end
 @implementation UserRequest
 +(instancetype)shared {
     static UserRequest *instance = nil;

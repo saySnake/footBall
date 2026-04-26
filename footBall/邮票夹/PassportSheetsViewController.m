@@ -558,7 +558,6 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         [subItem addObject:gridItem1];
     }
     headerItem.bottomItems = subItem;
-    [self.headerCard configureWithSectionItem:headerItem];
     //一个cell对应两组， tableView dataSource
     NSMutableArray *array = [NSMutableArray arrayWithCapacity:STAMP_SECTION_COUNT];
     for (int i=0; i<STAMP_SECTION_COUNT; i++) {
@@ -602,6 +601,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
             
         }
     }
+    [self.headerCard configureWithSectionItem:headerItem];
     [self.tableView reloadData];
 }
 // 获取自己已添加到主页的邮票（查看他人邮票夹时不加载）

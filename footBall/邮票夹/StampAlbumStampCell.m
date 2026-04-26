@@ -44,13 +44,13 @@ static const CGFloat kStampCircleIconDiameterDelta = 20;
     [super layoutSubviews];
     CGFloat w = CGRectGetWidth(self.bounds);
     CGFloat h = CGRectGetHeight(self.bounds);
-    CGFloat outer = MIN(w, h) * 0.72;
+    CGFloat outer = MIN(w, h);
     if (outer < 2) {
         outer = 2;
     }
     _circleView.layer.cornerRadius = outer * 0.5;
     _circleView.frame = CGRectMake((w - outer) * 0.5, (h - outer) * 0.5, outer, outer);
-    CGFloat iconD = MAX(0, outer - kStampCircleIconDiameterDelta);
+    CGFloat iconD = MAX(0, outer /*- kStampCircleIconDiameterDelta*/);
     _iconView.layer.cornerRadius = iconD * 0.5;
     _iconView.clipsToBounds = YES;
     _iconView.frame = CGRectMake((w - iconD) * 0.5, (h - iconD) * 0.5, iconD, iconD);
@@ -75,7 +75,7 @@ static const CGFloat kStampCircleIconDiameterDelta = 20;
     NSInteger rows = total > 0 ? (total + cols - 1) / cols : 0;
     _lineRight.hidden = (col == cols - 1);
     _lineBottom.hidden = (rows > 0 && row == rows - 1);
-    _circleView.backgroundColor = StampRarityColor(item.rarity);
+//    _circleView.backgroundColor = StampRarityColor(item.rarity);
     _circleView.layer.borderWidth = 1;
     _circleView.layer.borderColor = [UIColor colorWithWhite:0.35 alpha:0.35].CGColor;
     _iconView.hidden = NO;
@@ -93,12 +93,12 @@ static const CGFloat kStampCircleIconDiameterDelta = 20;
     }
 }
 
-static UIColor *StampRarityColor(NSString *rarity) {
-    NSString *r = [rarity isKindOfClass:NSString.class] ? [(NSString *)rarity uppercaseString] : @"";
-    if ([r isEqualToString:@"LEGENDARY"]) return [UIColor colorWithHexString:@"#D9B44A"];
-    if ([r isEqualToString:@"EPIC"]) return [UIColor colorWithHexString:@"#8E62D9"];
-    if ([r isEqualToString:@"RARE"]) return [UIColor colorWithHexString:@"#3C6FD9"];
-    return [UIColor colorWithHexString:@"#7C9A8B"]; // COMMON / fallback
-}
+//static UIColor *StampRarityColor(NSString *rarity) {
+//    NSString *r = [rarity isKindOfClass:NSString.class] ? [(NSString *)rarity uppercaseString] : @"";
+//    if ([r isEqualToString:@"LEGENDARY"]) return [UIColor colorWithHexString:@"#D9B44A"];
+//    if ([r isEqualToString:@"EPIC"]) return [UIColor colorWithHexString:@"#8E62D9"];
+//    if ([r isEqualToString:@"RARE"]) return [UIColor colorWithHexString:@"#3C6FD9"];
+//    return [UIColor colorWithHexString:@"#7C9A8B"]; // COMMON / fallback
+//}
 
 @end
