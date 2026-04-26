@@ -187,6 +187,10 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
         _awayLabel.lineBreakMode = NSLineBreakByTruncatingTail;
         _homeLabel.adjustsFontSizeToFitWidth = NO;
         _awayLabel.adjustsFontSizeToFitWidth = NO;
+        [_homeLabel setContentCompressionResistancePriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
+        [_awayLabel setContentCompressionResistancePriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
+        [_homeLabel setContentHuggingPriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
+        [_awayLabel setContentHuggingPriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
 
         _timePill = [UIButton buttonWithType:UIButtonTypeSystem];
         _timePill.userInteractionEnabled = NO;
@@ -213,7 +217,8 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
         [_homeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.equalTo(card).offset(12);
             make.centerY.equalTo(card);
-            make.right.equalTo(_homeBadge.mas_left).offset(-6);
+            make.right.lessThanOrEqualTo(_homeBadge.mas_left).offset(-6);
+            make.width.mas_lessThanOrEqualTo(120);
         }];
         [_homeBadge mas_makeConstraints:^(MASConstraintMaker *make) {
             make.right.equalTo(_timePill.mas_left).offset(-10);
@@ -250,6 +255,7 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
             make.left.equalTo(_awayBadge.mas_right).offset(6);
             make.centerY.equalTo(card);
             make.right.lessThanOrEqualTo(_favoriteBtn.mas_left).offset(-10);
+            make.width.mas_lessThanOrEqualTo(120);
         }];
     }
     return self;
