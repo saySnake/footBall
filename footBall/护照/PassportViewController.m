@@ -393,7 +393,7 @@ static UIColor *PassportPageBg(void) {
     }
     // PassportMetricBarsCell 设计稿（90pt 数字 + 7 条情绪 bar）
     if (indexPath.row == 7) {
-        return 368;
+        return 368 + 2;
     }
     // PassportOutcomeCell 设计稿（标题 + 圆环 + 2x2 图例）
     if (indexPath.row == 8) {
@@ -422,7 +422,7 @@ static UIColor *PassportPageBg(void) {
         return 520;
     }
     if (indexPath.row == 7) {
-        return 368;
+        return 370;
     }
     if (indexPath.row == 8) {
         return 416;
