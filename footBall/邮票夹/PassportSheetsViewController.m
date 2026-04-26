@@ -15,6 +15,7 @@
 #import "StampRequest.h"
 #import "StampModels.h"
 #import "StampAlbumViewController.h"
+#import "CommunityRequest.h"
 #define STAMP_SECTION_COUNT  1000
 #define STAMP_SECTION_ITEMS  15
 #define STAMP_ITEAM_FREE  5
@@ -604,18 +605,26 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     }
     [self.tableView reloadData];
 }
-// 获取自己已添加到主页的邮票（查看他人邮票夹时不加载）
+// 获取邮票列表（自己或好友）
 - (void)loadStampCollection {
-    if (self.targetUserId.length > 0) {
-        // TODO: 后端需补充查看他人邮票的接口 GET /api/v1/stamps/list?userId=xxx
-        return;
-    }
     __weak typeof(self) weakSelf = self;
-    [StampRequest.shared getStampListSuccess:^(HTTPResponse * _Nullable responseObject) {
-        [weakSelf reloadStamps:responseObject.dataObject];
-    } failure:^(NSError * _Nonnull error) {
-        [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
-    }];
+    
+    if (self.targetUserId.length > 0) {
+        // 查看好友邮票 - 使用社区接口
+        [CommunityRequest.shared getFriendStamps:self.targetUserId success:^(HTTPResponse * _Nullable responseObject) {
+            NSArray *stamps = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+            [weakSelf reloadStamps:stamps];
+        } failure:^(NSError * _Nonnull error) {
+            [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
+        }];
+    } else {
+        // 查看自己的邮票
+        [StampRequest.shared getStampListSuccess:^(HTTPResponse * _Nullable responseObject) {
+            [weakSelf reloadStamps:responseObject.dataObject];
+        } failure:^(NSError * _Nonnull error) {
+            [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
+        }];
+    }
 }
 - (void)loadPassportData {
     __weak typeof(self) weakSelf = self;
