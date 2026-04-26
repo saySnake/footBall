@@ -1578,17 +1578,35 @@
         appleProductId = self.redeemAppleProductId;
         planId = self.redeemPlanId;
         NSLog(@"[Pay] 折扣模式: appleProductId=%@, planId=%@", appleProductId, planId);
-    } else if (self.apiPlans.count > (NSUInteger)self.currentIndex) {
-        NSArray<PNMemberPlan *> *sorted = [self.apiPlans sortedArrayUsingComparator:^NSComparisonResult(PNMemberPlan *a, PNMemberPlan *b) {
-            return [a.planId compare:b.planId options:NSNumericSearch];
-        }];
-        if ((NSUInteger)self.currentIndex < sorted.count) {
-            PNMemberPlan *api = sorted[self.currentIndex];
-            appleProductId = api.appleProductId;
-            planId = api.planId;
+    } else if (self.apiPlans.count > 0) {
+        NSArray<NSString *> *expectedPlanIds = @[ @"1", @"2", @"3", @"4" ];
+        NSString *expectedPlanId = (self.currentIndex >= 0 && self.currentIndex < (NSInteger)expectedPlanIds.count) ? expectedPlanIds[self.currentIndex] : nil;
+        PNMemberPlan *target = nil;
+        // 优先按 planId 精确匹配，避免服务端返回顺序/缺项导致 index 对错方案。
+        if (expectedPlanId.length > 0) {
+            for (PNMemberPlan *p in self.apiPlans) {
+                if ([p.planId isEqualToString:expectedPlanId]) {
+                    target = p;
+                    break;
+                }
+            }
+        }
+        // 兜底：仍使用按 planId 排序后的同 index 项。
+        if (!target) {
+            NSArray<PNMemberPlan *> *sorted = [self.apiPlans sortedArrayUsingComparator:^NSComparisonResult(PNMemberPlan *a, PNMemberPlan *b) {
+                return [a.planId compare:b.planId options:NSNumericSearch];
+            }];
+            if ((NSUInteger)self.currentIndex < sorted.count) {
+                target = sorted[self.currentIndex];
+            }
+        }
+        if (target) {
+            appleProductId = target.appleProductId;
+            planId = target.planId;
         }
     }
 
+    appleProductId = [appleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (appleProductId.length == 0) {
         [[LoadingManager sharedManager] showError:@"该方案暂不支持购买" inView:self.view];
         return;
@@ -1612,6 +1630,11 @@
 
 /// 向 App Store 请求产品信息，成功后发起购买
 - (void)fetchProductAndPay:(NSString *)productId {
+    productId = [productId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (productId.length == 0) {
+        [[LoadingManager sharedManager] showError:@"商品标识无效，请稍后重试" inView:self.view];
+        return;
+    }
     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
     [self.productsRequest cancel];
     self.productsRequest = [[SKProductsRequest alloc] initWithProductIdentifiers:[NSSet setWithObject:productId]];
