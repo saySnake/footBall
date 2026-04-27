@@ -15,6 +15,8 @@
 #import "StampRequest.h"
 #import "StampModels.h"
 #import "StampAlbumViewController.h"
+#import "StampUnlockPopupViewController.h"
+#import "MembershipCenterViewController.h"
 #import "CommunityRequest.h"
 #define STAMP_SECTION_COUNT  1000
 #define STAMP_SECTION_ITEMS  15
@@ -399,6 +401,19 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 @end
 
 @implementation PassportSheetsViewController
+
+- (void)presentStampUnlockDialog {
+    __weak typeof(self) weakSelf = self;
+    StampUnlockPopupViewController *vc = [[StampUnlockPopupViewController alloc] init];
+    vc.onConfirm = ^(NSInteger initialPlanIndex) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        MembershipCenterViewController *member = [[MembershipCenterViewController alloc] init];
+        member.initialPlanIndex = initialPlanIndex;
+        [self.navigationController pushViewController:member animated:YES];
+    };
+    [self presentViewController:vc animated:NO completion:nil];
+}
 - (instancetype)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil {
     if (self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil]) {
         NSCalendar *cal = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
@@ -526,7 +541,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         [weakSelf.navigationController pushViewController:album animated:YES];
     };
     header.bottomGridView.onClickUnLock = ^(NSInteger index, PassportStampGridItem *item) {
-        // 跳转至开通会员
+        [weakSelf presentStampUnlockDialog];
     };
     header.bottomGridView.onClickDelete = ^(NSInteger index, PassportStampGridItem *item) {
         // 删除
@@ -715,7 +730,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         [weakSelf.navigationController pushViewController:album animated:YES];
     };
     c.topGridView.onClickUnLock = ^(NSInteger index, PassportStampGridItem *item) {
-        // 跳转至开通会员
+        [weakSelf presentStampUnlockDialog];
     };
     c.topGridView.onClickDelete = ^(NSInteger index, PassportStampGridItem *item) {
         NSString *sid = item.stamp.stampId ?: @"";
@@ -759,7 +774,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         [weakSelf.navigationController pushViewController:album animated:YES];
     };
     c.bottomGridView.onClickUnLock = ^(NSInteger index, PassportStampGridItem *item) {
-        // 跳转至开通会员
+        [weakSelf presentStampUnlockDialog];
     };
     c.bottomGridView.onClickDelete = ^(NSInteger index, PassportStampGridItem *item) {
         NSString *sid = item.stamp.stampId ?: @"";

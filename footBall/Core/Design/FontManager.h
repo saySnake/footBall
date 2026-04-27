@@ -66,6 +66,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// 70pt （数字）
 @property (nonatomic, strong, readonly) UIFont *font70Regular;
 
+/// 72pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font72Regular;
+
 /// 60pt （数字）
 @property (nonatomic, strong, readonly) UIFont *font60Regular;
 
@@ -87,6 +90,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// 26pt （数字）
 @property (nonatomic, strong, readonly) UIFont *font26Regular;
 
+/// 25pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font25Regular;
+
 /// 24pt （数字）
 @property (nonatomic, strong, readonly) UIFont *font24Regular;
 
@@ -104,6 +110,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 14pt （数字）
 @property (nonatomic, strong, readonly) UIFont *font14Regular;
+
+/// 13pt （数字）
+@property (nonatomic, strong, readonly) UIFont *font13Regular;
 
 /// 12pt （数字）
 @property (nonatomic, strong, readonly) UIFont *font12Regular;
