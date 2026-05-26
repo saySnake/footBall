@@ -82,7 +82,9 @@
     [card addSubview:self.cancelBtn];
 
     self.confirmBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.confirmBtn.backgroundColor = kAlertGreen;
+    self.confirmBtn.backgroundColor = self.confirmDestructive
+        ? [UIColor colorWithRed:0.92 green:0.26 blue:0.21 alpha:1.0]
+        : kAlertGreen;
     self.confirmBtn.layer.cornerRadius = 18;
     self.confirmBtn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
     [self.confirmBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];

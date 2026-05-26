@@ -12,7 +12,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// API路径值常量类 - 统一管理所有API路径值
 
 #pragma mark - 用户模块
-/// GET获取当前登录用户信息 , PUT更新当前用户个人资料
+/// GET获取当前登录用户信息 / PUT更新当前用户个人资料
 FOUNDATION_EXPORT NSString * const APIPathValueUser;
 /// 获取当前用户二维码
 FOUNDATION_EXPORT NSString * const APIPathValueUserQRCode;
@@ -30,6 +30,8 @@ FOUNDATION_EXPORT NSString * const APIPathValueLoginPhone;
 FOUNDATION_EXPORT NSString * const APIPathValueLogout;
 /// 刷新Token路径
 FOUNDATION_EXPORT NSString * const APIPathValueRefreshToken;
+/// POST 注销账号（需短信验证码，见 DeactivateAccountReq）
+FOUNDATION_EXPORT NSString * const APIPathValueDeactivateAccount;
 
 #pragma mark - 身份认证模块
 /// 获取当前用户认证状态

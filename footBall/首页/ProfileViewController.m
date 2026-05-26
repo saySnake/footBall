@@ -24,6 +24,8 @@
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
 #import "PNCommonAlertViewController.h"
+#import "VerifyCodeViewController.h"
+#import <MBProgressHUD/MBProgressHUD.h>
 
 #define kProfileHeaderBg  [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0]
 /// 会员券面主色（设计稿约 #2E5E4E）
@@ -54,8 +56,16 @@ static CGFloat const kProfileMembershipAspectW = 323.f;
 static CGFloat const kProfileMembershipNotchRadius = 7.f;
 
 static NSArray<NSString *> * _menuKeys(void) {
-    /// Figma 621:3583：仅「个人资料」「身份认证」
-    return @[@"profile_my_info", @"profile_id_verify"];
+    /// Figma 2188-2607：个人资料 → 身份认证 → 删除账户
+    return @[@"profile_my_info", @"profile_id_verify", @"settings_delete_account"];
+}
+
+static BOOL _isProfileDeleteAccountKey(NSString *key) {
+    return [key isEqualToString:@"settings_delete_account"];
+}
+
+static UIColor * _profileDeleteAccountTitleColor(void) {
+    return [UIColor colorWithRed:235.0 / 255.0 green:66.0 / 255.0 blue:53.0 / 255.0 alpha:1.0];
 }
 
 // 球队小图标+名字（用于首页展示的一行）
@@ -675,6 +685,7 @@ static NSArray<NSString *> * _menuKeys(void) {
     NSMutableArray *controls = [NSMutableArray array];
     for (NSInteger i = 0; i < _menuKeys().count; i++) {
         NSString *key = _menuKeys()[i];
+        BOOL isDeleteRow = _isProfileDeleteAccountKey(key);
         UIControl *card = [UIControl new];
         card.backgroundColor = kProfileCardBg;
         card.layer.cornerRadius = 6;
@@ -690,24 +701,43 @@ static NSArray<NSString *> * _menuKeys(void) {
         }];
 
         UILabel *lbl = [UILabel new];
+        lbl.tag = 8801;
         lbl.text = NSLocalizedString(key, nil);
         lbl.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
-        lbl.textColor = [UIColor blackColor];
+        lbl.textColor = isDeleteRow ? _profileDeleteAccountTitleColor() : [UIColor blackColor];
         [card addSubview:lbl];
-        [lbl mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(card).offset(kProfileCardInnerLeading);
-            make.centerY.equalTo(card);
-        }];
 
-        UIImageView *arr = [UIImageView new];
-        arr.contentMode = UIViewContentModeScaleAspectFit;
-        arr.image = [UIImage imageNamed:@"setting_right"];
-        [card addSubview:arr];
-        [arr mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.trailing.equalTo(card).offset(-kProfileCardInnerLeading);
-            make.centerY.equalTo(card);
-            make.size.mas_equalTo(CGSizeMake(18, 18));
-        }];
+        if (isDeleteRow) {
+            UIImageView *icon = [UIImageView new];
+            icon.contentMode = UIViewContentModeScaleAspectFit;
+            icon.image = [UIImage imageNamed:@"set_delete"];
+            [card addSubview:icon];
+            [icon mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.leading.equalTo(card).offset(kProfileCardInnerLeading);
+                make.centerY.equalTo(card);
+                make.size.mas_equalTo(CGSizeMake(24, 24));
+            }];
+            [lbl mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.leading.equalTo(icon.mas_trailing).offset(10);
+                make.centerY.equalTo(card);
+                make.trailing.lessThanOrEqualTo(card).offset(-kProfileCardInnerLeading);
+            }];
+        } else {
+            [lbl mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.leading.equalTo(card).offset(kProfileCardInnerLeading);
+                make.centerY.equalTo(card);
+            }];
+
+            UIImageView *arr = [UIImageView new];
+            arr.contentMode = UIViewContentModeScaleAspectFit;
+            arr.image = [UIImage imageNamed:@"setting_right"];
+            [card addSubview:arr];
+            [arr mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.trailing.equalTo(card).offset(-kProfileCardInnerLeading);
+                make.centerY.equalTo(card);
+                make.size.mas_equalTo(CGSizeMake(18, 18));
+            }];
+        }
 
         prevCard = card;
         [controls addObject:card];
@@ -812,8 +842,8 @@ static NSArray<NSString *> * _menuKeys(void) {
     self.teamsTitleLabel.text = NSLocalizedString(@"profile_section_teams", nil);
     self.teamsEmptyLabel.text = NSLocalizedString(@"profile_team_empty_hint", nil);
     for (NSInteger i = 0; i < self.menuControls.count && i < (NSInteger)_menuKeys().count; i++) {
-        UILabel *lbl = [self.menuControls[i].subviews firstObject];
-        if ([lbl isKindOfClass:[UILabel class]]) {
+        UILabel *lbl = [self.menuControls[i] viewWithTag:8801];
+        if (lbl) {
             lbl.text = NSLocalizedString(_menuKeys()[i], nil);
         }
     }
@@ -843,7 +873,73 @@ static NSArray<NSString *> * _menuKeys(void) {
         PersonalInfoViewController *vc = [PersonalInfoViewController new];
         vc.hidesBottomBarWhenPushed = YES;
         [self.navigationController pushViewController:vc animated:YES];
+    } else if (_isProfileDeleteAccountKey(key)) {
+        [self onDeleteAccount];
     }
+}
+
+#pragma mark - 删除账户（Figma 2188-2607，身份认证下方）
+
+- (NSString *)resolvedLoginPhone {
+    User *user = AuthManager.sharedManager.user;
+    NSString *phone = user.profile.phone.length > 0 ? user.profile.phone : user.phone;
+    if (phone.length > 0 && [phone rangeOfString:@"*"].location == NSNotFound) {
+        return phone;
+    }
+    return nil;
+}
+
+- (void)onDeleteAccount {
+    PNCommonAlertViewController *alert = [PNCommonAlertViewController new];
+    alert.alertTitle = NSLocalizedString(@"settings_delete_account_alert_title", nil);
+    alert.message = NSLocalizedString(@"settings_delete_account_alert_message", nil);
+    alert.cancelTitle = NSLocalizedString(@"cancel", nil);
+    alert.confirmTitle = NSLocalizedString(@"settings_delete_account_confirm", nil);
+    alert.confirmDestructive = YES;
+    __weak typeof(self) weakSelf = self;
+    alert.onConfirm = ^{
+        [weakSelf beginDeactivateAccountFlow];
+    };
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)beginDeactivateAccountFlow {
+    NSString *phone = [self resolvedLoginPhone];
+    if (phone.length > 0) {
+        [self sendDeactivateCodeAndShowVerifyForPhone:phone];
+        return;
+    }
+
+    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+    __weak typeof(self) weakSelf = self;
+    [[UserRequest shared] getLoginUserInfoSuccess:^(HTTPResponse * _Nullable responseObject) {
+        [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+        NSString *resolved = [weakSelf resolvedLoginPhone];
+        if (resolved.length > 0) {
+            [weakSelf sendDeactivateCodeAndShowVerifyForPhone:resolved];
+        } else {
+            [QMUITips showError:NSLocalizedString(@"settings_delete_account_no_phone", nil) inView:weakSelf.view hideAfterDelay:2.0];
+        }
+    } failure:^(NSError * _Nonnull error) {
+        [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+        [QMUITips showError:error.localizedDescription inView:weakSelf.view hideAfterDelay:2.0];
+    }];
+}
+
+- (void)sendDeactivateCodeAndShowVerifyForPhone:(NSString *)phone {
+    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+    __weak typeof(self) weakSelf = self;
+    [[AuthManager sharedManager] sendVerifyCode:phone success:^(HTTPResponse * _Nonnull responseObject) {
+        [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+        VerifyCodeViewController *vc = [VerifyCodeViewController new];
+        vc.phoneNumber = phone;
+        vc.purpose = VerifyCodePurposeDeactivateAccount;
+        vc.hidesBottomBarWhenPushed = YES;
+        [weakSelf.navigationController pushViewController:vc animated:YES];
+    } failure:^(NSError * _Nonnull error) {
+        [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+        [QMUITips showError:error.localizedDescription inView:weakSelf.view hideAfterDelay:2.0];
+    }];
 }
 
 - (void)openMembershipCenter {

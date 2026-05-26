@@ -51,6 +51,20 @@ static UIColor *kVCCaretGray(void) {
 
 @implementation VerifyCodeViewController
 
+- (BOOL)isDeactivateFlow {
+    return self.purpose == VerifyCodePurposeDeactivateAccount;
+}
+
+- (void)applyPurposeCopy {
+    if ([self isDeactivateFlow]) {
+        self.titleLabel.text = NSLocalizedString(@"verify_deactivate_title", nil);
+        [self.loginButton setTitle:NSLocalizedString(@"verify_deactivate_button", nil) forState:UIControlStateNormal];
+    } else {
+        self.titleLabel.text = NSLocalizedString(@"verify_title", nil);
+        [self.loginButton setTitle:NSLocalizedString(@"verify_login_button", nil) forState:UIControlStateNormal];
+    }
+}
+
 - (void)dealloc {
     [self stopCaretBlink];
 }
@@ -60,6 +74,7 @@ static UIColor *kVCCaretGray(void) {
     self.view.backgroundColor = [UIColor whiteColor];
 
     [self setupUI];
+    [self applyPurposeCopy];
     [self updateButtonState];
     [self updateCaretDisplay];
 }
@@ -377,6 +392,17 @@ static UIColor *kVCCaretGray(void) {
     }
 
     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+    if ([self isDeactivateFlow]) {
+        [AuthManager.sharedManager deactivateAccountWithCode:self.codeTextField.text success:^(HTTPResponse * _Nonnull response) {
+            [MBProgressHUD hideHUDForView:self.view animated:YES];
+            [self routeToLoginAfterDeactivate];
+        } failure:^(NSError * _Nonnull error) {
+            [MBProgressHUD hideHUDForView:self.view animated:YES];
+            [QMUITips showError:error.localizedDescription inView:self.view hideAfterDelay:2.0];
+        }];
+        return;
+    }
+
     [AuthManager.sharedManager loginPhone:self.phoneNumber verify:self.codeTextField.text success:^(HTTPResponse * _Nonnull response) {
         [MBProgressHUD hideHUDForView:self.view animated:YES];
         if (AuthManager.sharedManager.user.onboardingCompleted) {
@@ -390,6 +416,28 @@ static UIColor *kVCCaretGray(void) {
         [MBProgressHUD hideHUDForView:self.view animated:YES];
         [QMUITips showError:error.localizedDescription];
     }];
+}
+
+- (void)routeToLoginAfterDeactivate {
+    UIWindow *window = self.view.window;
+    if (!window) {
+        for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+            if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+            UIWindowScene *ws = (UIWindowScene *)scene;
+            for (UIWindow *w in ws.windows) {
+                if (w.isKeyWindow) { window = w; break; }
+            }
+            if (window) break;
+        }
+    }
+    if (!window) return;
+
+    Class loginClass = NSClassFromString(@"LoginChoiceViewController");
+    UIViewController *loginVC = loginClass ? [loginClass new] : [UIViewController new];
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
+    [UIView transitionWithView:window duration:0.25 options:UIViewAnimationOptionTransitionCrossDissolve animations:^{
+        window.rootViewController = nav;
+    } completion:nil];
 }
 
 - (void)goToHome {

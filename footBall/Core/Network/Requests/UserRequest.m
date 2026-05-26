@@ -6,6 +6,7 @@
 //
 
 #import "UserRequest.h"
+#import "AuthManager.h"
 // PNURLUtils.h
 @interface PNURLUtils : NSObject
 /// 从签名URL或objectKey中提取纯路径，去掉 ?Expires=... 等查询参数
@@ -224,6 +225,10 @@
         failure(error);
     }];
 
+}
+
+- (void)deactivateAccountWithCode:(NSString *)code success:(nullable APISuccessBlock)success failure:(nullable APIFailureBlock)failure {
+    [[AuthManager sharedManager] deactivateAccountWithCode:code success:success failure:failure];
 }
 
 @end

@@ -33,6 +33,11 @@ NS_ASSUME_NONNULL_BEGIN
             success:(nullable APISuccessBlock)success
             failure:(nullable APIFailureBlock)failure;
 
+/// POST `/api/v1/auth/account/deactivate` — 注销当前用户账号（需短信验证码）
+- (void)deactivateAccountWithCode:(NSString *)code
+                          success:(nullable APISuccessBlock)success
+                          failure:(nullable APIFailureBlock)failure;
+
 @end
 
 NS_ASSUME_NONNULL_END

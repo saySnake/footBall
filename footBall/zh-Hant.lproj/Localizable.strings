@@ -400,6 +400,13 @@
 "settings_logout" = "退出登錄";
 "settings_alert_title" = "提示";
 "settings_logout_confirm" = "確認退出登錄";
+"settings_delete_account" = "刪除賬戶";
+"settings_delete_account_alert_title" = "刪除賬戶";
+"settings_delete_account_alert_message" = "賬戶刪除後，您的所有數據將被永久刪除且無法恢復。確定要刪除嗎？";
+"settings_delete_account_confirm" = "刪除";
+"settings_delete_account_no_phone" = "無法獲取綁定手機號，請稍後重試";
+"verify_deactivate_title" = "驗證手機號";
+"verify_deactivate_button" = "確認刪除";
 "language_settings" = "語言設定";
 "theme_settings" = "主題設定";
 "about" = "關於";

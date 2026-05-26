@@ -400,6 +400,13 @@
 "settings_logout" = "Log Out";
 "settings_alert_title" = "Tip";
 "settings_logout_confirm" = "Confirm log out";
+"settings_delete_account" = "Delete Account";
+"settings_delete_account_alert_title" = "Delete Account";
+"settings_delete_account_alert_message" = "After deletion, all your data will be permanently removed and cannot be recovered. Are you sure?";
+"settings_delete_account_confirm" = "Delete";
+"settings_delete_account_no_phone" = "Unable to get your phone number. Please try again later.";
+"verify_deactivate_title" = "Verify Phone";
+"verify_deactivate_button" = "Confirm Delete";
 "language_settings" = "Language";
 "theme_settings" = "Theme";
 "about" = "About";

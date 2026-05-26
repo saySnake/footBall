@@ -19,6 +19,7 @@ NSString * const APIPathValueSendCode = @"/api/v1/auth/send-code";
 NSString * const APIPathValueLoginPhone= @"/api/v1/auth/login/phone";
 NSString * const APIPathValueLogout = @"/api/v1/auth/logout";
 NSString * const APIPathValueRefreshToken = @"/api/v1/auth/refresh";
+NSString * const APIPathValueDeactivateAccount = @"/api/v1/auth/account/deactivate";
 
 #pragma mark - 身份认证模块
 /// 获取当前用户认证状态

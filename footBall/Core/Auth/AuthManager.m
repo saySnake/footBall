@@ -149,6 +149,38 @@ static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
     }];
 
 }
+
+- (void)deactivateAccountWithCode:(NSString *)code success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    if (!self.isLoggedIn) {
+        if (failure) {
+            failure([NSError errorWithDomain:@"AuthManagerErrorDomain" code:-1
+                                     userInfo:@{NSLocalizedDescriptionKey: @"用户未登录"}]);
+        }
+        return;
+    }
+    NSString *trimmed = [code stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (trimmed.length != 6) {
+        if (failure) {
+            failure([NSError errorWithDomain:@"AuthManagerErrorDomain" code:-2
+                                     userInfo:@{NSLocalizedDescriptionKey: @"验证码格式错误"}]);
+        }
+        return;
+    }
+    [[APIManager sharedManager] POST:APIPathValueDeactivateAccount
+                          parameters:@{@"code": trimmed}
+                             headers:nil
+                             success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            self.user = nil;
+            [self removeUser];
+            if (success) success(responseObject);
+        } else if (failure) {
+            failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
 - (BOOL)isLoggedIn {
     return self.user && self.user.userId.length>0 && self.user.accessToken.length>0;
 }
