@@ -611,7 +611,7 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
 
     UILabel* (^makeValue)(void) = ^UILabel*{
         UILabel *l = [[UILabel alloc] init];
-        l.font = [UIFont systemFontOfSize:30 weight:UIFontWeightRegular];
+        l.font = FontManager.sharedManager.font30Regular;
         l.textColor = [UIColor whiteColor];
         return l;
     };
@@ -788,7 +788,7 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
 
     UILabel* (^bigNum)(void) = ^UILabel*{
         UILabel *l = [[UILabel alloc] init];
-        l.font = [UIFont systemFontOfSize:36 weight:UIFontWeightRegular];
+        l.font = FontManager.sharedManager.font36Regular;
         l.textColor = [UIColor blackColor];
         l.textAlignment = NSTextAlignmentCenter;
         return l;
