@@ -64,10 +64,6 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
     return [key isEqualToString:@"settings_delete_account"];
 }
 
-static UIColor * _profileDeleteAccountTitleColor(void) {
-    return [UIColor colorWithRed:235.0 / 255.0 green:66.0 / 255.0 blue:53.0 / 255.0 alpha:1.0];
-}
-
 // 球队小图标+名字（用于首页展示的一行）
 @interface ProfileTeamThumbView : UIView
 @property (nonatomic, strong) UIView *iconBg;
@@ -680,15 +676,15 @@ static UIColor * _profileDeleteAccountTitleColor(void) {
         make.center.equalTo(self.teamsContentWrap);
     }];
 
-    // 菜单行
+    // Figma 2188-2607：个人资料 / 身份认证 / 删除账户 — 三张独立白卡，左黑字 + 右箭头
     UIView *prevCard = nil;
     NSMutableArray *controls = [NSMutableArray array];
     for (NSInteger i = 0; i < _menuKeys().count; i++) {
         NSString *key = _menuKeys()[i];
-        BOOL isDeleteRow = _isProfileDeleteAccountKey(key);
         UIControl *card = [UIControl new];
         card.backgroundColor = kProfileCardBg;
-        card.layer.cornerRadius = 6;
+        card.layer.cornerRadius = 12;
+        card.clipsToBounds = YES;
         card.tag = i;
         [card addTarget:self action:@selector(onMenuTapped:) forControlEvents:UIControlEventTouchUpInside];
         [self.contentWrap addSubview:card];
@@ -696,48 +692,33 @@ static UIColor * _profileDeleteAccountTitleColor(void) {
             make.leading.equalTo(self.contentWrap).offset(kProfileScreenInset);
             make.trailing.equalTo(self.contentWrap).offset(-kProfileScreenInset);
             make.height.mas_equalTo(50);
-            if (prevCard) make.top.equalTo(prevCard.mas_bottom).offset(12);
-            else          make.top.equalTo(self.teamsCard.mas_bottom).offset(12);
+            if (prevCard) {
+                make.top.equalTo(prevCard.mas_bottom).offset(12);
+            } else {
+                make.top.equalTo(self.teamsCard.mas_bottom).offset(12);
+            }
         }];
 
         UILabel *lbl = [UILabel new];
         lbl.tag = 8801;
         lbl.text = NSLocalizedString(key, nil);
         lbl.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
-        lbl.textColor = isDeleteRow ? _profileDeleteAccountTitleColor() : [UIColor blackColor];
+        lbl.textColor = [UIColor blackColor];
         [card addSubview:lbl];
+        [lbl mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.leading.equalTo(card).offset(kProfileCardInnerLeading);
+            make.centerY.equalTo(card);
+        }];
 
-        if (isDeleteRow) {
-            UIImageView *icon = [UIImageView new];
-            icon.contentMode = UIViewContentModeScaleAspectFit;
-            icon.image = [UIImage imageNamed:@"set_delete"];
-            [card addSubview:icon];
-            [icon mas_makeConstraints:^(MASConstraintMaker *make) {
-                make.leading.equalTo(card).offset(kProfileCardInnerLeading);
-                make.centerY.equalTo(card);
-                make.size.mas_equalTo(CGSizeMake(24, 24));
-            }];
-            [lbl mas_makeConstraints:^(MASConstraintMaker *make) {
-                make.leading.equalTo(icon.mas_trailing).offset(10);
-                make.centerY.equalTo(card);
-                make.trailing.lessThanOrEqualTo(card).offset(-kProfileCardInnerLeading);
-            }];
-        } else {
-            [lbl mas_makeConstraints:^(MASConstraintMaker *make) {
-                make.leading.equalTo(card).offset(kProfileCardInnerLeading);
-                make.centerY.equalTo(card);
-            }];
-
-            UIImageView *arr = [UIImageView new];
-            arr.contentMode = UIViewContentModeScaleAspectFit;
-            arr.image = [UIImage imageNamed:@"setting_right"];
-            [card addSubview:arr];
-            [arr mas_makeConstraints:^(MASConstraintMaker *make) {
-                make.trailing.equalTo(card).offset(-kProfileCardInnerLeading);
-                make.centerY.equalTo(card);
-                make.size.mas_equalTo(CGSizeMake(18, 18));
-            }];
-        }
+        UIImageView *arr = [UIImageView new];
+        arr.contentMode = UIViewContentModeScaleAspectFit;
+        arr.image = [UIImage imageNamed:@"setting_right"];
+        [card addSubview:arr];
+        [arr mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.trailing.equalTo(card).offset(-kProfileCardInnerLeading);
+            make.centerY.equalTo(card);
+            make.size.mas_equalTo(CGSizeMake(18, 18));
+        }];
 
         prevCard = card;
         [controls addObject:card];
