@@ -126,45 +126,47 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
 //        UIImageView *footer2 = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"passport_header_sep"]];
 //        [self.contentView addSubview:footer2];
 
+        CGFloat h = _circleLblWH;
+
         [self.userInfoView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.top.equalTo(self.topView);
-            make.height.equalTo(@(_circleLblWH * 2));
+            make.width.mas_equalTo(h * 4);
+            make.height.mas_equalTo(h * 2);
         }];
         [self.lineChartView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.left.equalTo(self.topView).offset(h * 4);
             make.top.equalTo(self.topView);
-            make.height.equalTo(@(_circleLblWH * 2));
-            make.width.equalTo(@(_circleLblWH * 3));
-            make.left.equalTo(self.userInfoView.mas_right);
-            make.right.equalTo(self.rygCardView.mas_left).offset(-0.25);
+            make.width.mas_equalTo(h * 3);
+            make.height.mas_equalTo(h * 2);
         }];
         [self.rygCardView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.right.equalTo(self.topView);
-            make.width.equalTo(@(_circleLblWH-0.25));
-            make.height.equalTo(@(_circleLblWH * 3));
-        }];
-        [self.nothingView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.width.equalTo(@(_circleLblWH * 3));
-            make.right.equalTo(self.rygCardView.mas_left).offset(-0.25);
-            make.left.equalTo(self.lineChartView);
-            make.height.equalTo(@(_circleLblWH));
-            make.top.equalTo(self.lineChartView.mas_bottom).offset(-0.25);
-        }];
-        [self.moneyView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.left.equalTo(self.nothingView);
-            make.right.equalTo(self.topView);
-            make.top.equalTo(self.nothingView.mas_bottom);
-            make.bottom.equalTo(self.topView).offset(-_circleLblWH);
+            make.left.equalTo(self.topView).offset(h * 7);
+            make.top.equalTo(self.topView);
+            make.width.mas_equalTo(h);
+            make.height.mas_equalTo(h * 3);
         }];
         [self.globalMapView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.equalTo(self.topView);
-            make.height.equalTo(@(_circleLblWH * 2));
-            make.top.equalTo(self.userInfoView.mas_bottom).offset(0.25);
-            make.right.equalTo(self.userInfoView);
+            make.top.equalTo(self.topView).offset(h * 2);
+            make.width.mas_equalTo(h * 4);
+            make.height.mas_equalTo(h * 2);
+        }];
+        [self.nothingView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.left.equalTo(self.topView).offset(h * 4);
+            make.top.equalTo(self.topView).offset(h * 2);
+            make.width.mas_equalTo(h * 3);
+            make.height.mas_equalTo(h);
+        }];
+        [self.moneyView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.left.equalTo(self.topView).offset(h * 4);
+            make.top.equalTo(self.topView).offset(h * 3);
+            make.width.mas_equalTo(h * 4);
+            make.height.mas_equalTo(h);
         }];
         [self.totalWatchTimeView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.right.equalTo(self.topView);
-            make.top.equalTo(self.globalMapView.mas_bottom);
-            make.height.equalTo(@(_circleLblWH));
+            make.top.equalTo(self.topView).offset(h * 4);
+            make.height.mas_equalTo(h);
         }];
 
         [sepMid mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -190,14 +192,14 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
             make.height.mas_equalTo(_circleLblWH * 5);
         }];
         [sepBottom mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(self.passportHeader2View.mas_bottom).offset(2);
+            make.top.equalTo(self.passportHeader2View.mas_bottom).offset(3);
             make.height.mas_equalTo(10);
             make.leading.trailing.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 10, 0, 10));
             make.bottom.equalTo(self.contentView).offset(-16);
         }];
         if (sepBottomFallbackLine) {
             [sepBottomFallbackLine mas_makeConstraints:^(MASConstraintMaker *make) {
-                make.top.equalTo(self.passportHeader2View.mas_bottom).offset(14);
+                make.top.equalTo(self.passportHeader2View.mas_bottom).offset(15);
                 make.leading.trailing.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 10, 0, 10));
                 make.height.mas_equalTo(1);
                 make.bottom.equalTo(self.contentView).offset(-16);
@@ -406,12 +408,10 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
 }
 
 - (void)addLines{
-    UIView *userInfoView = self.userInfoView ?: self.topView;
-
     // 网格：8列×5行，h = _circleLblWH
-    // 行0-1: userInfoView(5列) | lineChart(2列) | rygCard红黄(1列)
-    // 行2:   globalMap(5列)    | nothingView(2列) | rygCard绿(1列)
-    // 行3:   globalMap(5列)    | moneyView(3列，含rygCard列)
+    // 行0-1: userInfo(4列) | lineChart(3列) | rygCard(1列)
+    // 行2:   globalMap(4列) | nothingView(3列)
+    // 行3:   globalMap(4列) | moneyView(4列)
     // 行4:   totalWatchTimeView(8列)
     CGFloat h = _circleLblWH;
 
@@ -441,12 +441,12 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
         make.bottom.left.right.equalTo(self.topView);
     }];
 
-    // ── 竖线A: x=5h, y=0~4h（userInfoView/globalMap 右边） ──
+    // ── 竖线A: x=4h, y=0~4h（userInfo/globalMap 右边） ──
     UIView *verLineA = [self newLine];
     [self.topView addSubview:verLineA];
     [verLineA mas_makeConstraints:^(MASConstraintMaker *make) {
         make.width.equalTo(@0.5);
-        make.left.equalTo(userInfoView.mas_right);
+        make.left.equalTo(self.topView).offset(h * 4);
         make.top.equalTo(self.topView);
         make.height.equalTo(@(h * 4));
     }];
@@ -477,7 +477,7 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
     [horLine_yg mas_makeConstraints:^(MASConstraintMaker *make) {
         make.height.equalTo(@0.5);
         make.top.equalTo(self.topView).offset(h * 3);
-        make.left.equalTo(userInfoView.mas_right);
+        make.left.equalTo(self.topView).offset(h * 4);
         make.right.equalTo(self.topView);
     }];
 
