@@ -7,6 +7,7 @@
 #import "Passport.h"
 #import "PassportNestedModels.h"
 #import "Team.h"
+#import "AuthManager.h"
 
 /// 线上观赛方式饼图扇区颜色（与条数对应循环使用）
 static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
@@ -209,19 +210,21 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     PassportViewModel *m = [[PassportViewModel alloc] init];
     NSInteger y = year > 0 ? year : (NSInteger)[[NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian] component:NSCalendarUnitYear fromDate:[NSDate date]];
 
-    NSString *digits = AuthManager.sharedManager.user.userId;
-//    if (passport) {
-//        if (passport.passportCode.length >= 4) {
-//            digits = passport.passportCode;
-//        } else if (passport.passportCode.length > 0) {
-//            digits = [passport.passportCode stringByPaddingToLength:4 withString:@"0" startingAtIndex:0];
-//        }
-//    }
+    NSString *digits = @"";
+    if (passport.passportCode.length > 0) {
+        digits = passport.passportCode;
+    } else if (passport.userId.length > 0) {
+        digits = passport.userId;
+    } else {
+        NSString *localId = AuthManager.sharedManager.user.userId;
+        if (localId.length > 0) {
+            digits = localId;
+        }
+    }
     NSMutableArray *box = [NSMutableArray array];
     for (NSUInteger i = 0; i < digits.length; i++) {
         [box addObject:[[digits substringWithRange:NSMakeRange(i, 1)] copy]];
     }
-//    while (box.count < 4) { [box addObject:@"0"]; }
 
     NSArray<PNIdentityDist *> *identityList = passport ? (passport.identityDist ?: @[]) : @[];
     NSArray<PNEmotionDist *> *emotionList = passport ? (passport.emotionDist ?: @[]) : @[];

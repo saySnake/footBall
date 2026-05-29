@@ -290,27 +290,21 @@ static UIColor *PassportPageBg(void) {
         [weakSelf.view setNeedsLayout];
     };
     if (isOther) {
-        // 查看好友数据 - 使用社区接口
-        [[CommunityRequest shared] getFriendData:self.targetUserId success:^(HTTPResponse * _Nullable responseObject) {
-            // 将统计数据转换为护照数据格式
-            PNStatistics *stats = [responseObject.dataObject isKindOfClass:PNStatistics.class] ? responseObject.dataObject : nil;
-            if (stats) {
-                PNPassport *p = [weakSelf convertStatisticsToPassport:stats];
-                handleSuccess(p);
-            } else {
-                // 如果统计数据转换失败，回退到护照接口
-                [[ProfileRequest shared] getPassportForUserId:weakSelf.targetUserId year:y success:^(HTTPResponse * _Nullable responseObject) {
-                    PNPassport *p = [responseObject.dataObject isKindOfClass:PNPassport.class] ? responseObject.dataObject : nil;
-                    handleSuccess(p);
-                } failure:^(NSError * _Nonnull error) {
-                    handleFailure(error);
-                }];
+        [[ProfileRequest shared] getPassportForUserId:self.targetUserId year:y success:^(HTTPResponse * _Nullable responseObject) {
+            PNPassport *p = [responseObject.dataObject isKindOfClass:PNPassport.class] ? responseObject.dataObject : nil;
+            if (p && !p.nickname.length && weakSelf.targetNickname.length > 0) {
+                p.nickname = weakSelf.targetNickname;
             }
+            handleSuccess(p);
         } failure:^(NSError * _Nonnull error) {
-            // 如果好友数据接口失败，回退到护照接口
-            [[ProfileRequest shared] getPassportForUserId:weakSelf.targetUserId year:y success:^(HTTPResponse * _Nullable responseObject) {
-                PNPassport *p = [responseObject.dataObject isKindOfClass:PNPassport.class] ? responseObject.dataObject : nil;
-                handleSuccess(p);
+            [[CommunityRequest shared] getFriendData:weakSelf.targetUserId success:^(HTTPResponse * _Nullable responseObject) {
+                PNStatistics *stats = [responseObject.dataObject isKindOfClass:PNStatistics.class] ? responseObject.dataObject : nil;
+                PNPassport *p = stats ? [weakSelf convertStatisticsToPassport:stats] : nil;
+                if (p) {
+                    handleSuccess(p);
+                } else {
+                    handleFailure(error);
+                }
             } failure:^(NSError * _Nonnull error) {
                 handleFailure(error);
             }];

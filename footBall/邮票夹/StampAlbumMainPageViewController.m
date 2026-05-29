@@ -719,7 +719,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 
     if (self.targetUserId.length > 0) {
         [CommunityRequest.shared getFriendStamps:self.targetUserId success:^(HTTPResponse * _Nullable responseObject) {
-            NSArray *stamps = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+            NSArray<PNStampAlbumItem *> *stamps = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
             [weakSelf reloadStamps:stamps];
         } failure:^(NSError * _Nonnull error) {
             [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
@@ -784,6 +784,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     if (isOther) {
         [[ProfileRequest shared] getPassportForUserId:self.targetUserId year:y success:^(HTTPResponse * _Nullable responseObject) {
             PNPassport *p = [responseObject.dataObject isKindOfClass:PNPassport.class] ? responseObject.dataObject : nil;
+            if (p && !p.nickname.length && weakSelf.targetNickname.length > 0) {
+                p.nickname = weakSelf.targetNickname;
+            }
             handleSuccess(p);
         } failure:^(NSError * _Nonnull error) {
             handleFailure(error);
