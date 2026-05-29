@@ -390,22 +390,23 @@
 
     NSMutableArray<UIView *> *digitBoxes = [NSMutableArray array];
     NSMutableArray<UILabel *> *digitLabels = [NSMutableArray array];
-    UIView *prevBox = nil;
+
+    UIStackView *digitStack = [[UIStackView alloc] init];
+    digitStack.axis = UILayoutConstraintAxisHorizontal;
+    digitStack.spacing = 8.761;
+    digitStack.distribution = UIStackViewDistributionFillEqually;
+    digitStack.alignment = UIStackViewAlignmentFill;
+    [self.giftCodeTapAreaBtn addSubview:digitStack];
+    [digitStack mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.giftCodeTapAreaBtn);
+    }];
+
     for (NSInteger i = 0; i < 5; i++) {
         UIView *box = [UIView new];
         box.layer.cornerRadius = 13.428;
         box.layer.borderWidth = 0.895;
         box.layer.borderColor = [UIColor colorWithRed:191/255.0 green:191/255.0 blue:191/255.0 alpha:1.0].CGColor;
-        [self.giftCodeTapAreaBtn addSubview:box];
-        [box mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.bottom.equalTo(self.giftCodeTapAreaBtn);
-            make.width.mas_equalTo(56.397);
-            if (prevBox) {
-                make.leading.equalTo(prevBox.mas_trailing).offset(8.761);
-            } else {
-                make.leading.equalTo(self.giftCodeTapAreaBtn);
-            }
-        }];
+        [digitStack addArrangedSubview:box];
         UILabel *digit = [UILabel new];
         digit.textAlignment = NSTextAlignmentCenter;
         digit.textColor = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
@@ -416,7 +417,6 @@
         }];
         [digitBoxes addObject:box];
         [digitLabels addObject:digit];
-        prevBox = box;
     }
     self.giftDigitBoxes = digitBoxes;
     self.giftDigitLabels = digitLabels;
