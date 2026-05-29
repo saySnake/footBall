@@ -106,6 +106,7 @@ static UIColor *PassportPageBg(void) {
         UIImage *img = [UIImage imageNamed:@"passport_share"];
         [_refreshButton setImage:[img imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
     }
+    _refreshButton.hidden = YES;
     _refreshButton.tintColor = [UIColor whiteColor];
     [_refreshButton addTarget:self action:@selector(loadPassportData) forControlEvents:UIControlEventTouchUpInside];
 

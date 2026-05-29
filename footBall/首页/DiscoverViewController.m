@@ -1491,6 +1491,9 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
         [cell.inputButton removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
         [cell.inputButton addTarget:self action:@selector(onInputInfoButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
         [cell.verifiedPill removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+        //DEBUG: 调试用
+//        [cell.verifiedPill addTarget:self action:@selector(onVerifyMatchButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
+
     } else {
         cell.inputButton.hidden = m.hasInputInfo;
         cell.verifiedPill.hidden = NO;

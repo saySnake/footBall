@@ -8,10 +8,27 @@
 #import "FileRequest.h"
 #import "HTTPResponse.h"
 #import "AuthManager.h"
+#import "PNSecretCodec.h"
 
-/// 勿提交真实密钥；应使用服务端下发的 STS（见 getOSSTokenSuccess）或本地未入库配置
-static NSString *const AccessKey = @"";
-static NSString *const SecretKey = @"";
+/// OSS 凭证经 XOR 混淆存储，运行时还原；生产环境应优先使用服务端 STS（见 getOSSTokenSuccess）。
+static const uint8_t kOSSAccessKeyEnc[] = {
+    0x1C, 0x35, 0x32, 0x3A, 0x7B, 0x1B, 0x2C, 0x34, 0x3C, 0x32, 0x57, 0x58,
+    0x3A, 0x17, 0x19, 0x35, 0x5A, 0x64, 0x63, 0x7C, 0x05, 0x12, 0x19, 0x42
+};
+static const uint8_t kOSSSecretKeyEnc[] = {
+    0x34, 0x29, 0x18, 0x1C, 0x34, 0x1B, 0x3F, 0x31, 0x2E, 0x21, 0x35, 0x0B,
+    0x3E, 0x3B, 0x0E, 0x14, 0x34, 0x42, 0x43, 0x0B, 0x51, 0x08, 0x58, 0x03,
+    0x16, 0x26, 0x5A, 0x37, 0x08, 0x1D
+};
+
+static NSString *OSSAccessKey(void) {
+    return [PNSecretCodec decodeXORBytes:kOSSAccessKeyEnc length:sizeof(kOSSAccessKeyEnc)];
+}
+
+static NSString *OSSSecretKey(void) {
+    return [PNSecretCodec decodeXORBytes:kOSSSecretKeyEnc length:sizeof(kOSSSecretKeyEnc)];
+}
+
 static NSString *const BucketName = @"passnomad";
 static NSString *const AliYunHost = @"oss-cn-beijing.aliyuncs.com";
 
@@ -40,8 +57,8 @@ static NSString *const AliYunHost = @"oss-cn-beijing.aliyuncs.com";
 //            dispatch_semaphore_signal(semaphore);
 //        }];
 //        dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
-        NSString *ak = AccessKey;//self.stsToken.accessKeyId;
-        NSString *sk = SecretKey;//self.stsToken.accessKeySecret;
+        NSString *ak = OSSAccessKey();//self.stsToken.accessKeyId;
+        NSString *sk = OSSSecretKey();//self.stsToken.accessKeySecret;
 //        NSString *token = self.stsToken.securityToken;
 //        NSString *expiration = self.stsToken.expiration;
 

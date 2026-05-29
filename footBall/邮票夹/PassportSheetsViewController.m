@@ -474,6 +474,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         UIImage *img = [UIImage imageNamed:@"passport_share"];
         [_shareButton setImage:[img imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
     }
+    _shareButton.hidden = YES;
     _shareButton.tintColor = [UIColor whiteColor];
     [_shareButton addTarget:self action:@selector(share) forControlEvents:UIControlEventTouchUpInside];
 
