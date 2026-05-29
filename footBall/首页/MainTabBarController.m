@@ -205,6 +205,9 @@ static const CGFloat kPillCircleSize = 44.f;
     if (index >= 0 && index < self.viewControllers.count) {
         self.selectedIndex = index;
         [self updatePillSelection];
+        if (index == 2) {
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"community_friends_did_change" object:nil];
+        }
     }
 }
 
@@ -227,6 +230,9 @@ static const CGFloat kPillCircleSize = 44.f;
 - (void)tabBarController:(UITabBarController *)tabBarController didSelectViewController:(UIViewController *)viewController {
     [self updatePillSelection];
     [self updateBottomBarHiddenForController:viewController];
+    if (tabBarController.selectedIndex == 2) {
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"community_friends_did_change" object:nil];
+    }
 }
 
 #pragma mark - UINavigationControllerDelegate

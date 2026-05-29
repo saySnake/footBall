@@ -20,6 +20,7 @@
 static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 static NSString * const kCommunityPendingCountDidChangeNotification = @"community_pending_count_did_change";
 static NSString * const kCommunityFriendsDidChangeNotification = @"community_friends_did_change";
+static const NSTimeInterval kFriendsRefreshMinInterval = 3.0;
 
 typedef NS_ENUM(NSInteger, CommunityRankType) {
     CommunityRankTypeWeek,
@@ -351,8 +352,9 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 @property (nonatomic, strong) MASConstraint *headerHeightConstraint;
 @property (nonatomic, strong) UIView *friendsEmptyBackgroundView;
 @property (nonatomic, strong) UILabel *friendsEmptyTitleLabel;
-/// 标记是否需要重新拉取好友列表（首次进入或好友关系变化时置 YES，从子页面返回时不重拉）
+/// 标记是否需要重新拉取好友列表（首次进入或好友关系变化时置 YES）
 @property (nonatomic, assign) BOOL needsReloadFriends;
+@property (nonatomic, strong) NSDate *friendsLastRefreshDate;
 @end
 
 @implementation LocationViewController
@@ -439,13 +441,37 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     }
 }
 
+- (BOOL)isCommunityNavigationRoot {
+    UINavigationController *nav = self.navigationController;
+    if (!nav) {
+        return YES;
+    }
+    return nav.viewControllers.count <= 1 || nav.viewControllers.firstObject == self;
+}
+
+- (BOOL)shouldRefreshFriendsNow {
+    if (!self.friendsLastRefreshDate) {
+        return YES;
+    }
+    return [[NSDate date] timeIntervalSinceDate:self.friendsLastRefreshDate] >= kFriendsRefreshMinInterval;
+}
+
+- (void)refreshFriendsIfNeededForced:(BOOL)forced {
+    if (!forced && !self.needsReloadFriends && ![self shouldRefreshFriendsNow]) {
+        return;
+    }
+    self.needsReloadFriends = NO;
+    [self loadRemoteFriends];
+}
+
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     self.pendingCount = [[NSUserDefaults standardUserDefaults] integerForKey:kCommunityPendingCountKey];
-    // 只在需要时重新拉取好友列表（首次进入或好友关系变化），从子页面返回时跳过，避免头像闪烁
     if (self.needsReloadFriends) {
-        self.needsReloadFriends = NO;
-        [self loadRemoteFriends];
+        [self refreshFriendsIfNeededForced:YES];
+    } else if ([self isCommunityNavigationRoot]) {
+        // 社区根页面：切 Tab 回来、从添加好友返回、对方同意申请后需看到最新列表
+        [self refreshFriendsIfNeededForced:NO];
     }
     [self refreshPendingCountFromServer];
     [self updateCommunityEmptyState];
@@ -457,6 +483,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 }
 
 - (void)loadRemoteFriends {
+    self.friendsLastRefreshDate = [NSDate date];
     __weak typeof(self) weakSelf = self;
     [CommunityRequest.shared getCommunityFriendsWithPage:1 pageSize:50 success:^(HTTPResponse * _Nullable responseObject) {
         id raw = responseObject.dataObject ?: responseObject.data;
@@ -757,6 +784,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 }
 
 - (void)onAddFriend {
+    self.needsReloadFriends = YES;
     AddFriendViewController *vc = [[AddFriendViewController alloc] init];
     vc.hidesBottomBarWhenPushed = YES;
     [self.navigationController pushViewController:vc animated:YES];
@@ -775,9 +803,8 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 }
 
 - (void)onFriendsChanged {
-    // 如果当前页面可见，立即刷新；否则标记等下次 viewWillAppear 时刷新
     if (self.isViewLoaded && self.view.window) {
-        [self loadRemoteFriends];
+        [self refreshFriendsIfNeededForced:YES];
     } else {
         self.needsReloadFriends = YES;
     }
@@ -787,6 +814,11 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
 - (void)onAppWillEnterForeground {
     [self refreshPendingCountFromServer];
+    if (self.isViewLoaded && self.view.window) {
+        [self refreshFriendsIfNeededForced:YES];
+    } else {
+        self.needsReloadFriends = YES;
+    }
 }
 
 - (void)updatePendingBadge {
