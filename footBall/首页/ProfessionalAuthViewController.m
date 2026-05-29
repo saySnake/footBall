@@ -22,9 +22,10 @@ static CGFloat const kPAWorkCardSideInset = 16.f;
 static CGFloat const kPAWorkCardInnerInset = 14.f;
 static CGFloat const kPAGridInteritem = 15.f;
 static CGFloat const kPAGridLineSpacing = 18.f;
-/// 稿中单元约 150×206
+/// 稿 375 宽下：卡片内宽 315，两列间距 15 → 单元 150×206
 static CGFloat const kPACellRefW = 150.f;
 static CGFloat const kPACellRefH = 206.f;
+static CGFloat const kPACellAspect = kPACellRefH / kPACellRefW;
 
 /// Figma 1:4218「职业认证」已完成态
 static CGFloat const kPACompletedHeaderLeading = 15.f;   // 稿 x=15
@@ -33,13 +34,20 @@ static CGFloat const kPAVerifiedTitleTop = 16.f;         // 192−176
 static CGFloat const kPAVerifiedTitleLeading = 14.f;     // 30−16
 static CGFloat const kPAVerifiedTitleToImage = 17.f;     // 234−217（标题约 25 高）
 static CGFloat const kPAVerifiedImageInset = 17.f;       // 33−16
+static CGFloat const kPAVerifiedImageRefW = 310.f;       // 稿 343 卡内左右各 17
 static CGFloat const kPAVerifiedImageH = 428.f;          // 稿单张展示区域高
+static CGFloat const kPAVerifiedImageAspect = kPAVerifiedImageH / kPAVerifiedImageRefW;
 static CGFloat const kPAVerifiedCardBottomInset = 23.f;  // 685−662
 
 static const NSInteger kMaxProfessionalImages = 4;
 
-static CGSize kPAGridCellSizeForScreen(void) {
-    return CGSizeMake(kPACellRefW, kPACellRefH);
+static CGSize kPAGridCellSizeForGridWidth(CGFloat gridWidth) {
+    if (gridWidth <= kPAGridInteritem) {
+        return CGSizeMake(kPACellRefW, kPACellRefH);
+    }
+    CGFloat itemW = floor((gridWidth - kPAGridInteritem) / 2.0);
+    CGFloat itemH = floor(itemW * kPACellAspect);
+    return CGSizeMake(itemW, itemH);
 }
 
 @interface ProfessionalAuthViewController () <UIImagePickerControllerDelegate, UINavigationControllerDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout>
@@ -51,6 +59,8 @@ static CGSize kPAGridCellSizeForScreen(void) {
 @property (nonatomic, strong) UIView *workCard;
 @property (nonatomic, strong) UILabel *workTitleLabel;
 @property (nonatomic, strong) UICollectionView *collectionView;
+@property (nonatomic, strong) MASConstraint *collectionViewHeightConstraint;
+@property (nonatomic, assign) CGFloat lastGridLayoutWidth;
 @property (nonatomic, strong) UIButton *submitBtn;
 
 @property (nonatomic, strong) UILabel *completedHeaderLabel;
@@ -237,7 +247,8 @@ static CGSize kPAGridCellSizeForScreen(void) {
         make.trailing.lessThanOrEqualTo(self.workCard).offset(-kPAWorkCardInnerInset);
     }];
 
-    CGSize cellSz = kPAGridCellSizeForScreen();
+    CGFloat initialGridW = CGRectGetWidth(UIScreen.mainScreen.bounds) - kPAWorkCardSideInset * 2 - kPAWorkCardInnerInset * 2;
+    CGSize cellSz = kPAGridCellSizeForGridWidth(initialGridW);
     CGFloat gridH = cellSz.height * 2 + kPAGridLineSpacing;
 
     UICollectionViewFlowLayout *layout = [UICollectionViewFlowLayout new];
@@ -256,7 +267,7 @@ static CGSize kPAGridCellSizeForScreen(void) {
         make.top.equalTo(self.workTitleLabel.mas_bottom).offset(18);
         make.leading.equalTo(self.workCard).offset(kPAWorkCardInnerInset);
         make.trailing.equalTo(self.workCard).offset(-kPAWorkCardInnerInset);
-        make.height.mas_equalTo(gridH);
+        self.collectionViewHeightConstraint = make.height.mas_equalTo(gridH);
         make.bottom.equalTo(self.workCard).offset(-21);
     }];
 
@@ -318,9 +329,29 @@ static CGSize kPAGridCellSizeForScreen(void) {
         make.top.equalTo(self.readOnlyTitleLabel.mas_bottom).offset(kPAVerifiedTitleToImage);
         make.leading.equalTo(self.readOnlyCard).offset(kPAVerifiedImageInset);
         make.trailing.equalTo(self.readOnlyCard).offset(-kPAVerifiedImageInset);
-        make.height.mas_equalTo(kPAVerifiedImageH);
+        make.height.equalTo(self.readOnlyImageView.mas_width).multipliedBy(kPAVerifiedImageAspect);
         make.bottom.equalTo(self.readOnlyCard).offset(-kPAVerifiedCardBottomInset);
     }];
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    [self updateProfessionalGridLayoutIfNeeded];
+}
+
+- (void)updateProfessionalGridLayoutIfNeeded {
+    if (!self.collectionView || self.collectionView.hidden) return;
+    CGFloat gridW = CGRectGetWidth(self.collectionView.bounds);
+    if (gridW < 1 || fabs(gridW - self.lastGridLayoutWidth) < 0.5) return;
+
+    self.lastGridLayoutWidth = gridW;
+    CGSize cellSz = kPAGridCellSizeForGridWidth(gridW);
+    CGFloat gridH = cellSz.height * 2.f + kPAGridLineSpacing;
+    self.collectionViewHeightConstraint.offset = gridH;
+    UICollectionViewFlowLayout *layout = (UICollectionViewFlowLayout *)self.collectionView.collectionViewLayout;
+    if ([layout isKindOfClass:UICollectionViewFlowLayout.class]) {
+        [layout invalidateLayout];
+    }
 }
 
 - (void)refreshState {
@@ -339,7 +370,9 @@ static CGSize kPAGridCellSizeForScreen(void) {
     self.completedHeaderLabel.hidden = showUnverified;
 
     if (showUnverified) {
+        self.lastGridLayoutWidth = 0;
         [self.collectionView reloadData];
+        [self updateProfessionalGridLayoutIfNeeded];
     } else {
         NSString *urlString = [VerificationRequest shared].cachedProfessionalImageUrls.firstObject;
         NSURL *url = urlString.length > 0 ? [NSURL URLWithString:urlString] : nil;
@@ -399,7 +432,7 @@ static CGSize kPAGridCellSizeForScreen(void) {
 }
 
 - (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
-    return kPAGridCellSizeForScreen();
+    return kPAGridCellSizeForGridWidth(CGRectGetWidth(collectionView.bounds));
 }
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
