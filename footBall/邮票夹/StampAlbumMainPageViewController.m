@@ -1,9 +1,9 @@
 //
-//  PassportSheetsViewController.m
+//  StampAlbumMainPageViewController.m
 //  footBall
 //
 
-#import "PassportSheetsViewController.h"
+#import "StampAlbumMainPageViewController.h"
 #import "PassportHeader2View.h"
 #import "PassportViewModel.h"
 #import "ProfileRequest.h"
@@ -14,7 +14,7 @@
 #import <SDWebImage/SDWebImage.h>
 #import "StampRequest.h"
 #import "StampModels.h"
-#import "StampAlbumViewController.h"
+#import "StampAlbumCategoryViewController.h"
 #import "StampUnlockPopupViewController.h"
 #import "MembershipCenterViewController.h"
 #import "CommunityRequest.h"
@@ -33,6 +33,8 @@ static UIColor *PassportSheetsListBg(void) {
 #pragma mark - Stamp sheet grid
 @interface PassportStampGridItem : NSObject
 @property (nonatomic, assign) BOOL unlocked;
+/// 查看他人主页时为 YES：仅展示已有邮票，禁止交互，不显示添加/解锁
+@property (nonatomic, assign) BOOL viewOnly;
 @property (nonatomic, strong, nullable) PNStampAlbumItem *stamp;
 @end
 @implementation PassportStampGridItem
@@ -41,7 +43,8 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     PassportStampGridItemViewStateAdd,//添加
     PassportStampGridItemViewStateUnlock,//解锁
     PassportStampGridItemViewStateUpdate,//更换
-    PassportStampGridItemViewStateDelete//长按等待删除
+    PassportStampGridItemViewStateDelete,//长按等待删除
+    PassportStampGridItemViewStateViewOnly,//他人主页只读
 };
 @interface PassportStampGridItemView : UIButton
 @property (nonatomic, strong) UIImageView *lockView;
@@ -74,6 +77,21 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 }
 - (void)setItem:(PassportStampGridItem *)item {
     _item = item;
+    if (item.viewOnly) {
+        self.stampState = PassportStampGridItemViewStateViewOnly;
+        self.userInteractionEnabled = NO;
+        self.lockView.hidden = YES;
+        if (item.stamp) {
+            self.backgroundColor = [UIColor colorWithHexString:@"#9C9C9C"];
+            [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
+        } else {
+            self.backgroundColor = [UIColor colorWithHexString:@"#E9E9E9"];
+            [self sd_cancelImageLoadForState:UIControlStateNormal];
+            [self setImage:nil forState:UIControlStateNormal];
+        }
+        return;
+    }
+    self.userInteractionEnabled = YES;
     if (item.unlocked) {
         self.backgroundColor = [UIColor colorWithHexString:@"#9C9C9C"];
         self.lockView.image = [UIImage imageNamed:@"stamp_add"];
@@ -106,8 +124,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 @property (nonatomic, copy) void (^onClickStamp)(NSInteger index,PassportStampGridItem *item);
 //删除
 @property (nonatomic, copy) void (^onClickDelete)(NSInteger index,PassportStampGridItem *item);
+@property (nonatomic, assign) BOOL viewOnly;
 
-- (void)configureWithItems:(NSArray<PassportStampGridItem *> *)items;
+- (void)configureWithItems:(NSArray<PassportStampGridItem *> *)items viewOnly:(BOOL)viewOnly;
 @end
 @implementation PassportStampSheetGridView
 - (instancetype)initWithFrame:(CGRect)frame
@@ -161,6 +180,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     return self;
 }
 - (void)onClick:(PassportStampGridItemView *)sender {
+    if (self.viewOnly || sender.stampState == PassportStampGridItemViewStateViewOnly) {
+        return;
+    }
     NSInteger idx = sender.tag - 0x900;
     if (sender.stampState == PassportStampGridItemViewStateDelete) {
         sender.stampState = PassportStampGridItemViewStateUpdate;
@@ -181,6 +203,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     }
 }
 - (void)deleteAction:(UIButton *)sender {
+    if (self.viewOnly) {
+        return;
+    }
     sender.hidden = YES;
     NSInteger idx = sender.tag - 0xF;
     PassportStampGridItemView *itemView = (PassportStampGridItemView *)[self viewWithTag:0x900+idx];
@@ -191,6 +216,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 //    [itemView setItem:itemView.item];
 }
 - (void)itemLongPressAction:(UILongPressGestureRecognizer *)sender {
+    if (self.viewOnly) {
+        return;
+    }
     PassportStampGridItemView *itemView = (PassportStampGridItemView *)sender.view;
     if (itemView.stampState == PassportStampGridItemViewStateUpdate) {
         itemView.stampState = PassportStampGridItemViewStateDelete;
@@ -201,13 +229,25 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 
 }
 - (void)configureWithItems:(NSArray<PassportStampGridItem *> *)items {
+    [self configureWithItems:items viewOnly:NO];
+}
+
+- (void)configureWithItems:(NSArray<PassportStampGridItem *> *)items viewOnly:(BOOL)viewOnly {
+    self.viewOnly = viewOnly;
+    self.userInteractionEnabled = !viewOnly;
     self.items = items ?: @[];
-    for (int i = 0; i < items.count; i++) {
+    for (int i = 0; i < STAMP_SECTION_ITEMS; i++) {
+        UIButton *deleteBtn = (UIButton *)[self viewWithTag:0xF + i];
+        deleteBtn.hidden = YES;
+        deleteBtn.userInteractionEnabled = !viewOnly;
+    }
+    for (int i = 0; i < (NSInteger)self.items.count; i++) {
         PassportStampGridItemView *iv = (PassportStampGridItemView *)[self viewWithTag:0x900 + i];
         if (![iv isKindOfClass:PassportStampGridItemView.class]) {
             continue;
         }
         PassportStampGridItem *it = self.items[(NSUInteger)i];
+        it.viewOnly = viewOnly;
         iv.item = it;
     }
 }
@@ -302,8 +342,11 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 - (void)configureWithModel:(PassportViewModel *)model {
     [self.header2 configureWithModel:model];
 }
+- (void)configureWithSectionItem:(PassportStampSheetCardItem *)item viewOnly:(BOOL)viewOnly {
+    [self.bottomGridView configureWithItems:item.bottomItems viewOnly:viewOnly];
+}
 - (void)configureWithSectionItem:(PassportStampSheetCardItem *)item {
-    [self.bottomGridView configureWithItems:item.bottomItems];
+    [self configureWithSectionItem:item viewOnly:NO];
 }
 @end
 
@@ -376,9 +419,12 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     return self;
 }
 
+- (void)configureWithSectionItem:(PassportStampSheetCardItem *)item viewOnly:(BOOL)viewOnly {
+    [self.topGridView configureWithItems:item.topItems viewOnly:viewOnly];
+    [self.bottomGridView configureWithItems:item.bottomItems viewOnly:viewOnly];
+}
 - (void)configureWithSectionItem:(PassportStampSheetCardItem *)item {
-    [self.topGridView configureWithItems:item.topItems];
-    [self.bottomGridView configureWithItems:item.bottomItems];
+    [self configureWithSectionItem:item viewOnly:NO];
 }
 
 
@@ -387,7 +433,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 
 #pragma mark - View controller
 
-@interface PassportSheetsViewController () <UITableViewDelegate, UITableViewDataSource>
+@interface StampAlbumMainPageViewController () <UITableViewDelegate, UITableViewDataSource>
 @property (nonatomic, strong) PassportViewModel *viewModel;
 @property (nonatomic, assign) NSInteger year;
 @property (nonatomic, strong) UIView *topBar;
@@ -404,7 +450,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 
 @end
 
-@implementation PassportSheetsViewController
+@implementation StampAlbumMainPageViewController
 
 - (void)presentStampUnlockDialog {
     __weak typeof(self) weakSelf = self;
@@ -443,9 +489,13 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     }
 }
 
+- (BOOL)isViewingOthers {
+    return self.targetUserId.length > 0;
+}
+
 - (BOOL)isSlotUnlockedInFirstGroup:(BOOL)isFirstGroup atIndex:(NSInteger)index {
-    if (self.targetUserId.length > 0) {
-        return YES;
+    if ([self isViewingOthers]) {
+        return NO;
     }
     // 仅第一组（header，坐标 section=1）前 5 格永久免费；其余全部按会员解锁
     if (isFirstGroup && index < STAMP_ITEAM_FREE) {
@@ -553,8 +603,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     PassportHeader2Card *header = [PassportHeader2Card.alloc initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH, 516)];
     [header configureWithModel:self.viewModel];
     __weak typeof(self) weakSelf = self;
-    header.bottomGridView.onClickAdd = ^(NSInteger index, PassportStampGridItem *item) {
-        StampAlbumViewController *album = StampAlbumViewController.alloc.init;
+    if (![self isViewingOthers]) {
+        header.bottomGridView.onClickAdd = ^(NSInteger index, PassportStampGridItem *item) {
+        StampAlbumCategoryViewController *album = StampAlbumCategoryViewController.alloc.init;
         album.didSelected = ^(PNStampAlbumItem * _Nonnull stamp) {
             //header只有一组,坐标分组从1开始
             NSString *position = [NSString stringWithFormat:@"1,%ld",index];
@@ -567,7 +618,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         [weakSelf.navigationController pushViewController:album animated:YES];
     };
     header.bottomGridView.onClickStamp = ^(NSInteger index, PassportStampGridItem *item) {
-        StampAlbumViewController *album = StampAlbumViewController.alloc.init;
+        StampAlbumCategoryViewController *album = StampAlbumCategoryViewController.alloc.init;
         album.didSelected = ^(PNStampAlbumItem * _Nonnull stamp) {
             [StampRequest.shared updateOldStamp:item.stamp.stampId newStamp:stamp.stampId success:^(HTTPResponse * _Nullable responseObject) {
                 [weakSelf loadStampCollection];
@@ -588,6 +639,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
             [QMUITips showError:error.localizedDescription];
         }];
     };
+    }
     self.headerCard = header;
     self.tableView.tableHeaderView = header;
     
@@ -600,12 +652,14 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 }
 
 - (void)reloadStamps:(NSArray <PNStampAlbumItem *> *)stamps {
+    BOOL viewOnly = [self isViewingOthers];
     //第一组 tableView headerView
     PassportStampSheetCardItem *headerItem = PassportStampSheetCardItem.alloc.init;
     NSMutableArray *subItem = [NSMutableArray arrayWithCapacity:STAMP_SECTION_ITEMS];
     for (int j=0; j<STAMP_SECTION_ITEMS; j++) {
         PassportStampGridItem *gridItem1 = PassportStampGridItem.alloc.init;
-        gridItem1.unlocked = [self isSlotUnlockedInFirstGroup:YES atIndex:j];
+        gridItem1.viewOnly = viewOnly;
+        gridItem1.unlocked = viewOnly ? NO : [self isSlotUnlockedInFirstGroup:YES atIndex:j];
         [subItem addObject:gridItem1];
     }
     headerItem.bottomItems = subItem;
@@ -617,10 +671,12 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         NSMutableArray *subItem2 = [NSMutableArray arrayWithCapacity:STAMP_SECTION_ITEMS];
         for (int j=0; j<STAMP_SECTION_ITEMS; j++) {
             PassportStampGridItem *gridItem1 = PassportStampGridItem.alloc.init;
-            gridItem1.unlocked = [self isSlotUnlockedInFirstGroup:NO atIndex:j];
+            gridItem1.viewOnly = viewOnly;
+            gridItem1.unlocked = viewOnly ? NO : [self isSlotUnlockedInFirstGroup:NO atIndex:j];
             [subItem1 addObject:gridItem1];
             PassportStampGridItem *gridItem2 = PassportStampGridItem.alloc.init;
-            gridItem2.unlocked = [self isSlotUnlockedInFirstGroup:NO atIndex:j];
+            gridItem2.viewOnly = viewOnly;
+            gridItem2.unlocked = viewOnly ? NO : [self isSlotUnlockedInFirstGroup:NO atIndex:j];
             [subItem2 addObject:gridItem2];
         }
         item.topItems = subItem1;
@@ -654,7 +710,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
             
         }
     }
-    [self.headerCard configureWithSectionItem:headerItem];
+    [self.headerCard configureWithSectionItem:headerItem viewOnly:viewOnly];
     [self.tableView reloadData];
 }
 // 获取邮票列表（自己或好友）
@@ -758,8 +814,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     PassportStampSheetCardCell *c = [tableView dequeueReusableCellWithIdentifier:@"stamp" forIndexPath:indexPath];
     __weak typeof(self) weakSelf = self;
+    if (![self isViewingOthers]) {
     c.topGridView.onClickAdd = ^(NSInteger index, PassportStampGridItem *item) {
-        StampAlbumViewController *album = StampAlbumViewController.alloc.init;
+        StampAlbumCategoryViewController *album = StampAlbumCategoryViewController.alloc.init;
         album.didSelected = ^(PNStampAlbumItem * _Nonnull stamp) {
             // NSInteger section = row * 2 + 2 + (0 or 1) 坐标分组从1开始
             NSInteger section = indexPath.row*2 + 2;
@@ -773,7 +830,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         [weakSelf.navigationController pushViewController:album animated:YES];
     };
     c.topGridView.onClickStamp = ^(NSInteger index, PassportStampGridItem *item) {
-        StampAlbumViewController *album = StampAlbumViewController.alloc.init;
+        StampAlbumCategoryViewController *album = StampAlbumCategoryViewController.alloc.init;
         album.didSelected = ^(PNStampAlbumItem * _Nonnull stamp) {
             NSString *oldId = item.stamp.stampId ?: @"";
             NSString *newId = stamp.stampId ?: @"";
@@ -803,7 +860,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         }];
     };
     c.bottomGridView.onClickAdd = ^(NSInteger index, PassportStampGridItem *item) {
-        StampAlbumViewController *album = StampAlbumViewController.alloc.init;
+        StampAlbumCategoryViewController *album = StampAlbumCategoryViewController.alloc.init;
         album.didSelected = ^(PNStampAlbumItem * _Nonnull stamp) {
             // NSInteger section = row * 2 + 2 + (0 or 1) 坐标分组从1开始
             NSInteger section = indexPath.row*2 + 2 + 1;
@@ -817,7 +874,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         [weakSelf.navigationController pushViewController:album animated:YES];
     };
     c.bottomGridView.onClickStamp = ^(NSInteger index, PassportStampGridItem *item) {
-        StampAlbumViewController *album = StampAlbumViewController.alloc.init;
+        StampAlbumCategoryViewController *album = StampAlbumCategoryViewController.alloc.init;
         album.didSelected = ^(PNStampAlbumItem * _Nonnull stamp) {
             NSString *oldId = item.stamp.stampId ?: @"";
             NSString *newId = stamp.stampId ?: @"";
@@ -846,7 +903,17 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
             [QMUITips showError:error.localizedDescription];
         }];
     };
-    [c configureWithSectionItem:self.items[indexPath.row]];
+    } else {
+        c.topGridView.onClickAdd = nil;
+        c.topGridView.onClickStamp = nil;
+        c.topGridView.onClickUnLock = nil;
+        c.topGridView.onClickDelete = nil;
+        c.bottomGridView.onClickAdd = nil;
+        c.bottomGridView.onClickStamp = nil;
+        c.bottomGridView.onClickUnLock = nil;
+        c.bottomGridView.onClickDelete = nil;
+    }
+    [c configureWithSectionItem:self.items[indexPath.row] viewOnly:[self isViewingOthers]];
     return c;
 }
 
@@ -856,7 +923,12 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 
 - (void)updateLocalizedStrings {
     [super updateLocalizedStrings];
-    _titleLabel.text = NSLocalizedString(@"passport_nav_title", nil) ?: @"我的护照";
+    if ([self isViewingOthers]) {
+        NSString *name = self.targetNickname.length > 0 ? self.targetNickname : (NSLocalizedString(@"stamp_album_friend_title", nil) ?: @"TA的邮票夹");
+        _titleLabel.text = name;
+    } else {
+        _titleLabel.text = NSLocalizedString(@"passport_nav_title", nil) ?: @"我的护照";
+    }
 }
 
 @end

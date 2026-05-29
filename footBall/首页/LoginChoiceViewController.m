@@ -5,6 +5,8 @@
 
 #import "LoginChoiceViewController.h"
 #import <Masonry/Masonry.h>
+#import "UINavigationController+NavigationBar.h"
+#import "NavigationBarManager.h"
 
 @interface LoginChoiceViewController ()
 
@@ -18,10 +20,31 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+    if (@available(iOS 13.0, *)) {
+        // 登录页为固定浅色稿，避免夜间深色模式下导航栏标题变白
+        self.overrideUserInterfaceStyle = UIUserInterfaceStyleLight;
+    }
     self.view.backgroundColor = [UIColor whiteColor];
     self.title = NSLocalizedString(@"login_nav_title", nil);
     
     [self setupUI];
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self.navigationController setNavigationBarHidden:NO animated:animated];
+    [self applyLoginNavigationBarStyle];
+}
+
+- (void)applyLoginNavigationBarStyle {
+    if (!self.navigationController) {
+        return;
+    }
+    NavigationBarConfig *config = [NavigationBarManager configWithBackgroundColor:[UIColor whiteColor]
+                                                                        titleColor:[UIColor colorWithHexString:@"#000000"]];
+    config.hideShadow = YES;
+    config.tintColor = [ColorManager sharedManager].primaryColor;
+    [self.navigationController applyNavigationBarStyle:config];
 }
 
 - (void)setupUI {
@@ -33,7 +56,7 @@
     self.titleLabel.text = NSLocalizedString(@"login_welcome_title", nil);
     self.titleLabel.font = [UIFont boldSystemFontOfSize:20.0];
     self.titleLabel.textAlignment = NSTextAlignmentCenter;
-    self.titleLabel.textColor = [UIColor blackColor];
+    self.titleLabel.textColor = [UIColor colorWithHexString:@"#000000"];
     
     self.phoneLoginButton = [UIButton buttonWithType:UIButtonTypeSystem];
     [self.phoneLoginButton setTitle:NSLocalizedString(@"login_with_phone_button", nil) forState:UIControlStateNormal];

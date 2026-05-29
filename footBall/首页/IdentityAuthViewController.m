@@ -175,7 +175,7 @@ static BOOL IAStatusNeedsRetry(NSString *s) {
     self.userCard.layer.shadowRadius = 8;
     [self.view addSubview:self.userCard];
     [self.userCard mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.view).offset(kIAUserCardTop);
+        make.top.equalTo(self.view).offset(kIAUserCardTop+15);
         make.leading.equalTo(self.view).offset(kIACardSideInset);
         make.trailing.equalTo(self.view).offset(-kIACardSideInset);
         make.height.mas_equalTo(84);

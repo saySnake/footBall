@@ -8,7 +8,7 @@
 #import "PassportYearTabStrip.h"
 #import "PassportViewModel.h"
 #import "PassportTableCells.h"
-#import "PassportSheetsViewController.h"
+#import "StampAlbumMainPageViewController.h"
 #import "ProfileRequest.h"
 #import "HTTPResponse.h"
 #import "AuthManager.h"
@@ -67,7 +67,7 @@ static UIColor *PassportPageBg(void) {
 //        if (!m) {
 //            return;
 //        }
-//        PassportSheetsViewController *vc = [[PassportSheetsViewController alloc] initWithViewModel:m year:weakSelf.selectedYear];
+//        StampAlbumMainPageViewController *vc = [[StampAlbumMainPageViewController alloc] initWithViewModel:m year:weakSelf.selectedYear];
 //        [weakSelf.navigationController pushViewController:vc animated:YES];
 //    };
     self.viewModel = [PassportViewModel viewModelWithPassport:nil year:self.selectedYear];

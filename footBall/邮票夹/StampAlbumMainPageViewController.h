@@ -1,5 +1,5 @@
 //
-//  PassportSheetsViewController.h
+//  StampAlbumMainPageViewController.h
 //  footBall
 //
 
@@ -10,7 +10,7 @@ NS_ASSUME_NONNULL_BEGIN
 @class PassportViewModel;
 
 /// 邮票主页
-@interface PassportSheetsViewController : QMBaseViewController
+@interface StampAlbumMainPageViewController : QMBaseViewController
 
 - (instancetype)initWithViewModel:(PassportViewModel *)viewModel year:(NSInteger)year;
 

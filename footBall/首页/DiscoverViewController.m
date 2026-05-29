@@ -10,7 +10,7 @@
 #import "PNMatchVerifyViewController.h"
 #import "ConsumptionRecordViewController.h"
 #import "PassportViewController.h"
-#import "PassportSheetsViewController.h"
+#import "StampAlbumMainPageViewController.h"
 #import "PNMatchDetailViewController.h"
 #import "PNMatchInfoInputViewController.h"
 #import "LoadingManager.h"
@@ -1409,7 +1409,7 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
 }
 
 - (void)onStampAlbumTapped {
-    PassportSheetsViewController *vc = [[PassportSheetsViewController alloc] init];
+    StampAlbumMainPageViewController *vc = [[StampAlbumMainPageViewController alloc] init];
     vc.hidesBottomBarWhenPushed = YES;
     [self.navigationController pushViewController:vc animated:YES];
 }
