@@ -172,7 +172,8 @@
 - (void)getStampQuotaSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     [[APIManager sharedManager] GET:APIPathValueStampsQuota parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            responseObject.dataObject = responseObject.data;
+            PNStampQuota *quota = [PNStampQuota yy_modelWithJSON:responseObject.data];
+            responseObject.dataObject = quota ?: responseObject.data;
             if (success) success(responseObject);
         } else {
             if (failure) failure([APIError errorWithResponse:responseObject]);

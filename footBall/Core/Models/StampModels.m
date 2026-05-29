@@ -44,3 +44,6 @@
 }
 @end
 
+@implementation PNStampQuota
+@end
+

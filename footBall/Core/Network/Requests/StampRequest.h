@@ -52,7 +52,7 @@ NS_ASSUME_NONNULL_BEGIN
                success:(nullable APISuccessBlock)success
                failure:(nullable APIFailureBlock)failure;
 
-/// GET `/api/v1/stamps/quota` 邮票配额信息（已认证场次、已选邮票数、是否可添加、会员状态）
+/// GET `/api/v1/stamps/quota` 邮票配额信息；`dataObject` 为 `PNStampQuota`
 - (void)getStampQuotaSuccess:(nullable APISuccessBlock)success
                      failure:(nullable APIFailureBlock)failure;
 

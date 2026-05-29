@@ -43,4 +43,22 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSArray<PNStampAlbumItem *> *stamps;
 @end
 
+/// StampQuotaVO — 邮票配额（会员状态、免费额度、最大可选数）
+@interface PNStampQuota : NSObject <YYModel>
+/// 已认证比赛场次数
+@property (nonatomic, assign) NSInteger verifiedMatchCount;
+/// 已选择邮票数
+@property (nonatomic, assign) NSInteger selectedStampCount;
+/// 最大可选邮票数
+@property (nonatomic, assign) NSInteger maxStampCount;
+/// 是否可继续添加
+@property (nonatomic, assign) BOOL canAddStamp;
+/// 是否会员
+@property (nonatomic, assign) BOOL isMember;
+/// 非会员免费额度（后端默认 5）
+@property (nonatomic, assign) NSInteger freeQuota;
+/// 不可添加时的原因
+@property (nonatomic, copy, nullable) NSString *reason;
+@end
+
 NS_ASSUME_NONNULL_END

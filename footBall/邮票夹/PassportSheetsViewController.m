@@ -397,6 +397,10 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) PassportHeader2Card *headerCard;
 @property (nonatomic, strong) NSArray <PassportStampSheetCardItem *> *items;
+/// 邮票配额（仅自己护照页使用）
+@property (nonatomic, assign) BOOL stampIsMember;
+@property (nonatomic, assign) NSInteger stampFreeQuota;
+@property (nonatomic, assign) NSInteger stampMaxCount;
 
 @end
 
@@ -418,6 +422,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     if (self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil]) {
         NSCalendar *cal = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
         _year = [cal component:NSCalendarUnitYear fromDate:[NSDate date]];
+        _stampFreeQuota = STAMP_ITEAM_FREE;
     }
     return self;
 }
@@ -425,8 +430,39 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     if (self = [super init]) {
         _viewModel = viewModel;
         _year = year;
+        _stampFreeQuota = STAMP_ITEAM_FREE;
     }
     return self;
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    // 从会员中心等页面返回时刷新配额与锁状态（首次 push 时 isMovingToParentViewController 为 YES，跳过避免重复请求）
+    if (!self.isMovingToParentViewController && self.targetUserId.length == 0) {
+        [self loadStampCollection];
+    }
+}
+
+- (BOOL)isSlotUnlockedInFirstGroup:(BOOL)isFirstGroup atIndex:(NSInteger)index {
+    if (self.targetUserId.length > 0) {
+        return YES;
+    }
+    // 仅第一组（header，坐标 section=1）前 5 格永久免费；其余全部按会员解锁
+    if (isFirstGroup && index < STAMP_ITEAM_FREE) {
+        return YES;
+    }
+    return self.stampIsMember;
+}
+
+- (void)applyStampQuota:(PNStampQuota *)quota {
+    if (!quota) {
+        return;
+    }
+    self.stampIsMember = quota.isMember;
+    if (quota.freeQuota > 0) {
+        self.stampFreeQuota = quota.freeQuota;
+    }
+    self.stampMaxCount = quota.maxStampCount;
 }
 
 - (void)viewDidLoad {
@@ -569,9 +605,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     NSMutableArray *subItem = [NSMutableArray arrayWithCapacity:STAMP_SECTION_ITEMS];
     for (int j=0; j<STAMP_SECTION_ITEMS; j++) {
         PassportStampGridItem *gridItem1 = PassportStampGridItem.alloc.init;
-        if (j<STAMP_ITEAM_FREE) {
-            gridItem1.unlocked = YES;
-        }
+        gridItem1.unlocked = [self isSlotUnlockedInFirstGroup:YES atIndex:j];
         [subItem addObject:gridItem1];
     }
     headerItem.bottomItems = subItem;
@@ -583,8 +617,10 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         NSMutableArray *subItem2 = [NSMutableArray arrayWithCapacity:STAMP_SECTION_ITEMS];
         for (int j=0; j<STAMP_SECTION_ITEMS; j++) {
             PassportStampGridItem *gridItem1 = PassportStampGridItem.alloc.init;
+            gridItem1.unlocked = [self isSlotUnlockedInFirstGroup:NO atIndex:j];
             [subItem1 addObject:gridItem1];
             PassportStampGridItem *gridItem2 = PassportStampGridItem.alloc.init;
+            gridItem2.unlocked = [self isSlotUnlockedInFirstGroup:NO atIndex:j];
             [subItem2 addObject:gridItem2];
         }
         item.topItems = subItem1;
@@ -624,23 +660,45 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 // 获取邮票列表（自己或好友）
 - (void)loadStampCollection {
     __weak typeof(self) weakSelf = self;
-    
+
     if (self.targetUserId.length > 0) {
-        // 查看好友邮票 - 使用社区接口
         [CommunityRequest.shared getFriendStamps:self.targetUserId success:^(HTTPResponse * _Nullable responseObject) {
             NSArray *stamps = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
             [weakSelf reloadStamps:stamps];
         } failure:^(NSError * _Nonnull error) {
             [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
         }];
-    } else {
-        // 查看自己的邮票
-        [StampRequest.shared getStampListSuccess:^(HTTPResponse * _Nullable responseObject) {
-            [weakSelf reloadStamps:responseObject.dataObject];
-        } failure:^(NSError * _Nonnull error) {
-            [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
-        }];
+        return;
     }
+
+    __block NSArray<PNStampAlbumItem *> *stamps = @[];
+    __block PNStampQuota *quota = nil;
+    dispatch_group_t group = dispatch_group_create();
+
+    dispatch_group_enter(group);
+    [StampRequest.shared getStampQuotaSuccess:^(HTTPResponse * _Nullable responseObject) {
+        if ([responseObject.dataObject isKindOfClass:PNStampQuota.class]) {
+            quota = (PNStampQuota *)responseObject.dataObject;
+        }
+        dispatch_group_leave(group);
+    } failure:^(NSError * _Nonnull error) {
+        dispatch_group_leave(group);
+    }];
+
+    dispatch_group_enter(group);
+    [StampRequest.shared getStampListSuccess:^(HTTPResponse * _Nullable responseObject) {
+        if ([responseObject.dataObject isKindOfClass:NSArray.class]) {
+            stamps = (NSArray<PNStampAlbumItem *> *)responseObject.dataObject;
+        }
+        dispatch_group_leave(group);
+    } failure:^(NSError * _Nonnull error) {
+        dispatch_group_leave(group);
+    }];
+
+    dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+        [weakSelf applyStampQuota:quota];
+        [weakSelf reloadStamps:stamps];
+    });
 }
 - (void)loadPassportData {
     __weak typeof(self) weakSelf = self;
