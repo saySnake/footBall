@@ -28,6 +28,10 @@ static CGFloat const kHomeFeaturedCardH = 168.f;
 static CGFloat const kHomeFeaturedCardGap = 12.f;
 static CGFloat const kHomeFeaturedCardPad = 16.f;
 static CGFloat const kHomeFeaturedBadgeSize = 24.f;
+/// 顶部球队：圈 56 + 名上间距 5 + 11pt 单行字高约 13
+static CGFloat const kHomeTeamNameBottomFromCollectionTop = 74.f;
+/// 球队名底到白色内容区顶（Figma）
+static CGFloat const kHomeTeamNameToBodyGap = 18.f;
 static CGFloat const kHomeFeaturedCardCorner = 24.f;
 
 /// 与「更多比赛」一致：收藏用 match_star
@@ -593,8 +597,8 @@ static NSString *kHomeTeamIdString(id raw) {
     [_contentView addSubview:_tableView];
 
     [self.bodyBgView mas_makeConstraints:^(MASConstraintMaker *make) {
-        // 轻微上移，让顶部圆弧露出绿底（与设计图一致）
-        make.top.equalTo(self.view).offset(214);
+        // 相对球队列表定位，保证队名与白色内容区间距恒为 18pt（不随安全区变化）
+        make.top.equalTo(_teamCollectionView.mas_top).offset(kHomeTeamNameBottomFromCollectionTop + kHomeTeamNameToBodyGap);
         make.leading.trailing.bottom.equalTo(self.view);
     }];
     [_scrollView mas_makeConstraints:^(MASConstraintMaker *make) {
