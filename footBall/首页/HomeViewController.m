@@ -348,6 +348,9 @@ static NSString *kHomeTeamIdString(id raw) {
 
 @implementation HomeViewController
 
+static const NSInteger kHomeScheduleDisplayLimit = 400;
+static const NSInteger kHomeScheduleFetchPageSize = 400;
+
 /// 首页数据防护：按 matchId+matchDate 去重并限制最大数量，避免异常大包导致首屏卡死。
 - (NSArray<Match *> *)home_sanitizedMatchesForHome:(NSArray<Match *> *)input maxCount:(NSInteger)maxCount {
     if (![input isKindOfClass:NSArray.class] || input.count == 0) return @[];
@@ -1008,7 +1011,7 @@ static NSString *kHomeTeamIdString(id raw) {
         if ([base hasSuffix:@"/"]) base = [base substringToIndex:base.length - 1];
         NSString *token = AuthManager.sharedManager.user.accessToken ?: @"<token>";
         NSString *firstDate = targetDates.firstObject ?: todayStr;
-        NSString *url = [NSString stringWithFormat:@"%@/api/v1/home/schedule?date=%@&myTeamOnly=0&pageNum=1&pageSize=20", base, firstDate];
+        NSString *url = [NSString stringWithFormat:@"%@/api/v1/home/schedule?date=%@&myTeamOnly=0&pageNum=1&pageSize=%ld", base, firstDate, (long)kHomeScheduleFetchPageSize];
         NSString *curl = [NSString stringWithFormat:
                           @"curl '%@' \\\n"
                           "  -X 'GET' \\\n"
@@ -1037,7 +1040,7 @@ static NSString *kHomeTeamIdString(id raw) {
 
         for (NSString *date in targetDates) {
             dispatch_group_enter(scheduleGroup);
-            [[MatchRequest shared] getMatchScheduleWithDate:date myTeamOnly:NO page:1 pageSize:20 success:^(HTTPResponse<NSArray<Match *> *> * _Nullable r) {
+            [[MatchRequest shared] getMatchScheduleWithDate:date myTeamOnly:NO page:1 pageSize:kHomeScheduleFetchPageSize success:^(HTTPResponse<NSArray<Match *> *> * _Nullable r) {
                 NSArray<Match *> *list = [r.dataObject isKindOfClass:NSArray.class] ? r.dataObject : @[];
                 for (Match *m in list) {
                     NSDate *md = [self dateFromRaw:m.matchDate];
@@ -1064,7 +1067,7 @@ static NSString *kHomeTeamIdString(id raw) {
                 if (!db) return NSOrderedAscending;
                 return [da compare:db];
             }];
-            NSArray<Match *> *sanitized = [self home_sanitizedMatchesForHome:sorted maxCount:180];
+            NSArray<Match *> *sanitized = [self home_sanitizedMatchesForHome:sorted maxCount:kHomeScheduleDisplayLimit];
             NSLog(@"[HomeDebug] schedule merged raw=%ld sanitized=%ld elapsed=%.3f",
                   (long)sorted.count, (long)sanitized.count, CACurrentMediaTime() - self.homeDebugLoadStartAt);
             self.dataSource = sanitized.mutableCopy;
