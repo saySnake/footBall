@@ -603,7 +603,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     _tableView.contentInset = UIEdgeInsetsMake(0, 0, 24, 0);
     [self.view addSubview:_tableView];
 
-    CGFloat headerHeight = ([PassportHeader2Card itemWH]*5+30)*2;
+    CGFloat headerHeight = ([PassportHeader2Card itemWH]*5+30+40+30+200);
     PassportHeader2Card *header = [PassportHeader2Card.alloc initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH, headerHeight)];
     [header configureWithModel:self.viewModel];
     __weak typeof(self) weakSelf = self;
