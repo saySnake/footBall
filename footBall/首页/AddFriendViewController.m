@@ -857,7 +857,8 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
             [self showError:NSLocalizedString(@"community_search_failed", nil)];
         }
     });
-    NSDictionary *payload = @{@"toUserId": targetUserId};
+  // /api/v1/friends/scan 使用 ScanQRCodeReq.targetUserId（与 /friends/requests 的 toUserId 不同）
+    NSDictionary *payload = @{@"targetUserId": targetUserId};
     [SocialRequest.shared scanAddFriendWithPayload:payload success:^(HTTPResponse * _Nullable responseObject) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
