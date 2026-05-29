@@ -264,6 +264,7 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
         UIView *card = [[UIView alloc] init];
         card.backgroundColor = kDiscoverCellBg;
         card.layer.cornerRadius = 8;
+        card.semanticContentAttribute = UISemanticContentAttributeForceLeftToRight;
         [self.contentView addSubview:card];
         self.cardView = card;
         [card mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -352,34 +353,35 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
         [card addSubview:_inputButton];
         [card addSubview:_verifiedPill];
 
-        // Figma 1:9284：队名 — 队徽 — 14 — 时间 — 14 — 队徽 — 队名
-        [_homeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(card).offset(16);
-            make.centerY.equalTo(_homeLogo);
-            make.width.mas_equalTo(80);
-        }];
-        [_homeLogo mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_homeLabel.mas_trailing).offset(7);
-            make.top.equalTo(card).offset(14);
-            make.width.height.mas_equalTo(24);
-        }];
+        // 中间时间/比分居中，主客队左右对称展开（与首页 MatchCell 一致）
         [_scoreLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_homeLogo.mas_trailing).offset(14);
-            make.centerY.equalTo(_homeLogo);
+            make.centerX.equalTo(card);
+            make.top.equalTo(card).offset(14);
             make.height.mas_equalTo(24);
             make.width.mas_greaterThanOrEqualTo(56);
         }];
         [_scoreLabel setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+        [_homeLogo mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.right.equalTo(_scoreLabel.mas_left).offset(-14);
+            make.centerY.equalTo(_scoreLabel);
+            make.width.height.mas_equalTo(24);
+        }];
+        [_homeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.left.greaterThanOrEqualTo(card).offset(16);
+            make.right.equalTo(_homeLogo.mas_left).offset(-7);
+            make.centerY.equalTo(_scoreLabel);
+            make.width.mas_lessThanOrEqualTo(card.mas_width).multipliedBy(0.28);
+        }];
         [_awayLogo mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_scoreLabel.mas_trailing).offset(14);
-            make.centerY.equalTo(_homeLogo);
+            make.left.equalTo(_scoreLabel.mas_right).offset(14);
+            make.centerY.equalTo(_scoreLabel);
             make.width.height.mas_equalTo(24);
         }];
         [_awayLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_awayLogo.mas_trailing).offset(8);
-            make.centerY.equalTo(_homeLogo);
-            make.width.mas_lessThanOrEqualTo(80);
-            make.trailing.lessThanOrEqualTo(card).offset(-16);
+            make.left.equalTo(_awayLogo.mas_right).offset(8);
+            make.centerY.equalTo(_scoreLabel);
+            make.right.lessThanOrEqualTo(card).offset(-16);
+            make.width.mas_lessThanOrEqualTo(card.mas_width).multipliedBy(0.28);
         }];
         // Figma 里“中间徽章”与客队队徽重叠/相邻，这里保留占位但隐藏，避免影响布局
         _middleBadge.hidden = YES;
@@ -389,10 +391,10 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
             make.width.height.mas_equalTo(0);
         }];
 
-        // 日期：在时间胶囊下方，左对齐到时间胶囊
+        // 底行：左按钮 — 居中日期 — 右按钮（同一水平线）
         [_dateLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(_scoreLabel);
-            make.top.equalTo(_scoreLabel.mas_bottom).offset(10);
+            make.centerX.equalTo(card);
+            make.centerY.equalTo(_inputButton);
         }];
         [_inputButton mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(card).offset(16);
@@ -1475,17 +1477,17 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
         cell.scoreLabel.textColor = kDiscoverGreen;
         cell.scoreLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
         if (m.hasInputInfo) {
-            // 提交后与原型一致，日期从中间态左移
+            // 提交后与原型一致，日期移至卡片左下（与底行按钮同高）
             cell.dateLabel.textAlignment = NSTextAlignmentLeft;
             [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
                 make.leading.equalTo(cell.cardView).offset(16);
-                make.top.equalTo(cell.scoreLabel.mas_bottom).offset(17);
+                make.centerY.equalTo(cell.inputButton);
             }];
         } else {
             cell.dateLabel.textAlignment = NSTextAlignmentCenter;
             [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
-                make.centerX.equalTo(cell.scoreLabel);
-                make.top.equalTo(cell.scoreLabel.mas_bottom).offset(17);
+                make.centerX.equalTo(cell.cardView);
+                make.centerY.equalTo(cell.inputButton);
             }];
         }
         [cell.inputButton removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
@@ -1522,18 +1524,18 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
             cell.verifiedPill.tintColor = [UIColor whiteColor];
         }
         if (m.hasInputInfo) {
-            // 已提交输入信息：隐藏左下按钮，日期左移到卡片左下
+            // 已提交输入信息：隐藏左下按钮，日期左移并与右侧认证按钮同高
             cell.dateLabel.textAlignment = NSTextAlignmentLeft;
             [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
                 make.leading.equalTo(cell.cardView).offset(16);
-                make.top.equalTo(cell.scoreLabel.mas_bottom).offset(20);
+                make.centerY.equalTo(cell.verifiedPill);
             }];
         } else {
-            // 未提交输入信息：保留日期在比分区域下方的中间态布局
+            // 未提交输入信息：日期在底行正中
             cell.dateLabel.textAlignment = NSTextAlignmentCenter;
             [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
-                make.centerX.equalTo(cell.scoreLabel);
-                make.top.equalTo(cell.scoreLabel.mas_bottom).offset(20);
+                make.centerX.equalTo(cell.cardView);
+                make.centerY.equalTo(cell.inputButton);
             }];
         }
         [cell.verifiedPill removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
