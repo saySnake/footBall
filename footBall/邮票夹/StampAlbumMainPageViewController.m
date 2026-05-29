@@ -300,7 +300,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         _header2 = [[PassportHeader2View alloc] initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH-32, 0)];
         [_card addSubview:_header2];
 
-        CGFloat whUnit = (SCREEN_WIDTH - 32 - 32) / 8.0;
+        CGFloat whUnit = [PassportHeader2Card itemWH];
         CGFloat headerH = whUnit * 5.0;
 
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -338,7 +338,10 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     }
     return self;
 }
-
++ (CGFloat)itemWH{
+    CGFloat whUnit = (SCREEN_WIDTH - 32 - 32) / 8.0;
+    return whUnit;
+}
 - (void)configureWithModel:(PassportViewModel *)model {
     [self.header2 configureWithModel:model];
 }
@@ -600,7 +603,8 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     _tableView.contentInset = UIEdgeInsetsMake(0, 0, 24, 0);
     [self.view addSubview:_tableView];
 
-    PassportHeader2Card *header = [PassportHeader2Card.alloc initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH, 516)];
+    CGFloat headerHeight = ([PassportHeader2Card itemWH]*5+30)*2;
+    PassportHeader2Card *header = [PassportHeader2Card.alloc initWithFrame:CGRectMake(0, 0, SCREEN_WIDTH, headerHeight)];
     [header configureWithModel:self.viewModel];
     __weak typeof(self) weakSelf = self;
     if (![self isViewingOthers]) {
