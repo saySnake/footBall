@@ -22,6 +22,71 @@ static NSString * const kCommunityPendingCountDidChangeNotification = @"communit
 static NSString * const kCommunityFriendsDidChangeNotification = @"community_friends_did_change";
 static const NSTimeInterval kFriendsRefreshMinInterval = 3.0;
 
+static UIImage *PNCommunityAvatarPlaceholder(void) {
+    if (@available(iOS 13.0, *)) {
+        return [UIImage systemImageNamed:@"person.crop.circle.fill"];
+    }
+    return nil;
+}
+
+static void PNApplyAvatarToImageView(UIImageView *imageView, NSString *urlString) {
+    NSString *rawURL = urlString.length > 0 ? urlString : @"";
+    NSString *avatarURL = [rawURL stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+
+    UIImage *placeholder = PNCommunityAvatarPlaceholder();
+    if (avatarURL.length == 0) {
+        [imageView sd_cancelCurrentImageLoad];
+        imageView.image = placeholder;
+        if (@available(iOS 13.0, *)) {
+            imageView.tintColor = [UIColor colorWithWhite:0.7 alpha:1.0];
+            imageView.contentMode = UIViewContentModeCenter;
+        }
+        return;
+    }
+
+    NSURL *url = [NSURL URLWithString:avatarURL];
+    if (!url) {
+        [imageView sd_cancelCurrentImageLoad];
+        imageView.image = placeholder;
+        return;
+    }
+
+    NSString *cacheKey = [[SDWebImageManager sharedManager] cacheKeyForURL:url];
+    UIImage *cached = [[SDImageCache sharedImageCache] imageFromMemoryCacheForKey:cacheKey];
+    if (!cached) {
+        cached = [[SDImageCache sharedImageCache] imageFromDiskCacheForKey:cacheKey];
+    }
+    if (cached) {
+        [imageView sd_cancelCurrentImageLoad];
+        imageView.image = cached;
+        imageView.contentMode = UIViewContentModeScaleAspectFill;
+        imageView.tintColor = nil;
+        return;
+    }
+
+    imageView.image = placeholder;
+    if (@available(iOS 13.0, *)) {
+        imageView.tintColor = [UIColor colorWithWhite:0.7 alpha:1.0];
+        imageView.contentMode = UIViewContentModeCenter;
+    }
+    __weak UIImageView *weakIV = imageView;
+    [imageView sd_setImageWithURL:url
+                 placeholderImage:nil
+                          options:SDWebImageRetryFailed
+                        completed:^(UIImage *image, NSError *error, SDImageCacheType cacheType, NSURL *imageURL) {
+        UIImageView *iv = weakIV;
+        if (!iv) return;
+        if (image && !error) {
+            iv.contentMode = UIViewContentModeScaleAspectFill;
+            iv.tintColor = nil;
+        } else if (@available(iOS 13.0, *)) {
+            iv.image = placeholder;
+            iv.tintColor = [UIColor colorWithWhite:0.7 alpha:1.0];
+            iv.contentMode = UIViewContentModeCenter;
+        }
+    }];
+}
+
 typedef NS_ENUM(NSInteger, CommunityRankType) {
     CommunityRankTypeWeek,
     CommunityRankTypeMonth,
@@ -37,6 +102,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 @property (nonatomic, strong) UILabel *statusLabel;
 @property (nonatomic, strong) UIButton *stampBtn;
 @property (nonatomic, strong) UIButton *dataBtn;
+@property (nonatomic, copy) NSString *loadedAvatarURL;
 - (void)configureWithFriend:(PNFriend *)f;
 @end
 
@@ -199,7 +265,6 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 - (void)prepareForReuse {
     [super prepareForReuse];
     [self.avatarView sd_cancelCurrentImageLoad];
-    self.avatarView.image = nil;
 }
 
 - (void)configureWithFriend:(PNFriend *)f {
@@ -211,25 +276,13 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     [self.stampBtn setTitle:NSLocalizedString(@"community_view_stamps", nil) forState:UIControlStateNormal];
     [self.dataBtn setTitle:NSLocalizedString(@"community_view_data", nil) forState:UIControlStateNormal];
 
-    NSURL *url = f.avatar.length > 0 ? [NSURL URLWithString:f.avatar] : nil;
-    UIImage *placeholder = (@available(iOS 13.0, *)) ? [UIImage systemImageNamed:@"person.crop.circle.fill"] : nil;
-    __weak typeof(self) weakSelf = self;
-    [self.avatarView sd_setImageWithURL:url
-                       placeholderImage:placeholder
-                                options:SDWebImageRetryFailed
-                              completed:^(UIImage *image, NSError *error, SDImageCacheType cacheType, NSURL *imageURL) {
-        __strong typeof(weakSelf) self = weakSelf;
-        if (!self) return;
-        if (image && !error) {
-            self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
-            self.avatarView.tintColor = nil;
-        } else {
-            if (@available(iOS 13.0, *)) {
-                self.avatarView.tintColor = [UIColor colorWithWhite:0.7 alpha:1.0];
-                self.avatarView.contentMode = UIViewContentModeCenter;
-            }
-        }
-    }];
+    NSString *rawAvatar = f.avatar.length > 0 ? f.avatar : @"";
+    NSString *avatarURL = [rawAvatar stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([self.loadedAvatarURL isEqualToString:avatarURL] && self.avatarView.image) {
+        return;
+    }
+    self.loadedAvatarURL = avatarURL;
+    PNApplyAvatarToImageView(self.avatarView, avatarURL);
 }
 
 @end
@@ -241,6 +294,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 @property (nonatomic, strong) UILabel *nameLabel;
 @property (nonatomic, strong) UILabel *teamLabel;
 @property (nonatomic, strong) UILabel *gamesLabel;
+@property (nonatomic, copy) NSString *loadedAvatarURL;
 - (void)configureWithItem:(PNLeaderboardEntry *)item rank:(NSInteger)rank;
 @end
 
@@ -302,6 +356,11 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     return self;
 }
 
+- (void)prepareForReuse {
+    [super prepareForReuse];
+    [self.avatarView sd_cancelCurrentImageLoad];
+}
+
 - (void)configureWithItem:(PNLeaderboardEntry *)item rank:(NSInteger)rank {
     NSInteger displayRank = item.rank > 0 ? item.rank : rank;
     self.rankLabel.text = [NSString stringWithFormat:@"%ld", (long)displayRank];
@@ -310,15 +369,13 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     NSString *teamText = item.teamName.length > 0 ? item.teamName : (team.name.length > 0 ? team.name : @"-");
     self.teamLabel.text = teamText;
     self.gamesLabel.text = [NSString stringWithFormat:NSLocalizedString(@"community_rank_games_format", nil), (long)MAX(item.matchCount, 0)];
-    NSURL *url = item.avatar.length > 0 ? [NSURL URLWithString:item.avatar] : nil;
-    UIImage *placeholder = (@available(iOS 13.0, *)) ? [UIImage systemImageNamed:@"person.crop.circle.fill"] : nil;
-    [self.avatarView sd_setImageWithURL:url placeholderImage:placeholder];
-    if (!self.avatarView.image && @available(iOS 13.0, *)) {
-        self.avatarView.tintColor = [UIColor colorWithWhite:0.7 alpha:1.0];
-        self.avatarView.contentMode = UIViewContentModeCenter;
-    } else {
-        self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
+    NSString *rawAvatar = item.avatar.length > 0 ? item.avatar : @"";
+    NSString *avatarURL = [rawAvatar stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([self.loadedAvatarURL isEqualToString:avatarURL] && self.avatarView.image) {
+        return;
     }
+    self.loadedAvatarURL = avatarURL;
+    PNApplyAvatarToImageView(self.avatarView, avatarURL);
 }
 
 @end
@@ -413,6 +470,20 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     return out;
 }
 
+- (BOOL)pn_friendsList:(NSArray<PNFriend *> *)lhs equalTo:(NSArray<PNFriend *> *)rhs {
+    if (lhs.count != rhs.count) return NO;
+    for (NSInteger i = 0; i < lhs.count; i++) {
+        PNFriend *a = lhs[i];
+        PNFriend *b = rhs[i];
+        if (![a.userId ?: @"" isEqualToString:b.userId ?: @""]) return NO;
+        if (![a.avatar ?: @"" isEqualToString:b.avatar ?: @""]) return NO;
+        if (![a.nickname ?: @"" isEqualToString:b.nickname ?: @""]) return NO;
+        if (a.online != b.online) return NO;
+        if (![a.lastOnlineTime ?: @"" isEqualToString:b.lastOnlineTime ?: @""]) return NO;
+    }
+    return YES;
+}
+
 - (void)viewDidLoad {
     self.friends = @[];
     self.weekRanks = @[];
@@ -421,9 +492,7 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     self.isFriendsTab = YES;
     self.currentRankType = CommunityRankTypeWeek;
     self.pendingCount = [[NSUserDefaults standardUserDefaults] integerForKey:kCommunityPendingCountKey];
-    self.needsReloadFriends = YES; // 首次进入需要拉取
-    [self loadRemoteFriends];
-    [self loadRemoteRanks];
+    self.needsReloadFriends = NO;
     [super viewDidLoad];
     self.view.backgroundColor = kCommunityPageBg;
     self.shouldShowNavigationBar = NO;
@@ -431,6 +500,8 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onPendingCountChanged) name:kCommunityPendingCountDidChangeNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onFriendsChanged) name:kCommunityFriendsDidChangeNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onAppWillEnterForeground) name:UIApplicationWillEnterForegroundNotification object:nil];
+    [self loadRemoteFriends];
+    [self loadRemoteRanks];
 }
 
 - (void)viewDidLayoutSubviews {
@@ -486,16 +557,25 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     self.friendsLastRefreshDate = [NSDate date];
     __weak typeof(self) weakSelf = self;
     [CommunityRequest.shared getCommunityFriendsWithPage:1 pageSize:50 success:^(HTTPResponse * _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
         id raw = responseObject.dataObject ?: responseObject.data;
-        weakSelf.friends = [weakSelf pnFriendsFromCommunityData:raw];
-        [weakSelf updateFriendsSectionTitle];
-        [weakSelf.tableView reloadData];
-        [weakSelf updateCommunityEmptyState];
+        NSArray<PNFriend *> *newFriends = [self pnFriendsFromCommunityData:raw];
+        if ([self pn_friendsList:self.friends equalTo:newFriends]) {
+            return;
+        }
+        self.friends = newFriends;
+        [self updateFriendsSectionTitle];
+        [self.tableView reloadData];
+        [self updateCommunityEmptyState];
     } failure:^(NSError * _Nonnull error) {
-        weakSelf.friends = @[];
-        [weakSelf updateFriendsSectionTitle];
-        [weakSelf.tableView reloadData];
-        [weakSelf updateCommunityEmptyState];
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        if (self.friends.count == 0) {
+            [self updateFriendsSectionTitle];
+            [self.tableView reloadData];
+            [self updateCommunityEmptyState];
+        }
     }];
 }
 
@@ -808,8 +888,6 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
     } else {
         self.needsReloadFriends = YES;
     }
-    [self.tableView reloadData];
-    [self updateCommunityEmptyState];
 }
 
 - (void)onAppWillEnterForeground {
