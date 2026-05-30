@@ -320,7 +320,7 @@ static NSString *kHomeTeamIdString(id raw) {
 @property (nonatomic, strong) UILabel *dateLabel;
 @property (nonatomic, strong) UICollectionView *teamCollectionView;
 @property (nonatomic, strong) NSArray<TeamIcon *> *teamItems;
-@property (nonatomic, copy, nullable) NSString *selectedTeamId; // nil = 全部
+@property (nonatomic, copy, nullable) NSString *selectedTeamId; // 当前选中的关注球队；有球队时默认第一个
 
 @property (nonatomic, strong) NSMutableArray<Match *> *dataSource;
 @property (nonatomic, strong) NSMutableArray<Match *> *filteredData;
@@ -394,15 +394,15 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
 }
 
 #if DEBUG
-- (NSString *)home_monthUpcomingScheduleCurlWithStartTime:(NSString *)startTime pageSize:(NSInteger)pageSize {
+- (NSString *)home_monthUpcomingScheduleCurlWithStartTime:(NSString *)startTime pageSize:(NSInteger)pageSize myTeamOnly:(BOOL)myTeamOnly {
     NSString *base = [APIEnvironmentManager sharedManager].currentBaseURL ?: @"";
     if ([base hasSuffix:@"/"]) {
         base = [base substringToIndex:base.length - 1];
     }
     NSString *token = AuthManager.sharedManager.user.accessToken ?: @"<token>";
     NSString *safeStart = startTime.length ? startTime : @"yyyyMMddHHmmss";
-    NSString *url = [NSString stringWithFormat:@"%@/api/v1/home/schedule/month-upcoming?startTime=%@&myTeamOnly=0&pageNum=1&pageSize=%ld",
-                     base, safeStart, (long)MAX(pageSize, 1)];
+    NSString *url = [NSString stringWithFormat:@"%@/api/v1/home/schedule/month-upcoming?startTime=%@&myTeamOnly=%d&pageNum=1&pageSize=%ld",
+                     base, safeStart, myTeamOnly ? 1 : 0, (long)MAX(pageSize, 1)];
     return [NSString stringWithFormat:
             @"curl '%@' \\\n"
             "  -H 'Accept: application/json' \\\n"
@@ -414,6 +414,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
 - (void)home_fetchUpcomingScheduleFromStartTime:(NSString *)startTime
                                     accumulated:(NSMutableArray<Match *> *)accumulated
                                      monthIndex:(NSInteger)monthIndex
+                                     myTeamOnly:(BOOL)myTeamOnly
                                      completion:(void (^)(NSArray<Match *> *matches))completion {
     if (!completion) {
         return;
@@ -426,7 +427,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
     NSInteger pageSize = MIN(remaining, kHomeScheduleFetchPageSize);
     __weak typeof(self) weakSelf = self;
     [[MatchRequest shared] getMonthUpcomingScheduleWithStartTime:startTime
-                                                      myTeamOnly:NO
+                                                      myTeamOnly:myTeamOnly
                                                             page:1
                                                         pageSize:pageSize
                                                          success:^(HTTPResponse * _Nullable responseObject) {
@@ -456,6 +457,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
         [self home_fetchUpcomingScheduleFromStartTime:nextStart
                                           accumulated:[sanitized mutableCopy]
                                            monthIndex:monthIndex + 1
+                                           myTeamOnly:myTeamOnly
                                            completion:completion];
     } failure:^(NSError * _Nonnull error) {
         __strong typeof(weakSelf) self = weakSelf;
@@ -531,15 +533,29 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
 //    self.teamItems = [arr copy];
 }
 
+- (void)ensureDefaultSelectedTeamIfNeeded {
+    if (self.selectedTeamId.length > 0) return;
+    if (self.teamItems.count == 0) return;
+    NSString *firstId = kHomeTeamIdString(self.teamItems.firstObject.teamId);
+    if (firstId.length > 0) {
+        self.selectedTeamId = firstId;
+    }
+}
+
 - (void)filterData {
     CFTimeInterval t0 = CACurrentMediaTime();
-    if (!_selectedTeamId.length) {
+    [self ensureDefaultSelectedTeamIfNeeded];
+    if (!_selectedTeamId.length || self.teamItems.count == 0) {
         _filteredData = [_dataSource mutableCopy];
     } else {
+        NSString *selected = _selectedTeamId;
         NSMutableArray *arr = [NSMutableArray array];
         for (Match *m in _dataSource) {
-            if ([m.homeTeamId isEqualToString:_selectedTeamId] || [m.awayTeamId isEqualToString:_selectedTeamId])
+            NSString *homeId = kHomeTeamIdString(m.homeTeamId);
+            NSString *awayId = kHomeTeamIdString(m.awayTeamId);
+            if ([homeId isEqualToString:selected] || [awayId isEqualToString:selected]) {
                 [arr addObject:m];
+            }
         }
         _filteredData = arr;
     }
@@ -1043,19 +1059,21 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
     if (self.isLoadingSchedule) return;
     self.isLoadingSchedule = YES;
     __weak typeof(self) weakSelf = self;
+    BOOL myTeamOnly = AuthManager.sharedManager.isLoggedIn;
 
     NSDate *now = [NSDate date];
     NSString *startTime = [self home_scheduleStartTimeStringFromDate:now];
 #if DEBUG
-    NSLog(@"[HomeDebug] schedule month-upcoming startTime=%@ pageSize=%ld limit=%ld",
-          startTime, (long)kHomeScheduleFetchPageSize, (long)kHomeScheduleDisplayLimit);
+    NSLog(@"[HomeDebug] schedule month-upcoming startTime=%@ myTeamOnly=%d pageSize=%ld limit=%ld",
+          startTime, myTeamOnly, (long)kHomeScheduleFetchPageSize, (long)kHomeScheduleDisplayLimit);
     NSLog(@"[HomeDebug] schedule month-upcoming curl:\n%@",
-          [self home_monthUpcomingScheduleCurlWithStartTime:startTime pageSize:kHomeScheduleFetchPageSize]);
+          [self home_monthUpcomingScheduleCurlWithStartTime:startTime pageSize:kHomeScheduleFetchPageSize myTeamOnly:myTeamOnly]);
 #endif
 
     [self home_fetchUpcomingScheduleFromStartTime:startTime
                                       accumulated:[NSMutableArray array]
                                        monthIndex:0
+                                       myTeamOnly:myTeamOnly
                                        completion:^(NSArray<Match *> *matches) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
@@ -1090,6 +1108,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
             }
             if (!found) self.selectedTeamId = nil;
         }
+        [self ensureDefaultSelectedTeamIfNeeded];
         [self.teamCollectionView reloadData];
         [self filterData];
     } failure:^(NSError * _Nonnull error) {
@@ -1236,11 +1255,8 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
     TeamIcon *item = _teamItems[indexPath.item];
     NSString *tid = kHomeTeamIdString(item.teamId);
     if (tid.length == 0) { return; }
-    if (_selectedTeamId.length && [tid isEqualToString:_selectedTeamId]) {
-        _selectedTeamId = nil;
-    } else {
-        _selectedTeamId = [tid copy];
-    }
+    if ([tid isEqualToString:_selectedTeamId]) { return; }
+    _selectedTeamId = [tid copy];
     [collectionView reloadData];
     [self filterData];
 }
