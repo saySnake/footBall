@@ -26,6 +26,8 @@ static UIColor *PCHex(NSString *hex) {
 static const CGFloat kPassportAbilityValueColumnWidth = 24;
 static const CGFloat kPassportAbilityBarHeight = 12;
 static const CGFloat kPassportAbilityRowHeight = 25;
+/// 与输入信息页座位选项数量一致
+static const NSInteger kPassportAbilitySeatRowCount = 10;
 
 /// 能力块左侧列宽：取当前数据里所有行标题在指定字体下排版宽度的最大值（与左侧 UILabel 一致）
 static CGFloat PCAbilityMaxLabelWidthForTitles(NSArray<NSString *> *titles, UIFont *font) {
@@ -396,8 +398,8 @@ static CGFloat PCAbilityMaxLabelWidthForTitles(NSArray<NSString *> *titles, UIFo
      最高值做高亮
      数据从信息填写得来
      */
-    // TODO: 当前绑定 goalTrendTitle/goalTrendValues（PassportViewModel 占位为“近8场进球数”），与本 cell 注释“地点频次柱状图”不一致；待确认此 cell 的真实数据源再改字段。
     _chart.maxValue = 100;
+    _chart.xTitles = (model.goalTrendXTitles.count > 0) ? model.goalTrendXTitles : _chart.xTitles;
     _chart.values = model.goalTrendValues;
 }
 
@@ -771,7 +773,7 @@ static NSAttributedString *PCAbilitySummaryAttributed(CGFloat level) {
         _rightLabels = [NSMutableArray array];
         FontManager *fm = [FontManager sharedManager];
         UIColor *labelGray = [UIColor colorWithWhite:0.45 alpha:1.0];
-        for (NSInteger i = 0; i < 14; i++) {
+        for (NSInteger i = 0; i < kPassportAbilitySeatRowCount; i++) {
             UIView *row = [[UIView alloc] init];
             UILabel *left = [[UILabel alloc] init];
             left.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
@@ -825,7 +827,7 @@ static NSAttributedString *PCAbilitySummaryAttributed(CGFloat level) {
             [_rowStack addArrangedSubview:row];
         }
         // 等宽约束需在各行都已挂到 _rowStack 上之后再添加，否则无共同父视图会 crash
-        for (NSInteger i = 1; i < 14; i++) {
+        for (NSInteger i = 1; i < kPassportAbilitySeatRowCount; i++) {
             UILabel *left = _leftLabels[i];
             [left mas_makeConstraints:^(MASConstraintMaker *make) {
                 make.width.equalTo(_leftLabels[0]);
@@ -893,7 +895,8 @@ static NSAttributedString *PCAbilitySummaryAttributed(CGFloat level) {
     [_leftLabels[0] mas_updateConstraints:^(MASConstraintMaker *make) {
         make.width.mas_equalTo(labelColW);
     }];
-    for (NSInteger i = 0; i < 14; i++) {
+    NSInteger rowCount = kPassportAbilitySeatRowCount;
+    for (NSInteger i = 0; i < rowCount; i++) {
         UILabel *left = _leftLabels[i];
         UILabel *right = _rightLabels[i];
         UIView *track = _tracks[i];
@@ -1290,7 +1293,7 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
 
 - (void)configureWithModel:(PassportViewModel *)model {
     [self prepareForReuse];
-    //6种情绪 在填写比赛信息里写 然后一样是做统计图
+    // 7 种情绪，与输入信息页一致
     _bigNumber.text = [NSString stringWithFormat:@"%ld", (long)model.metricEmotionCount];
     _asideLine1.text = @"我出现了";
     _asideLine2.text = [NSString stringWithFormat:@"种赛后情绪"];

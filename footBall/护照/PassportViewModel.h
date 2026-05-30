@@ -73,6 +73,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSString *growthSubtitle;
 
 @property (nonatomic, copy) NSString *goalTrendTitle;
+/// 与输入信息页观赛地点顺序一致
+@property (nonatomic, copy) NSArray<NSString *> *goalTrendXTitles;
 @property (nonatomic, strong) NSArray<NSNumber *> *goalTrendValues;
 
 @property (nonatomic, copy) NSString *possessionCardTitle;

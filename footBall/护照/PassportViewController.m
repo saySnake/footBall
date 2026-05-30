@@ -434,9 +434,9 @@ static UIColor *PassportPageBg(void) {
     if (indexPath.row == 4) {
         return 412;
     }
-    // PassportAbilityBlockCell 设计稿固定高度
+    // PassportAbilityBlockCell：10 行座位（与输入信息一致）
     if (indexPath.row == 5) {
-        return 522;
+        return 422;
     }
     // PassportTacticalCell（图例每行 3 个，最多 6 种身份为 2 行）
     if (indexPath.row == 6) {
