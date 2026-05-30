@@ -34,6 +34,17 @@ static CGFloat PNInputSectionSpacing(void) {
     return 20.0;
 }
 
+static const NSInteger kPNMaxViewingIdentityCount = 6;
+
+static NSSet<NSString *> *PNSeatAllowedWatchLocations(void) {
+    static NSSet<NSString *> *set;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        set = [NSSet setWithObjects:@"在现场", @"在球场", nil];
+    });
+    return set;
+}
+
 @interface PNMatchInfoInputViewController () <UITextViewDelegate, UITextFieldDelegate, UIGestureRecognizerDelegate>
 @property (nonatomic, strong) UIView *dimmingView;
 @property (nonatomic, strong) UIView *cardView;
@@ -60,6 +71,7 @@ static CGFloat PNInputSectionSpacing(void) {
 @property (nonatomic, strong) UILabel *commentPlaceholderLabel;
 
 @property (nonatomic, strong) NSArray<UIButton *> *watchButtons;
+@property (nonatomic, strong) UILabel *seatTitleLabel;
 @property (nonatomic, strong) NSArray<UIButton *> *seatButtons;
 @property (nonatomic, strong) NSArray<UIButton *> *reasonButtons;
 @property (nonatomic, strong) NSArray<UIButton *> *identityButtons;
@@ -597,10 +609,11 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
                                                 toParent:content
                                               topAnchor:watchTitle.mas_bottom];
     
-    // 座位
+    // 座位（仅观赛地点为「在现场」「在球场」时可选）
     UILabel *seatTitle = [[UILabel alloc] init];
     seatTitle.text = @"座位";
     seatTitle.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    self.seatTitleLabel = seatTitle;
     [content addSubview:seatTitle];
     [seatTitle mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(((UIButton *)self.watchButtons.lastObject).mas_bottom).offset(PNInputSectionSpacing());
@@ -938,6 +951,44 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [self updateCommentCountLabel];
 }
 
+- (BOOL)pn_isSeatSelectionAllowed {
+    NSString *loc = [self.selectedWatchInfo stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    return loc.length > 0 && [PNSeatAllowedWatchLocations() containsObject:loc];
+}
+
+- (void)pn_updateSeatSectionAvailability {
+    BOOL allowed = [self pn_isSeatSelectionAllowed];
+    self.seatTitleLabel.alpha = allowed ? 1.0 : 0.45;
+    if (!allowed) {
+        self.selectedSeat = @"";
+    }
+    for (UIButton *b in self.seatButtons) {
+        b.enabled = allowed;
+        b.userInteractionEnabled = allowed;
+        if (!allowed) {
+            [self pn_applyPillButton:b selected:NO];
+        }
+    }
+}
+
+- (void)pn_trimIdentitiesToMaxCount {
+    if (self.selectedIdentities.count <= kPNMaxViewingIdentityCount) {
+        return;
+    }
+    NSMutableOrderedSet<NSString *> *keep = [NSMutableOrderedSet orderedSet];
+    for (UIButton *b in self.identityButtons) {
+        NSString *title = b.titleLabel.text ?: @"";
+        if (title.length == 0 || ![self.selectedIdentities containsObject:title]) {
+            continue;
+        }
+        [keep addObject:title];
+        if (keep.count >= kPNMaxViewingIdentityCount) {
+            break;
+        }
+    }
+    [self.selectedIdentities setSet:[keep set]];
+}
+
 - (void)loadInitialFormData {
     if (self.recordId.length > 0) {
         self.headerTitleLabel.text = @"编辑信息";
@@ -996,6 +1047,10 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     }
     if (self.selectedIdentities.count == 0) {
         [self.selectedIdentities addObject:@"球迷"];
+    }
+    [self pn_trimIdentitiesToMaxCount];
+    if (![self pn_isSeatSelectionAllowed]) {
+        self.selectedSeat = @"";
     }
 
     if (detail.ticketPrice.length > 0) {
@@ -1078,6 +1133,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         BOOL sel = [self.selectedIdentities containsObject:b.titleLabel.text];
         [self pn_applyPillButton:b selected:sel];
     }
+    [self pn_updateSeatSectionAvailability];
 }
 
 - (NSString *)pn_isoMatchDateTimeString {
@@ -1113,7 +1169,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     m[@"watchReason"] = self.selectedReason ?: @"";
     m[@"ticketPrice"] = @([self.priceField.text ?: @"0" doubleValue]);
     m[@"matchDateTime"] = [self pn_isoMatchDateTimeString];
-    m[@"postMatchEmotion"] = self.selectedEmotion ?: @"";
+    m[@"postMatchEmotion"] = (self.selectedEmotionName.length > 0 ? self.selectedEmotionName : (self.selectedEmotion ?: @""));
     m[@"notes"] = self.commentView.text ?: @"";
     m[@"photoUrls"] = @[];
     return m;
@@ -1353,6 +1409,10 @@ shouldChangeTextInRange:(NSRange)range
     BOOL multi = [self.identityButtons containsObject:sender];
     NSString *title = sender.titleLabel.text ?: @"";
     if (multi) {
+        if (!sender.selected && self.selectedIdentities.count >= kPNMaxViewingIdentityCount) {
+            [[LoadingManager sharedManager] showError:@"观赛身份最多选择6种" inView:self.view];
+            return;
+        }
         sender.selected = !sender.selected;
         if (sender.selected) {
             [self pn_applyPillButton:sender selected:YES];
@@ -1361,21 +1421,28 @@ shouldChangeTextInRange:(NSRange)range
             [self pn_applyPillButton:sender selected:NO];
             [self.selectedIdentities removeObject:title];
         }
-    } else {
-        NSArray<UIButton *> *group = nil;
-        if ([self.watchButtons containsObject:sender]) {
-            group = self.watchButtons;
-            self.selectedWatchInfo = title;
-        } else if ([self.seatButtons containsObject:sender]) {
-            group = self.seatButtons;
-            self.selectedSeat = title;
-        } else if ([self.reasonButtons containsObject:sender]) {
-            group = self.reasonButtons;
-            self.selectedReason = title;
-        }
-        for (UIButton *b in group) {
-            [self pn_applyPillButton:b selected:(b == sender)];
-        }
+        return;
+    }
+    if ([self.seatButtons containsObject:sender] && ![self pn_isSeatSelectionAllowed]) {
+        return;
+    }
+    NSArray<UIButton *> *group = nil;
+    if ([self.watchButtons containsObject:sender]) {
+        group = self.watchButtons;
+        self.selectedWatchInfo = title;
+    } else if ([self.seatButtons containsObject:sender]) {
+        group = self.seatButtons;
+        self.selectedSeat = title;
+    } else if ([self.reasonButtons containsObject:sender]) {
+        group = self.reasonButtons;
+        self.selectedReason = title;
+    }
+    for (UIButton *b in group) {
+        [self pn_applyPillButton:b selected:(b == sender)];
+    }
+    if ([self.watchButtons containsObject:sender]) {
+        [self pn_updateSeatSectionAvailability];
+        [self pn_refreshPillButtonsFromSelection];
     }
 }
 

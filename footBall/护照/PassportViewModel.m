@@ -9,6 +9,106 @@
 #import "Team.h"
 #import "AuthManager.h"
 
+/// 与 PNMatchInfoInputViewController 座位 pill 顺序一致
+static NSArray<NSString *> *PNPassportSeatTypeOrder(void) {
+    static NSArray<NSString *> *order;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        order = @[ @"主席台", @"VIP看台", @"包厢", @"看台区", @"场边", @"山顶", @"短边", @"球门后", @"曲线看台", @"角旗区" ];
+    });
+    return order;
+}
+
+/// 接口/历史看台文案 → 输入页座位分类
+static NSString *PNPassportInputSeatLabelForServerStandType(NSString *server) {
+    NSString *s = [server stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (s.length == 0) {
+        return nil;
+    }
+    static NSDictionary<NSString *, NSString *> *aliasToLabel;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSMutableDictionary<NSString *, NSString *> *m = [NSMutableDictionary dictionary];
+        NSDictionary<NSString *, NSArray<NSString *> *> *groups = @{
+            @"主席台": @[ @"主席台" ],
+            @"VIP看台": @[ @"VIP看台" ],
+            @"包厢": @[ @"包厢", @"包厢层" ],
+            @"看台区": @[ @"看台区" ],
+            @"场边": @[ @"场边" ],
+            @"山顶": @[ @"山顶" ],
+            @"短边": @[ @"短边" ],
+            @"球门后": @[ @"球门后" ],
+            @"曲线看台": @[ @"曲线看台", @"曲线看球" ],
+            @"角旗区": @[ @"角旗区" ],
+        };
+        for (NSString *label in PNPassportSeatTypeOrder()) {
+            for (NSString *alias in groups[label] ?: @[ label ]) {
+                m[alias] = label;
+            }
+        }
+        aliasToLabel = [m copy];
+    });
+    return aliasToLabel[s];
+}
+
+/// 与 PNMatchInfoInputViewController 赛后情绪选项顺序一致
+static NSArray<NSString *> *PNPassportEmotionOrder(void) {
+    static NSArray<NSString *> *order;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        order = @[ @"兴奋", @"激动", @"希望", @"遗憾", @"平静", @"失望", @"暴躁" ];
+    });
+    return order;
+}
+
+/// 接口/历史情绪文案 → 输入页情绪名
+static NSString *PNPassportInputEmotionLabelForServerEmotion(NSString *server) {
+    NSString *s = [server stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (s.length == 0) {
+        return nil;
+    }
+    static NSDictionary<NSString *, NSString *> *aliasToLabel;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSMutableDictionary<NSString *, NSString *> *m = [NSMutableDictionary dictionary];
+        NSDictionary<NSString *, NSArray<NSString *> *> *groups = @{
+            @"兴奋": @[ @"兴奋", @"🤩" ],
+            @"激动": @[ @"激动", @"🥳" ],
+            @"希望": @[ @"希望", @"乐观", @"🤗" ],
+            @"遗憾": @[ @"遗憾", @"迷茫", @"😩" ],
+            @"平静": @[ @"平静", @"😎" ],
+            @"失望": @[ @"失望", @"😤" ],
+            @"暴躁": @[ @"暴躁", @"😡" ],
+        };
+        for (NSString *label in PNPassportEmotionOrder()) {
+            for (NSString *alias in groups[label] ?: @[ label ]) {
+                m[alias] = label;
+            }
+        }
+        aliasToLabel = [m copy];
+    });
+    NSString *exact = aliasToLabel[s];
+    if (exact.length) {
+        return exact;
+    }
+    for (NSString *label in PNPassportEmotionOrder()) {
+        if ([s containsString:label]) {
+            return label;
+        }
+    }
+    return nil;
+}
+
+/// 与 PNMatchInfoInputViewController 观赛地点 pill 顺序一致
+static NSArray<NSString *> *PNPassportViewingLocationOrder(void) {
+    static NSArray<NSString *> *order;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        order = @[ @"在现场", @"在球场", @"在酒吧", @"在家里", @"在外面", @"在学校", @"在公司" ];
+    });
+    return order;
+}
+
 /// 线上观赛方式饼图扇区颜色（与条数对应循环使用）
 static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     static NSArray<NSString *> *p;
@@ -20,6 +120,55 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
 }
 
 @implementation PassportViewModel
+
++ (NSArray<NSDictionary *> *)abilityItemsOrderedFromStandDist:(NSArray<PNStandDist *> *)standList {
+    NSMutableDictionary<NSString *, NSNumber *> *countBySeat = [NSMutableDictionary dictionary];
+    for (PNStandDist *sd in standList) {
+        NSString *label = PNPassportInputSeatLabelForServerStandType(sd.standType);
+        if (!label.length) {
+            continue;
+        }
+        NSInteger add = MAX(0, sd.count);
+        countBySeat[label] = @([countBySeat[label] integerValue] + add);
+    }
+    NSMutableArray<NSDictionary *> *rows = [NSMutableArray array];
+    for (NSString *title in PNPassportSeatTypeOrder()) {
+        [rows addObject:@{ @"title": title, @"value": countBySeat[title] ?: @0 }];
+    }
+    return [rows copy];
+}
+
++ (NSArray<NSDictionary *> *)emotionMetricBarsOrderedFromEmotionDist:(NSArray<PNEmotionDist *> *)emotionList {
+    NSMutableDictionary<NSString *, NSNumber *> *countByEmotion = [NSMutableDictionary dictionary];
+    for (PNEmotionDist *ed in emotionList) {
+        NSString *label = PNPassportInputEmotionLabelForServerEmotion(ed.emotion);
+        if (!label.length) {
+            continue;
+        }
+        NSInteger add = MAX(0, ed.count);
+        countByEmotion[label] = @([countByEmotion[label] integerValue] + add);
+    }
+    NSMutableArray<NSDictionary *> *bars = [NSMutableArray array];
+    for (NSString *title in PNPassportEmotionOrder()) {
+        [bars addObject:@{ @"title": title, @"value": countByEmotion[title] ?: @0 }];
+    }
+    return [bars copy];
+}
+
++ (NSArray<NSNumber *> *)goalTrendValuesOrderedFromLocationDist:(NSArray<PNLocationDist *> *)locationList {
+    NSMutableDictionary<NSString *, NSNumber *> *countByLocation = [NSMutableDictionary dictionary];
+    for (PNLocationDist *ld in locationList) {
+        NSString *name = [ld.location stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (name.length > 0) {
+            countByLocation[name] = @(MAX(0, ld.count));
+        }
+    }
+    NSMutableArray<NSNumber *> *values = [NSMutableArray array];
+    for (NSString *title in PNPassportViewingLocationOrder()) {
+        [values addObject:countByLocation[title] ?: @0];
+    }
+    return [values copy];
+}
 
 + (NSArray<NSNumber *> *)headerWeekValuesNormalizedFromWeekly:(NSArray<NSNumber *> *)weekly {
     if (![weekly isKindOfClass:[NSArray class]] || weekly.count != 7) {
@@ -268,13 +417,10 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     m.growthHeadline = [NSString stringWithFormat:@"%ld%@", (long)y, NSLocalizedString(@"passport_growth_wake_suffix", nil) ?: @"年睡醒时间里的"];
     m.growthSubtitle = [self awakeWatchPercentDisplay:passport ? passport.awakeWatchPercent : nil];
 
-    // 柱状图：用 locationDist 各点 count 作为 Y 值（与设计注释「地点频次」一致）
+    // 柱状图：观赛地点频次，X 轴类别与输入信息页一致
     m.goalTrendTitle = [NSString stringWithFormat:@"%ld年观赛数据", (long)y];
-    NSMutableArray<NSNumber *> *locTrend = [NSMutableArray array];
-    for (PNLocationDist *ld in locationList) {
-        [locTrend addObject:@(MAX(0, ld.count))];
-    }
-    m.goalTrendValues = [locTrend copy];
+    m.goalTrendXTitles = PNPassportViewingLocationOrder();
+    m.goalTrendValues = [PassportViewModel goalTrendValuesOrderedFromLocationDist:locationList];
 
     PNPassportTeamRecord *tr = passport ? passport.teamRecord : nil;
 
@@ -312,11 +458,7 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     } else {
         m.abilityAverageLevel = 0;
     }
-    NSMutableArray<NSDictionary *> *abilityRows = [NSMutableArray array];
-    for (PNStandDist *sd in standList) {
-        [abilityRows addObject:@{ @"title": sd.standType ?: @"", @"value": @(MAX(0, sd.count)) }];
-    }
-    m.abilityItems = [abilityRows copy];
+    m.abilityItems = [PassportViewModel abilityItemsOrderedFromStandDist:standList];
 
     //观赛身份 tactical：用 identityDist（有 count/percentage）构建 segments
     m.tacticalTitle = NSLocalizedString(@"passport_tactical_identity_title", nil) ?: @"观赛身份";
@@ -332,16 +474,21 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     m.tacticalSegments = [segs copy];
     m.tacticalIdentityCount = (NSInteger)MIN(6, m.tacticalSegments.count);
 
-    //观赛后的情绪 metric bars：用 emotionDist
-    m.metricEmotionCount = (NSInteger)MIN(9, (NSInteger)emotionList.count);
-    m.metricHeaderAsideLine1 = (passport && passport.topLocation.length) ? passport.topLocation : @"";
-    m.metricHeaderAsideLine2 = (passport && passport.topEmotion.length) ? passport.topEmotion : @"";
-    m.metricBarsPrompt = NSLocalizedString(@"passport_metric_prompt", nil) ?: @"";
-    NSMutableArray *bars = [NSMutableArray array];
-    for (PNEmotionDist *d in emotionList) {
-        [bars addObject:@{ @"title": d.emotion ?: @"", @"value": @(MAX(0, d.count)) }];
+    // 观赛后的情绪：与输入信息页 7 种情绪顺序一致
+    NSArray<NSDictionary *> *emotionBars = [PassportViewModel emotionMetricBarsOrderedFromEmotionDist:emotionList];
+    NSInteger emotionKindCount = 0;
+    for (NSDictionary *item in emotionBars) {
+        if ([item[@"value"] integerValue] > 0) {
+            emotionKindCount++;
+        }
     }
-    m.recentMetricBars = [bars copy];
+    m.metricEmotionCount = emotionKindCount;
+    m.metricHeaderAsideLine1 = (passport && passport.topLocation.length) ? passport.topLocation : @"";
+    NSString *topEmotion = passport.topEmotion ?: @"";
+    NSString *topEmotionInput = PNPassportInputEmotionLabelForServerEmotion(topEmotion);
+    m.metricHeaderAsideLine2 = topEmotionInput.length ? topEmotionInput : topEmotion;
+    m.metricBarsPrompt = NSLocalizedString(@"passport_metric_prompt", nil) ?: @"";
+    m.recentMetricBars = emotionBars;
     m.recentGoalsTitle = @"";
     m.recentGoalsSubtitle = @"";
 
@@ -407,27 +554,9 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
 }
 
 + (NSArray<NSDictionary *> *)defaultAbilityItems {
-    NSArray<NSString *> *titleKeys = @[
-        @"passport_ability_seat_0", @"passport_ability_seat_1", @"passport_ability_seat_2", @"passport_ability_seat_3",
-        @"passport_ability_seat_4", @"passport_ability_seat_5", @"passport_ability_seat_6", @"passport_ability_seat_7",
-        @"passport_ability_seat_8", @"passport_ability_seat_9", @"passport_ability_seat_10", @"passport_ability_seat_11",
-        @"passport_ability_seat_12", @"passport_ability_seat_13",
-    ];
-    NSArray<NSNumber *> *vals = @[
-        @21, @73, @17, @12, @9, @6, @21, @23, @25, @12, @9, @3, @12, @0,
-    ];
-    NSArray<NSString *> *zhFallbacks = @[
-        @"内场", @"1层", @"2层", @"3层", @"4层", @"包厢层", @"看台区", @"短边", @"场边",
-        @"VIP看台", @"山顶", @"主席台", @"球门后", @"曲线看球",
-    ];
     NSMutableArray *out = [NSMutableArray array];
-    for (NSUInteger i = 0; i < titleKeys.count; i++) {
-        NSString *key = titleKeys[i];
-        NSString *t = NSLocalizedString(key, nil);
-        if (!t.length || [t isEqualToString:key]) {
-            t = zhFallbacks[i];
-        }
-        [out addObject:@{@"title": t, @"value": vals[i]}];
+    for (NSString *title in PNPassportSeatTypeOrder()) {
+        [out addObject:@{ @"title": title, @"value": @0 }];
     }
     return [out copy];
 }

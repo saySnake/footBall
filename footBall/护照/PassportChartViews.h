@@ -11,7 +11,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSArray<NSNumber *> *values;
 @property (nonatomic, assign) CGFloat maxValue;
 @property (nonatomic, strong) UIColor *barColor;
-/// x 轴标题（与 values 一一对应），默认是“在现场/在酒吧/在球场/在家里/在外面/在学校/在公司”
+/// x 轴标题（与 values 一一对应），默认与输入信息页观赛地点顺序一致
 @property (nonatomic, copy) NSArray<NSString *> *xTitles;
 /// 固定柱宽，设计稿为 20
 @property (nonatomic, assign) CGFloat barWidth;

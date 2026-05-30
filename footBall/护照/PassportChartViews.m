@@ -22,7 +22,7 @@
     if (self = [super initWithFrame:frame]) {
         self.backgroundColor = [UIColor clearColor];
         _barWidth = 20;
-        _xTitles = @[ @"在现场", @"在酒吧", @"在球场", @"在家里", @"在外面", @"在学校", @"在公司" ];
+        _xTitles = @[ @"在现场", @"在球场", @"在酒吧", @"在家里", @"在外面", @"在学校", @"在公司" ];
         _gridLayer = [CAShapeLayer layer];
         _gridLayer.fillColor = [UIColor clearColor].CGColor;
         _gridLayer.strokeColor = [[UIColor colorWithRed:0.70 green:0.73 blue:0.80 alpha:1.0] colorWithAlphaComponent:0.55].CGColor;
@@ -123,11 +123,21 @@
     if (self.xTitles.count == n) {
         titles = self.xTitles;
     } else if (n == 7) {
-        titles = @[ @"在现场", @"在酒吧", @"在球场", @"在家里", @"在外面", @"在学校", @"在公司" ];
+        titles = @[ @"在现场", @"在球场", @"在酒吧", @"在家里", @"在外面", @"在学校", @"在公司" ];
     } else {
         NSMutableArray *tmp = [NSMutableArray array];
         for (NSInteger i = 0; i < n; i++) { [tmp addObject:@""]; }
         titles = tmp;
+    }
+
+    NSInteger highlightIndex = -1;
+    CGFloat peak = 0;
+    for (NSUInteger i = 0; i < self.values.count; i++) {
+        CGFloat v = self.values[i].doubleValue;
+        if (v > peak) {
+            peak = v;
+            highlightIndex = (NSInteger)i;
+        }
     }
 
     for (NSUInteger i = 0; i < self.values.count; i++) {
@@ -137,17 +147,18 @@
         CGFloat colLeft = plotX + segmentW * i;
         CGFloat x = colLeft + (segmentW - barW) * 0.5;
         CGFloat y = plotY + plotH - bh;
+        BOOL highlight = (peak > 0 && (NSInteger)i == highlightIndex);
 
         UIView *bar = [[UIView alloc] initWithFrame:CGRectMake(x, y, barW, bh)];
         bar.backgroundColor = c;
         bar.layer.cornerRadius = 3;
-        bar.alpha = (i == 3 ? 1.0 : 0.85); // 让第 4 根更亮，接近设计稿强调
+        bar.alpha = highlight ? 1.0 : 0.85;
         [self addSubview:bar];
         [self.barViews addObject:bar];
 
         UILabel *vl = [[UILabel alloc] initWithFrame:CGRectMake(colLeft, y - 22, segmentW, 22)];
         vl.font = FontManager.sharedManager.font18Regular;
-        vl.textColor = (i == 3 ? [UIColor blackColor] : [UIColor colorWithWhite:0.5 alpha:1.0]);
+        vl.textColor = highlight ? [UIColor blackColor] : [UIColor colorWithWhite:0.5 alpha:1.0];
         vl.textAlignment = NSTextAlignmentCenter;
         vl.text = [NSString stringWithFormat:@"%ld", (long)llround(v)];
         [self addSubview:vl];
