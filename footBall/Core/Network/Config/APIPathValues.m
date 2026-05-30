@@ -67,6 +67,8 @@ NSString * const APIPathValueMatchFeatured = @"/api/v1/home/featured-matches";
 NSString * const APIPathValueMatchSchedule = @"/api/v1/home/schedule";
 /// 获取指定月份有比赛的日期列表
 NSString * const APIPathValueMatchScheduleDates = @"/api/v1/home/schedule/dates";
+/// 获取起始时间之后、当月内的未来比赛日程
+NSString * const APIPathValueMatchScheduleMonthUpcoming = @"/api/v1/home/schedule/month-upcoming";
 /// 按日期查询 Nami 比赛列表
 NSString * const APIPathValueMatchNamiSchedule = @"/api/v1/matches/nami/schedule";
 /// 查询正在进行的 Nami 比赛

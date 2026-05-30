@@ -348,8 +348,8 @@ static NSString *kHomeTeamIdString(id raw) {
 
 @implementation HomeViewController
 
-static const NSInteger kHomeScheduleDisplayLimit = 400;
-static const NSInteger kHomeScheduleFetchPageSize = 400;
+static const NSInteger kHomeScheduleDisplayLimit = 100;
+static const NSInteger kHomeScheduleFetchPageSize = 100;
 
 /// 首页数据防护：按 matchId+matchDate 去重并限制最大数量，避免异常大包导致首屏卡死。
 - (NSArray<Match *> *)home_sanitizedMatchesForHome:(NSArray<Match *> *)input maxCount:(NSInteger)maxCount {
@@ -371,6 +371,105 @@ static const NSInteger kHomeScheduleFetchPageSize = 400;
         if (maxCount > 0 && out.count >= maxCount) break;
     }
     return out;
+}
+
+- (NSString *)home_scheduleStartTimeStringFromDate:(NSDate *)date {
+    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    fmt.dateFormat = @"yyyyMMddHHmmss";
+    return [fmt stringFromDate:date ?: [NSDate date]];
+}
+
+- (NSString *)home_scheduleNextMonthStartTimeStringFromDate:(NSDate *)date {
+    NSCalendar *calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian] ?: [NSCalendar currentCalendar];
+    NSDate *base = date ?: [NSDate date];
+    NSDateComponents *comp = [calendar components:(NSCalendarUnitYear | NSCalendarUnitMonth) fromDate:base];
+    comp.month += 1;
+    comp.day = 1;
+    comp.hour = 0;
+    comp.minute = 0;
+    comp.second = 0;
+    NSDate *nextMonthStart = [calendar dateFromComponents:comp];
+    return [self home_scheduleStartTimeStringFromDate:nextMonthStart ?: base];
+}
+
+#if DEBUG
+- (NSString *)home_monthUpcomingScheduleCurlWithStartTime:(NSString *)startTime pageSize:(NSInteger)pageSize {
+    NSString *base = [APIEnvironmentManager sharedManager].currentBaseURL ?: @"";
+    if ([base hasSuffix:@"/"]) {
+        base = [base substringToIndex:base.length - 1];
+    }
+    NSString *token = AuthManager.sharedManager.user.accessToken ?: @"<token>";
+    NSString *safeStart = startTime.length ? startTime : @"yyyyMMddHHmmss";
+    NSString *url = [NSString stringWithFormat:@"%@/api/v1/home/schedule/month-upcoming?startTime=%@&myTeamOnly=0&pageNum=1&pageSize=%ld",
+                     base, safeStart, (long)MAX(pageSize, 1)];
+    return [NSString stringWithFormat:
+            @"curl '%@' \\\n"
+            "  -H 'Accept: application/json' \\\n"
+            "  -H 'Authorization: Bearer %@'",
+            url, token];
+}
+#endif
+
+- (void)home_fetchUpcomingScheduleFromStartTime:(NSString *)startTime
+                                    accumulated:(NSMutableArray<Match *> *)accumulated
+                                     monthIndex:(NSInteger)monthIndex
+                                     completion:(void (^)(NSArray<Match *> *matches))completion {
+    if (!completion) {
+        return;
+    }
+    if (accumulated.count >= kHomeScheduleDisplayLimit || monthIndex >= 6) {
+        completion([self home_sanitizedMatchesForHome:accumulated maxCount:kHomeScheduleDisplayLimit]);
+        return;
+    }
+    NSInteger remaining = kHomeScheduleDisplayLimit - accumulated.count;
+    NSInteger pageSize = MIN(remaining, kHomeScheduleFetchPageSize);
+    __weak typeof(self) weakSelf = self;
+    [[MatchRequest shared] getMonthUpcomingScheduleWithStartTime:startTime
+                                                      myTeamOnly:NO
+                                                            page:1
+                                                        pageSize:pageSize
+                                                         success:^(HTTPResponse * _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) {
+            completion(@[]);
+            return;
+        }
+        NSArray<Match *> *list = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+        [accumulated addObjectsFromArray:list];
+        NSArray<Match *> *sanitized = [self home_sanitizedMatchesForHome:accumulated maxCount:kHomeScheduleDisplayLimit];
+        NSLog(@"[HomeDebug] month-upcoming start=%@ batch=%ld total=%ld monthIndex=%ld",
+              startTime, (long)list.count, (long)sanitized.count, (long)monthIndex);
+        if (sanitized.count >= kHomeScheduleDisplayLimit) {
+            completion(sanitized);
+            return;
+        }
+        NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+        fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+        fmt.dateFormat = @"yyyyMMddHHmmss";
+        NSDate *startDate = [fmt dateFromString:startTime];
+        NSString *nextStart = [self home_scheduleNextMonthStartTimeStringFromDate:startDate];
+        if ([nextStart isEqualToString:startTime]) {
+            completion(sanitized);
+            return;
+        }
+        [self home_fetchUpcomingScheduleFromStartTime:nextStart
+                                          accumulated:[sanitized mutableCopy]
+                                           monthIndex:monthIndex + 1
+                                           completion:completion];
+    } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) {
+            completion(@[]);
+            return;
+        }
+        NSLog(@"[HomeDebug] month-upcoming failed start=%@ error=%@", startTime, error.localizedDescription);
+        if (accumulated.count > 0) {
+            completion([self home_sanitizedMatchesForHome:accumulated maxCount:kHomeScheduleDisplayLimit]);
+        } else {
+            completion(@[]);
+        }
+    }];
 }
 
 - (void)viewDidLoad {
@@ -941,141 +1040,32 @@ static const NSInteger kHomeScheduleFetchPageSize = 400;
 }
 
 - (void)fetchScheduleMatches {
-    // 防止并发：上一次请求还未完成时不重复发起
     if (self.isLoadingSchedule) return;
     self.isLoadingSchedule = YES;
     __weak typeof(self) weakSelf = self;
-    NSDateFormatter *dateFmt = [[NSDateFormatter alloc] init];
-    dateFmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    dateFmt.dateFormat = @"yyyy-MM-dd";
-    NSString *todayStr = [dateFmt stringFromDate:[NSDate date]];
 
-    NSDateFormatter *monthFmt = [[NSDateFormatter alloc] init];
-    monthFmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    monthFmt.dateFormat = @"yyyy-MM";
-    NSString *currentMonthStr = [monthFmt stringFromDate:[NSDate date]];
-    NSCalendar *calendar = [NSCalendar currentCalendar];
-    NSDate *nextMonthDate = [calendar dateByAddingUnit:NSCalendarUnitMonth value:1 toDate:[NSDate date] options:0];
-    NSString *nextMonthStr = [monthFmt stringFromDate:nextMonthDate ?: [NSDate date]];
+    NSDate *now = [NSDate date];
+    NSString *startTime = [self home_scheduleStartTimeStringFromDate:now];
+#if DEBUG
+    NSLog(@"[HomeDebug] schedule month-upcoming startTime=%@ pageSize=%ld limit=%ld",
+          startTime, (long)kHomeScheduleFetchPageSize, (long)kHomeScheduleDisplayLimit);
+    NSLog(@"[HomeDebug] schedule month-upcoming curl:\n%@",
+          [self home_monthUpcomingScheduleCurlWithStartTime:startTime pageSize:kHomeScheduleFetchPageSize]);
+#endif
 
-    dispatch_group_t monthsGroup = dispatch_group_create();
-    NSMutableArray<NSString *> *allDateStrings = [NSMutableArray array];
-
-    void (^fetchDatesForMonth)(NSString *) = ^(NSString *month) {
-        if (month.length == 0) return;
-        dispatch_group_enter(monthsGroup);
-        [[MatchRequest shared] getMatchScheduleDatesWithMonth:month success:^(HTTPResponse * _Nullable responseObject) {
-            NSArray *dates = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
-            for (id d in dates) {
-                if ([d isKindOfClass:NSString.class]) {
-                    [allDateStrings addObject:(NSString *)d];
-                }
-            }
-            dispatch_group_leave(monthsGroup);
-        } failure:^(NSError * _Nonnull error) {
-            dispatch_group_leave(monthsGroup);
-        }];
-    };
-
-    fetchDatesForMonth(currentMonthStr);
-    if (![nextMonthStr isEqualToString:currentMonthStr]) {
-        fetchDatesForMonth(nextMonthStr);
-    }
-
-    dispatch_group_notify(monthsGroup, dispatch_get_main_queue(), ^{
+    [self home_fetchUpcomingScheduleFromStartTime:startTime
+                                      accumulated:[NSMutableArray array]
+                                       monthIndex:0
+                                       completion:^(NSArray<Match *> *matches) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
-
-        // 去重 + 仅保留今天及之后（字符串格式 yyyy-MM-dd，可直接比较）
-        NSOrderedSet<NSString *> *unique = [NSOrderedSet orderedSetWithArray:allDateStrings];
-        NSMutableArray<NSString *> *targetDates = [NSMutableArray array];
-        for (NSString *d in unique) {
-            if (![d isKindOfClass:NSString.class]) continue;
-            if ([d compare:todayStr options:NSNumericSearch] != NSOrderedAscending) {
-                [targetDates addObject:d];
-            }
-        }
-        [targetDates sortUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
-            return [a compare:b options:NSNumericSearch];
-        }];
-        if (targetDates.count == 0) {
-            [targetDates addObject:todayStr];
-        }
-        // 防卡保护：最多拉 45 天。
-        if (targetDates.count > 45) {
-            targetDates = [[targetDates subarrayWithRange:NSMakeRange(0, 45)] mutableCopy];
-        }
-        NSLog(@"[HomeDebug] schedule dates merged count=%ld elapsed=%.3f", (long)targetDates.count, CACurrentMediaTime() - self.homeDebugLoadStartAt);
-
-        NSString *base = [APIEnvironmentManager sharedManager].currentBaseURL ?: @"";
-        if ([base hasSuffix:@"/"]) base = [base substringToIndex:base.length - 1];
-        NSString *token = AuthManager.sharedManager.user.accessToken ?: @"<token>";
-        NSString *firstDate = targetDates.firstObject ?: todayStr;
-        NSString *url = [NSString stringWithFormat:@"%@/api/v1/home/schedule?date=%@&myTeamOnly=0&pageNum=1&pageSize=%ld", base, firstDate, (long)kHomeScheduleFetchPageSize];
-        NSString *curl = [NSString stringWithFormat:
-                          @"curl '%@' \\\n"
-                          "  -X 'GET' \\\n"
-                          "  -H 'Accept: application/json, text/plain, */*' \\\n"
-                          "  -H 'Accept-Language: zh-CN,zh;q=0.9' \\\n"
-                          "  -H 'Authorization: Bearer %@' \\\n"
-                          "  -H 'Connection: keep-alive' \\\n"
-                          "  -H 'Origin: %@' \\\n"
-                          "  -H 'Referer: %@/' \\\n"
-                          "  -H 'Sec-Fetch-Dest: empty' \\\n"
-                          "  -H 'Sec-Fetch-Mode: cors' \\\n"
-                          "  -H 'Sec-Fetch-Site: same-origin' \\\n"
-                          "  -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36' \\\n"
-                          "  -H 'sec-ch-ua: \"Not:A-Brand\";v=\"99\", \"Google Chrome\";v=\"145\", \"Chromium\";v=\"145\"' \\\n"
-                          "  -H 'sec-ch-ua-mobile: ?0' \\\n"
-                          "  -H 'sec-ch-ua-platform: \"macOS\"'",
-                          url, token, base, base];
-        NSLog(@"[HomeDebug] schedule curl(first date): %@", curl);
-
-        NSSet<NSString *> *allowedDates = [NSSet setWithArray:targetDates];
-        dispatch_group_t scheduleGroup = dispatch_group_create();
-        NSMutableArray<Match *> *allMatches = [NSMutableArray array];
-        NSDateFormatter *dayFmt = [[NSDateFormatter alloc] init];
-        dayFmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-        dayFmt.dateFormat = @"yyyy-MM-dd";
-
-        for (NSString *date in targetDates) {
-            dispatch_group_enter(scheduleGroup);
-            [[MatchRequest shared] getMatchScheduleWithDate:date myTeamOnly:NO page:1 pageSize:kHomeScheduleFetchPageSize success:^(HTTPResponse<NSArray<Match *> *> * _Nullable r) {
-                NSArray<Match *> *list = [r.dataObject isKindOfClass:NSArray.class] ? r.dataObject : @[];
-                for (Match *m in list) {
-                    NSDate *md = [self dateFromRaw:m.matchDate];
-                    NSString *matchDay = md ? [dayFmt stringFromDate:md] : @"";
-                    if (matchDay.length == 0 || [allowedDates containsObject:matchDay]) {
-                        [allMatches addObject:m];
-                    }
-                }
-                dispatch_group_leave(scheduleGroup);
-            } failure:^(NSError * _Nonnull error) {
-                dispatch_group_leave(scheduleGroup);
-            }];
-        }
-
-        dispatch_group_notify(scheduleGroup, dispatch_get_main_queue(), ^{
-            __strong typeof(weakSelf) self = weakSelf;
-            if (!self) return;
-            self.isLoadingSchedule = NO;
-            NSArray<Match *> *sorted = [allMatches sortedArrayUsingComparator:^NSComparisonResult(Match *a, Match *b) {
-                NSDate *da = [self dateFromRaw:a.matchDate];
-                NSDate *db = [self dateFromRaw:b.matchDate];
-                if (!da && !db) return NSOrderedSame;
-                if (!da) return NSOrderedDescending;
-                if (!db) return NSOrderedAscending;
-                return [da compare:db];
-            }];
-            NSArray<Match *> *sanitized = [self home_sanitizedMatchesForHome:sorted maxCount:kHomeScheduleDisplayLimit];
-            NSLog(@"[HomeDebug] schedule merged raw=%ld sanitized=%ld elapsed=%.3f",
-                  (long)sorted.count, (long)sanitized.count, CACurrentMediaTime() - self.homeDebugLoadStartAt);
-            self.dataSource = sanitized.mutableCopy;
-            [self filterData];
-            [self updateTableHeight];
-            NSLog(@"[HomeDebug] schedule apply done elapsed=%.3f", CACurrentMediaTime() - self.homeDebugLoadStartAt);
-        });
-    });
+        self.isLoadingSchedule = NO;
+        NSLog(@"[HomeDebug] schedule month-upcoming done count=%ld elapsed=%.3f",
+              (long)matches.count, CACurrentMediaTime() - self.homeDebugLoadStartAt);
+        self.dataSource = matches.mutableCopy;
+        [self filterData];
+        [self updateTableHeight];
+    }];
 }
 
 - (void)fetchUserProfile {

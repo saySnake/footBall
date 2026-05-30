@@ -180,6 +180,34 @@ static void PNMatchRequestGETMyTeamSegment(NSString *path, NSInteger page, NSInt
     }];
 }
 
+- (void)getMonthUpcomingScheduleWithStartTime:(NSString *)startTime
+                                   myTeamOnly:(BOOL)myTeamOnly
+                                         page:(NSInteger)page
+                                     pageSize:(NSInteger)pageSize
+                                      success:(APISuccessBlock)success
+                                      failure:(APIFailureBlock)failure {
+    NSMutableDictionary *params = [NSMutableDictionary dictionary];
+    params[@"startTime"] = startTime.length > 0 ? startTime : @"";
+    params[@"myTeamOnly"] = @(myTeamOnly);
+    params[@"pageNum"] = @(MAX(page, 1));
+    params[@"pageSize"] = @(MAX(pageSize, 1));
+    [[APIManager sharedManager] GET:APIPathValueMatchScheduleMonthUpcoming parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            NSArray *list = PNMatchJSONArrayFromPageData(responseObject.data);
+            if (!list) {
+                list = @[];
+            }
+            NSArray *matches = [NSArray yy_modelArrayWithClass:Match.class json:list];
+            responseObject.dataObject = matches;
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
+
 #pragma mark - 比赛检索 / 详情 / 收藏
 
 - (void)searchMatchesWithKeyword:(NSString *)keyword

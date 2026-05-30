@@ -37,6 +37,15 @@ NS_ASSUME_NONNULL_BEGIN
                                success:(nullable APISuccessBlock)success
                                failure:(nullable APIFailureBlock)failure;
 
+/// GET `/api/v1/home/schedule/month-upcoming` — 从起始时间起、当月内的未来赛程（matchDate > startTime）
+/// @param startTime 格式 `yyyyMMddHHmmss`
+- (void)getMonthUpcomingScheduleWithStartTime:(NSString *)startTime
+                                   myTeamOnly:(BOOL)myTeamOnly
+                                         page:(NSInteger)page
+                                     pageSize:(NSInteger)pageSize
+                                      success:(nullable APISuccessBlock)success
+                                      failure:(nullable APIFailureBlock)failure;
+
 #pragma mark - 比赛检索 / 详情 / 收藏
 
 /// GET `/api/v1/matches/search` — 搜索比赛

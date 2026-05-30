@@ -76,6 +76,8 @@ FOUNDATION_EXPORT NSString * const APIPathValueMatchFeatured;
 FOUNDATION_EXPORT NSString * const APIPathValueMatchSchedule;
 /// 获取指定月份有比赛的日期列表
 FOUNDATION_EXPORT NSString * const APIPathValueMatchScheduleDates;
+/// 获取起始时间之后、当月内的未来比赛日程
+FOUNDATION_EXPORT NSString * const APIPathValueMatchScheduleMonthUpcoming;
 /// 按日期查询 Nami 比赛列表
 FOUNDATION_EXPORT NSString * const APIPathValueMatchNamiSchedule;
 /// 查询正在进行的 Nami 比赛
