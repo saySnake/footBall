@@ -314,6 +314,8 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
 
 #pragma mark - MoreMatchesViewController
 
+static NSInteger const kMoreMatchesPageSize = 50;
+
 @interface MoreMatchesViewController () <UITableViewDataSource, UITableViewDelegate>
 @property (nonatomic, strong) UIView *topBar;
 @property (nonatomic, strong) UIButton *backButton;
@@ -321,7 +323,11 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UILabel *monthLabel;
 @property (nonatomic, strong) UITableView *tableView;
-@property (nonatomic, strong) NSArray<Match *> *matches;
+@property (nonatomic, strong) NSMutableArray<Match *> *matches;
+@property (nonatomic, assign) NSInteger currentPage;
+@property (nonatomic, assign) BOOL hasMore;
+@property (nonatomic, assign) BOOL isLoadingSchedule;
+@property (nonatomic, assign) NSUInteger scheduleRequestToken;
 @property (nonatomic, strong) NSDate *selectedDate;        // 当前选中的日期（默认今天）
 @property (nonatomic, strong) NSDate *weekStartDate;       // 当前周的周日日期
 @property (nonatomic, strong) NSCalendar *calendar;
@@ -342,6 +348,9 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
     self.calendar.firstWeekday = 1;
     self.calendar.timeZone = [NSTimeZone localTimeZone];
     self.selectedDate = [NSDate date];
+    self.matches = [NSMutableArray array];
+    self.currentPage = 1;
+    self.hasMore = YES;
 
     [self buildTopBar];
     [self buildHeader];
@@ -489,25 +498,120 @@ static UIImage *kMoreMatchesFavoriteIcon(BOOL favorited) {
         make.top.equalTo(self.monthLabel.superview.mas_bottom);
         make.leading.trailing.bottom.equalTo(self.view);
     }];
+
+    __weak typeof(self) weakSelf = self;
+    MJRefreshAutoNormalFooter *footer = [MJRefreshAutoNormalFooter footerWithRefreshingBlock:^{
+        [weakSelf loadMoreMatches];
+    }];
+    footer.stateLabel.font = [UIFont systemFontOfSize:13];
+    footer.stateLabel.textColor = [UIColor colorWithWhite:0.6 alpha:1.0];
+    footer.hidden = YES;
+    self.tableView.mj_footer = footer;
+}
+
+- (NSInteger)moreMatches_totalFromPageData:(id)data {
+    if (![data isKindOfClass:NSDictionary.class]) return 0;
+    NSDictionary *d = (NSDictionary *)data;
+    id total = d[@"total"] ?: d[@"totalCount"] ?: d[@"totalElements"];
+    if ([total respondsToSelector:@selector(longLongValue)]) {
+        return (NSInteger)[total longLongValue];
+    }
+    return 0;
+}
+
+- (NSArray<Match *> *)moreMatches_sortedMatches:(NSArray *)matches {
+    return [matches sortedArrayUsingComparator:^NSComparisonResult(Match *obj1, Match *obj2) {
+        NSString *d1 = obj1.matchDate ?: @"";
+        NSString *d2 = obj2.matchDate ?: @"";
+        return [d1 compare:d2];
+    }];
+}
+
+- (void)moreMatches_updateFooterState {
+    MJRefreshAutoNormalFooter *footer = (MJRefreshAutoNormalFooter *)self.tableView.mj_footer;
+    if (!footer) return;
+    footer.hidden = (self.matches.count == 0 && !self.hasMore);
+    [footer endRefreshing];
+    if (!self.hasMore && self.matches.count > 0) {
+        [footer endRefreshingWithNoMoreData];
+    }
 }
 
 - (void)reloadDataForSelectedDate {
+    self.scheduleRequestToken += 1;
+    self.currentPage = 1;
+    self.hasMore = YES;
+    self.isLoadingSchedule = NO;
+    [self.matches removeAllObjects];
+    [self.tableView reloadData];
+    [self.tableView.mj_footer resetNoMoreData];
+    self.tableView.mj_footer.hidden = YES;
+    [self fetchSchedulePage:1 append:NO];
+}
+
+- (void)loadMoreMatches {
+    if (!self.hasMore || self.isLoadingSchedule) {
+        [self.tableView.mj_footer endRefreshing];
+        return;
+    }
+    [self fetchSchedulePage:self.currentPage + 1 append:YES];
+}
+
+- (void)fetchSchedulePage:(NSInteger)page append:(BOOL)append {
+    if (self.isLoadingSchedule) {
+        if (append) {
+            [self.tableView.mj_footer endRefreshing];
+        }
+        return;
+    }
     if (!self.selectedDate) self.selectedDate = [NSDate date];
+
+    self.isLoadingSchedule = YES;
+    NSUInteger requestToken = self.scheduleRequestToken;
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
     formatter.dateFormat = @"yyyy-MM-dd";
     NSString *dateStr = [formatter stringFromDate:self.selectedDate];
+
     __weak typeof(self) weakSelf = self;
-    [[MatchRequest shared] getMatchScheduleWithDate:dateStr myTeamOnly:NO page:1 pageSize:50 success:^(HTTPResponse * _Nullable responseObject) {
-        NSArray *matches = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
-        weakSelf.matches = [matches sortedArrayUsingComparator:^NSComparisonResult(Match *obj1, Match *obj2) {
-            NSString *d1 = obj1.matchDate ?: @"";
-            NSString *d2 = obj2.matchDate ?: @"";
-            return [d1 compare:d2];
-        }];
-        [weakSelf.tableView reloadData];
+    [[MatchRequest shared] getMatchScheduleWithDate:dateStr
+                                         myTeamOnly:NO
+                                               page:page
+                                           pageSize:kMoreMatchesPageSize
+                                            success:^(HTTPResponse * _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self || requestToken != self.scheduleRequestToken) return;
+        self.isLoadingSchedule = NO;
+
+        NSArray *raw = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+        NSArray<Match *> *sorted = [self moreMatches_sortedMatches:raw];
+        if (append) {
+            [self.matches addObjectsFromArray:sorted];
+        } else {
+            [self.matches removeAllObjects];
+            [self.matches addObjectsFromArray:sorted];
+        }
+        self.currentPage = page;
+
+        NSInteger total = [self moreMatches_totalFromPageData:responseObject.data];
+        if (total > 0) {
+            self.hasMore = self.matches.count < total;
+        } else {
+            self.hasMore = sorted.count >= kMoreMatchesPageSize;
+        }
+
+        [self.tableView reloadData];
+        [self moreMatches_updateFooterState];
     } failure:^(NSError * _Nonnull error) {
-        weakSelf.matches = @[];
-        [weakSelf.tableView reloadData];
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self || requestToken != self.scheduleRequestToken) return;
+        self.isLoadingSchedule = NO;
+        if (append) {
+            [self.tableView.mj_footer endRefreshing];
+        } else {
+            [self.matches removeAllObjects];
+            [self.tableView reloadData];
+            self.tableView.mj_footer.hidden = YES;
+        }
     }];
 }
 
