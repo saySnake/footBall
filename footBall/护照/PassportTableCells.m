@@ -950,6 +950,11 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
 
 #pragma mark - Tactical
 
+static CGFloat PCTacticalLegendRowHeight(void) {
+    // dot 16 + gap 6 + 14pt 标签约 1~2 行
+    return 62.0;
+}
+
 @implementation PassportTacticalCell {
     UIView *_card;
     UILabel *_title;
@@ -1013,6 +1018,26 @@ static NSAttributedString *PCTacticalIdentitySubtitle(NSInteger count) {
         }];
     }
     return self;
+}
+
++ (CGFloat)preferredHeightForSegmentCount:(NSUInteger)count {
+    static const CGFloat kTop = 30.0;
+    static const CGFloat kTitle = 22.0;
+    static const CGFloat kTitleSubtitleGap = 10.0;
+    static const CGFloat kSubtitle = 20.0;
+    static const CGFloat kSubtitleDonutGap = 12.0;
+    static const CGFloat kDonut = 260.0;
+    static const CGFloat kDonutLegendGap = 12.0;
+    static const CGFloat kLegendRowSpacing = 16.0;
+    static const CGFloat kBottom = 16.0;
+
+    NSUInteger legendRows = count == 0 ? 0 : (count + 2) / 3;
+    CGFloat legendHeight = 0;
+    if (legendRows > 0) {
+        CGFloat rowH = PCTacticalLegendRowHeight();
+        legendHeight = legendRows * rowH + (legendRows - 1) * kLegendRowSpacing;
+    }
+    return kTop + kTitle + kTitleSubtitleGap + kSubtitle + kSubtitleDonutGap + kDonut + kDonutLegendGap + legendHeight + kBottom;
 }
 
 - (void)prepareForReuse {

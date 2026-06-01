@@ -34,6 +34,7 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 @interface PassportTacticalCell : UITableViewCell
++ (CGFloat)preferredHeightForSegmentCount:(NSUInteger)count;
 - (void)configureWithModel:(PassportViewModel *)model;
 @end
 

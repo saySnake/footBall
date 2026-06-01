@@ -438,9 +438,10 @@ static UIColor *PassportPageBg(void) {
     if (indexPath.row == 5) {
         return 422;
     }
-    // PassportTacticalCell（图例每行 3 个，最多 6 种身份为 2 行）
+    // PassportTacticalCell：图例每行 3 个，高度随 tacticalSegments 数量变化
     if (indexPath.row == 6) {
-        return 520;
+        NSUInteger segCount = self.viewModel.tacticalSegments.count;
+        return [PassportTacticalCell preferredHeightForSegmentCount:segCount];
     }
     // PassportMetricBarsCell 设计稿（90pt 数字 + 7 条情绪 bar）
     if (indexPath.row == 7) {

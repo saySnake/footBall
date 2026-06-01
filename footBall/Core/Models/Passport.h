@@ -117,7 +117,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSArray<PNIdentityDist *> *identityDist;
 /// 赛后情绪分布
 @property (nonatomic, strong) NSArray<PNEmotionDist *> *emotionDist;
-/// 频次最高情绪
+/// 频次最高情绪（emoji）
 @property (nonatomic, copy, nullable) NSString *topEmotion;
 /// 线上观赛方式分布
 @property (nonatomic, strong) NSArray<PNOnlineMethodDist *> *onlineMethodDist;

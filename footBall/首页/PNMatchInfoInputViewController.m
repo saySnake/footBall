@@ -1169,7 +1169,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     m[@"watchReason"] = self.selectedReason ?: @"";
     m[@"ticketPrice"] = @([self.priceField.text ?: @"0" doubleValue]);
     m[@"matchDateTime"] = [self pn_isoMatchDateTimeString];
-    m[@"postMatchEmotion"] = (self.selectedEmotionName.length > 0 ? self.selectedEmotionName : (self.selectedEmotion ?: @""));
+    m[@"postMatchEmotion"] = self.selectedEmotion ?: @"";
     m[@"notes"] = self.commentView.text ?: @"";
     m[@"photoUrls"] = @[];
     return m;
@@ -1208,6 +1208,12 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
             }
             return NO;
         }
+    }
+    if (self.selectedEmotion.length == 0) {
+        if (outMessage) {
+            *outMessage = @"请选择赛后情绪";
+        }
+        return NO;
     }
     return YES;
 }

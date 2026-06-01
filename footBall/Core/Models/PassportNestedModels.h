@@ -75,7 +75,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// EmotionDistVO — 赛后情绪分布
 @interface PNEmotionDist : NSObject <YYModel>
-/// 情绪类型：CALM / EXCITED 等
+/// 情绪类型（emoji，如 🤩 / 🥳）
 @property (nonatomic, copy) NSString *emotion;
 /// 出现次数
 @property (nonatomic, assign) NSInteger count;

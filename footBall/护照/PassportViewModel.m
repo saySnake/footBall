@@ -51,52 +51,82 @@ static NSString *PNPassportInputSeatLabelForServerStandType(NSString *server) {
     return aliasToLabel[s];
 }
 
+/// 与 PNMatchInfoInputViewController 赛后情绪选项一致（接口 emotion / topEmotion 为 emoji）
+static NSArray<NSDictionary<NSString *, NSString *> *> *PNPassportEmotionOptionsData(void) {
+    static NSArray<NSDictionary<NSString *, NSString *> *> *options = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        options = @[
+            @{ @"name": @"兴奋", @"emoji": @"🤩" },
+            @{ @"name": @"激动", @"emoji": @"🥳" },
+            @{ @"name": @"希望", @"emoji": @"🤗" },
+            @{ @"name": @"遗憾", @"emoji": @"😩" },
+            @{ @"name": @"平静", @"emoji": @"😎" },
+            @{ @"name": @"失望", @"emoji": @"😤" },
+            @{ @"name": @"暴躁", @"emoji": @"😡" },
+        ];
+    });
+    return options;
+}
+
 /// 与 PNMatchInfoInputViewController 赛后情绪选项顺序一致
 static NSArray<NSString *> *PNPassportEmotionOrder(void) {
     static NSArray<NSString *> *order;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        order = @[ @"兴奋", @"激动", @"希望", @"遗憾", @"平静", @"失望", @"暴躁" ];
+        NSMutableArray<NSString *> *names = [NSMutableArray array];
+        for (NSDictionary<NSString *, NSString *> *opt in PNPassportEmotionOptionsData()) {
+            [names addObject:opt[@"name"] ?: @""];
+        }
+        order = [names copy];
     });
     return order;
 }
 
-/// 接口/历史情绪文案 → 输入页情绪名
-static NSString *PNPassportInputEmotionLabelForServerEmotion(NSString *server) {
-    NSString *s = [server stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if (s.length == 0) {
+/// 接口 emotion / topEmotion（emoji）或历史中文别名 → 情绪选项
+static NSDictionary<NSString *, NSString *> *PNPassportEmotionOptionForServerValue(NSString *value) {
+    NSString *v = [value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (v.length == 0) {
         return nil;
     }
-    static NSDictionary<NSString *, NSString *> *aliasToLabel;
+    static NSDictionary<NSString *, NSDictionary<NSString *, NSString *> *> *aliasToOption;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        NSMutableDictionary<NSString *, NSString *> *m = [NSMutableDictionary dictionary];
-        NSDictionary<NSString *, NSArray<NSString *> *> *groups = @{
-            @"兴奋": @[ @"兴奋", @"🤩" ],
-            @"激动": @[ @"激动", @"🥳" ],
-            @"希望": @[ @"希望", @"乐观", @"🤗" ],
-            @"遗憾": @[ @"遗憾", @"迷茫", @"😩" ],
-            @"平静": @[ @"平静", @"😎" ],
-            @"失望": @[ @"失望", @"😤" ],
-            @"暴躁": @[ @"暴躁", @"😡" ],
+        NSMutableDictionary<NSString *, NSDictionary<NSString *, NSString *> *> *m = [NSMutableDictionary dictionary];
+        NSDictionary<NSString *, NSArray<NSString *> *> *legacyNames = @{
+            @"希望": @[ @"乐观" ],
+            @"遗憾": @[ @"迷茫" ],
         };
-        for (NSString *label in PNPassportEmotionOrder()) {
-            for (NSString *alias in groups[label] ?: @[ label ]) {
-                m[alias] = label;
+        for (NSDictionary<NSString *, NSString *> *opt in PNPassportEmotionOptionsData()) {
+            NSString *name = opt[@"name"] ?: @"";
+            NSString *emoji = opt[@"emoji"] ?: @"";
+            m[name] = opt;
+            if (emoji.length) {
+                m[emoji] = opt;
+            }
+            m[[NSString stringWithFormat:@"%@ %@", name, emoji]] = opt;
+            for (NSString *alias in legacyNames[name] ?: @[]) {
+                m[alias] = opt;
             }
         }
-        aliasToLabel = [m copy];
+        aliasToOption = [m copy];
     });
-    NSString *exact = aliasToLabel[s];
-    if (exact.length) {
+    NSDictionary<NSString *, NSString *> *exact = aliasToOption[v];
+    if (exact) {
         return exact;
     }
-    for (NSString *label in PNPassportEmotionOrder()) {
-        if ([s containsString:label]) {
-            return label;
+    for (NSDictionary<NSString *, NSString *> *opt in PNPassportEmotionOptionsData()) {
+        NSString *name = opt[@"name"] ?: @"";
+        NSString *emoji = opt[@"emoji"] ?: @"";
+        if ((emoji.length && [v containsString:emoji]) || [v containsString:name]) {
+            return opt;
         }
     }
     return nil;
+}
+
+static NSString *PNPassportEmotionDisplayNameForServerValue(NSString *value) {
+    return PNPassportEmotionOptionForServerValue(value)[@"name"];
 }
 
 /// 与 PNMatchInfoInputViewController 观赛地点 pill 顺序一致
@@ -141,7 +171,7 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
 + (NSArray<NSDictionary *> *)emotionMetricBarsOrderedFromEmotionDist:(NSArray<PNEmotionDist *> *)emotionList {
     NSMutableDictionary<NSString *, NSNumber *> *countByEmotion = [NSMutableDictionary dictionary];
     for (PNEmotionDist *ed in emotionList) {
-        NSString *label = PNPassportInputEmotionLabelForServerEmotion(ed.emotion);
+        NSString *label = PNPassportEmotionDisplayNameForServerValue(ed.emotion);
         if (!label.length) {
             continue;
         }
@@ -462,17 +492,34 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
 
     //观赛身份 tactical：用 identityDist（有 count/percentage）构建 segments
     m.tacticalTitle = NSLocalizedString(@"passport_tactical_identity_title", nil) ?: @"观赛身份";
-    NSMutableArray<NSDictionary *> *segs = [NSMutableArray array];
-    double totalIdentity = 0;
+    NSMutableArray<PNIdentityDist *> *filteredIdentities = [NSMutableArray array];
     for (PNIdentityDist *d in identityList) {
+        if (d.count > 0) {
+            [filteredIdentities addObject:d];
+        }
+    }
+    [filteredIdentities sortUsingComparator:^NSComparisonResult(PNIdentityDist *a, PNIdentityDist *b) {
+        NSInteger ca = MAX(0, a.count);
+        NSInteger cb = MAX(0, b.count);
+        if (ca > cb) {
+            return NSOrderedAscending;
+        }
+        if (ca < cb) {
+            return NSOrderedDescending;
+        }
+        return NSOrderedSame;
+    }];
+    double totalIdentity = 0;
+    for (PNIdentityDist *d in filteredIdentities) {
         totalIdentity += MAX(0, (double)d.count);
     }
-    for (PNIdentityDist *d in identityList) {
+    NSMutableArray<NSDictionary *> *segs = [NSMutableArray array];
+    for (PNIdentityDist *d in filteredIdentities) {
         double p = totalIdentity > 0 ? ((double)MAX(0, d.count) / totalIdentity) : 0;
         [segs addObject:@{ @"p": @(p), @"title": d.identity ?: @"" }];
     }
     m.tacticalSegments = [segs copy];
-    m.tacticalIdentityCount = (NSInteger)MIN(6, m.tacticalSegments.count);
+    m.tacticalIdentityCount = m.tacticalSegments.count;
 
     // 观赛后的情绪：与输入信息页 7 种情绪顺序一致
     NSArray<NSDictionary *> *emotionBars = [PassportViewModel emotionMetricBarsOrderedFromEmotionDist:emotionList];
@@ -485,8 +532,8 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     m.metricEmotionCount = emotionKindCount;
     m.metricHeaderAsideLine1 = (passport && passport.topLocation.length) ? passport.topLocation : @"";
     NSString *topEmotion = passport.topEmotion ?: @"";
-    NSString *topEmotionInput = PNPassportInputEmotionLabelForServerEmotion(topEmotion);
-    m.metricHeaderAsideLine2 = topEmotionInput.length ? topEmotionInput : topEmotion;
+    NSString *topEmotionName = PNPassportEmotionDisplayNameForServerValue(topEmotion);
+    m.metricHeaderAsideLine2 = topEmotionName.length ? topEmotionName : topEmotion;
     m.metricBarsPrompt = NSLocalizedString(@"passport_metric_prompt", nil) ?: @"";
     m.recentMetricBars = emotionBars;
     m.recentGoalsTitle = @"";
