@@ -25,6 +25,7 @@
 #define kDiscoverCardBg       [UIColor colorWithRed:0.976 green:0.976 blue:0.976 alpha:1.0]   // #F9F9F9
 #define kDiscoverCellBg       [UIColor colorWithRed:0.961 green:0.961 blue:0.961 alpha:1.0]   // #F5F5F5 未来观赛卡片
 #define kDiscoverFinishedCardBg [UIColor colorWithRed:0.957 green:0.957 blue:0.957 alpha:1.0]   // #F4F4F4 已经观赛卡片（Figma 1:7162）
+static NSString * const kDiscoverOfflineCacheKeyPrefix = @"discover.offline.cache.v1";
 
 typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     DiscoverMatchTypeUpcoming,
@@ -527,8 +528,125 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
     [self buildBody];
     [self refreshDiscoverHeader];
     [self switchToType:DiscoverMatchTypeUpcoming];
+    [self restoreCachedDataIfNeeded];
     // 首次加载数据放在 viewDidLoad，避免 viewWillAppear 每次重拉导致闪烁
     [self loadRemoteData];
+}
+
+- (NSString *)discoverCacheKey {
+    NSString *uid = AuthManager.sharedManager.user.profile.userId ?: AuthManager.sharedManager.user.userId ?: @"guest";
+    if (uid.length == 0) uid = @"guest";
+    return [NSString stringWithFormat:@"%@.%@", kDiscoverOfflineCacheKeyPrefix, uid];
+}
+
+- (NSDictionary *)dictionaryFromDiscoverMatch:(DiscoverMatch *)m {
+    if (!m) return @{};
+    return @{
+        @"recordId": m.recordId ?: @"",
+        @"matchId": m.matchId ?: @"",
+        @"homeName": m.homeName ?: @"",
+        @"awayName": m.awayName ?: @"",
+        @"timeText": m.timeText ?: @"",
+        @"dateText": m.dateText ?: @"",
+        @"scoreText": m.scoreText ?: @"",
+        @"verifiedText": m.verifiedText ?: @"",
+        @"hasInputInfo": @(m.hasInputInfo),
+        @"hasVerified": @(m.hasVerified),
+        @"hasPendingVerification": @(m.hasPendingVerification),
+        @"type": @(m.type),
+        @"homeLogoURL": m.homeLogoURL ?: @"",
+        @"awayLogoURL": m.awayLogoURL ?: @"",
+    };
+}
+
+- (DiscoverMatch *)discoverMatchFromDictionary:(NSDictionary *)dict {
+    if (![dict isKindOfClass:NSDictionary.class]) return nil;
+    DiscoverMatch *m = [DiscoverMatch new];
+    m.recordId = DiscoverStringFromAny(dict[@"recordId"]) ?: @"";
+    m.matchId = DiscoverStringFromAny(dict[@"matchId"]) ?: @"";
+    m.homeName = DiscoverStringFromAny(dict[@"homeName"]) ?: @"-";
+    m.awayName = DiscoverStringFromAny(dict[@"awayName"]) ?: @"-";
+    m.timeText = DiscoverStringFromAny(dict[@"timeText"]) ?: @"";
+    m.dateText = DiscoverStringFromAny(dict[@"dateText"]) ?: @"";
+    m.scoreText = DiscoverStringFromAny(dict[@"scoreText"]) ?: @"";
+    m.verifiedText = DiscoverStringFromAny(dict[@"verifiedText"]) ?: @"";
+    m.hasInputInfo = [dict[@"hasInputInfo"] respondsToSelector:@selector(boolValue)] ? [dict[@"hasInputInfo"] boolValue] : NO;
+    m.hasVerified = [dict[@"hasVerified"] respondsToSelector:@selector(boolValue)] ? [dict[@"hasVerified"] boolValue] : NO;
+    m.hasPendingVerification = [dict[@"hasPendingVerification"] respondsToSelector:@selector(boolValue)] ? [dict[@"hasPendingVerification"] boolValue] : NO;
+    m.type = [dict[@"type"] respondsToSelector:@selector(integerValue)] ? [dict[@"type"] integerValue] : DiscoverMatchTypeUpcoming;
+    m.homeLogoURL = DiscoverStringFromAny(dict[@"homeLogoURL"]) ?: @"";
+    m.awayLogoURL = DiscoverStringFromAny(dict[@"awayLogoURL"]) ?: @"";
+    return m;
+}
+
+- (void)saveDiscoverOfflineCache {
+    if (!AuthManager.sharedManager.isLoggedIn) return;
+    NSMutableArray *upcoming = [NSMutableArray array];
+    for (DiscoverMatch *m in self.upcomingMatches ?: @[]) {
+        [upcoming addObject:[self dictionaryFromDiscoverMatch:m]];
+    }
+    NSMutableArray *finished = [NSMutableArray array];
+    for (DiscoverMatch *m in self.finishedMatches ?: @[]) {
+        [finished addObject:[self dictionaryFromDiscoverMatch:m]];
+    }
+    NSDictionary *stats = @{
+        @"statA": self.statAValue.text ?: @"0",
+        @"statB": self.statBValue.text ?: @"0 min",
+        @"statC": self.statCValue.text ?: @"0",
+        @"statD": self.statDValue.text ?: @"0",
+        @"statE": self.statEValue.text ?: @"0",
+        @"leagueWin": self.leagueWinValueLabel.text ?: @"0",
+        @"leagueDraw": self.leagueDrawValueLabel.text ?: @"0",
+        @"leagueLoss": self.leagueLossValueLabel.text ?: @"0",
+        @"leagueElim": self.leagueElimValueLabel.text ?: @"0",
+        @"leagueQual": self.leagueQualValueLabel.text ?: @"0",
+    };
+    NSDictionary *payload = @{
+        @"upcoming": upcoming,
+        @"finished": finished,
+        @"stats": stats,
+        @"savedAt": @([[NSDate date] timeIntervalSince1970]),
+    };
+    [[NSUserDefaults standardUserDefaults] setObject:payload forKey:[self discoverCacheKey]];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+- (void)restoreCachedDataIfNeeded {
+    if (!AuthManager.sharedManager.isLoggedIn) return;
+    NSDictionary *payload = [[NSUserDefaults standardUserDefaults] objectForKey:[self discoverCacheKey]];
+    if (![payload isKindOfClass:NSDictionary.class]) return;
+
+    NSArray *upcomingArr = [payload[@"upcoming"] isKindOfClass:NSArray.class] ? payload[@"upcoming"] : @[];
+    NSMutableArray<DiscoverMatch *> *upcoming = [NSMutableArray arrayWithCapacity:upcomingArr.count];
+    for (id item in upcomingArr) {
+        DiscoverMatch *m = [self discoverMatchFromDictionary:item];
+        if (m) [upcoming addObject:m];
+    }
+    NSArray *finishedArr = [payload[@"finished"] isKindOfClass:NSArray.class] ? payload[@"finished"] : @[];
+    NSMutableArray<DiscoverMatch *> *finished = [NSMutableArray arrayWithCapacity:finishedArr.count];
+    for (id item in finishedArr) {
+        DiscoverMatch *m = [self discoverMatchFromDictionary:item];
+        if (m) [finished addObject:m];
+    }
+    if (upcoming.count > 0 || finished.count > 0) {
+        self.upcomingMatches = [upcoming copy];
+        self.finishedMatches = [finished copy];
+        [self refreshTabs];
+    }
+
+    NSDictionary *stats = [payload[@"stats"] isKindOfClass:NSDictionary.class] ? payload[@"stats"] : nil;
+    if (stats) {
+        self.statAValue.text = DiscoverStringFromAny(stats[@"statA"]) ?: self.statAValue.text;
+        self.statBValue.text = DiscoverStringFromAny(stats[@"statB"]) ?: self.statBValue.text;
+        self.statCValue.text = DiscoverStringFromAny(stats[@"statC"]) ?: self.statCValue.text;
+        self.statDValue.text = DiscoverStringFromAny(stats[@"statD"]) ?: self.statDValue.text;
+        self.statEValue.text = DiscoverStringFromAny(stats[@"statE"]) ?: self.statEValue.text;
+        self.leagueWinValueLabel.text = DiscoverStringFromAny(stats[@"leagueWin"]) ?: self.leagueWinValueLabel.text;
+        self.leagueDrawValueLabel.text = DiscoverStringFromAny(stats[@"leagueDraw"]) ?: self.leagueDrawValueLabel.text;
+        self.leagueLossValueLabel.text = DiscoverStringFromAny(stats[@"leagueLoss"]) ?: self.leagueLossValueLabel.text;
+        self.leagueElimValueLabel.text = DiscoverStringFromAny(stats[@"leagueElim"]) ?: self.leagueElimValueLabel.text;
+        self.leagueQualValueLabel.text = DiscoverStringFromAny(stats[@"leagueQual"]) ?: self.leagueQualValueLabel.text;
+    }
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -1090,10 +1208,13 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
     dispatch_group_t group = dispatch_group_create();
     __block NSArray<Match *> *upList = @[];
     __block NSArray<Match *> *finList = @[];
+    __block BOOL upReqSuccess = NO;
+    __block BOOL finReqSuccess = NO;
     dispatch_group_enter(group);
     [[MatchRequest shared] getMyTeamUpcomingMatchesWithPage:1 pageSize:50 success:^(HTTPResponse * _Nullable responseObject) {
         NSArray *rows = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
         upList = rows;
+        upReqSuccess = YES;
         dispatch_group_leave(group);
     } failure:^(NSError * _Nonnull error) {
         dispatch_group_leave(group);
@@ -1102,15 +1223,21 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
     [[MatchRequest shared] getMyTeamFinishedMatchesWithPage:1 pageSize:50 success:^(HTTPResponse * _Nullable responseObject) {
         NSArray *rows = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
         finList = rows;
+        finReqSuccess = YES;
         dispatch_group_leave(group);
     } failure:^(NSError * _Nonnull error) {
         dispatch_group_leave(group);
     }];
     dispatch_group_notify(group, dispatch_get_main_queue(), ^{
-        weakSelf.upcomingMatches = [weakSelf discoverMatchesFrom:upList type:DiscoverMatchTypeUpcoming];
-        weakSelf.finishedMatches = [weakSelf discoverMatchesFrom:finList type:DiscoverMatchTypeFinished];
+        // 断网/请求失败时保留上次成功数据，避免页面被清空。
+        if (upReqSuccess) {
+            weakSelf.upcomingMatches = [weakSelf discoverMatchesFrom:upList type:DiscoverMatchTypeUpcoming];
+        }
+        if (finReqSuccess) {
+            weakSelf.finishedMatches = [weakSelf discoverMatchesFrom:finList type:DiscoverMatchTypeFinished];
+        }
         // Debug: 打印第一条已观赛数据的关键字段
-        if (finList.count > 0) {
+        if (finReqSuccess && finList.count > 0) {
             Match *first = finList[0];
             NSLog(@"[DiscoverDebug] finishedMatches[0] => matchId=%@, recordId=%@, verifyCompleted=%d, verificationStatus=%@, certifiedMinutes=%ld",
                   first.matchId ?: @"",
@@ -1126,12 +1253,16 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
         }
         [weakSelf refreshTabs];
         [weakSelf refreshFinishedPendingStatusByDetail];
+        if (upReqSuccess || finReqSuccess) {
+            [weakSelf saveDiscoverOfflineCache];
+        }
     });
     [[ProfileRequest shared] getMyStatisticsWithPeriod:@"all" success:^(HTTPResponse * _Nullable responseObject) {
         PNStatistics *statistics = [responseObject.dataObject isKindOfClass:PNStatistics.class] ? responseObject.dataObject : nil;
         [weakSelf applyStatistics:statistics];
+        [weakSelf saveDiscoverOfflineCache];
     } failure:^(NSError * _Nonnull error) {
-        [weakSelf applyStatistics:nil];
+        // 网络失败时保留当前统计值，避免离线回退成全 0。
     }];
 }
 

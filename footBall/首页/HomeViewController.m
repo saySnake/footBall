@@ -24,6 +24,7 @@
 #define kHomeTeamBadgeBg [UIColor colorWithRed:0.965 green:0.973 blue:0.996 alpha:1.0]
 #define kHomeMetaIconColor [UIColor colorWithRed:0.114 green:0.114 blue:0.114 alpha:1.0]
 static NSString *const kLogoPlaceholder = @"team_placeholder";
+static NSString * const kHomeOfflineCacheKeyPrefix = @"home.offline.cache.v1";
 static CGFloat const kHomeFeaturedCardH = 168.f;
 static CGFloat const kHomeFeaturedCardGap = 12.f;
 static CGFloat const kHomeFeaturedCardPad = 16.f;
@@ -319,7 +320,7 @@ static NSString *kHomeTeamIdString(id raw) {
 @property (nonatomic, strong) UILabel *challengerLabel;
 @property (nonatomic, strong) UILabel *dateLabel;
 @property (nonatomic, strong) UICollectionView *teamCollectionView;
-@property (nonatomic, strong) NSArray<TeamIcon *> *teamItems;
+@property (nonatomic, strong) NSArray<Team *> *teamItems;
 @property (nonatomic, copy, nullable) NSString *selectedTeamId; // 当前选中的关注球队；有球队时默认第一个
 
 @property (nonatomic, strong) NSMutableArray<Match *> *dataSource;
@@ -350,6 +351,131 @@ static NSString *kHomeTeamIdString(id raw) {
 
 static const NSInteger kHomeScheduleDisplayLimit = 100;
 static const NSInteger kHomeScheduleFetchPageSize = 100;
+
+- (NSString *)homeCacheKey {
+    NSString *uid = AuthManager.sharedManager.user.profile.userId ?: AuthManager.sharedManager.user.userId ?: @"guest";
+    if (uid.length == 0) uid = @"guest";
+    return [NSString stringWithFormat:@"%@.%@", kHomeOfflineCacheKeyPrefix, uid];
+}
+
+- (NSDictionary *)home_teamIconDictFromModel:(Team *)item {
+    if (!item) return @{};
+    return @{
+        @"teamId": item.teamId ?: @"",
+        @"name": item.name ?: @"",
+        @"logo": item.logo ?: @"",
+        @"nameEn": item.nameEn ?: @"",
+    };
+}
+
+- (Team *)home_teamIconFromDict:(NSDictionary *)dict {
+    if (![dict isKindOfClass:NSDictionary.class]) return nil;
+    Team *item = [Team new];
+    item.teamId = [dict[@"teamId"] isKindOfClass:NSString.class] ? dict[@"teamId"] : @"";
+    item.name = [dict[@"name"] isKindOfClass:NSString.class] ? dict[@"name"] : @"";
+    item.logo = [dict[@"logo"] isKindOfClass:NSString.class] ? dict[@"logo"] : @"";
+    item.nameEn = [dict[@"nameEn"] isKindOfClass:NSString.class] ? dict[@"nameEn"] : @"";
+    return item;
+}
+
+- (NSDictionary *)home_matchDictFromModel:(Match *)m {
+    if (!m) return @{};
+    return @{
+        @"matchId": m.matchId ?: @"",
+        @"homeTeamId": m.homeTeamId ?: @"",
+        @"awayTeamId": m.awayTeamId ?: @"",
+        @"homeTeamName": m.homeTeamName ?: @"",
+        @"awayTeamName": m.awayTeamName ?: @"",
+        @"homeTeamLogo": m.homeTeamLogo ?: @"",
+        @"awayTeamLogo": m.awayTeamLogo ?: @"",
+        @"matchDate": m.matchDate ?: @"",
+        @"matchStatus": m.matchStatus ?: @"",
+        @"homeScore": @(m.homeScore),
+        @"awayScore": @(m.awayScore),
+        @"favorited": @(m.favorited),
+    };
+}
+
+- (Match *)home_matchFromDict:(NSDictionary *)dict {
+    if (![dict isKindOfClass:NSDictionary.class]) return nil;
+    Match *m = [Match new];
+    m.matchId = [dict[@"matchId"] isKindOfClass:NSString.class] ? dict[@"matchId"] : @"";
+    m.homeTeamId = [dict[@"homeTeamId"] isKindOfClass:NSString.class] ? dict[@"homeTeamId"] : @"";
+    m.awayTeamId = [dict[@"awayTeamId"] isKindOfClass:NSString.class] ? dict[@"awayTeamId"] : @"";
+    m.homeTeamName = [dict[@"homeTeamName"] isKindOfClass:NSString.class] ? dict[@"homeTeamName"] : @"";
+    m.awayTeamName = [dict[@"awayTeamName"] isKindOfClass:NSString.class] ? dict[@"awayTeamName"] : @"";
+    m.homeTeamLogo = [dict[@"homeTeamLogo"] isKindOfClass:NSString.class] ? dict[@"homeTeamLogo"] : @"";
+    m.awayTeamLogo = [dict[@"awayTeamLogo"] isKindOfClass:NSString.class] ? dict[@"awayTeamLogo"] : @"";
+    m.matchDate = [dict[@"matchDate"] isKindOfClass:NSString.class] ? dict[@"matchDate"] : @"";
+    m.matchStatus = [dict[@"matchStatus"] isKindOfClass:NSString.class] ? dict[@"matchStatus"] : @"";
+    m.homeScore = [dict[@"homeScore"] respondsToSelector:@selector(integerValue)] ? [dict[@"homeScore"] integerValue] : 0;
+    m.awayScore = [dict[@"awayScore"] respondsToSelector:@selector(integerValue)] ? [dict[@"awayScore"] integerValue] : 0;
+    m.favorited = [dict[@"favorited"] respondsToSelector:@selector(boolValue)] ? [dict[@"favorited"] boolValue] : NO;
+    return m;
+}
+
+- (void)saveHomeOfflineCache {
+    NSMutableArray *teams = [NSMutableArray array];
+    for (Team *item in self.teamItems ?: @[]) {
+        [teams addObject:[self home_teamIconDictFromModel:item]];
+    }
+    NSMutableArray *schedule = [NSMutableArray array];
+    for (Match *m in self.dataSource ?: @[]) {
+        [schedule addObject:[self home_matchDictFromModel:m]];
+    }
+    NSMutableArray *featured = [NSMutableArray array];
+    if (self.highlightFinished) [featured addObject:[self home_matchDictFromModel:self.highlightFinished]];
+    if (self.highlightUpcoming) [featured addObject:[self home_matchDictFromModel:self.highlightUpcoming]];
+    NSDictionary *profile = @{
+        @"nickname": self.challengerLabel.text ?: @"",
+        @"dateText": self.dateLabel.text ?: @"",
+        @"avatarURL": AuthManager.sharedManager.user.profile.avatar ?: AuthManager.sharedManager.user.avatar ?: @"",
+    };
+    NSDictionary *payload = @{
+        @"teams": teams,
+        @"selectedTeamId": self.selectedTeamId ?: @"",
+        @"schedule": schedule,
+        @"featured": featured,
+        @"profile": profile,
+        @"savedAt": @([[NSDate date] timeIntervalSince1970]),
+    };
+    [[NSUserDefaults standardUserDefaults] setObject:payload forKey:[self homeCacheKey]];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+- (void)restoreHomeOfflineCacheIfNeeded {
+    NSDictionary *payload = [[NSUserDefaults standardUserDefaults] objectForKey:[self homeCacheKey]];
+    if (![payload isKindOfClass:NSDictionary.class]) return;
+    NSArray *teamArr = [payload[@"teams"] isKindOfClass:NSArray.class] ? payload[@"teams"] : @[];
+    NSMutableArray<Team *> *teams = [NSMutableArray arrayWithCapacity:teamArr.count];
+    for (id item in teamArr) {
+        Team *team = [self home_teamIconFromDict:item];
+        if (team) [teams addObject:team];
+    }
+    if (teams.count > 0) {
+        self.teamItems = [teams copy];
+    }
+    NSString *selected = [payload[@"selectedTeamId"] isKindOfClass:NSString.class] ? payload[@"selectedTeamId"] : @"";
+    if (selected.length > 0) {
+        self.selectedTeamId = selected;
+    }
+    NSArray *scheduleArr = [payload[@"schedule"] isKindOfClass:NSArray.class] ? payload[@"schedule"] : @[];
+    NSMutableArray<Match *> *matches = [NSMutableArray arrayWithCapacity:scheduleArr.count];
+    for (id item in scheduleArr) {
+        Match *m = [self home_matchFromDict:item];
+        if (m) [matches addObject:m];
+    }
+    if (matches.count > 0) {
+        self.dataSource = [matches mutableCopy];
+    }
+    NSArray *featuredArr = [payload[@"featured"] isKindOfClass:NSArray.class] ? payload[@"featured"] : @[];
+    if (featuredArr.count > 0) {
+        self.highlightFinished = [self home_matchFromDict:featuredArr.firstObject];
+    }
+    if (featuredArr.count > 1) {
+        self.highlightUpcoming = [self home_matchFromDict:featuredArr[1]];
+    }
+}
 
 /// 首页数据防护：按 matchId+matchDate 去重并限制最大数量，避免异常大包导致首屏卡死。
 - (NSArray<Match *> *)home_sanitizedMatchesForHome:(NSArray<Match *> *)input maxCount:(NSInteger)maxCount {
@@ -480,6 +606,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
     self.dataSource = NSMutableArray.array;
     self.filteredData = NSMutableArray.array;
     self.selectedTeamId = nil;
+    [self restoreHomeOfflineCacheIfNeeded];
     [self filterData];
 
     // super 内会调一次 -setupUI；切勿在本方法末尾再调 setupUI，否则 header/body/scroll/table 会重复添加，出现叠在一起的重复布局
@@ -487,6 +614,15 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
 
     self.view.backgroundColor = kCardLightGray;
     self.shouldShowNavigationBar = NO;
+    NSMutableArray<Match *> *cachedFeatured = [NSMutableArray array];
+    if ([self.highlightFinished isKindOfClass:Match.class]) [cachedFeatured addObject:self.highlightFinished];
+    if ([self.highlightUpcoming isKindOfClass:Match.class]) [cachedFeatured addObject:self.highlightUpcoming];
+    if (cachedFeatured.count > 0) {
+        [self applyFeaturedList:cachedFeatured];
+    }
+    if (self.teamItems.count > 0) {
+        [self.teamCollectionView reloadData];
+    }
     [self filterData];
     [self setupRefresh];
     NSLog(@"[HomeDebug] viewDidLoad done");
@@ -1017,13 +1153,12 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
         }
 #endif
         [self applyFeaturedList:list];
+        [self saveHomeOfflineCache];
     } failure:^(NSError * _Nonnull error) {
 #if DEBUG
         NSLog(@"[HomeFeatured] failed error=%@", error);
 #endif
-        self.highlightFinished = nil;
-        self.highlightUpcoming = nil;
-        [self buildTwoCards];
+        // 失败时保留已有精选卡（可能来自缓存），避免离线清空。
     }];
 }
 
@@ -1070,6 +1205,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
           [self home_monthUpcomingScheduleCurlWithStartTime:startTime pageSize:kHomeScheduleFetchPageSize myTeamOnly:myTeamOnly]);
 #endif
 
+    NSArray<Match *> *previous = [self.dataSource copy];
     [self home_fetchUpcomingScheduleFromStartTime:startTime
                                       accumulated:[NSMutableArray array]
                                        monthIndex:0
@@ -1080,9 +1216,15 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
         self.isLoadingSchedule = NO;
         NSLog(@"[HomeDebug] schedule month-upcoming done count=%ld elapsed=%.3f",
               (long)matches.count, CACurrentMediaTime() - self.homeDebugLoadStartAt);
-        self.dataSource = matches.mutableCopy;
+        if (matches.count == 0 && previous.count > 0) {
+            // 网络异常时 completion 可能给空数组，这里保留旧数据，避免离线空白。
+            self.dataSource = [previous mutableCopy];
+        } else {
+            self.dataSource = matches.mutableCopy;
+        }
         [self filterData];
         [self updateTableHeight];
+        [self saveHomeOfflineCache];
     }];
 }
 
@@ -1094,7 +1236,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
 }
 - (void)fetchFollowTeams {
     __weak typeof(self) weakSelf = self;
-    [TeamsRequest.shared getFollowTeamIconsSuccess:^(HTTPResponse <NSArray <TeamIcon *> *>* _Nullable responseObject) {
+    [TeamsRequest.shared getFollowTeamIconsSuccess:^(HTTPResponse <NSArray <Team *> *>* _Nullable responseObject) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
         NSArray *list = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
@@ -1103,7 +1245,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
         NSString *kept = self.selectedTeamId;
         if (kept.length) {
             BOOL found = NO;
-            for (TeamIcon *t in list) {
+            for (Team *t in list) {
                 if ([kHomeTeamIdString(t.teamId) isEqualToString:kept]) { found = YES; break; }
             }
             if (!found) self.selectedTeamId = nil;
@@ -1111,23 +1253,23 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
         [self ensureDefaultSelectedTeamIfNeeded];
         [self.teamCollectionView reloadData];
         [self filterData];
+        [self saveHomeOfflineCache];
     } failure:^(NSError * _Nonnull error) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
-        self.teamItems = @[];
-        self.selectedTeamId = nil;
-        [self.teamCollectionView reloadData];
-        [self filterData];
+        // 网络失败时保留已有球队（可能来自缓存），避免断网后顶部球队清空。
     }];
 }
 - (void)refreshUserProfile {
-    [_avatarView sd_setImageWithURL:[NSURL URLWithString:AuthManager.sharedManager.user.profile.avatar]];
+    NSString *avatar = AuthManager.sharedManager.user.profile.avatar ?: AuthManager.sharedManager.user.avatar;
+    [_avatarView sd_setImageWithURL:[NSURL URLWithString:avatar]];
     NSString *nickname = AuthManager.sharedManager.user.profile.nickname;
     _challengerLabel.text = nickname.length > 0 ? nickname : (NSLocalizedString(@"home_challenger", nil) ?: @"CHALLENGER");
     NSDateFormatter *df = [[NSDateFormatter alloc] init];
     df.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
     df.dateFormat = @"MMMM d, yyyy";
     _dateLabel.text = [df stringFromDate:[NSDate date]];
+    [self saveHomeOfflineCache];
 }
 
 - (NSDate *)dateFromRaw:(NSString *)raw {
@@ -1225,7 +1367,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
 }
 - (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
     HomeTeamCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"TeamCell" forIndexPath:indexPath];
-    TeamIcon *item = _teamItems[indexPath.item];
+    Team *item = _teamItems[indexPath.item];
     cell.nameLabel.text = item.name;
     __weak HomeTeamCell *weakCell = cell;
     [cell.logoView sd_setImageWithURL:[NSURL URLWithString:item.logo]
@@ -1252,7 +1394,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
     return CGSizeMake(64, 96);
 }
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-    TeamIcon *item = _teamItems[indexPath.item];
+    Team *item = _teamItems[indexPath.item];
     NSString *tid = kHomeTeamIdString(item.teamId);
     if (tid.length == 0) { return; }
     if ([tid isEqualToString:_selectedTeamId]) { return; }
