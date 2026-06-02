@@ -689,8 +689,9 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
         [card addTarget:self action:@selector(onMenuTapped:) forControlEvents:UIControlEventTouchUpInside];
         [self.contentWrap addSubview:card];
         [card mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.leading.equalTo(self.contentWrap).offset(kProfileScreenInset);
-            make.trailing.equalTo(self.contentWrap).offset(-kProfileScreenInset);
+            // 与「我关注的球队」胶囊保持同一左右对齐
+            make.leading.equalTo(self.contentWrap).offset(kProfileTeamsCardInset);
+            make.trailing.equalTo(self.contentWrap).offset(-kProfileTeamsCardInset);
             make.height.mas_equalTo(50);
             if (prevCard) {
                 make.top.equalTo(prevCard.mas_bottom).offset(12);
