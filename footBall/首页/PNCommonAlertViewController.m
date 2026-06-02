@@ -115,7 +115,7 @@
 }
 
 - (void)onTapDim {
-    // 与原型一致：点击蒙层不关闭
+    [self onCancelTapped];
 }
 
 - (void)onCancelTapped {
