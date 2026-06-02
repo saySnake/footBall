@@ -1690,7 +1690,7 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
         if (!m.hasInputInfo) {
             [self presentMatchInfoForMatch:m];
         } else if (m.hasPendingVerification) {
-            [[LoadingManager sharedManager] showText:(NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"待审核") inView:self.view];
+            [[LoadingManager sharedManager] showCenteredText:(NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"待审核") inView:self.view];
         } else {
             [self presentMatchVerifyForMatch:m];
         }
@@ -1703,7 +1703,7 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
     if (!indexPath) return;
     DiscoverMatch *m = [self currentDataSource][indexPath.row];
     if (m.hasPendingVerification) {
-        [[LoadingManager sharedManager] showText:(NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"待审核") inView:self.view];
+        [[LoadingManager sharedManager] showCenteredText:(NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"待审核") inView:self.view];
         return;
     }
     if (m.type == DiscoverMatchTypeUpcoming) {

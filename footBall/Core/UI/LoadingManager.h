@@ -63,6 +63,11 @@ NS_ASSUME_NONNULL_BEGIN
 /// @param duration 显示时长（秒）
 - (void)showText:(NSString *)message inView:(UIView *)view duration:(NSTimeInterval)duration;
 
+/// 显示居中文本提示（无图标）
+/// @param message 提示消息
+/// @param view 要显示到的视图
+- (void)showCenteredText:(NSString *)message inView:(UIView *)view;
+
 #pragma mark - 便捷方法（使用 keyWindow）
 
 /// 显示加载提示（默认消息，显示在 keyWindow）

@@ -147,18 +147,26 @@
     [self showText:message inView:view mode:MBProgressHUDModeText duration:duration];
 }
 
+- (void)showCenteredText:(NSString *)message inView:(UIView *)view {
+    [self showText:message inView:view mode:MBProgressHUDModeText iconName:nil duration:2.0 centered:YES];
+}
+
 /// 显示文本提示（内部方法）
 - (void)showText:(NSString *)message inView:(UIView *)view mode:(MBProgressHUDMode)mode duration:(NSTimeInterval)duration {
-    [self showText:message inView:view mode:mode iconName:nil duration:duration];
+    [self showText:message inView:view mode:mode iconName:nil duration:duration centered:NO];
 }
 
 /// 显示文本提示（内部方法，支持图标）
 - (void)showText:(NSString *)message inView:(UIView *)view mode:(MBProgressHUDMode)mode iconName:(nullable NSString *)iconName {
-    [self showText:message inView:view mode:mode iconName:iconName duration:2.0];
+    [self showText:message inView:view mode:mode iconName:iconName duration:2.0 centered:NO];
 }
 
 /// 显示文本提示（内部方法，支持图标和时长）
 - (void)showText:(NSString *)message inView:(UIView *)view mode:(MBProgressHUDMode)mode iconName:(nullable NSString *)iconName duration:(NSTimeInterval)duration {
+    [self showText:message inView:view mode:mode iconName:iconName duration:duration centered:NO];
+}
+
+- (void)showText:(NSString *)message inView:(UIView *)view mode:(MBProgressHUDMode)mode iconName:(nullable NSString *)iconName duration:(NSTimeInterval)duration centered:(BOOL)centered {
     if (!view) {
         NSLog(@"⚠️ LoadingManager: view 不能为 nil");
         return;
@@ -194,7 +202,7 @@
     
     // 根据模式设置不同的样式
     if (mode == MBProgressHUDModeText) {
-        hud.offset = CGPointMake(0, MBProgressMaxOffset);
+        hud.offset = centered ? CGPointZero : CGPointMake(0, MBProgressMaxOffset);
     }
     
     // 自动隐藏
