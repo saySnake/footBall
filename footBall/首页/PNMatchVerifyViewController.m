@@ -154,6 +154,9 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
     [dim mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
     }];
+    UITapGestureRecognizer *bgTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onDismiss)];
+    bgTap.cancelsTouchesInView = YES;
+    [dim addGestureRecognizer:bgTap];
 
     UIView *card = [[UIView alloc] init];
     card.backgroundColor = [UIColor whiteColor];

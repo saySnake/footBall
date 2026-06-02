@@ -492,6 +492,15 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     }
 }
 
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    // 自定义导航栏页面也开启系统左侧滑动返回
+    if (self.navigationController.viewControllers.count > 1) {
+        self.navigationController.interactivePopGestureRecognizer.enabled = YES;
+        self.navigationController.interactivePopGestureRecognizer.delegate = nil;
+    }
+}
+
 - (BOOL)isViewingOthers {
     return self.targetUserId.length > 0;
 }

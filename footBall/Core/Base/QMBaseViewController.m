@@ -67,6 +67,15 @@
     }
 }
 
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    // 统一为所有 push 页面开启系统左滑返回（含自定义导航栏页面）
+    if (self.navigationController && self.navigationController.viewControllers.count > 1) {
+        self.navigationController.interactivePopGestureRecognizer.enabled = YES;
+        self.navigationController.interactivePopGestureRecognizer.delegate = nil;
+    }
+}
+
 #pragma mark - QMUIEmptyView
 
 - (void)showEmptyView {

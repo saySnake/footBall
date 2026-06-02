@@ -359,6 +359,15 @@ static void kConsumeSetLabelLineHeight(UILabel *label, CGFloat lineHeight) {
     self.tabBarController.tabBar.hidden = YES;
 }
 
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    // 自定义导航栏页面也开启系统左侧滑动返回
+    if (self.navigationController.viewControllers.count > 1) {
+        self.navigationController.interactivePopGestureRecognizer.enabled = YES;
+        self.navigationController.interactivePopGestureRecognizer.delegate = nil;
+    }
+}
+
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
     self.tabBarController.tabBar.hidden = NO;
