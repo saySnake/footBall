@@ -631,20 +631,8 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
 - (void)filterData {
     CFTimeInterval t0 = CACurrentMediaTime();
     [self ensureDefaultSelectedTeamIfNeeded];
-    if (!_selectedTeamId.length) {
-        _filteredData = [_dataSource mutableCopy];
-    } else {
-        NSString *selected = _selectedTeamId;
-        NSMutableArray *arr = [NSMutableArray array];
-        for (Match *m in _dataSource) {
-            NSString *homeId = kHomeTeamIdString(m.homeTeamId);
-            NSString *awayId = kHomeTeamIdString(m.awayTeamId);
-            if ([homeId isEqualToString:selected] || [awayId isEqualToString:selected]) {
-                [arr addObject:m];
-            }
-        }
-        _filteredData = arr;
-    }
+    // 赛程已按 selectedTeamId 走服务端 teamId 过滤；直接展示 dataSource，避免旧缓存/其它队数据被本地误滤空
+    _filteredData = [_dataSource mutableCopy];
     // 预计算分组缓存，避免 tableView 回调里反复遍历
     [self rebuildGroupCache];
     [_tableView reloadData];
@@ -1236,11 +1224,8 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
         self.isLoadingSchedule = NO;
         NSArray<Match *> *list = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
         if (reset) {
-            if (list.count == 0 && previous.count > 0) {
-                self.dataSource = [previous mutableCopy];
-            } else {
-                self.dataSource = [list mutableCopy];
-            }
+            // 切换球队时服务端返回空列表即展示空，不能保留上一支球队的数据
+            self.dataSource = [list mutableCopy];
         } else if (list.count > 0) {
             [self.dataSource addObjectsFromArray:list];
         }
@@ -1268,6 +1253,12 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
         if (!self) return;
         self.isLoadingSchedule = NO;
         NSLog(@"[HomeDebug] schedule page failed page=%ld error=%@", (long)pageNum, error.localizedDescription);
+        // 仅网络失败时保留旧数据；成功但为空已在 success 分支清空
+        if (reset && previous.count > 0 && self.dataSource.count == 0) {
+            self.dataSource = [previous mutableCopy];
+            [self filterData];
+            [self updateTableHeight];
+        }
         [self.scrollView.mj_header endRefreshing];
         [self.scrollView.mj_footer endRefreshing];
     }];
@@ -1421,6 +1412,9 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     [collectionView reloadData];
     self.scheduleCurrentPage = 0;
     self.scheduleHasMore = YES;
+    // 切换球队时先清空列表，避免短暂展示上一支球队数据
+    [self.dataSource removeAllObjects];
+    [self filterData];
     [self fetchFeatureMatchs];
     [self fetchScheduleMatchesReset:YES];
     [self saveHomeOfflineCache];
