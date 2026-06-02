@@ -17,8 +17,10 @@ NS_ASSUME_NONNULL_BEGIN
 #pragma mark - 首页 / 日程
 
 /// GET `/api/v1/home/featured-matches` — 精选比赛卡片；成功时 `dataObject` 为 `Match` 数组
-- (void)getFeaturesMatchsSuccess:(nullable APISuccessBlock)success
-                         failure:(nullable APIFailureBlock)failure;
+/// @param teamId 指定球队 ID，与首页选中球队一致（可选）
+- (void)getFeaturesMatchsWithTeamId:(nullable NSString *)teamId
+                            success:(nullable APISuccessBlock)success
+                            failure:(nullable APIFailureBlock)failure;
 
 /// GET `/api/v1/home/schedule` — 比赛日程
 /// @param date 可选，如 `yyyy-MM-dd`
@@ -37,10 +39,12 @@ NS_ASSUME_NONNULL_BEGIN
                                success:(nullable APISuccessBlock)success
                                failure:(nullable APIFailureBlock)failure;
 
-/// GET `/api/v1/home/schedule/month-upcoming` — 从起始时间起、当月内的未来赛程（matchDate > startTime）
-/// @param startTime 格式 `yyyyMMddHHmmss`
-- (void)getMonthUpcomingScheduleWithStartTime:(NSString *)startTime
+/// GET `/api/v1/home/schedule/month-upcoming` — 从起始时间起的未来赛程（分页，可跨月）
+/// @param startTime 格式 `yyyyMMddHHmmss`，传 nil 时不传该参数（服务端默认当前时间）
+/// @param teamId 指定球队 ID，优先于 myTeamOnly
+- (void)getMonthUpcomingScheduleWithStartTime:(nullable NSString *)startTime
                                    myTeamOnly:(BOOL)myTeamOnly
+                                       teamId:(nullable NSString *)teamId
                                          page:(NSInteger)page
                                      pageSize:(NSInteger)pageSize
                                       success:(nullable APISuccessBlock)success

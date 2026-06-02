@@ -47,6 +47,22 @@
             self.recordId = (NSString *)r;
         }
     }
+    id homeIdRaw = dic[@"homeTeamId"] ?: dic[@"home_team_id"];
+    if (self.homeTeamId.length == 0 && homeIdRaw && homeIdRaw != (id)kCFNull) {
+        if ([homeIdRaw isKindOfClass:NSNumber.class]) {
+            self.homeTeamId = [(NSNumber *)homeIdRaw stringValue];
+        } else if ([homeIdRaw isKindOfClass:NSString.class]) {
+            self.homeTeamId = (NSString *)homeIdRaw;
+        }
+    }
+    id awayIdRaw = dic[@"awayTeamId"] ?: dic[@"away_team_id"];
+    if (self.awayTeamId.length == 0 && awayIdRaw && awayIdRaw != (id)kCFNull) {
+        if ([awayIdRaw isKindOfClass:NSNumber.class]) {
+            self.awayTeamId = [(NSNumber *)awayIdRaw stringValue];
+        } else if ([awayIdRaw isKindOfClass:NSString.class]) {
+            self.awayTeamId = (NSString *)awayIdRaw;
+        }
+    }
     // 兼容后端将 verifyCompleted 以字符串/数字/枚举返回的情况
     BOOL (^parseBoolLike)(id) = ^BOOL(id raw) {
         if ([raw isKindOfClass:NSNumber.class]) {

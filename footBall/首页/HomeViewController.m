@@ -6,6 +6,7 @@
 #import "HomeViewController.h"
 #import "MoreMatchesViewController.h"
 #import "RefreshPagHeader.h"
+#import <MJRefresh/MJRefreshAutoNormalFooter.h>
 #import <Masonry/Masonry.h>
 #import "ColorManager.h"
 #import "MatchRequest.h"
@@ -340,6 +341,9 @@ static NSString *kHomeTeamIdString(id raw) {
 @property (nonatomic, assign) NSTimeInterval lastLoadTime;
 /// 是否正在加载中，防止并发请求
 @property (nonatomic, assign) BOOL isLoadingSchedule;
+/// 赛程分页
+@property (nonatomic, assign) NSInteger scheduleCurrentPage;
+@property (nonatomic, assign) BOOL scheduleHasMore;
 /// 预计算的分组缓存：按月份分组，key=月份字符串，value=该月比赛数组，顺序与 sortedDateKeys 一致
 @property (nonatomic, strong) NSArray<NSString *> *sortedDateKeys;
 @property (nonatomic, strong) NSDictionary<NSString *, NSArray<Match *> *> *groupedMatches;
@@ -349,8 +353,7 @@ static NSString *kHomeTeamIdString(id raw) {
 
 @implementation HomeViewController
 
-static const NSInteger kHomeScheduleDisplayLimit = 100;
-static const NSInteger kHomeScheduleFetchPageSize = 100;
+static const NSInteger kHomeScheduleFetchPageSize = 20;
 
 - (NSString *)homeCacheKey {
     NSString *uid = AuthManager.sharedManager.user.profile.userId ?: AuthManager.sharedManager.user.userId ?: @"guest";
@@ -506,29 +509,37 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
     return [fmt stringFromDate:date ?: [NSDate date]];
 }
 
-- (NSString *)home_scheduleNextMonthStartTimeStringFromDate:(NSDate *)date {
-    NSCalendar *calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian] ?: [NSCalendar currentCalendar];
-    NSDate *base = date ?: [NSDate date];
-    NSDateComponents *comp = [calendar components:(NSCalendarUnitYear | NSCalendarUnitMonth) fromDate:base];
-    comp.month += 1;
-    comp.day = 1;
-    comp.hour = 0;
-    comp.minute = 0;
-    comp.second = 0;
-    NSDate *nextMonthStart = [calendar dateFromComponents:comp];
-    return [self home_scheduleStartTimeStringFromDate:nextMonthStart ?: base];
+- (BOOL)home_scheduleHasMoreFromResponse:(HTTPResponse *)responseObject
+                                pageNum:(NSInteger)pageNum
+                               pageSize:(NSInteger)pageSize
+                              listCount:(NSInteger)listCount {
+    if ([responseObject.data isKindOfClass:NSDictionary.class]) {
+        NSDictionary *d = (NSDictionary *)responseObject.data;
+        NSInteger total = [d[@"total"] respondsToSelector:@selector(longLongValue)] ? (NSInteger)[d[@"total"] longLongValue] : 0;
+        if (total > 0) {
+            return pageNum * pageSize < total;
+        }
+    }
+    return listCount >= pageSize;
 }
 
 #if DEBUG
-- (NSString *)home_monthUpcomingScheduleCurlWithStartTime:(NSString *)startTime pageSize:(NSInteger)pageSize myTeamOnly:(BOOL)myTeamOnly {
+- (NSString *)home_monthUpcomingScheduleCurlWithTeamId:(NSString *)teamId page:(NSInteger)page pageSize:(NSInteger)pageSize myTeamOnly:(BOOL)myTeamOnly {
     NSString *base = [APIEnvironmentManager sharedManager].currentBaseURL ?: @"";
     if ([base hasSuffix:@"/"]) {
         base = [base substringToIndex:base.length - 1];
     }
     NSString *token = AuthManager.sharedManager.user.accessToken ?: @"<token>";
-    NSString *safeStart = startTime.length ? startTime : @"yyyyMMddHHmmss";
-    NSString *url = [NSString stringWithFormat:@"%@/api/v1/home/schedule/month-upcoming?startTime=%@&myTeamOnly=%d&pageNum=1&pageSize=%ld",
-                     base, safeStart, myTeamOnly ? 1 : 0, (long)MAX(pageSize, 1)];
+    NSMutableArray<NSString *> *parts = [NSMutableArray arrayWithObjects:
+                                         [NSString stringWithFormat:@"myTeamOnly=%d", myTeamOnly ? 1 : 0],
+                                         [NSString stringWithFormat:@"pageNum=%ld", (long)MAX(page, 1)],
+                                         [NSString stringWithFormat:@"pageSize=%ld", (long)MAX(pageSize, 1)],
+                                         nil];
+    if (teamId.length > 0) {
+        [parts addObject:[NSString stringWithFormat:@"teamId=%@", teamId]];
+    }
+    NSString *url = [NSString stringWithFormat:@"%@/api/v1/home/schedule/month-upcoming?%@",
+                     base, [parts componentsJoinedByString:@"&"]];
     return [NSString stringWithFormat:
             @"curl '%@' \\\n"
             "  -H 'Accept: application/json' \\\n"
@@ -537,75 +548,14 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
 }
 #endif
 
-- (void)home_fetchUpcomingScheduleFromStartTime:(NSString *)startTime
-                                    accumulated:(NSMutableArray<Match *> *)accumulated
-                                     monthIndex:(NSInteger)monthIndex
-                                     myTeamOnly:(BOOL)myTeamOnly
-                                     completion:(void (^)(NSArray<Match *> *matches))completion {
-    if (!completion) {
-        return;
-    }
-    if (accumulated.count >= kHomeScheduleDisplayLimit || monthIndex >= 6) {
-        completion([self home_sanitizedMatchesForHome:accumulated maxCount:kHomeScheduleDisplayLimit]);
-        return;
-    }
-    NSInteger remaining = kHomeScheduleDisplayLimit - accumulated.count;
-    NSInteger pageSize = MIN(remaining, kHomeScheduleFetchPageSize);
-    __weak typeof(self) weakSelf = self;
-    [[MatchRequest shared] getMonthUpcomingScheduleWithStartTime:startTime
-                                                      myTeamOnly:myTeamOnly
-                                                            page:1
-                                                        pageSize:pageSize
-                                                         success:^(HTTPResponse * _Nullable responseObject) {
-        __strong typeof(weakSelf) self = weakSelf;
-        if (!self) {
-            completion(@[]);
-            return;
-        }
-        NSArray<Match *> *list = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
-        [accumulated addObjectsFromArray:list];
-        NSArray<Match *> *sanitized = [self home_sanitizedMatchesForHome:accumulated maxCount:kHomeScheduleDisplayLimit];
-        NSLog(@"[HomeDebug] month-upcoming start=%@ batch=%ld total=%ld monthIndex=%ld",
-              startTime, (long)list.count, (long)sanitized.count, (long)monthIndex);
-        if (sanitized.count >= kHomeScheduleDisplayLimit) {
-            completion(sanitized);
-            return;
-        }
-        NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
-        fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-        fmt.dateFormat = @"yyyyMMddHHmmss";
-        NSDate *startDate = [fmt dateFromString:startTime];
-        NSString *nextStart = [self home_scheduleNextMonthStartTimeStringFromDate:startDate];
-        if ([nextStart isEqualToString:startTime]) {
-            completion(sanitized);
-            return;
-        }
-        [self home_fetchUpcomingScheduleFromStartTime:nextStart
-                                          accumulated:[sanitized mutableCopy]
-                                           monthIndex:monthIndex + 1
-                                           myTeamOnly:myTeamOnly
-                                           completion:completion];
-    } failure:^(NSError * _Nonnull error) {
-        __strong typeof(weakSelf) self = weakSelf;
-        if (!self) {
-            completion(@[]);
-            return;
-        }
-        NSLog(@"[HomeDebug] month-upcoming failed start=%@ error=%@", startTime, error.localizedDescription);
-        if (accumulated.count > 0) {
-            completion([self home_sanitizedMatchesForHome:accumulated maxCount:kHomeScheduleDisplayLimit]);
-        } else {
-            completion(@[]);
-        }
-    }];
-}
-
 - (void)viewDidLoad {
     // 先准备好赛程数据源：QMBaseViewController 会在 [super viewDidLoad] 里调用 -setupUI，本页若晚于 super 再建数据，第一次建 UI 时 table 无有效数据
     [self buildTeams];
     self.dataSource = NSMutableArray.array;
     self.filteredData = NSMutableArray.array;
     self.selectedTeamId = nil;
+    self.scheduleCurrentPage = 0;
+    self.scheduleHasMore = YES;
     [self restoreHomeOfflineCacheIfNeeded];
     [self filterData];
 
@@ -681,7 +631,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
 - (void)filterData {
     CFTimeInterval t0 = CACurrentMediaTime();
     [self ensureDefaultSelectedTeamIfNeeded];
-    if (!_selectedTeamId.length || self.teamItems.count == 0) {
+    if (!_selectedTeamId.length) {
         _filteredData = [_dataSource mutableCopy];
     } else {
         NSString *selected = _selectedTeamId;
@@ -1090,10 +1040,21 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
     RefreshPagHeader *header = [RefreshPagHeader headerWithRefreshingTarget:self refreshingAction:@selector(refreshData)];
     [header prepare];
     _scrollView.mj_header = header;
+    __weak typeof(self) weakSelf = self;
+    MJRefreshAutoNormalFooter *footer = [MJRefreshAutoNormalFooter footerWithRefreshingBlock:^{
+        [weakSelf loadMoreScheduleMatches];
+    }];
+    footer.automaticallyHidden = YES;
+    footer.stateLabel.font = [UIFont systemFontOfSize:12];
+    _scrollView.mj_footer = footer;
 }
 
 - (void)refreshData {
     [self loadHomeDataAndEndRefreshing:YES];
+}
+
+- (void)loadMoreScheduleMatches {
+    [self fetchScheduleMatchesReset:NO];
 }
 
 - (void)loadHomeDataAndEndRefreshing:(BOOL)endRefreshing {
@@ -1101,20 +1062,51 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
     NSLog(@"[HomeDebug] loadHomeData begin loggedIn=%d", AuthManager.sharedManager.isLoggedIn);
     if (AuthManager.sharedManager.isLoggedIn) {
         [self fetchUserProfile];
-        [self fetchFollowTeams];
+        [self fetchFollowTeamsThenSchedule:endRefreshing];
     } else {
         self.teamItems = @[];
         [self.teamCollectionView reloadData];
         [self refreshDiscoverLikeGuestState];
-    }
-    [self fetchFeatureMatchs];
-    [self fetchScheduleMatches];
-
-    if (endRefreshing) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self fetchFeatureMatchs];
+        [self fetchScheduleMatchesReset:YES];
+        if (endRefreshing) {
             [self.scrollView.mj_header endRefreshing];
-        });
+        }
     }
+}
+
+- (void)fetchFollowTeamsThenSchedule:(BOOL)endRefreshing {
+    __weak typeof(self) weakSelf = self;
+    [TeamsRequest.shared getFollowTeamIconsSuccess:^(HTTPResponse <NSArray <Team *> *>* _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        NSArray *list = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+        self.teamItems = list;
+        NSString *kept = self.selectedTeamId;
+        if (kept.length) {
+            BOOL found = NO;
+            for (Team *t in list) {
+                if ([kHomeTeamIdString(t.teamId) isEqualToString:kept]) { found = YES; break; }
+            }
+            if (!found) self.selectedTeamId = nil;
+        }
+        [self ensureDefaultSelectedTeamIfNeeded];
+        [self.teamCollectionView reloadData];
+        [self fetchFeatureMatchs];
+        [self fetchScheduleMatchesReset:YES];
+        if (endRefreshing) {
+            [self.scrollView.mj_header endRefreshing];
+        }
+        [self saveHomeOfflineCache];
+    } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        [self fetchFeatureMatchs];
+        [self fetchScheduleMatchesReset:YES];
+        if (endRefreshing) {
+            [self.scrollView.mj_header endRefreshing];
+        }
+    }];
 }
 
 - (void)refreshDiscoverLikeGuestState {
@@ -1132,7 +1124,9 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
 }
 
 - (void)fetchFeatureMatchs {
-    [MatchRequest.shared getFeaturesMatchsSuccess:^(HTTPResponse <NSArray <Match*> *>* _Nullable responseObject) {
+    [self ensureDefaultSelectedTeamIfNeeded];
+    NSString *teamId = self.selectedTeamId.length > 0 ? self.selectedTeamId : nil;
+    [MatchRequest.shared getFeaturesMatchsWithTeamId:teamId success:^(HTTPResponse <NSArray <Match*> *>* _Nullable responseObject) {
         NSArray<Match *> *list = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
         if (list.count > 30) {
             list = [list subarrayWithRange:NSMakeRange(0, 30)];
@@ -1162,6 +1156,25 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
     }];
 }
 
+- (BOOL)home_match:(Match *)match involvesTeamId:(NSString *)teamId {
+    if (teamId.length == 0 || !match) return NO;
+    NSString *homeId = kHomeTeamIdString(match.homeTeamId);
+    NSString *awayId = kHomeTeamIdString(match.awayTeamId);
+    return [homeId isEqualToString:teamId] || [awayId isEqualToString:teamId];
+}
+
+- (NSArray<Match *> *)home_featuredScopeFromList:(NSArray<Match *> *)list {
+    if (list.count == 0) return @[];
+    if (_selectedTeamId.length == 0) return list;
+    NSMutableArray<Match *> *teamOnly = [NSMutableArray array];
+    for (Match *m in list) {
+        if ([self home_match:m involvesTeamId:_selectedTeamId]) {
+            [teamOnly addObject:m];
+        }
+    }
+    return teamOnly.count > 0 ? [teamOnly copy] : list;
+}
+
 - (void)applyFeaturedList:(NSArray<Match *> *)list {
     if (list.count == 0) {
         self.highlightFinished = nil;
@@ -1170,61 +1183,93 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
         return;
     }
 
-    Match *firstFinished = nil;
+    NSArray<Match *> *scope = [self home_featuredScopeFromList:list];
+    Match *lastFinished = nil;
     Match *firstUpcoming = nil;
-    for (Match *m in list) {
-        BOOL finished = [self home_isMatchFinished:m];
-        if (finished && !firstFinished) firstFinished = m;
-        if (!finished && !firstUpcoming) firstUpcoming = m;
-        if (firstFinished && firstUpcoming) break;
+    for (Match *m in scope) {
+        if ([self home_isMatchFinished:m]) {
+            lastFinished = m;
+        } else if (!firstUpcoming) {
+            firstUpcoming = m;
+        }
     }
 
-    Match *first = list.firstObject;
-    Match *second = (list.count > 1) ? list[1] : first;
-    self.highlightFinished = firstFinished ?: first;
+    Match *first = scope.firstObject;
+    Match *second = (scope.count > 1) ? scope[1] : first;
+    self.highlightFinished = lastFinished ?: first;
     self.highlightUpcoming = firstUpcoming ?: ((second != self.highlightFinished) ? second : first);
-    if (self.highlightFinished == self.highlightUpcoming && list.count > 1) {
+    if (self.highlightFinished == self.highlightUpcoming && scope.count > 1) {
         self.highlightUpcoming = second;
     }
 
     [self buildTwoCards];
 }
 
-- (void)fetchScheduleMatches {
+- (void)fetchScheduleMatchesReset:(BOOL)reset {
     if (self.isLoadingSchedule) return;
+    if (!reset && !self.scheduleHasMore) {
+        [self.scrollView.mj_footer endRefreshingWithNoMoreData];
+        return;
+    }
     self.isLoadingSchedule = YES;
     __weak typeof(self) weakSelf = self;
-    BOOL myTeamOnly = AuthManager.sharedManager.isLoggedIn;
+    [self ensureDefaultSelectedTeamIfNeeded];
 
-    NSDate *now = [NSDate date];
-    NSString *startTime = [self home_scheduleStartTimeStringFromDate:now];
-#if DEBUG
-    NSLog(@"[HomeDebug] schedule month-upcoming startTime=%@ myTeamOnly=%d pageSize=%ld limit=%ld",
-          startTime, myTeamOnly, (long)kHomeScheduleFetchPageSize, (long)kHomeScheduleDisplayLimit);
-    NSLog(@"[HomeDebug] schedule month-upcoming curl:\n%@",
-          [self home_monthUpcomingScheduleCurlWithStartTime:startTime pageSize:kHomeScheduleFetchPageSize myTeamOnly:myTeamOnly]);
-#endif
-
+    NSString *teamId = self.selectedTeamId.length > 0 ? self.selectedTeamId : nil;
+    BOOL myTeamOnly = (teamId.length == 0 && AuthManager.sharedManager.isLoggedIn);
+    NSInteger pageNum = reset ? 1 : MAX(self.scheduleCurrentPage + 1, 1);
     NSArray<Match *> *previous = [self.dataSource copy];
-    [self home_fetchUpcomingScheduleFromStartTime:startTime
-                                      accumulated:[NSMutableArray array]
-                                       monthIndex:0
-                                       myTeamOnly:myTeamOnly
-                                       completion:^(NSArray<Match *> *matches) {
+#if DEBUG
+    NSLog(@"[HomeDebug] schedule page=%ld teamId=%@ myTeamOnly=%d pageSize=%ld",
+          (long)pageNum, teamId ?: @"(nil)", myTeamOnly, (long)kHomeScheduleFetchPageSize);
+    NSLog(@"[HomeDebug] schedule curl:\n%@",
+          [self home_monthUpcomingScheduleCurlWithTeamId:teamId page:pageNum pageSize:kHomeScheduleFetchPageSize myTeamOnly:myTeamOnly]);
+#endif
+    [[MatchRequest shared] getMonthUpcomingScheduleWithStartTime:nil
+                                                      myTeamOnly:myTeamOnly
+                                                          teamId:teamId
+                                                            page:pageNum
+                                                        pageSize:kHomeScheduleFetchPageSize
+                                                         success:^(HTTPResponse * _Nullable responseObject) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
         self.isLoadingSchedule = NO;
-        NSLog(@"[HomeDebug] schedule month-upcoming done count=%ld elapsed=%.3f",
-              (long)matches.count, CACurrentMediaTime() - self.homeDebugLoadStartAt);
-        if (matches.count == 0 && previous.count > 0) {
-            // 网络异常时 completion 可能给空数组，这里保留旧数据，避免离线空白。
-            self.dataSource = [previous mutableCopy];
-        } else {
-            self.dataSource = matches.mutableCopy;
+        NSArray<Match *> *list = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+        if (reset) {
+            if (list.count == 0 && previous.count > 0) {
+                self.dataSource = [previous mutableCopy];
+            } else {
+                self.dataSource = [list mutableCopy];
+            }
+        } else if (list.count > 0) {
+            [self.dataSource addObjectsFromArray:list];
         }
+        self.dataSource = [[self home_sanitizedMatchesForHome:self.dataSource maxCount:0] mutableCopy];
+        self.scheduleCurrentPage = pageNum;
+        self.scheduleHasMore = [self home_scheduleHasMoreFromResponse:responseObject
+                                                              pageNum:pageNum
+                                                             pageSize:kHomeScheduleFetchPageSize
+                                                            listCount:list.count];
+        NSLog(@"[HomeDebug] schedule page done page=%ld count=%ld batch=%ld hasMore=%d elapsed=%.3f",
+              (long)pageNum, (long)self.dataSource.count, (long)list.count, self.scheduleHasMore,
+              CACurrentMediaTime() - self.homeDebugLoadStartAt);
         [self filterData];
         [self updateTableHeight];
         [self saveHomeOfflineCache];
+        [self.scrollView.mj_header endRefreshing];
+        if (self.scheduleHasMore) {
+            [self.scrollView.mj_footer endRefreshing];
+            [self.scrollView.mj_footer resetNoMoreData];
+        } else {
+            [self.scrollView.mj_footer endRefreshingWithNoMoreData];
+        }
+    } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        self.isLoadingSchedule = NO;
+        NSLog(@"[HomeDebug] schedule page failed page=%ld error=%@", (long)pageNum, error.localizedDescription);
+        [self.scrollView.mj_header endRefreshing];
+        [self.scrollView.mj_footer endRefreshing];
     }];
 }
 
@@ -1232,32 +1277,6 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
     [UserRequest.shared getLoginUserInfoSuccess:^(HTTPResponse <User *>* _Nullable responseObject) {
         [self refreshUserProfile];
     } failure:^(NSError * _Nonnull error) {
-    }];
-}
-- (void)fetchFollowTeams {
-    __weak typeof(self) weakSelf = self;
-    [TeamsRequest.shared getFollowTeamIconsSuccess:^(HTTPResponse <NSArray <Team *> *>* _Nullable responseObject) {
-        __strong typeof(weakSelf) self = weakSelf;
-        if (!self) return;
-        NSArray *list = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
-        self.teamItems = list;
-        // 仅在新列表中找不到当前选中项时清空，避免每次拉取关注球队都把选中态打回未选中
-        NSString *kept = self.selectedTeamId;
-        if (kept.length) {
-            BOOL found = NO;
-            for (Team *t in list) {
-                if ([kHomeTeamIdString(t.teamId) isEqualToString:kept]) { found = YES; break; }
-            }
-            if (!found) self.selectedTeamId = nil;
-        }
-        [self ensureDefaultSelectedTeamIfNeeded];
-        [self.teamCollectionView reloadData];
-        [self filterData];
-        [self saveHomeOfflineCache];
-    } failure:^(NSError * _Nonnull error) {
-        __strong typeof(weakSelf) self = weakSelf;
-        if (!self) return;
-        // 网络失败时保留已有球队（可能来自缓存），避免断网后顶部球队清空。
     }];
 }
 - (void)refreshUserProfile {
@@ -1400,7 +1419,11 @@ static const NSInteger kHomeScheduleFetchPageSize = 100;
     if ([tid isEqualToString:_selectedTeamId]) { return; }
     _selectedTeamId = [tid copy];
     [collectionView reloadData];
-    [self filterData];
+    self.scheduleCurrentPage = 0;
+    self.scheduleHasMore = YES;
+    [self fetchFeatureMatchs];
+    [self fetchScheduleMatchesReset:YES];
+    [self saveHomeOfflineCache];
 }
 
 #pragma mark - UITableView（按日期倒序、分组）

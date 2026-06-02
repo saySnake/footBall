@@ -115,8 +115,12 @@ static void PNMatchRequestGETMyTeamSegment(NSString *path, NSInteger page, NSInt
 
 #pragma mark - 首页 / 日程
 
-- (void)getFeaturesMatchsSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
-    [[APIManager sharedManager] GET:APIPathValueMatchFeatured parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+- (void)getFeaturesMatchsWithTeamId:(NSString *)teamId success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    NSMutableDictionary *params = [NSMutableDictionary dictionary];
+    if (teamId.length > 0) {
+        params[@"teamId"] = teamId;
+    }
+    [[APIManager sharedManager] GET:APIPathValueMatchFeatured parameters:params.count > 0 ? params : nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
             NSArray *list = PNMatchJSONArrayFromPageData(responseObject.data);
             if (!list) {
@@ -182,13 +186,19 @@ static void PNMatchRequestGETMyTeamSegment(NSString *path, NSInteger page, NSInt
 
 - (void)getMonthUpcomingScheduleWithStartTime:(NSString *)startTime
                                    myTeamOnly:(BOOL)myTeamOnly
+                                       teamId:(NSString *)teamId
                                          page:(NSInteger)page
                                      pageSize:(NSInteger)pageSize
                                       success:(APISuccessBlock)success
                                       failure:(APIFailureBlock)failure {
     NSMutableDictionary *params = [NSMutableDictionary dictionary];
-    params[@"startTime"] = startTime.length > 0 ? startTime : @"";
+    if (startTime.length > 0) {
+        params[@"startTime"] = startTime;
+    }
     params[@"myTeamOnly"] = @(myTeamOnly);
+    if (teamId.length > 0) {
+        params[@"teamId"] = teamId;
+    }
     params[@"pageNum"] = @(MAX(page, 1));
     params[@"pageSize"] = @(MAX(pageSize, 1));
     [[APIManager sharedManager] GET:APIPathValueMatchScheduleMonthUpcoming parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
