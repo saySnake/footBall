@@ -12,6 +12,7 @@
 #import "Match.h"
 #import "HTTPResponse.h"
 #import <QMUIKit/QMUITips.h>
+#import "PNMatchInfoInputViewController.h"
 
 #define kDetailGreen  [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0]
 #define kDetailBg     [UIColor colorWithRed:0.965 green:0.965 blue:0.965 alpha:1.0]
@@ -663,14 +664,23 @@
 }
 
 - (void)onEdit {
-    self.isEditingNotes = YES;
-    self.notesTextView.editable = YES;
-    self.notesTextView.selectable = YES;
-    self.notesTextView.layer.borderWidth = 1;
-    self.notesTextView.layer.borderColor = kDetailGreen.CGColor;
-    self.confirmBtn.backgroundColor = kDetailGreen;
-    [self.confirmBtn setTitle:@"保存" forState:UIControlStateNormal];
-    [self.notesTextView becomeFirstResponder];
+    // 需求：已认证比赛在详情页点击“修改”，重新进入“输入信息”页并自动回填原数据。
+    PNMatchInfoInputViewController *vc = [[PNMatchInfoInputViewController alloc] init];
+    vc.recordId = self.recordId;
+    vc.matchId = self.currentDetail.matchId.length > 0 ? self.currentDetail.matchId : self.matchId;
+    vc.homeName = self.currentDetail.homeTeamName.length > 0 ? self.currentDetail.homeTeamName : self.homeName;
+    vc.awayName = self.currentDetail.awayTeamName.length > 0 ? self.currentDetail.awayTeamName : self.awayName;
+    __weak typeof(self) weakSelf = self;
+    vc.completion = ^(NSString * _Nullable recordId) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        if (recordId.length > 0) {
+            self.recordId = recordId;
+        }
+        [self loadRemoteData];
+    };
+    vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
+    [self presentViewController:vc animated:NO completion:nil];
 }
 
 - (void)onConfirm {
