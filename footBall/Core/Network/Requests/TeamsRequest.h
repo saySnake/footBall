@@ -9,6 +9,9 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+/// 关注/取消关注球队成功后发送，护照与邮票夹可监听并刷新队徽
+FOUNDATION_EXPORT NSString * const PNTeamFollowDidUpdateNotification;
+
 @interface TeamsRequest : NSObject
 +(instancetype)shared;
 /// 搜索球队

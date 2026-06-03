@@ -8,6 +8,12 @@
 #import "TeamsRequest.h"
 #import "Team.h"
 
+NSString * const PNTeamFollowDidUpdateNotification = @"PNTeamFollowDidUpdateNotification";
+
+static void PNPostTeamFollowDidUpdateNotification(void) {
+    [[NSNotificationCenter defaultCenter] postNotificationName:PNTeamFollowDidUpdateNotification object:nil];
+}
+
 @implementation TeamsRequest
 +(instancetype)shared {
     static TeamsRequest *instance = nil;
@@ -80,6 +86,7 @@
     }
     [[APIManager sharedManager] POST:APIPathValueOnboardingBatchFollow parameters:@{@"teamIds":teamIds} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
+            PNPostTeamFollowDidUpdateNotification();
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);
@@ -101,6 +108,7 @@
     }
     [[APIManager sharedManager] POST:APIPathValueTeamsBatchFollow parameters:@{@"teamIds":teamIds} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
+            PNPostTeamFollowDidUpdateNotification();
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);
@@ -122,6 +130,7 @@
     }
     [[APIManager sharedManager] POST:APIPathValueTeamsFollow(teamId) parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
+            PNPostTeamFollowDidUpdateNotification();
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);
@@ -143,6 +152,7 @@
     }
     [[APIManager sharedManager] DELETE:APIPathValueTeamsFollow(teamId) parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
+            PNPostTeamFollowDidUpdateNotification();
             success(responseObject);
         } else {
             failure([APIError errorWithResponse:responseObject]);

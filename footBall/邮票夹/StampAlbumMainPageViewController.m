@@ -19,6 +19,7 @@
 #import "MembershipCenterViewController.h"
 #import "CommunityRequest.h"
 #import "PNMatchInfoInputViewController.h"
+#import "TeamsRequest.h"
 #define STAMP_SECTION_COUNT  1000
 #define STAMP_SECTION_ITEMS  15
 #define STAMP_ITEAM_FREE  5
@@ -536,9 +537,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 
 - (void)onPullToRefresh {
     [self loadStampCollection];
-    if (_viewModel == nil) {
-        [self loadPassportData];
-    }
+    [self loadPassportData];
 }
 
 - (void)viewDidLoad {
@@ -559,6 +558,10 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(onMatchRecordDidUpdate:)
                                                  name:PNMatchRecordDidUpdateNotification
+                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(onTeamFollowDidUpdate:)
+                                                 name:PNTeamFollowDidUpdateNotification
                                                object:nil];
 }
 
@@ -983,9 +986,11 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 
 - (void)onMatchRecordDidUpdate:(NSNotification *)notification {
     [self loadStampCollection];
-    if (_viewModel == nil) {
-        [self loadPassportData];
-    }
+    [self loadPassportData];
+}
+
+- (void)onTeamFollowDidUpdate:(NSNotification *)notification {
+    [self loadPassportData];
 }
 
 @end

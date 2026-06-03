@@ -15,6 +15,7 @@
 #import "CommunityRequest.h"
 #import "StatisticsModels.h"
 #import "PNMatchInfoInputViewController.h"
+#import "TeamsRequest.h"
 #import <Masonry/Masonry.h>
 
 static UIColor *PassportPageBg(void) {
@@ -81,6 +82,10 @@ static UIColor *PassportPageBg(void) {
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(onMatchRecordDidUpdate:)
                                                  name:PNMatchRecordDidUpdateNotification
+                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(onTeamFollowDidUpdate:)
+                                                 name:PNTeamFollowDidUpdateNotification
                                                object:nil];
 }
 
@@ -538,6 +543,10 @@ static UIColor *PassportPageBg(void) {
 #pragma mark - Notifications
 
 - (void)onMatchRecordDidUpdate:(NSNotification *)notification {
+    [self loadPassportData];
+}
+
+- (void)onTeamFollowDidUpdate:(NSNotification *)notification {
     [self loadPassportData];
 }
 
