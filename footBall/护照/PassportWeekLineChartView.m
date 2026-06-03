@@ -30,7 +30,6 @@ static UIBezierPath *PassportSmoothLineThroughPoints(CGPoint *pts, NSInteger cou
 }
 
 @interface PassportWeekLineChartView ()
-@property (nonatomic, strong) NSArray<UILabel *> *yLabels;
 @property (nonatomic, strong) NSArray<UILabel *> *xLabels;
 @property (nonatomic, strong) UIView *plotContainer;
 @property (nonatomic, strong) CAShapeLayer *gridLayer;
@@ -66,19 +65,6 @@ static UIBezierPath *PassportSmoothLineThroughPoints(CGPoint *pts, NSInteger cou
         _lineLayer.lineJoin = kCALineJoinRound;
         [_plotContainer.layer addSublayer:_lineLayer];
 
-        NSArray *yTicks = @[ @100, @80, @50, @20, @0 ];
-        NSMutableArray *ys = [NSMutableArray array];
-        for (NSNumber *n in yTicks) {
-            UILabel *l = [[UILabel alloc] init];
-            l.text = [NSString stringWithFormat:@"%@", n];
-            l.font = [UIFont monospacedDigitSystemFontOfSize:9 weight:UIFontWeightRegular];
-            l.textColor = _lineColor;
-            l.textAlignment = NSTextAlignmentRight;
-            [self addSubview:l];
-            [ys addObject:l];
-        }
-        self.yLabels = [ys copy];
-
         NSArray *xTitles = @[ @"日", @"一", @"二", @"三", @"四", @"五", @"六" ];
         NSMutableArray *xs = [NSMutableArray array];
         for (NSString *t in xTitles) {
@@ -100,9 +86,6 @@ static UIBezierPath *PassportSmoothLineThroughPoints(CGPoint *pts, NSInteger cou
 - (void)setLineColor:(UIColor *)lineColor {
     _lineColor = lineColor;
     _lineLayer.strokeColor = lineColor.CGColor;
-    for (UILabel *l in self.yLabels) {
-        l.textColor = lineColor;
-    }
 }
 
 - (void)setGridColor:(UIColor *)gridColor {
@@ -121,32 +104,22 @@ static UIBezierPath *PassportSmoothLineThroughPoints(CGPoint *pts, NSInteger cou
 
     CGFloat W = CGRectGetWidth(self.bounds);
     CGFloat H = CGRectGetHeight(self.bounds);
-    CGFloat leftInset = 5;
-    CGFloat rightInset = 15;
-    CGFloat leftAxisW = 26;
+    CGFloat leftInset = 8;
+    CGFloat rightInset = 8;
     CGFloat bottomH = 20;
     CGFloat topPad = 15;
     CGFloat bottomInset = 5;
 
-    CGFloat plotW = W - leftInset - leftAxisW - rightInset;
+    CGFloat plotW = W - leftInset - rightInset;
     CGFloat plotH = H - topPad - bottomInset - bottomH;
 
-    CGFloat plotX = leftInset + leftAxisW;
-    CGRect plotFrame = CGRectMake(plotX, topPad, plotW, plotH);
+    CGRect plotFrame = CGRectMake(leftInset, topPad, plotW, plotH);
     self.plotContainer.frame = plotFrame;
-
-    NSArray *yTicks = @[ @100, @80, @50, @20, @0 ];
-    for (NSUInteger i = 0; i < self.yLabels.count; i++) {
-        CGFloat v = [yTicks[i] doubleValue];
-        CGFloat gy = (1.0 - v / 100.0) * plotH;
-        UILabel *l = self.yLabels[i];
-        l.frame = CGRectMake(leftInset + 4, topPad + gy - 7, leftAxisW - 6, 14);
-    }
 
     CGFloat colW = plotW / 7.0;
     for (NSUInteger i = 0; i < self.xLabels.count; i++) {
         UILabel *l = self.xLabels[i];
-        l.frame = CGRectMake(plotX + i * colW, H - bottomInset - bottomH, colW, bottomH);
+        l.frame = CGRectMake(leftInset + i * colW, H - bottomInset - bottomH, colW, bottomH);
     }
 
     [self updatePlotLayersInRect:CGRectMake(0, 0, plotW, plotH)];
