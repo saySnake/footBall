@@ -282,8 +282,8 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
         m.headerSpendingAmountText = @"";
     }
     
-    // careerTotalWatchTime -> totalWatchTimeTexts
-    NSInteger minutes = MAX(0, passport.careerTotalWatchTime);
+    // yearTotalWatchTime -> totalWatchTimeTexts（与折线图/地图/消费等同属所选赛季）
+    NSInteger minutes = MAX(0, passport.yearTotalWatchTime);
     NSString *minuteStr = [NSString stringWithFormat:@"%ld", (long)minutes];
     NSMutableArray<NSString *> *parts = [NSMutableArray arrayWithCapacity:minuteStr.length + 1];
     for (NSUInteger i = 0; i < minuteStr.length; i++) {

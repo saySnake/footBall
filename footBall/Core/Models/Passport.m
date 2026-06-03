@@ -64,7 +64,11 @@ static NSString * _Nullable PNPassportStringFromJson(id v) {
 }
 
 + (NSDictionary<NSString *, id> *)modelCustomPropertyMapper {
-    return @{ @"userId": @[ @"userId", @"id" ] };
+    return @{
+        @"userId": @[ @"userId", @"id" ],
+        @"yearTotalWatchTime": @[ @"yearTotalWatchTime", @"year_total_watch_time" ],
+        @"careerTotalWatchTime": @[ @"careerTotalWatchTime", @"career_total_watch_time" ],
+    };
 }
 
 /// 与当前接口对齐：`yearTotalWatchTime` / `careerTotalWatchTime` 常为字符串；`yearSpending`、`seasonDays`、`awakeWatchPercent` 常为数字。

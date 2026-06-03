@@ -32,6 +32,7 @@ static UIColor *PassportPageBg(void) {
 @property (nonatomic, strong) PassportYearTabStrip *yearStrip;
 @property (nonatomic, strong) PassportViewModel *viewModel;
 @property (nonatomic, assign) NSInteger selectedYear;
+@property (nonatomic, assign) NSInteger passportLoadGeneration;
 @property (nonatomic, assign) CGFloat passportHeaderCachedWidth;
 @property (nonatomic, assign) CGFloat passportHeaderCachedHeight;
 @end
@@ -280,6 +281,7 @@ static UIColor *PassportPageBg(void) {
 
 - (void)loadPassportData {
     __weak typeof(self) weakSelf = self;
+    NSInteger generation = ++self.passportLoadGeneration;
     BOOL isPullRefresh = self.tableView.mj_header.isRefreshing;
     if (!isPullRefresh) {
         [self showLoading];
@@ -287,6 +289,9 @@ static UIColor *PassportPageBg(void) {
     NSString *y = [NSString stringWithFormat:@"%ld", (long)self.selectedYear];
     BOOL isOther = self.targetUserId.length > 0;
     void (^handleSuccess)(PNPassport *) = ^(PNPassport *p) {
+        if (generation != weakSelf.passportLoadGeneration) {
+            return;
+        }
         [weakSelf hideLoading];
         [weakSelf.tableView.mj_header endRefreshing];
         weakSelf.viewModel = [PassportViewModel viewModelWithPassport:p year:weakSelf.selectedYear];
@@ -311,6 +316,9 @@ static UIColor *PassportPageBg(void) {
         [weakSelf.view setNeedsLayout];
     };
     void (^handleFailure)(NSError *) = ^(NSError *error) {
+        if (generation != weakSelf.passportLoadGeneration) {
+            return;
+        }
         [weakSelf hideLoading];
         [weakSelf.tableView.mj_header endRefreshing];
         [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];

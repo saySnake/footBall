@@ -38,7 +38,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 年度消费金额展示（RMB 数字文案，可含千分位）
 @property (nonatomic, copy) NSString *headerSpendingAmountText;
-/// 个人生涯总时间，没有年份因素限制认证几场就是其背后的总时间 TIME SUM
+/// 所选赛季总观赛时长（分钟），与 header2 / 常规赛数据卡一致
 @property (nonatomic, copy) NSArray<NSString *> *totalWatchTimeTexts;
 
 #pragma mark - 护照头部下区 PassportHeader2View

@@ -538,7 +538,7 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
     }
     
     
-    // 个人生涯总时间：来自 PassportViewModel.totalWatchTimeTexts（按位拆分，末位为“分”）
+    // 所选赛季总观赛时长：来自 PassportViewModel.totalWatchTimeTexts（按位拆分，末位为“分”）
     // totalWatchTimeView 固定 8 个圆，做右对齐展示：不足则前面留空，超出则截取末尾 8 位
     NSArray<NSString *> *twt = model.totalWatchTimeTexts ?: @[];
     if (![twt isKindOfClass:NSArray.class]) {
