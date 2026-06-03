@@ -5,6 +5,9 @@
 
 #import <UIKit/UIKit.h>
 
+/// 观赛信息保存成功后发出的通知，护照和邮票夹页面监听此通知刷新数据
+FOUNDATION_EXPORT NSString * const PNMatchRecordDidUpdateNotification;
+
 /// 观赛信息输入弹层（底部卡片）
 @interface PNMatchInfoInputViewController : UIViewController
 

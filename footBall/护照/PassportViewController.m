@@ -14,6 +14,7 @@
 #import "AuthManager.h"
 #import "CommunityRequest.h"
 #import "StatisticsModels.h"
+#import "PNMatchInfoInputViewController.h"
 #import <Masonry/Masonry.h>
 
 static UIColor *PassportPageBg(void) {
@@ -60,6 +61,7 @@ static UIColor *PassportPageBg(void) {
 
     [self buildTopBar];
     [self buildTable];
+    [self setupRefresh];
     [self buildTableHeader];
     __weak typeof(self) weakSelf = self;
 //    self.passportHeader.onPassportHeader2Tap = ^{
@@ -74,6 +76,11 @@ static UIColor *PassportPageBg(void) {
     [self.passportHeader configureWithModel:self.viewModel];
     [self.tableView reloadData];
     [self loadPassportData];
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(onMatchRecordDidUpdate:)
+                                                 name:PNMatchRecordDidUpdateNotification
+                                               object:nil];
 }
 
 - (void)viewDidAppear:(BOOL)animated {
@@ -219,6 +226,16 @@ static UIColor *PassportPageBg(void) {
     _headerWrap.translatesAutoresizingMaskIntoConstraints = NO;
 }
 
+- (void)setupRefresh {
+    RefreshPagHeader *header = [RefreshPagHeader headerWithRefreshingTarget:self refreshingAction:@selector(onPullToRefresh)];
+    [header prepare];
+    _tableView.mj_header = header;
+}
+
+- (void)onPullToRefresh {
+    [self loadPassportData];
+}
+
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
     [self layoutPassportTableHeaderIfNeeded];
@@ -263,11 +280,15 @@ static UIColor *PassportPageBg(void) {
 
 - (void)loadPassportData {
     __weak typeof(self) weakSelf = self;
-    [self showLoading];
+    BOOL isPullRefresh = self.tableView.mj_header.isRefreshing;
+    if (!isPullRefresh) {
+        [self showLoading];
+    }
     NSString *y = [NSString stringWithFormat:@"%ld", (long)self.selectedYear];
     BOOL isOther = self.targetUserId.length > 0;
     void (^handleSuccess)(PNPassport *) = ^(PNPassport *p) {
         [weakSelf hideLoading];
+        [weakSelf.tableView.mj_header endRefreshing];
         weakSelf.viewModel = [PassportViewModel viewModelWithPassport:p year:weakSelf.selectedYear];
         // 查看自己的护照时，用本地 AuthManager 的真实头像和城市覆盖接口返回的占位数据
         if (!isOther) {
@@ -291,6 +312,7 @@ static UIColor *PassportPageBg(void) {
     };
     void (^handleFailure)(NSError *) = ^(NSError *error) {
         [weakSelf hideLoading];
+        [weakSelf.tableView.mj_header endRefreshing];
         [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
         weakSelf.viewModel = [PassportViewModel viewModelWithPassport:nil year:weakSelf.selectedYear];
         [weakSelf.passportHeader configureWithModel:weakSelf.viewModel];
@@ -499,6 +521,16 @@ static UIColor *PassportPageBg(void) {
     } else {
         _titleLabel.text = NSLocalizedString(@"passport_nav_title", nil) ?: @"我的护照";
     }
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+#pragma mark - Notifications
+
+- (void)onMatchRecordDidUpdate:(NSNotification *)notification {
+    [self loadPassportData];
 }
 
 @end

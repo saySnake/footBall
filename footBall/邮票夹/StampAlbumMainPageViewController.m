@@ -18,6 +18,7 @@
 #import "StampUnlockPopupViewController.h"
 #import "MembershipCenterViewController.h"
 #import "CommunityRequest.h"
+#import "PNMatchInfoInputViewController.h"
 #define STAMP_SECTION_COUNT  1000
 #define STAMP_SECTION_ITEMS  15
 #define STAMP_ITEAM_FREE  5
@@ -527,6 +528,19 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     self.stampMaxCount = quota.maxStampCount;
 }
 
+- (void)setupRefresh {
+    RefreshPagHeader *header = [RefreshPagHeader headerWithRefreshingTarget:self refreshingAction:@selector(onPullToRefresh)];
+    [header prepare];
+    _tableView.mj_header = header;
+}
+
+- (void)onPullToRefresh {
+    [self loadStampCollection];
+    if (_viewModel == nil) {
+        [self loadPassportData];
+    }
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.hidesBottomBarWhenPushed = YES;
@@ -535,11 +549,17 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 
     [self buildTopBar];
     [self buildTable];
+    [self setupRefresh];
     if (_viewModel == nil) {
         [self loadPassportData];
     }
     [self reloadStamps:@[]];
     [self loadStampCollection];
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(onMatchRecordDidUpdate:)
+                                                 name:PNMatchRecordDidUpdateNotification
+                                               object:nil];
 }
 
 - (void)buildTopBar {
@@ -734,8 +754,10 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         [CommunityRequest.shared getFriendStamps:self.targetUserId success:^(HTTPResponse * _Nullable responseObject) {
             NSArray<PNStampAlbumItem *> *stamps = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
             [weakSelf reloadStamps:stamps];
+            [weakSelf.tableView.mj_header endRefreshing];
         } failure:^(NSError * _Nonnull error) {
             [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
+            [weakSelf.tableView.mj_header endRefreshing];
         }];
         return;
     }
@@ -767,15 +789,20 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     dispatch_group_notify(group, dispatch_get_main_queue(), ^{
         [weakSelf applyStampQuota:quota];
         [weakSelf reloadStamps:stamps];
+        [weakSelf.tableView.mj_header endRefreshing];
     });
 }
 - (void)loadPassportData {
     __weak typeof(self) weakSelf = self;
-    [self showLoading];
+    BOOL isPullRefresh = self.tableView.mj_header.isRefreshing;
+    if (!isPullRefresh) {
+        [self showLoading];
+    }
     NSString *y = [NSString stringWithFormat:@"%ld", (long)self.year];
     BOOL isOther = self.targetUserId.length > 0;
     void (^handleSuccess)(PNPassport *) = ^(PNPassport *p) {
         [weakSelf hideLoading];
+        [weakSelf.tableView.mj_header endRefreshing];
         weakSelf.viewModel = [PassportViewModel viewModelWithPassport:p year:weakSelf.year];
         // 查看自己时用本地头像和城市
         if (!isOther) {
@@ -791,6 +818,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     };
     void (^handleFailure)(NSError *) = ^(NSError *error) {
         [weakSelf hideLoading];
+        [weakSelf.tableView.mj_header endRefreshing];
         [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
         weakSelf.viewModel = [PassportViewModel viewModelWithPassport:nil year:weakSelf.year];
     };
@@ -944,6 +972,19 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         _titleLabel.text = name;
     } else {
         _titleLabel.text = NSLocalizedString(@"passport_nav_title", nil) ?: @"我的护照";
+    }
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+#pragma mark - Notifications
+
+- (void)onMatchRecordDidUpdate:(NSNotification *)notification {
+    [self loadStampCollection];
+    if (_viewModel == nil) {
+        [self loadPassportData];
     }
 }
 

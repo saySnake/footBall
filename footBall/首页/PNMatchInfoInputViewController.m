@@ -36,6 +36,8 @@ static CGFloat PNInputSectionSpacing(void) {
 
 static const NSInteger kPNMaxViewingIdentityCount = 6;
 
+NSString * const PNMatchRecordDidUpdateNotification = @"PNMatchRecordDidUpdateNotification";
+
 static NSSet<NSString *> *PNSeatAllowedWatchLocations(void) {
     static NSSet<NSString *> *set;
     static dispatch_once_t onceToken;
@@ -1237,6 +1239,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     if (isUpdate) {
         [[MatchRequest shared] updateMatchRecord:self.recordId body:body success:^(HTTPResponse * _Nullable responseObject) {
             [[LoadingManager sharedManager] hideLoadingInView:weakSelf.view];
+            [[NSNotificationCenter defaultCenter] postNotificationName:PNMatchRecordDidUpdateNotification object:nil];
             if (weakSelf.completion) {
                 weakSelf.completion(weakSelf.recordId);
             }
@@ -1259,6 +1262,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
             if (newRecordId.length > 0) {
                 weakSelf.recordId = newRecordId;
             }
+            [[NSNotificationCenter defaultCenter] postNotificationName:PNMatchRecordDidUpdateNotification object:nil];
             if (weakSelf.completion) {
                 weakSelf.completion(newRecordId);
             }
