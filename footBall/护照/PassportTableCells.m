@@ -26,6 +26,8 @@ static UIColor *PCHex(NSString *hex) {
 static const CGFloat kPassportAbilityValueColumnWidth = 24;
 static const CGFloat kPassportAbilityBarHeight = 12;
 static const CGFloat kPassportAbilityRowHeight = 25;
+static const CGFloat kPassportEmotionIconSize = 24;
+static const CGFloat kPassportEmotionIconTextGap = 6;
 /// 与输入信息页座位选项数量一致
 static const NSInteger kPassportAbilitySeatRowCount = 10;
 
@@ -1126,6 +1128,7 @@ static CGFloat PCTacticalLegendRowHeight(void) {
 
 /// 情绪条：左标签 + 仅绿色进度（无灰底）+ 分数紧跟进度末端；ratio = value/max
 @interface PCMetricEmotionRowView : UIView
+@property (nonatomic, strong, readonly) UIImageView *iconView;
 @property (nonatomic, strong, readonly) UILabel *leftLabel;
 @property (nonatomic, strong, readonly) UILabel *scoreLabel;
 @property (nonatomic, assign) CGFloat labelColumnWidth;
@@ -1143,6 +1146,8 @@ static CGFloat PCTacticalLegendRowHeight(void) {
         _labelColumnWidth = lw;
         _ratio = MIN(1, MAX(0, ratio));
         self.backgroundColor = [UIColor clearColor];
+        _iconView = [[UIImageView alloc] init];
+        _iconView.contentMode = UIViewContentModeScaleAspectFit;
         _leftLabel = [[UILabel alloc] init];
         _leftLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
         _leftLabel.textColor = [UIColor colorWithWhite:0.45 alpha:1.0];
@@ -1157,9 +1162,11 @@ static CGFloat PCTacticalLegendRowHeight(void) {
         _scoreLabel.font = [FontManager sharedManager].font18Regular;
         _scoreLabel.textColor = [UIColor colorWithWhite:0.12 alpha:1.0];
         _scoreLabel.numberOfLines = 1;
+        [self addSubview:_iconView];
         [self addSubview:_leftLabel];
         [self addSubview:self.fillBar];
         [self addSubview:_scoreLabel];
+        _iconView.translatesAutoresizingMaskIntoConstraints = YES;
         _leftLabel.translatesAutoresizingMaskIntoConstraints = YES;
         self.fillBar.translatesAutoresizingMaskIntoConstraints = YES;
         _scoreLabel.translatesAutoresizingMaskIntoConstraints = YES;
@@ -1187,7 +1194,11 @@ static CGFloat PCTacticalLegendRowHeight(void) {
     CGFloat fillW = avail * self.ratio;
     CGFloat yBar = (rowH - kPassportAbilityBarHeight) / 2.0;
     CGFloat yScore = (rowH - scoreSz.height) / 2.0;
-    self.leftLabel.frame = CGRectMake(0, 0, leftW, rowH);
+    CGFloat iconY = (rowH - kPassportEmotionIconSize) / 2.0;
+    self.iconView.frame = CGRectMake(0, iconY, kPassportEmotionIconSize, kPassportEmotionIconSize);
+    CGFloat textX = kPassportEmotionIconSize + kPassportEmotionIconTextGap;
+    CGFloat textW = MAX(0, leftW - textX);
+    self.leftLabel.frame = CGRectMake(textX, 0, textW, rowH);
     self.fillBar.frame = CGRectMake(leftW + gap, yBar, fillW, kPassportAbilityBarHeight);
     self.scoreLabel.frame = CGRectMake(leftW + gap + fillW + gap, yScore, scoreSz.width, scoreSz.height);
 }
@@ -1344,7 +1355,8 @@ static CGFloat PCTacticalLegendRowHeight(void) {
             [titles addObject:(NSString *)t];
         }
     }
-    CGFloat labelColW = PCAbilityMaxLabelWidthForTitles(titles, labelFont);
+    CGFloat textColW = PCAbilityMaxLabelWidthForTitles(titles, labelFont);
+    CGFloat labelColW = kPassportEmotionIconSize + kPassportEmotionIconTextGap + textColW;
     if (labelColW < 1) labelColW = 1;
     for (NSDictionary *item in items) {
         NSInteger val = [item[@"value"] integerValue];
@@ -1353,6 +1365,8 @@ static CGFloat PCTacticalLegendRowHeight(void) {
         PCMetricEmotionRowView *row = [[PCMetricEmotionRowView alloc] initWithLabelColumnWidth:labelColW ratio:ratio];
         row.leftLabel.text = [NSString stringWithFormat:@"%@", item[@"title"] ?: @""];
         row.leftLabel.font = labelFont;
+        NSString *iconName = [item[@"icon"] isKindOfClass:[NSString class]] ? item[@"icon"] : @"";
+        row.iconView.image = iconName.length ? [UIImage imageNamed:iconName] : nil;
         row.scoreLabel.text = [NSString stringWithFormat:@"%ld", (long)val];
         [row mas_makeConstraints:^(MASConstraintMaker *make) {
             make.height.mas_equalTo(kPassportAbilityRowHeight);

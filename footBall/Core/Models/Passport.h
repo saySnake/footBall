@@ -97,9 +97,9 @@ NS_ASSUME_NONNULL_BEGIN
 #pragma mark - 观赛数据观（口径以接口为准）
 /// 赛季投入天数（后端可能为数字或字符串，如 0.000）
 @property (nonatomic, copy, nullable) NSString *seasonDays;
-/// 周末:工作日比值化简，如 34:1
+/// 周末:工作日观赛场次比（化简），如 1:0、34:1
 @property (nonatomic, copy, nullable) NSString *weekendWeekdayRatio;
-/// 白天:深夜比值化简
+/// 白天:深夜观赛场次比（化简）
 @property (nonatomic, copy, nullable) NSString *dayNightRatio;
 /// 睡醒时间看球百分比（后端可能为数字或字符串）
 @property (nonatomic, copy, nullable) NSString *awakeWatchPercent;

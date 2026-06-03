@@ -66,7 +66,11 @@ static NSString * _Nullable PNPassportStringFromJson(id v) {
 + (NSDictionary<NSString *, id> *)modelCustomPropertyMapper {
     return @{
         @"userId": @[ @"userId", @"id" ],
+        @"yearTotalMatches": @[ @"yearTotalMatches", @"year_total_matches" ],
         @"yearTotalWatchTime": @[ @"yearTotalWatchTime", @"year_total_watch_time" ],
+        @"yearStadiumCount": @[ @"yearStadiumCount", @"year_stadium_count" ],
+        @"yearCityCount": @[ @"yearCityCount", @"year_city_count" ],
+        @"yearCountryCount": @[ @"yearCountryCount", @"year_country_count" ],
         @"careerTotalWatchTime": @[ @"careerTotalWatchTime", @"career_total_watch_time" ],
     };
 }
@@ -96,6 +100,22 @@ static NSString * _Nullable PNPassportStringFromJson(id v) {
     id af = dic[@"averageFloor"];
     if (af) {
         self.averageFloor = PNPassportStringFromJson(af);
+    }
+    id ytm = dic[@"yearTotalMatches"] ?: dic[@"year_total_matches"];
+    if (ytm) {
+        self.yearTotalMatches = PNPassportIntFromJson(ytm, self.yearTotalMatches);
+    }
+    id ysc = dic[@"yearStadiumCount"] ?: dic[@"year_stadium_count"];
+    if (ysc) {
+        self.yearStadiumCount = PNPassportIntFromJson(ysc, self.yearStadiumCount);
+    }
+    id ycc = dic[@"yearCityCount"] ?: dic[@"year_city_count"];
+    if (ycc) {
+        self.yearCityCount = PNPassportIntFromJson(ycc, self.yearCityCount);
+    }
+    id ync = dic[@"yearCountryCount"] ?: dic[@"year_country_count"];
+    if (ync) {
+        self.yearCountryCount = PNPassportIntFromJson(ync, self.yearCountryCount);
     }
     return YES;
 }

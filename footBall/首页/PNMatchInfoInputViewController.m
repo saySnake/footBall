@@ -63,6 +63,9 @@ static NSSet<NSString *> *PNSeatAllowedWatchLocations(void) {
 @property (nonatomic, strong) UIImageView *emotionButtonIconView;
 @property (nonatomic, strong) UIImageView *emotionButtonArrowView;
 @property (nonatomic, copy) NSString *selectedEmotionName;
+@property (nonatomic, strong) NSArray<UIControl *> *emotionOptionViews;
+@property (nonatomic, strong) NSArray<UIView *> *emotionOptionIconBgs;
+@property (nonatomic, strong) NSArray<UILabel *> *emotionOptionNameLabels;
 
 @property (nonatomic, strong) UITextField *matchField;
 @property (nonatomic, strong) UITextField *priceField;
@@ -153,6 +156,29 @@ static CGFloat PNMatchInfoDimBaseAlpha(void) {
     [self.emotionButton setTitle:(name.length > 0 ? name : @"选择情绪") forState:UIControlStateNormal];
     UIImage *icon = [UIImage imageNamed:iconName];
     self.emotionButtonIconView.image = icon ?: [UIImage imageNamed:@"team_ex"];
+    [self pn_updateEmotionOptionSelection];
+}
+
+- (void)pn_updateEmotionOptionSelection {
+    NSArray<NSDictionary<NSString *, NSString *> *> *options = [self pn_emotionOptionsData];
+    for (NSUInteger i = 0; i < self.emotionOptionViews.count && i < options.count; i++) {
+        UIControl *optView = self.emotionOptionViews[i];
+        UIView *iconBg = (i < self.emotionOptionIconBgs.count) ? self.emotionOptionIconBgs[i] : nil;
+        UILabel *nameLabel = (i < self.emotionOptionNameLabels.count) ? self.emotionOptionNameLabels[i] : nil;
+        NSDictionary<NSString *, NSString *> *opt = options[i];
+        BOOL isSelected = ([opt[@"emoji"] isEqualToString:self.selectedEmotion] ||
+                           [opt[@"name"] isEqualToString:self.selectedEmotionName]);
+        optView.backgroundColor = UIColor.clearColor;
+        if (iconBg) {
+            iconBg.backgroundColor = isSelected ? [UIColor whiteColor] : PNInputFieldBgColor();
+            iconBg.layer.borderWidth = isSelected ? 1.5 : 0;
+            iconBg.layer.borderColor = isSelected ? PNInputGreenColor().CGColor : UIColor.clearColor.CGColor;
+        }
+        if (nameLabel) {
+            nameLabel.textColor = isSelected ? PNInputGreenColor() : [UIColor blackColor];
+            nameLabel.font = [UIFont systemFontOfSize:12 weight:(isSelected ? UIFontWeightMedium : UIFontWeightRegular)];
+        }
+    }
 }
 
 - (void)viewDidLoad {
@@ -449,11 +475,14 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     
     NSArray<NSDictionary<NSString *, NSString *> *> *emotionOptions = [self pn_emotionOptionsData];
     NSMutableArray<UIControl *> *emotionOptionViews = [NSMutableArray array];
+    NSMutableArray<UIView *> *emotionIconBgs = [NSMutableArray array];
+    NSMutableArray<UILabel *> *emotionNameLabels = [NSMutableArray array];
     const NSInteger columns = 4;
     for (NSUInteger idx = 0; idx < emotionOptions.count; idx++) {
         NSDictionary<NSString *, NSString *> *option = emotionOptions[idx];
         UIControl *optionView = [[UIControl alloc] init];
         optionView.tag = (NSInteger)idx;
+        optionView.backgroundColor = UIColor.clearColor;
         [optionView addTarget:self action:@selector(onEmotionOptionTapped:) forControlEvents:UIControlEventTouchUpInside];
         [emotionPanel addSubview:optionView];
         [emotionOptionViews addObject:optionView];
@@ -472,14 +501,17 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
                 make.top.equalTo(emotionPanel).offset(12);
             } else {
                 UIControl *prevRowFirst = emotionOptionViews[(row - 1) * columns];
-                make.top.equalTo(prevRowFirst).offset(72);
+                make.top.equalTo(prevRowFirst.mas_bottom).offset(12);
             }
         }];
         
         UIView *iconBg = [[UIView alloc] init];
         iconBg.backgroundColor = PNInputFieldBgColor();
         iconBg.layer.cornerRadius = 20;
+        iconBg.clipsToBounds = YES;
+        iconBg.userInteractionEnabled = NO;
         [optionView addSubview:iconBg];
+        [emotionIconBgs addObject:iconBg];
         [iconBg mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.leading.equalTo(optionView);
             make.width.height.mas_equalTo(40);
@@ -487,6 +519,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         
         UIImageView *iconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:(option[@"icon"] ?: @"")]];
         iconView.contentMode = UIViewContentModeScaleAspectFit;
+        iconView.userInteractionEnabled = NO;
         [iconBg addSubview:iconView];
         [iconView mas_makeConstraints:^(MASConstraintMaker *make) {
             make.center.equalTo(iconBg);
@@ -498,12 +531,17 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         nameLabel.textColor = [UIColor blackColor];
         nameLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
         nameLabel.textAlignment = NSTextAlignmentCenter;
+        nameLabel.userInteractionEnabled = NO;
         [optionView addSubview:nameLabel];
+        [emotionNameLabels addObject:nameLabel];
         [nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
             make.top.equalTo(iconBg.mas_bottom).offset(8);
             make.centerX.equalTo(iconBg);
         }];
     }
+    self.emotionOptionViews = emotionOptionViews;
+    self.emotionOptionIconBgs = emotionIconBgs;
+    self.emotionOptionNameLabels = emotionNameLabels;
     UIControl *lastEmotionBtn = [emotionOptionViews lastObject];
     [emotionPanel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.bottom.equalTo(lastEmotionBtn.mas_bottom).offset(12);
@@ -1300,6 +1338,13 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     NSInteger idx = sender.tag;
     NSArray<NSDictionary<NSString *, NSString *> *> *options = [self pn_emotionOptionsData];
     if (idx >= 0 && idx < (NSInteger)options.count) {
+        [UIView animateWithDuration:0.1 animations:^{
+            sender.transform = CGAffineTransformMakeScale(0.92, 0.92);
+        } completion:^(BOOL finished) {
+            [UIView animateWithDuration:0.1 animations:^{
+                sender.transform = CGAffineTransformIdentity;
+            }];
+        }];
         [self pn_applyEmotionOption:options[idx]];
     }
     self.emotionPanel.hidden = YES;

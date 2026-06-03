@@ -57,13 +57,13 @@ static NSArray<NSDictionary<NSString *, NSString *> *> *PNPassportEmotionOptions
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         options = @[
-            @{ @"name": @"兴奋", @"emoji": @"🤩" },
-            @{ @"name": @"激动", @"emoji": @"🥳" },
-            @{ @"name": @"希望", @"emoji": @"🤗" },
-            @{ @"name": @"遗憾", @"emoji": @"😩" },
-            @{ @"name": @"平静", @"emoji": @"😎" },
-            @{ @"name": @"失望", @"emoji": @"😤" },
-            @{ @"name": @"暴躁", @"emoji": @"😡" },
+            @{ @"name": @"兴奋", @"emoji": @"🤩", @"icon": @"team_ex" },
+            @{ @"name": @"激动", @"emoji": @"🥳", @"icon": @"team_ji" },
+            @{ @"name": @"希望", @"emoji": @"🤗", @"icon": @"team_hop" },
+            @{ @"name": @"遗憾", @"emoji": @"😩", @"icon": @"team_ku" },
+            @{ @"name": @"平静", @"emoji": @"😎", @"icon": @"team_ping" },
+            @{ @"name": @"失望", @"emoji": @"😤", @"icon": @"team_shi" },
+            @{ @"name": @"暴躁", @"emoji": @"😡", @"icon": @"team_angry" },
         ];
     });
     return options;
@@ -179,8 +179,13 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
         countByEmotion[label] = @([countByEmotion[label] integerValue] + add);
     }
     NSMutableArray<NSDictionary *> *bars = [NSMutableArray array];
-    for (NSString *title in PNPassportEmotionOrder()) {
-        [bars addObject:@{ @"title": title, @"value": countByEmotion[title] ?: @0 }];
+    for (NSDictionary<NSString *, NSString *> *opt in PNPassportEmotionOptionsData()) {
+        NSString *title = opt[@"name"] ?: @"";
+        [bars addObject:@{
+            @"title": title,
+            @"value": countByEmotion[title] ?: @0,
+            @"icon": opt[@"icon"] ?: @"",
+        }];
     }
     return [bars copy];
 }

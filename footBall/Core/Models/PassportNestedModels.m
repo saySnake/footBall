@@ -25,6 +25,21 @@ static NSString * _Nullable PNPassportNestedStringFromJson(id v) {
 @end
 
 @implementation PNPassportTeamRecord
+
++ (NSDictionary<NSString *, id> *)modelCustomPropertyMapper {
+    return @{
+        @"winRate": @[ @"winRate", @"win_rate" ],
+    };
+}
+
+- (BOOL)modelCustomTransformFromDictionary:(NSDictionary *)dic {
+    id wr = dic[@"winRate"] ?: dic[@"win_rate"];
+    if (wr) {
+        self.winRate = PNPassportNestedStringFromJson(wr).floatValue;
+    }
+    return YES;
+}
+
 @end
 
 @implementation PNLocationDist
