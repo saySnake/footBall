@@ -1411,6 +1411,8 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
         // minutesByMatchId: matchId -> duration（来自护照记录里关联的比赛时长，没有则兜底90）
         NSMutableDictionary<NSString *, NSString *> *statusByRecordId = [NSMutableDictionary dictionary];
         NSMutableDictionary<NSString *, NSString *> *statusByMatchId = [NSMutableDictionary dictionary];
+        NSMutableDictionary<NSString *, NSString *> *verificationStatusByRecordId = [NSMutableDictionary dictionary];
+        NSMutableDictionary<NSString *, NSString *> *verificationStatusByMatchId = [NSMutableDictionary dictionary];
         __block BOOL loggedFirstMatchedRow = NO;
         for (id item in rows) {
             if (![item isKindOfClass:NSDictionary.class]) continue;
@@ -1421,6 +1423,7 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
             if (recordId.length == 0) recordId = DiscoverStringFromAny(row[@"id"]);
             NSString *matchId = DiscoverStringFromAny(row[@"matchId"]);
             if (matchId.length == 0) matchId = DiscoverStringFromAny(row[@"match_id"]);
+            NSString *rawVerificationStatus = DiscoverStringFromAny(row[@"verificationStatus"]);
             if (!loggedFirstMatchedRow) {
                 loggedFirstMatchedRow = YES;
                 NSLog(@"[DiscoverDebug] first matched row => recordId=%@, matchId=%@, status=%@, verificationStatus=%@, verifyCompleted=%@, verification_status=%@, verifyStatus=%@, verify_status=%@, verify_completed=%@",
@@ -1434,8 +1437,18 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
                       DiscoverStringFromAny(row[@"verify_status"]) ?: @"",
                       DiscoverStringFromAny(row[@"verify_completed"]) ?: @"");
             }
-            if (recordId.length > 0) statusByRecordId[recordId] = normalized;
-            if (matchId.length > 0) statusByMatchId[matchId] = normalized;
+            if (recordId.length > 0) {
+                statusByRecordId[recordId] = normalized;
+                if (rawVerificationStatus.length > 0) {
+                    verificationStatusByRecordId[recordId] = rawVerificationStatus;
+                }
+            }
+            if (matchId.length > 0) {
+                statusByMatchId[matchId] = normalized;
+                if (rawVerificationStatus.length > 0) {
+                    verificationStatusByMatchId[matchId] = rawVerificationStatus;
+                }
+            }
         }
         if (statusByRecordId.count == 0 && statusByMatchId.count == 0) {
             return;
@@ -1475,11 +1488,18 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
             } else if ([normalized isEqualToString:@"REJECTED"] || [normalized isEqualToString:@"UNVERIFIED"]) {
                 NSString *retryTitle = (NSLocalizedString(@"auth_cert_retry", nil) ?: @"重新认证");
                 BOOL shouldReverify = match.hasInputInfo;
+                NSString *rawVerificationStatus = nil;
+                if (match.recordId.length > 0) {
+                    rawVerificationStatus = verificationStatusByRecordId[match.recordId];
+                }
+                if (rawVerificationStatus.length == 0 && match.matchId.length > 0) {
+                    rawVerificationStatus = verificationStatusByMatchId[match.matchId];
+                }
                 if (match.hasVerified || match.hasPendingVerification || match.needsReverify != shouldReverify) {
                     match.hasVerified = NO;
                     match.hasPendingVerification = NO;
                     match.needsReverify = shouldReverify;
-                    match.verificationStatus = DiscoverStringFromAny(row[@"verificationStatus"]) ?: match.verificationStatus;
+                    match.verificationStatus = rawVerificationStatus ?: match.verificationStatus;
                     match.verifiedText = shouldReverify ? retryTitle : @"";
                     changed = YES;
                 } else if (shouldReverify && ![match.verifiedText isEqualToString:retryTitle]) {
