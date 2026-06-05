@@ -1173,22 +1173,17 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
 
     NSArray<Match *> *scope = [self home_featuredScopeFromList:list];
     Match *lastFinished = nil;
-    Match *firstUpcoming = nil;
+    Match *nextUpcoming = nil;
     for (Match *m in scope) {
         if ([self home_isMatchFinished:m]) {
             lastFinished = m;
-        } else if (!firstUpcoming) {
-            firstUpcoming = m;
+        } else if (!nextUpcoming && [self home_isMatchUpcomingForFeatured:m]) {
+            nextUpcoming = m;
         }
     }
-
-    Match *first = scope.firstObject;
-    Match *second = (scope.count > 1) ? scope[1] : first;
-    self.highlightFinished = lastFinished ?: first;
-    self.highlightUpcoming = firstUpcoming ?: ((second != self.highlightFinished) ? second : first);
-    if (self.highlightFinished == self.highlightUpcoming && scope.count > 1) {
-        self.highlightUpcoming = second;
-    }
+    // 与服务端一致：左卡=上一场（已结束+比分），右卡=下一场（未开赛）
+    self.highlightFinished = lastFinished;
+    self.highlightUpcoming = nextUpcoming;
 
     [self buildTwoCards];
 }
@@ -1499,6 +1494,14 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     [cell.bookmarkBtn removeTarget:self action:@selector(onHomeFavoriteTapped:) forControlEvents:UIControlEventTouchUpInside];
     [cell.bookmarkBtn addTarget:self action:@selector(onHomeFavoriteTapped:) forControlEvents:UIControlEventTouchUpInside];
     return cell;
+}
+
+/// 精选右卡「下一场」：未开赛且非进行中（与赛程 VS 判定一致）
+- (BOOL)home_isMatchUpcomingForFeatured:(Match *)match {
+    if ([self home_isMatchFinished:match]) {
+        return NO;
+    }
+    return [self home_isMatchNotYetStartedForDisplay:match];
 }
 
 /// 与发现页类似：已结束/进行中用于精选卡片等；LIVE 视为未「踢完终场」但不一定算「已结束」

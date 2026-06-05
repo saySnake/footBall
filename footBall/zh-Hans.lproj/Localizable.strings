@@ -364,6 +364,9 @@
 "auth_cert_status_approved" = "已认证";
 "auth_cert_status_pending" = "审核中";
 "auth_cert_retry" = "重新认证";
+"force_update_title" = "版本更新";
+"force_update_message" = "当前版本过低，请更新到最新版本后继续使用。";
+"force_update_button" = "立即更新";
 "auth_conditions_title" = "认证条件";
 "auth_professional_title" = "职业认证";
 "auth_professional_desc" = "认证可加速曝光度";

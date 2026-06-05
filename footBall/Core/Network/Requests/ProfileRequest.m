@@ -18,9 +18,16 @@
 }
 
 - (void)getMyPassportWithYear:(NSString *)year success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    [self getMyPassportWithYear:year bypassCache:NO success:success failure:failure];
+}
+
+- (void)getMyPassportWithYear:(NSString *)year bypassCache:(BOOL)bypassCache success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     NSMutableDictionary *params = NSMutableDictionary.dictionary;
     if (year.length > 0) {
         params[@"year"] = year;
+    }
+    if (bypassCache) {
+        params[@"_refresh"] = @((long long)([NSDate date].timeIntervalSince1970 * 1000));
     }
     [[APIManager sharedManager] GET:APIPathValuePassportMe parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
@@ -91,8 +98,16 @@
 }
 
 - (void)getMyStatisticsWithPeriod:(NSString *)period success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    [self getMyStatisticsWithPeriod:period bypassCache:NO success:success failure:failure];
+}
+
+- (void)getMyStatisticsWithPeriod:(NSString *)period bypassCache:(BOOL)bypassCache success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     NSString *safePeriod = period.length > 0 ? period : @"all";
-    [[APIManager sharedManager] GET:APIPathValueStatisticsMe parameters:@{@"period": safePeriod} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+    NSMutableDictionary *params = [NSMutableDictionary dictionaryWithObject:safePeriod forKey:@"period"];
+    if (bypassCache) {
+        params[@"_refresh"] = @((long long)([NSDate date].timeIntervalSince1970 * 1000));
+    }
+    [[APIManager sharedManager] GET:APIPathValueStatisticsMe parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
             PNStatistics *statistics = [PNStatistics yy_modelWithJSON:responseObject.data];
             responseObject.dataObject = statistics;

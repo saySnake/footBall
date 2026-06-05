@@ -18,6 +18,12 @@ NS_ASSUME_NONNULL_BEGIN
                       success:(nullable APISuccessBlock)success
                       failure:(nullable APIFailureBlock)failure;
 
+/// 同上；`bypassCache` 为 YES 时附带时间戳，观赛信息保存后强刷护照
+- (void)getMyPassportWithYear:(nullable NSString *)year
+                  bypassCache:(BOOL)bypassCache
+                      success:(nullable APISuccessBlock)success
+                      failure:(nullable APIFailureBlock)failure;
+
 /// GET `/api/v1/passport/{userId}` — 他人护照；query `year` 可选；`dataObject` 为 `PNPassport` 或原始 data
 - (void)getPassportForUserId:(NSString *)userId
                         year:(nullable NSString *)year
@@ -39,6 +45,12 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// GET `/api/v1/statistics/me` — 我的数据统计；`period` 如 all/week；`dataObject` 为 `PNStatistics`
 - (void)getMyStatisticsWithPeriod:(nullable NSString *)period
+                          success:(nullable APISuccessBlock)success
+                          failure:(nullable APIFailureBlock)failure;
+
+/// 同上；`bypassCache` 为 YES 时附带时间戳，避免系统 HTTP 缓存返回旧统计
+- (void)getMyStatisticsWithPeriod:(nullable NSString *)period
+                      bypassCache:(BOOL)bypassCache
                           success:(nullable APISuccessBlock)success
                           failure:(nullable APIFailureBlock)failure;
 

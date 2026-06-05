@@ -42,7 +42,7 @@ static NSSet<NSString *> *PNSeatAllowedWatchLocations(void) {
     static NSSet<NSString *> *set;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        set = [NSSet setWithObjects:@"在现场", @"在球场", nil];
+        set = [NSSet setWithObjects:@"在聚会", @"在球场", nil];
     });
     return set;
 }
@@ -646,13 +646,13 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         make.leading.equalTo(content).offset(16);
     }];
     
-    NSArray *watchOptions = @[ @"在现场", @"在球场", @"在酒吧", @"在家里", @"在外面", @"在学校", @"在公司" ];
+    NSArray *watchOptions = @[ @"在聚会", @"在球场", @"在酒吧", @"在家里", @"在外面", @"在学校", @"在公司" ];
     self.watchButtons = [self addPillButtonsWithTitles:watchOptions
                                              multiSelect:NO
                                                 toParent:content
                                               topAnchor:watchTitle.mas_bottom];
     
-    // 座位（仅观赛地点为「在现场」「在球场」时可选）
+    // 座位（仅观赛地点为「在聚会」「在球场」时可选）
     UILabel *seatTitle = [[UILabel alloc] init];
     seatTitle.text = @"座位";
     seatTitle.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
@@ -1123,6 +1123,9 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
 /// 若服务端文案与本地 pill 文案一致则采用，否则用默认 fallback
 - (NSString *)pn_serverValueOrFallback:(NSArray<UIButton *> *)buttons serverValue:(NSString *)server fallback:(NSString *)fallback {
     NSString *s = server ?: @"";
+    if ([s isEqualToString:@"在现场"] || [s isEqualToString:@"AT_SCENE"]) {
+        s = @"在聚会";
+    }
     for (UIButton *b in buttons) {
         if ([b.titleLabel.text isEqualToString:s]) {
             return s;

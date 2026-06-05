@@ -14,6 +14,9 @@ NSString * const APIPathValueGetUser(NSString *userId) {
     return [NSString stringWithFormat:@"/api/v1/users/%@",userId];
 };
 NSString * const APIPathValueSearchUser = @"/api/v1/users/search";
+#pragma mark - 应用版本
+NSString * const APIPathValueAppVersionCheck = @"/api/v1/app/version-check";
+
 #pragma mark - 登录模块
 NSString * const APIPathValueSendCode = @"/api/v1/auth/send-code";
 NSString * const APIPathValueLoginPhone= @"/api/v1/auth/login/phone";

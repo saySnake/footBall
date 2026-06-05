@@ -12,6 +12,7 @@
 #import "APIManager.h"
 #import "APIEnvironmentManager.h"
 #import "APIRequestInterceptor.h"
+#import "APIAppMetadataInterceptor.h"
 #import "AuthManager.h"
 #import "PagFilePreloader.h"
 #import <DoraemonKit/DoraemonManager.h>
@@ -102,6 +103,7 @@
             // 从AuthManager获取token
             return [[AuthManager sharedManager] user].accessToken;
         }];
+    [apiManager addInterceptor:[[APIAppMetadataInterceptor alloc] init]];
     [apiManager addInterceptor:authInterceptor];
     // error拦截器
     APIErrorHandlingInterceptor *errorIntercaptor = [APIErrorHandlingInterceptor.alloc init];

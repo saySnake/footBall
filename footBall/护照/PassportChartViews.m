@@ -22,7 +22,7 @@
     if (self = [super initWithFrame:frame]) {
         self.backgroundColor = [UIColor clearColor];
         _barWidth = 20;
-        _xTitles = @[ @"在现场", @"在球场", @"在酒吧", @"在家里", @"在外面", @"在学校", @"在公司" ];
+        _xTitles = @[ @"在聚会", @"在球场", @"在酒吧", @"在家里", @"在外面", @"在学校", @"在公司" ];
         _gridLayer = [CAShapeLayer layer];
         _gridLayer.fillColor = [UIColor clearColor].CGColor;
         _gridLayer.strokeColor = [[UIColor colorWithRed:0.70 green:0.73 blue:0.80 alpha:1.0] colorWithAlphaComponent:0.55].CGColor;
@@ -123,7 +123,7 @@
     if (self.xTitles.count == n) {
         titles = self.xTitles;
     } else if (n == 7) {
-        titles = @[ @"在现场", @"在球场", @"在酒吧", @"在家里", @"在外面", @"在学校", @"在公司" ];
+        titles = @[ @"在聚会", @"在球场", @"在酒吧", @"在家里", @"在外面", @"在学校", @"在公司" ];
     } else {
         NSMutableArray *tmp = [NSMutableArray array];
         for (NSInteger i = 0; i < n; i++) { [tmp addObject:@""]; }

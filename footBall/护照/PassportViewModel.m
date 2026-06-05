@@ -134,7 +134,7 @@ static NSArray<NSString *> *PNPassportViewingLocationOrder(void) {
     static NSArray<NSString *> *order;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        order = @[ @"在现场", @"在球场", @"在酒吧", @"在家里", @"在外面", @"在学校", @"在公司" ];
+        order = @[ @"在聚会", @"在球场", @"在酒吧", @"在家里", @"在外面", @"在学校", @"在公司" ];
     });
     return order;
 }
@@ -194,8 +194,12 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     NSMutableDictionary<NSString *, NSNumber *> *countByLocation = [NSMutableDictionary dictionary];
     for (PNLocationDist *ld in locationList) {
         NSString *name = [ld.location stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if ([name isEqualToString:@"在现场"] || [name isEqualToString:@"AT_SCENE"]) {
+            name = @"在聚会";
+        }
         if (name.length > 0) {
-            countByLocation[name] = @(MAX(0, ld.count));
+            NSInteger prev = [countByLocation[name] integerValue];
+            countByLocation[name] = @(prev + MAX(0, ld.count));
         }
     }
     NSMutableArray<NSNumber *> *values = [NSMutableArray array];

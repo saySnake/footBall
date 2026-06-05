@@ -491,6 +491,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     // 从会员中心等页面返回时刷新配额与锁状态（首次 push 时 isMovingToParentViewController 为 YES，跳过避免重复请求）
     if (!self.isMovingToParentViewController && self.targetUserId.length == 0) {
         [self loadStampCollection];
+        [self loadPassportDataForceRefresh:NO];
     }
 }
 
@@ -796,6 +797,10 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     });
 }
 - (void)loadPassportData {
+    [self loadPassportDataForceRefresh:NO];
+}
+
+- (void)loadPassportDataForceRefresh:(BOOL)forceRefresh {
     __weak typeof(self) weakSelf = self;
     BOOL isPullRefresh = self.tableView.mj_header.isRefreshing;
     if (!isPullRefresh) {
@@ -836,7 +841,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
             handleFailure(error);
         }];
     } else {
-        [[ProfileRequest shared] getMyPassportWithYear:y success:^(HTTPResponse * _Nullable responseObject) {
+        [[ProfileRequest shared] getMyPassportWithYear:y bypassCache:forceRefresh success:^(HTTPResponse * _Nullable responseObject) {
             handleSuccess(responseObject.dataObject);
         } failure:^(NSError * _Nonnull error) {
             handleFailure(error);
@@ -986,7 +991,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 
 - (void)onMatchRecordDidUpdate:(NSNotification *)notification {
     [self loadStampCollection];
-    [self loadPassportData];
+    [self loadPassportDataForceRefresh:YES];
 }
 
 - (void)onTeamFollowDidUpdate:(NSNotification *)notification {

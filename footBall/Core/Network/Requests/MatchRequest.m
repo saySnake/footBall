@@ -60,8 +60,11 @@ static NSArray *PNMatchJSONArrayFromMyTeamData(id data) {
 }
 
 /// upcoming / finished 独立接口：`data` 与分页列表一致，按 `list` 等键解析（不做 upcoming+finished 合并）
-static void PNMatchRequestGETMyTeamSegment(NSString *path, NSInteger page, NSInteger pageSize, APISuccessBlock success, APIFailureBlock failure) {
-    NSDictionary *params = @{ @"pageNum": @(MAX(page, 1)), @"pageSize": @(MAX(pageSize, 1)) };
+static void PNMatchRequestGETMyTeamSegment(NSString *path, NSInteger page, NSInteger pageSize, BOOL bypassCache, APISuccessBlock success, APIFailureBlock failure) {
+    NSMutableDictionary *params = [@{ @"pageNum": @(MAX(page, 1)), @"pageSize": @(MAX(pageSize, 1)) } mutableCopy];
+    if (bypassCache) {
+        params[@"_refresh"] = @((long long)([NSDate date].timeIntervalSince1970 * 1000));
+    }
     [[APIManager sharedManager] GET:path parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
             NSArray *list = PNMatchJSONArrayFromPageData(responseObject.data);
@@ -100,6 +103,18 @@ static void PNMatchRequestGETMyTeamSegment(NSString *path, NSInteger page, NSInt
             failure(error);
         }
     }];
+}
+
+NSString * const PNMatchFavoriteDidUpdateNotification = @"PNMatchFavoriteDidUpdateNotification";
+
+static void PNPostMatchFavoriteDidUpdateNotification(NSString *matchId) {
+    NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
+    if (matchId.length > 0) {
+        userInfo[@"matchId"] = matchId;
+    }
+    [[NSNotificationCenter defaultCenter] postNotificationName:PNMatchFavoriteDidUpdateNotification
+                                                        object:nil
+                                                      userInfo:userInfo.count > 0 ? [userInfo copy] : nil];
 }
 
 @implementation MatchRequest
@@ -310,11 +325,19 @@ static void PNMatchRequestGETMyTeamSegment(NSString *path, NSInteger page, NSInt
 }
 
 - (void)getMyTeamUpcomingMatchesWithPage:(NSInteger)page pageSize:(NSInteger)pageSize success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
-    PNMatchRequestGETMyTeamSegment(APIPathValueMatchMyTeamUpcoming, page, pageSize, success, failure);
+    [self getMyTeamUpcomingMatchesWithPage:page pageSize:pageSize bypassCache:NO success:success failure:failure];
+}
+
+- (void)getMyTeamUpcomingMatchesWithPage:(NSInteger)page pageSize:(NSInteger)pageSize bypassCache:(BOOL)bypassCache success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    PNMatchRequestGETMyTeamSegment(APIPathValueMatchMyTeamUpcoming, page, pageSize, bypassCache, success, failure);
 }
 
 - (void)getMyTeamFinishedMatchesWithPage:(NSInteger)page pageSize:(NSInteger)pageSize success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
-    PNMatchRequestGETMyTeamSegment(APIPathValueMatchMyTeamFinished, page, pageSize, success, failure);
+    [self getMyTeamFinishedMatchesWithPage:page pageSize:pageSize bypassCache:NO success:success failure:failure];
+}
+
+- (void)getMyTeamFinishedMatchesWithPage:(NSInteger)page pageSize:(NSInteger)pageSize bypassCache:(BOOL)bypassCache success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
+    PNMatchRequestGETMyTeamSegment(APIPathValueMatchMyTeamFinished, page, pageSize, bypassCache, success, failure);
 }
 
 - (void)favoriteMatch:(NSString *)matchId success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
@@ -326,6 +349,7 @@ static void PNMatchRequestGETMyTeamSegment(NSString *path, NSInteger page, NSInt
     [[APIManager sharedManager] POST:APIPathValueMatchFavorite(matchId) parameters:@{} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
             responseObject.dataObject = responseObject.data;
+            PNPostMatchFavoriteDidUpdateNotification(matchId);
             if (success) success(responseObject);
         } else {
             if (failure) failure([APIError errorWithResponse:responseObject]);
@@ -343,6 +367,7 @@ static void PNMatchRequestGETMyTeamSegment(NSString *path, NSInteger page, NSInt
     [[APIManager sharedManager] DELETE:APIPathValueMatchFavorite(matchId) parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
             responseObject.dataObject = responseObject.data;
+            PNPostMatchFavoriteDidUpdateNotification(matchId);
             if (success) success(responseObject);
         } else {
             if (failure) failure([APIError errorWithResponse:responseObject]);

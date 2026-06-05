@@ -18,6 +18,8 @@
 #import "User.h"
 #import "StatisticsModels.h"
 #import "MatchRecordModels.h"
+#import "Match.h"
+#import "MatchRequest.h"
 
 #define kDiscoverHeaderBg     [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0]   // #0D2122
 #define kDiscoverGreen        [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0]   // #285D4B
@@ -127,6 +129,14 @@ static BOOL DiscoverIsApprovedVerificationStatus(NSString *status) {
            [s isEqualToString:@"已认证"];
 }
 
+static BOOL DiscoverIsUnverifiedVerificationStatus(NSString *status) {
+    if (status.length == 0) return NO;
+    NSString *s = status.lowercaseString;
+    return [s isEqualToString:@"unverified"] ||
+           [s containsString:@"unverified"] ||
+           [s isEqualToString:@"未认证"];
+}
+
 static NSString *DiscoverStringFromAny(id value) {
     if ([value isKindOfClass:NSString.class]) {
         return (NSString *)value;
@@ -171,6 +181,13 @@ static NSString *DiscoverNormalizedRecordStatus(NSDictionary *row) {
         if ([s containsString:@"reject"] || [s containsString:@"refuse"] || [s containsString:@"fail"] || [s containsString:@"拒"]) {
             return @"REJECTED";
         }
+        if (DiscoverIsUnverifiedVerificationStatus(status)) {
+            return @"UNVERIFIED";
+        }
+    }
+    NSString *rejectReason = DiscoverStringFromAny(row[@"rejectReason"]);
+    if (rejectReason.length > 0) {
+        return @"REJECTED";
     }
     BOOL hasValue = NO;
     BOOL verified = DiscoverBoolFromAny(row[@"verifyCompleted"], &hasValue);
@@ -234,6 +251,10 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
 @property (nonatomic, assign) BOOL hasVerified;
 /// 已提交认证，待审核
 @property (nonatomic, assign) BOOL hasPendingVerification;
+/// 认证被驳回或未通过，可重新提交
+@property (nonatomic, assign) BOOL needsReverify;
+/// 列表接口下发的认证状态原文（用于离线缓存校正）
+@property (nonatomic, copy) NSString *verificationStatus;
 @property (nonatomic, assign) DiscoverMatchType type;
 @property (nonatomic, copy) NSString *homeLogoURL;
 @property (nonatomic, copy) NSString *awayLogoURL;
@@ -241,6 +262,29 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
 
 @implementation DiscoverMatch
 @end
+
+/// 管理端驳回后服务端多为 UNVERIFIED；有驳回原因时视为 REJECTED 以便展示「重新认证」
+static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *apiMatch) {
+    if (!match || !apiMatch) return;
+    NSString *status = apiMatch.verificationStatus ?: @"";
+    NSDictionary *row = @{ @"verificationStatus": status };
+    NSString *norm = DiscoverNormalizedRecordStatus(row);
+    BOOL approved = apiMatch.verifyCompleted || DiscoverIsApprovedVerificationStatus(status) || [norm isEqualToString:@"VERIFIED"];
+    BOOL pending = [norm isEqualToString:@"PENDING"];
+    BOOL rejected = [norm isEqualToString:@"REJECTED"];
+    BOOL unverified = [norm isEqualToString:@"UNVERIFIED"] || DiscoverIsUnverifiedVerificationStatus(status);
+
+    match.hasVerified = approved;
+    match.hasPendingVerification = pending;
+    if (rejected || unverified) {
+        match.hasPendingVerification = NO;
+        if (!approved) {
+            match.hasVerified = NO;
+        }
+    }
+    match.needsReverify = (rejected || (unverified && match.hasInputInfo && !approved && !pending));
+    match.verificationStatus = status;
+}
 
 @interface DiscoverMatchCell : UITableViewCell
 @property (nonatomic, strong) UIView *cardView;
@@ -433,6 +477,8 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
 #pragma mark - DiscoverViewController
 
 @interface DiscoverViewController () <UITableViewDataSource, UITableViewDelegate>
+@property (nonatomic, assign) BOOL discoverIsLoadingRemote;
+@property (nonatomic, assign) BOOL discoverPendingForceReload;
 @property (nonatomic, strong) UIScrollView *scrollView;
 @property (nonatomic, strong) UIView *contentView;
 
@@ -526,11 +572,43 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
 
     [self buildHeader];
     [self buildBody];
+    [self setupDiscoverRefresh];
     [self refreshDiscoverHeader];
     [self switchToType:DiscoverMatchTypeUpcoming];
     [self restoreCachedDataIfNeeded];
     // 首次加载数据放在 viewDidLoad，避免 viewWillAppear 每次重拉导致闪烁
-    [self loadRemoteData];
+    [self loadRemoteDataForceRefresh:NO];
+
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(onMatchRecordDidUpdate:)
+                                                 name:PNMatchRecordDidUpdateNotification
+                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(onMatchFavoriteDidUpdate:)
+                                                 name:PNMatchFavoriteDidUpdateNotification
+                                               object:nil];
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (void)setupDiscoverRefresh {
+    RefreshPagHeader *header = [RefreshPagHeader headerWithRefreshingTarget:self refreshingAction:@selector(onDiscoverPullToRefresh)];
+    [header prepare];
+    _scrollView.mj_header = header;
+}
+
+- (void)onDiscoverPullToRefresh {
+    [self loadRemoteDataForceRefresh:YES];
+}
+
+- (void)onMatchRecordDidUpdate:(NSNotification *)notification {
+    [self loadRemoteDataForceRefresh:YES];
+}
+
+- (void)onMatchFavoriteDidUpdate:(NSNotification *)notification {
+    [self loadRemoteDataForceRefresh:YES];
 }
 
 - (NSString *)discoverCacheKey {
@@ -553,6 +631,8 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
         @"hasInputInfo": @(m.hasInputInfo),
         @"hasVerified": @(m.hasVerified),
         @"hasPendingVerification": @(m.hasPendingVerification),
+        @"needsReverify": @(m.needsReverify),
+        @"verificationStatus": m.verificationStatus ?: @"",
         @"type": @(m.type),
         @"homeLogoURL": m.homeLogoURL ?: @"",
         @"awayLogoURL": m.awayLogoURL ?: @"",
@@ -573,7 +653,26 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
     m.hasInputInfo = [dict[@"hasInputInfo"] respondsToSelector:@selector(boolValue)] ? [dict[@"hasInputInfo"] boolValue] : NO;
     m.hasVerified = [dict[@"hasVerified"] respondsToSelector:@selector(boolValue)] ? [dict[@"hasVerified"] boolValue] : NO;
     m.hasPendingVerification = [dict[@"hasPendingVerification"] respondsToSelector:@selector(boolValue)] ? [dict[@"hasPendingVerification"] boolValue] : NO;
+    m.needsReverify = [dict[@"needsReverify"] respondsToSelector:@selector(boolValue)] ? [dict[@"needsReverify"] boolValue] : NO;
+    m.verificationStatus = DiscoverStringFromAny(dict[@"verificationStatus"]) ?: @"";
     m.type = [dict[@"type"] respondsToSelector:@selector(integerValue)] ? [dict[@"type"] integerValue] : DiscoverMatchTypeUpcoming;
+    if (m.type == DiscoverMatchTypeFinished) {
+        NSString *norm = DiscoverNormalizedRecordStatus(@{ @"verificationStatus": m.verificationStatus ?: @"" });
+        if ([norm isEqualToString:@"REJECTED"] || [norm isEqualToString:@"UNVERIFIED"]) {
+            m.hasPendingVerification = NO;
+            if (![norm isEqualToString:@"VERIFIED"]) {
+                m.hasVerified = NO;
+            }
+            m.needsReverify = ([norm isEqualToString:@"REJECTED"] || (m.hasInputInfo && [norm isEqualToString:@"UNVERIFIED"]));
+        } else if ([norm isEqualToString:@"PENDING"]) {
+            m.hasPendingVerification = YES;
+            m.hasVerified = NO;
+            m.needsReverify = NO;
+        } else if ([norm isEqualToString:@"VERIFIED"]) {
+            m.hasPendingVerification = NO;
+            m.needsReverify = NO;
+        }
+    }
     m.homeLogoURL = DiscoverStringFromAny(dict[@"homeLogoURL"]) ?: @"";
     m.awayLogoURL = DiscoverStringFromAny(dict[@"awayLogoURL"]) ?: @"";
     return m;
@@ -628,9 +727,13 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
         DiscoverMatch *m = [self discoverMatchFromDictionary:item];
         if (m) [finished addObject:m];
     }
-    if (upcoming.count > 0 || finished.count > 0) {
+    if ([payload[@"upcoming"] isKindOfClass:NSArray.class]) {
         self.upcomingMatches = [upcoming copy];
+    }
+    if ([payload[@"finished"] isKindOfClass:NSArray.class]) {
         self.finishedMatches = [finished copy];
+    }
+    if ([payload[@"upcoming"] isKindOfClass:NSArray.class] || [payload[@"finished"] isKindOfClass:NSArray.class]) {
         [self refreshTabs];
     }
 
@@ -652,10 +755,8 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     [self refreshDiscoverHeader];
-    // 非首次进入时才刷新（已有数据则静默刷新，不会产生高度跳变）
-    if (self.upcomingMatches.count > 0 || self.finishedMatches.count > 0) {
-        [self loadRemoteData];
-    }
+    // 切 Tab 回来须强刷，否则可能仍显示收藏前的空「未来观赛」离线缓存
+    [self loadRemoteDataForceRefresh:YES];
 }
 
 - (void)viewDidLayoutSubviews {
@@ -1196,22 +1297,45 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
 }
 
 - (void)loadRemoteData {
+    [self loadRemoteDataForceRefresh:NO];
+}
+
+- (void)loadRemoteDataForceRefresh:(BOOL)forceRefresh {
+    if (self.discoverIsLoadingRemote) {
+        if (forceRefresh) {
+            self.discoverPendingForceReload = YES;
+        }
+        return;
+    }
+    self.discoverPendingForceReload = NO;
+    self.discoverIsLoadingRemote = YES;
     __weak typeof(self) weakSelf = self;
+    BOOL bypassCache = forceRefresh;
+    void (^finishLoading)(void) = ^{
+        weakSelf.discoverIsLoadingRemote = NO;
+        if (weakSelf.scrollView.mj_header.isRefreshing) {
+            [weakSelf.scrollView.mj_header endRefreshing];
+        }
+    };
+
     if (!AuthManager.sharedManager.isLoggedIn) {
         self.upcomingMatches = @[];
         self.finishedMatches = @[];
         [self refreshTabs];
         [self applyStatistics:nil];
+        finishLoading();
         return;
     }
-    /// 接口：`/matches/my-team/upcoming` 与 `/matches/my-team/finished` 由服务端筛选排序；客户端只做 VO → DiscoverCell 映射
+
     dispatch_group_t group = dispatch_group_create();
     __block NSArray<Match *> *upList = @[];
     __block NSArray<Match *> *finList = @[];
     __block BOOL upReqSuccess = NO;
     __block BOOL finReqSuccess = NO;
+    __block BOOL statsReqSuccess = NO;
+
     dispatch_group_enter(group);
-    [[MatchRequest shared] getMyTeamUpcomingMatchesWithPage:1 pageSize:50 success:^(HTTPResponse * _Nullable responseObject) {
+    [[MatchRequest shared] getMyTeamUpcomingMatchesWithPage:1 pageSize:50 bypassCache:bypassCache success:^(HTTPResponse * _Nullable responseObject) {
         NSArray *rows = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
         upList = rows;
         upReqSuccess = YES;
@@ -1219,8 +1343,9 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
     } failure:^(NSError * _Nonnull error) {
         dispatch_group_leave(group);
     }];
+
     dispatch_group_enter(group);
-    [[MatchRequest shared] getMyTeamFinishedMatchesWithPage:1 pageSize:50 success:^(HTTPResponse * _Nullable responseObject) {
+    [[MatchRequest shared] getMyTeamFinishedMatchesWithPage:1 pageSize:50 bypassCache:bypassCache success:^(HTTPResponse * _Nullable responseObject) {
         NSArray *rows = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
         finList = rows;
         finReqSuccess = YES;
@@ -1228,42 +1353,35 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
     } failure:^(NSError * _Nonnull error) {
         dispatch_group_leave(group);
     }];
+
+    dispatch_group_enter(group);
+    [[ProfileRequest shared] getMyStatisticsWithPeriod:@"all" bypassCache:bypassCache success:^(HTTPResponse * _Nullable responseObject) {
+        PNStatistics *statistics = [responseObject.dataObject isKindOfClass:PNStatistics.class] ? responseObject.dataObject : nil;
+        [weakSelf applyStatistics:statistics];
+        statsReqSuccess = YES;
+        dispatch_group_leave(group);
+    } failure:^(NSError * _Nonnull error) {
+        dispatch_group_leave(group);
+    }];
+
     dispatch_group_notify(group, dispatch_get_main_queue(), ^{
-        // 断网/请求失败时保留上次成功数据，避免页面被清空。
         if (upReqSuccess) {
             weakSelf.upcomingMatches = [weakSelf discoverMatchesFrom:upList type:DiscoverMatchTypeUpcoming];
         }
         if (finReqSuccess) {
             weakSelf.finishedMatches = [weakSelf discoverMatchesFrom:finList type:DiscoverMatchTypeFinished];
         }
-        // Debug: 打印第一条已观赛数据的关键字段
-        if (finReqSuccess && finList.count > 0) {
-            Match *first = finList[0];
-            NSLog(@"[DiscoverDebug] finishedMatches[0] => matchId=%@, recordId=%@, verifyCompleted=%d, verificationStatus=%@, certifiedMinutes=%ld",
-                  first.matchId ?: @"",
-                  first.recordId ?: @"",
-                  first.verifyCompleted,
-                  first.verificationStatus ?: @"(nil)",
-                  (long)first.certifiedMinutes);
-        }
-        if (weakSelf.finishedMatches.count > 0) {
-            DiscoverMatch *dm = weakSelf.finishedMatches[0];
-            NSLog(@"[DiscoverDebug] DiscoverMatch[0] => hasVerified=%d, hasPending=%d, verifiedText=%@",
-                  dm.hasVerified, dm.hasPendingVerification, dm.verifiedText ?: @"(nil)");
-        }
         [weakSelf refreshTabs];
         [weakSelf refreshFinishedPendingStatusByDetail];
-        if (upReqSuccess || finReqSuccess) {
+        [weakSelf discoverClearStalePendingAfterVerificationRefresh];
+        if (upReqSuccess || finReqSuccess || statsReqSuccess) {
             [weakSelf saveDiscoverOfflineCache];
         }
+        finishLoading();
+        if (weakSelf.discoverPendingForceReload) {
+            [weakSelf loadRemoteDataForceRefresh:YES];
+        }
     });
-    [[ProfileRequest shared] getMyStatisticsWithPeriod:@"all" success:^(HTTPResponse * _Nullable responseObject) {
-        PNStatistics *statistics = [responseObject.dataObject isKindOfClass:PNStatistics.class] ? responseObject.dataObject : nil;
-        [weakSelf applyStatistics:statistics];
-        [weakSelf saveDiscoverOfflineCache];
-    } failure:^(NSError * _Nonnull error) {
-        // 网络失败时保留当前统计值，避免离线回退成全 0。
-    }];
 }
 
 - (void)refreshFinishedStatusFromPassportRecords {
@@ -1336,9 +1454,10 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
                 continue;
             }
             if ([normalized isEqualToString:@"VERIFIED"]) {
-                if (!match.hasVerified || match.hasPendingVerification) {
+                if (!match.hasVerified || match.hasPendingVerification || match.needsReverify) {
                     match.hasVerified = YES;
                     match.hasPendingVerification = NO;
+                    match.needsReverify = NO;
                     // 已有带分钟数的文本则保留，否则用 90 分钟兜底
                     if (match.verifiedText.length == 0) {
                         match.verifiedText = [NSString stringWithFormat:fmtVerified, (long)90];
@@ -1349,7 +1468,22 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
                 if (match.hasVerified || !match.hasPendingVerification || ![match.verifiedText isEqualToString:pendingTitle]) {
                     match.hasVerified = NO;
                     match.hasPendingVerification = YES;
+                    match.needsReverify = NO;
                     match.verifiedText = pendingTitle;
+                    changed = YES;
+                }
+            } else if ([normalized isEqualToString:@"REJECTED"] || [normalized isEqualToString:@"UNVERIFIED"]) {
+                NSString *retryTitle = (NSLocalizedString(@"auth_cert_retry", nil) ?: @"重新认证");
+                BOOL shouldReverify = match.hasInputInfo;
+                if (match.hasVerified || match.hasPendingVerification || match.needsReverify != shouldReverify) {
+                    match.hasVerified = NO;
+                    match.hasPendingVerification = NO;
+                    match.needsReverify = shouldReverify;
+                    match.verificationStatus = DiscoverStringFromAny(row[@"verificationStatus"]) ?: match.verificationStatus;
+                    match.verifiedText = shouldReverify ? retryTitle : @"";
+                    changed = YES;
+                } else if (shouldReverify && ![match.verifiedText isEqualToString:retryTitle]) {
+                    match.verifiedText = retryTitle;
                     changed = YES;
                 }
             }
@@ -1433,7 +1567,10 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
                 }
             }
         }
-        if (changed) [weakSelf.tableView reloadData];
+        if (changed) {
+            [weakSelf.tableView reloadData];
+            [weakSelf saveDiscoverOfflineCache];
+        }
     });
 }
 
@@ -1461,14 +1598,15 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
         } else {
             m.scoreText = [NSString stringWithFormat:@"%ld : %ld", (long)match.homeScore, (long)match.awayScore];
             m.hasInputInfo = match.infoCompleted;
-            m.hasVerified = match.verifyCompleted || DiscoverIsApprovedVerificationStatus(match.verificationStatus);
-            m.hasPendingVerification = (!m.hasVerified && DiscoverIsPendingVerificationStatus(match.verificationStatus));
+            DiscoverApplyFinishedVerificationState(m, match);
             if (m.hasVerified) {
                 // certifiedMinutes > 0 时显示具体分钟数，否则显示默认 90 分钟（标准足球比赛时长）
                 NSInteger minutes = match.certifiedMinutes > 0 ? match.certifiedMinutes : 90;
                 m.verifiedText = [NSString stringWithFormat:fmtVerified, (long)minutes];
             } else if (m.hasPendingVerification) {
                 m.verifiedText = pendingTitle;
+            } else if (m.needsReverify) {
+                m.verifiedText = (NSLocalizedString(@"auth_cert_retry", nil) ?: @"重新认证");
             } else {
                 m.verifiedText = @"";
             }
@@ -1647,6 +1785,12 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
             [cell.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
             [cell.verifiedPill setImage:nil forState:UIControlStateNormal];
             cell.verifiedPill.tintColor = [UIColor whiteColor];
+        } else if (m.needsReverify) {
+            [cell.verifiedPill setTitle:(m.verifiedText.length ? m.verifiedText : (NSLocalizedString(@"auth_cert_retry", nil) ?: @"重新认证")) forState:UIControlStateNormal];
+            cell.verifiedPill.backgroundColor = [UIColor colorWithRed:0.82 green:0.30 blue:0.28 alpha:1.0];
+            [cell.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+            [cell.verifiedPill setImage:[UIImage imageNamed:@"weizhi"] forState:UIControlStateNormal];
+            cell.verifiedPill.tintColor = [UIColor whiteColor];
         } else {
             [cell.verifiedPill setTitle:(NSLocalizedString(@"discover_verify_match", nil) ?: @"认证比赛") forState:UIControlStateNormal];
             cell.verifiedPill.backgroundColor = kDiscoverPillGreen;
@@ -1694,6 +1838,24 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
         } else {
             [self presentMatchVerifyForMatch:m];
         }
+    }
+}
+
+- (void)discoverClearStalePendingAfterVerificationRefresh {
+    BOOL changed = NO;
+    for (DiscoverMatch *match in self.finishedMatches) {
+        if (!match.hasPendingVerification) continue;
+        NSString *norm = DiscoverNormalizedRecordStatus(@{ @"verificationStatus": match.verificationStatus ?: @"" });
+        if ([norm isEqualToString:@"REJECTED"] || [norm isEqualToString:@"UNVERIFIED"]) {
+            match.hasPendingVerification = NO;
+            match.hasVerified = NO;
+            match.needsReverify = match.hasInputInfo;
+            changed = YES;
+        }
+    }
+    if (changed) {
+        [self.tableView reloadData];
+        [self saveDiscoverOfflineCache];
     }
 }
 
@@ -1759,9 +1921,10 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
         // 提交后先显示待审核，最终状态以后端回源为准
         match.hasVerified = NO;
         match.hasPendingVerification = YES;
+        match.needsReverify = NO;
         match.verifiedText = (NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"待审核");
         [weakSelf.tableView reloadData];
-        [weakSelf loadRemoteData];
+        [weakSelf loadRemoteDataForceRefresh:YES];
     };
     [self presentViewController:vc animated:NO completion:nil];
 }

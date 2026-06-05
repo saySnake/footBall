@@ -89,6 +89,13 @@ static UIColor *PassportPageBg(void) {
                                                object:nil];
 }
 
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    if (self.targetUserId.length == 0 && !self.isMovingToParentViewController) {
+        [self loadPassportDataForceRefresh:NO];
+    }
+}
+
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
     // 自定义导航栏页面也开启系统左侧滑动返回
@@ -285,6 +292,10 @@ static UIColor *PassportPageBg(void) {
 }
 
 - (void)loadPassportData {
+    [self loadPassportDataForceRefresh:NO];
+}
+
+- (void)loadPassportDataForceRefresh:(BOOL)forceRefresh {
     __weak typeof(self) weakSelf = self;
     NSInteger generation = ++self.passportLoadGeneration;
     BOOL isPullRefresh = self.tableView.mj_header.isRefreshing;
@@ -354,7 +365,7 @@ static UIColor *PassportPageBg(void) {
             }];
         }];
     } else {
-        [[ProfileRequest shared] getMyPassportWithYear:y success:^(HTTPResponse * _Nullable responseObject) {
+        [[ProfileRequest shared] getMyPassportWithYear:y bypassCache:forceRefresh success:^(HTTPResponse * _Nullable responseObject) {
             PNPassport *p = responseObject.dataObject;
             handleSuccess(p);
         } failure:^(NSError * _Nonnull error) {
@@ -543,7 +554,7 @@ static UIColor *PassportPageBg(void) {
 #pragma mark - Notifications
 
 - (void)onMatchRecordDidUpdate:(NSNotification *)notification {
-    [self loadPassportData];
+    [self loadPassportDataForceRefresh:YES];
 }
 
 - (void)onTeamFollowDidUpdate:(NSNotification *)notification {

@@ -7,6 +7,8 @@
 
 #import "APIRequestInterceptor.h"
 #import "APIError.h"
+#import "PNAppVersionManager.h"
+#import "PNAppVersionInfo.h"
 
 @implementation APIAuthenticationInterceptor
 
@@ -173,6 +175,11 @@
         }
         if (apiError.businessMessage.length > 0) {
             NSLog(@"❌ [API Business Error] code=%@ message=%@", apiError.businessCode ?: @"", apiError.businessMessage);
+        }
+
+        if ([apiError.businessCode isEqualToString:PNAppVersionOutdatedErrorCode]) {
+            [[PNAppVersionManager shared] handleAPIErrorIfNeeded:apiError];
+            return nil;
         }
         
         // 根据错误处理策略决定是否继续传播错误

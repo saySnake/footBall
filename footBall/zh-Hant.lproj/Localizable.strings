@@ -359,6 +359,9 @@
 "auth_cert_status_approved" = "已認證";
 "auth_cert_status_pending" = "審核中";
 "auth_cert_retry" = "重新認證";
+"force_update_title" = "版本更新";
+"force_update_message" = "當前版本過低，請更新到最新版本後繼續使用。";
+"force_update_button" = "立即更新";
 "auth_conditions_title" = "認證條件";
 "auth_professional_title" = "職業認證";
 "auth_professional_desc" = "認證可加速曝光度";

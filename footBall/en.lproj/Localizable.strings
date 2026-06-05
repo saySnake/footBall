@@ -359,6 +359,12 @@
 "auth_cert_status_approved" = "Verified";
 "auth_cert_status_pending" = "Pending review";
 "auth_cert_retry" = "Retry verification";
+"force_update_title" = "Update required";
+"force_update_message" = "Please update to the latest version to continue.";
+"force_update_button" = "Update now";
+"force_update_title" = "Update required";
+"force_update_message" = "Please update to the latest version to continue.";
+"force_update_button" = "Update now";
 "auth_conditions_title" = "Certification Conditions";
 "auth_professional_title" = "Professional Certification";
 "auth_professional_desc" = "Certification can increase exposure";

@@ -10,13 +10,16 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+/// 首页/更多比赛收藏或取消收藏成功后发出，发现页「未来观赛」等需刷新列表
+FOUNDATION_EXPORT NSString * const PNMatchFavoriteDidUpdateNotification;
+
 @interface MatchRequest : NSObject
 
 + (instancetype)shared;
 
 #pragma mark - 首页 / 日程
 
-/// GET `/api/v1/home/featured-matches` — 精选比赛卡片；成功时 `dataObject` 为 `Match` 数组
+/// GET `/api/v1/home/featured-matches` — 精选比赛卡片（前两项：上一场已结束、下一场未开赛）；成功时 `dataObject` 为 `Match` 数组
 /// @param teamId 指定球队 ID，与首页选中球队一致（可选）
 - (void)getFeaturesMatchsWithTeamId:(nullable NSString *)teamId
                             success:(nullable APISuccessBlock)success
@@ -86,9 +89,21 @@ NS_ASSUME_NONNULL_BEGIN
                                  success:(nullable APISuccessBlock)success
                                  failure:(nullable APIFailureBlock)failure;
 
+- (void)getMyTeamUpcomingMatchesWithPage:(NSInteger)page
+                                pageSize:(NSInteger)pageSize
+                             bypassCache:(BOOL)bypassCache
+                                 success:(nullable APISuccessBlock)success
+                                 failure:(nullable APIFailureBlock)failure;
+
 /// GET `/api/v1/matches/my-team/finished` — 已经观赛；`dataObject` 为 `Match` 数组（服务端已排序）
 - (void)getMyTeamFinishedMatchesWithPage:(NSInteger)page
                                 pageSize:(NSInteger)pageSize
+                                 success:(nullable APISuccessBlock)success
+                                 failure:(nullable APIFailureBlock)failure;
+
+- (void)getMyTeamFinishedMatchesWithPage:(NSInteger)page
+                                pageSize:(NSInteger)pageSize
+                             bypassCache:(BOOL)bypassCache
                                  success:(nullable APISuccessBlock)success
                                  failure:(nullable APIFailureBlock)failure;
 

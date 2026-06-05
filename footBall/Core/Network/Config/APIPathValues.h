@@ -21,6 +21,10 @@ FOUNDATION_EXPORT NSString * const APIPathValueGetUser(NSString *userId);
 /// 搜索用户
 FOUNDATION_EXPORT NSString * const APIPathValueSearchUser;
 
+#pragma mark - 应用版本
+/// GET 检查客户端是否须强制更新（无需登录）
+FOUNDATION_EXPORT NSString * const APIPathValueAppVersionCheck;
+
 #pragma mark - 登录模块
 /// 发送验证码
 FOUNDATION_EXPORT NSString * const APIPathValueSendCode;
