@@ -34,6 +34,8 @@ static UIColor *kVCCaretGray(void) {
     return [ColorManager colorWithHexString:@"#939393"];
 }
 
+static const NSInteger kVCResendCountdownSeconds = 60;
+
 @interface VerifyCodeViewController () <UITextFieldDelegate>
 
 @property (nonatomic, strong) UIView *customNavBar;
@@ -46,6 +48,9 @@ static UIColor *kVCCaretGray(void) {
 @property (nonatomic, strong) UIButton *resendButton;
 @property (nonatomic, strong) UIView *caretView;
 @property (nonatomic, strong) NSTimer *caretBlinkTimer;
+@property (nonatomic, strong) NSTimer *resendCountdownTimer;
+@property (nonatomic, assign) NSInteger resendCountdownRemaining;
+@property (nonatomic, assign) BOOL resendRequesting;
 
 @end
 
@@ -67,6 +72,7 @@ static UIColor *kVCCaretGray(void) {
 
 - (void)dealloc {
     [self stopCaretBlink];
+    [self stopResendCountdown];
 }
 
 - (void)viewDidLoad {
@@ -77,6 +83,8 @@ static UIColor *kVCCaretGray(void) {
     [self applyPurposeCopy];
     [self updateButtonState];
     [self updateCaretDisplay];
+    // 上一页已发过验证码，进入本页即进入倒计时，避免连点重发
+    [self startResendCountdown];
 }
 
 - (void)viewDidLayoutSubviews {
@@ -98,6 +106,57 @@ static UIColor *kVCCaretGray(void) {
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
     [self stopCaretBlink];
+}
+
+#pragma mark - Resend countdown
+
+- (void)startResendCountdown {
+    [self stopResendCountdown];
+    self.resendCountdownRemaining = kVCResendCountdownSeconds;
+    [self applyResendCountdownUI];
+    __weak typeof(self) weakSelf = self;
+    self.resendCountdownTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer * _Nonnull timer) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) {
+            [timer invalidate];
+            return;
+        }
+        self.resendCountdownRemaining -= 1;
+        if (self.resendCountdownRemaining <= 0) {
+            [self stopResendCountdown];
+            [self applyResendIdleUI];
+            return;
+        }
+        [self applyResendCountdownUI];
+    }];
+    [[NSRunLoop mainRunLoop] addTimer:self.resendCountdownTimer forMode:NSRunLoopCommonModes];
+}
+
+- (void)stopResendCountdown {
+    [self.resendCountdownTimer invalidate];
+    self.resendCountdownTimer = nil;
+    self.resendCountdownRemaining = 0;
+}
+
+- (void)applyResendCountdownUI {
+    self.resendButton.enabled = NO;
+    self.resendButton.alpha = 0.55;
+    [self.resendButton setImage:nil forState:UIControlStateNormal];
+    NSString *format = NSLocalizedString(@"verify_resend_countdown", @"%lds 后重新获取");
+    [self.resendButton setTitle:[NSString stringWithFormat:format, (long)self.resendCountdownRemaining]
+                       forState:UIControlStateNormal];
+    [self.resendButton setTitleColor:kVCMutedText() forState:UIControlStateNormal];
+    self.resendButton.tintColor = kVCMutedText();
+}
+
+- (void)applyResendIdleUI {
+    self.resendButton.enabled = YES;
+    self.resendButton.alpha = 1.0;
+    UIImage *resetIcon = [[UIImage imageNamed:@"reset_msg"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    [self.resendButton setImage:resetIcon forState:UIControlStateNormal];
+    [self.resendButton setTitle:NSLocalizedString(@"verify_resend_button", nil) forState:UIControlStateNormal];
+    [self.resendButton setTitleColor:kVCMutedText() forState:UIControlStateNormal];
+    self.resendButton.tintColor = kVCMutedText();
 }
 
 - (NSString *)formattedDisplayPhone:(NSString *)raw {
@@ -370,18 +429,31 @@ static UIColor *kVCCaretGray(void) {
 }
 
 - (void)resendTapped {
+    if (self.resendCountdownRemaining > 0 || self.resendRequesting || !self.resendButton.enabled) {
+        return;
+    }
     NSString *phone = self.phoneNumber ?: @"";
     if (phone.length == 0) {
         return;
     }
+    self.resendRequesting = YES;
+    self.resendButton.enabled = NO;
     __weak typeof(self) weakSelf = self;
     [AuthManager.sharedManager sendVerifyCode:phone success:^(HTTPResponse * _Nonnull response) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) {
             return;
         }
+        self.resendRequesting = NO;
         [QMUITips showSucceed:NSLocalizedString(@"verify_code_sent", nil) inView:self.view hideAfterDelay:1.5];
+        [self startResendCountdown];
     } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) {
+            return;
+        }
+        self.resendRequesting = NO;
+        [self applyResendIdleUI];
         [QMUITips showError:error.localizedDescription];
     }];
 }

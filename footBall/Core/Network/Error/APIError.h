@@ -94,6 +94,13 @@ typedef NS_ENUM(NSInteger, APIErrorHandlingStrategy) {
 /// 判断是否为认证错误
 - (BOOL)isAuthenticationError;
 
+/// 将业务错误码映射为面向用户的中文文案；未知码返回 fallback（可为 nil）
++ (nullable NSString *)localizedMessageForBusinessCode:(nullable NSString *)businessCode
+                                             fallback:(nullable NSString *)fallback;
+
+/// 优先业务文案映射，其次 businessMessage，最后 fallback
+- (NSString *)displayMessageWithFallback:(nullable NSString *)fallback;
+
 @end
 
 NS_ASSUME_NONNULL_END

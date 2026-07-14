@@ -13,6 +13,7 @@
 #import "MembershipRequest.h"
 #import "MembershipModels.h"
 #import "LoadingManager.h"
+#import "APIError.h"
 #import <MBProgressHUD/MBProgressHUD.h>
 
 #define kMCPageBg [UIColor colorWithRed:13/255.0 green:33/255.0 blue:34/255.0 alpha:1.0]
@@ -101,9 +102,11 @@
 @property (nonatomic, assign) NSInteger currentIndex;
 @property (nonatomic, assign) BOOL redeemDialogShowingSuccess;
 @property (nonatomic, assign) BOOL hasAppliedRedeemDiscount;
-/// 兑换码(EXCHANGE_CODE)成功后，服务端返回的折扣商品 ID 和方案 ID
+/// 兑换码/付费邀请码成功后，服务端返回的折扣商品 ID 和方案 ID
 @property (nonatomic, copy) NSString *redeemAppleProductId;
 @property (nonatomic, copy) NSString *redeemPlanId;
+/// 待随 IAP /purchase 上报的兑换码（EXCHANGE_CODE / INVITE_CODE）
+@property (nonatomic, copy) NSString *pendingRedeemCode;
 /// 服务端返回的方案列表，用于获取 appleProductId 和 planId
 @property (nonatomic, strong) NSArray<PNMemberPlan *> *apiPlans;
 /// 当前会员状态
@@ -702,14 +705,18 @@
     }];
 
     self.redeemInputField = [UITextField new];
-    self.redeemInputField.placeholder = @"请输入兑换码";
+    self.redeemInputField.placeholder = @"请输入兑换码/邀请码";
     self.redeemInputField.textColor = [UIColor colorWithRed:40/255.0 green:93/255.0 blue:75/255.0 alpha:1.0];
     self.redeemInputField.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
-    self.redeemInputField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"请输入兑换码" attributes:@{
+    self.redeemInputField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"请输入兑换码/邀请码" attributes:@{
         NSForegroundColorAttributeName: [UIColor colorWithRed:173/255.0 green:173/255.0 blue:173/255.0 alpha:1.0],
         NSFontAttributeName: [UIFont systemFontOfSize:8 weight:UIFontWeightRegular]
     }];
-    self.redeemInputField.keyboardType = UIKeyboardTypeNumberPad;
+    // 支持邀请码（12 位字母数字）与原有兑换码（数字）
+    self.redeemInputField.keyboardType = UIKeyboardTypeASCIICapable;
+    self.redeemInputField.autocapitalizationType = UITextAutocapitalizationTypeAllCharacters;
+    self.redeemInputField.autocorrectionType = UITextAutocorrectionTypeNo;
+    self.redeemInputField.spellCheckingType = UITextSpellCheckingTypeNo;
     [self.redeemInputField addTarget:self action:@selector(onRedeemDialogInputChanged) forControlEvents:UIControlEventEditingChanged];
     [self.redeemInputWrapView addSubview:self.redeemInputField];
     [self.redeemInputField mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -1423,11 +1430,30 @@
     self.redeemOverlayView.hidden = YES;
 }
 
+- (NSString *)normalizedRedeemInput:(NSString *)raw {
+    NSString *trimmed = [raw ?: @"" stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    trimmed = [trimmed uppercaseString];
+    // 仅保留 A-Z / 0-9，兼容邀请码（12 位字母数字）与原兑换码
+    NSMutableString *code = [NSMutableString stringWithCapacity:trimmed.length];
+    for (NSUInteger i = 0; i < trimmed.length; i++) {
+        unichar c = [trimmed characterAtIndex:i];
+        if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+            [code appendFormat:@"%C", c];
+        }
+    }
+    if (code.length > 12) {
+        return [code substringToIndex:12];
+    }
+    return [code copy];
+}
+
+- (BOOL)isRedeemCodeReadyToSubmit:(NSString *)code {
+    // 邀请码固定 12 位；历史兑换码多为 5 位数字
+    return code.length == 12 || code.length == 5;
+}
+
 - (void)onRedeemDialogInputChanged {
-    NSString *raw = [self.redeemInputField.text ?: @"" stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    NSCharacterSet *nonDigits = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
-    NSString *code = [[raw componentsSeparatedByCharactersInSet:nonDigits] componentsJoinedByString:@""];
-    if (code.length > 5) code = [code substringToIndex:5];
+    NSString *code = [self normalizedRedeemInput:self.redeemInputField.text];
     if (![code isEqualToString:self.redeemInputField.text ?: @""]) {
         self.redeemInputField.text = code;
     }
@@ -1439,7 +1465,7 @@
     BOOL hasInput = code.length > 0;
     [self applyRedeemHelpLabelStyle];
     self.redeemHelpLabel.hidden = !hasInput;
-    self.redeemConfirmBtn.alpha = code.length == 5 ? 1.0 : 0.88;
+    self.redeemConfirmBtn.alpha = [self isRedeemCodeReadyToSubmit:code] ? 1.0 : 0.88;
 }
 
 - (void)applyRedeemHelpLabelStyle {
@@ -1466,9 +1492,42 @@
     self.redeemHelpLabel.attributedText = helpAttr;
 }
 
+- (NSString *)displayDateText:(NSString *)raw {
+    if (raw.length == 0) return @"";
+    // 兼容 "2026-07-15T10:00:00" / "2026-07-15 10:00:00"
+    NSString *normalized = [[raw stringByReplacingOccurrencesOfString:@"T" withString:@" "] componentsSeparatedByString:@"."].firstObject;
+    if (normalized.length >= 16) {
+        return [normalized substringToIndex:16];
+    }
+    return normalized ?: raw;
+}
+
+- (void)showRedeemDialogSuccessWithTitle:(NSString *)title desc:(NSString *)desc autoHide:(BOOL)autoHide {
+    self.redeemDialogShowingSuccess = YES;
+    self.redeemDialogTicketIconView.hidden = YES;
+    self.redeemInputWrapView.hidden = YES;
+    self.redeemHelpLabel.hidden = YES;
+    self.redeemSuccessWrapView.hidden = NO;
+    self.redeemSuccessTitleLabel.hidden = NO;
+    self.redeemSuccessDescLabel.hidden = NO;
+    self.redeemSuccessTitleLabel.text = title.length ? title : @"兑换成功！";
+    self.redeemSuccessDescLabel.text = desc.length ? desc : @"";
+    self.redeemSuccessDescLabel.numberOfLines = 0;
+    self.redeemSuccessDescLabel.textAlignment = NSTextAlignmentCenter;
+    if (autoHide) {
+        __weak typeof(self) weakSelf = self;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            if (weakSelf.redeemDialogShowingSuccess) {
+                [weakSelf hideRedeemDialog];
+            }
+        });
+    }
+}
+
 - (void)onTapRedeemDialogConfirm {
-    NSString *code = self.redeemInputField.text ?: @"";
-    if (code.length < 5) return;
+    NSString *code = [self normalizedRedeemInput:self.redeemInputField.text];
+    self.redeemInputField.text = code;
+    if (![self isRedeemCodeReadyToSubmit:code]) return;
     [self.view endEditing:YES];
 
     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
@@ -1476,46 +1535,64 @@
     [[MembershipRequest shared] redeemCodeWithBody:@{@"code": code} success:^(HTTPResponse * _Nullable responseObject) {
         dispatch_async(dispatch_get_main_queue(), ^{
             [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+            id raw = responseObject.dataObject ?: responseObject.data;
+            PNRedeemResult *result = [PNRedeemResult yy_modelWithJSON:raw];
+            NSLog(@"[Redeem] codeType=%@ needPayment=%@ appleProductId=%@ planId=%@",
+                  result.codeType, result.needPayment ? @"YES" : @"NO", result.appleProductId, result.planId);
+
+            if (!result.needPayment) {
+                // 免费码（GIFT / 免费 INVITE）：服务端已直接激活会员
+                weakSelf.hasAppliedRedeemDiscount = NO;
+                weakSelf.pendingRedeemCode = nil;
+                weakSelf.redeemAppleProductId = nil;
+                weakSelf.redeemPlanId = nil;
+                NSMutableString *desc = [NSMutableString stringWithString:@"会员权益已激活"];
+                NSString *activateText = [weakSelf displayDateText:result.activateTime];
+                NSString *expireText = [weakSelf displayDateText:result.expireTime];
+                if (activateText.length > 0) {
+                    [desc appendFormat:@"\n激活时间：%@", activateText];
+                }
+                if (expireText.length > 0) {
+                    [desc appendFormat:@"\n到期时间：%@", expireText];
+                } else if (result.durationDays == 0 &&
+                           ([result.codeType isEqualToString:@"INVITE_CODE"] || [result.codeType isEqualToString:@"GIFT_CODE"])) {
+                    [desc appendString:@"\n到期时间：永久"];
+                }
+                [weakSelf showRedeemDialogSuccessWithTitle:@"激活成功！" desc:desc autoHide:YES];
+                [weakSelf loadRemoteData];
+                [weakSelf refreshRedeemBannerState];
+                return;
+            }
+
+            // 付费码（EXCHANGE / 付费 INVITE）：记录商品信息，引导走 Apple IAP
+            if (result.appleProductId.length == 0) {
+                weakSelf.redeemHelpLabel.text = @"该兑换码配置异常，请联系客服 点击寻求帮助";
+                weakSelf.redeemHelpLabel.hidden = NO;
+                [weakSelf applyRedeemHelpLabelStyle];
+                return;
+            }
             weakSelf.hasAppliedRedeemDiscount = YES;
-            // 解析兑换码返回的折扣商品 ID 和方案 ID，用于后续 IAP 支付
-            NSDictionary *data = nil;
-            if ([responseObject.dataObject isKindOfClass:NSDictionary.class]) {
-                data = responseObject.dataObject;
-            } else if ([responseObject.data isKindOfClass:NSDictionary.class]) {
-                data = responseObject.data;
+            weakSelf.pendingRedeemCode = code;
+            weakSelf.redeemAppleProductId = result.appleProductId;
+            if (result.planId.length > 0) {
+                weakSelf.redeemPlanId = result.planId;
             }
-            NSString *retAppleProductId = data[@"appleProductId"];
-            NSString *retPlanId = data[@"planId"] ? [NSString stringWithFormat:@"%@", data[@"planId"]] : nil;
-            NSLog(@"[Redeem] data=%@, appleProductId=%@, planId=%@", data, retAppleProductId, retPlanId);
-            if (retAppleProductId.length > 0) {
-                weakSelf.redeemAppleProductId = retAppleProductId;
-            }
-            if (retPlanId.length > 0) {
-                weakSelf.redeemPlanId = retPlanId;
-            }
-            weakSelf.redeemDialogShowingSuccess = YES;
-            weakSelf.redeemDialogTicketIconView.hidden = YES;
-            weakSelf.redeemInputWrapView.hidden = YES;
-            weakSelf.redeemHelpLabel.hidden = YES;
-            weakSelf.redeemSuccessWrapView.hidden = NO;
-            weakSelf.redeemSuccessTitleLabel.hidden = NO;
-            weakSelf.redeemSuccessDescLabel.hidden = NO;
+            NSString *paidDesc = [result.codeType isEqualToString:@"INVITE_CODE"]
+                ? @"请继续完成支付以激活会员权益"
+                : @"折扣已应用到相应会员订阅中";
+            [weakSelf showRedeemDialogSuccessWithTitle:@"兑换成功！" desc:paidDesc autoHide:YES];
             [weakSelf reloadPlanCardsPreservingIndex];
             [weakSelf refreshRedeemBannerState];
             [weakSelf switchToGiftMode:NO];
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.85 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                if (weakSelf.redeemDialogShowingSuccess) {
-                    [weakSelf hideRedeemDialog];
-                }
-            });
         });
     } failure:^(NSError * _Nonnull error) {
         dispatch_async(dispatch_get_main_queue(), ^{
             [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
             NSString *msg = @"兑换失败";
             if ([error isKindOfClass:[APIError class]]) {
-                APIError *ae = (APIError *)error;
-                if (ae.businessMessage.length) msg = ae.businessMessage;
+                msg = [(APIError *)error displayMessageWithFallback:msg];
+            } else if (error.localizedDescription.length > 0) {
+                msg = error.localizedDescription;
             }
             weakSelf.redeemHelpLabel.text = [NSString stringWithFormat:@"%@ 点击寻求帮助", msg];
             weakSelf.redeemHelpLabel.hidden = NO;
@@ -1706,8 +1783,9 @@
                 [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
                 dispatch_async(dispatch_get_main_queue(), ^{
                     [MBProgressHUD hideHUDForView:self.view animated:YES];
-                    // 用户主动取消不弹错误提示
-                    if (transaction.error.code != SKErrorPaymentCancelled) {
+                    if (transaction.error.code == SKErrorPaymentCancelled) {
+                        [[LoadingManager sharedManager] showError:@"支付已取消，可重试" inView:self.view];
+                    } else {
                         NSString *msg = transaction.error.localizedDescription ?: @"购买失败，请稍后重试";
                         [[LoadingManager sharedManager] showError:msg inView:self.view];
                     }
@@ -1750,12 +1828,16 @@
     }
 
     NSString *planId = self.pendingPlanId ?: @"";
-    NSDictionary *body = @{
+    NSMutableDictionary *body = [@{
         @"transactionId": transactionId,
         @"signedTransaction": signedTransaction,
         @"planId": planId,
         @"agreementAccepted": @YES
-    };
+    } mutableCopy];
+    // 兑换码/付费邀请码：随 purchase 带上 redeemCode，服务端按码关联方案与追踪
+    if (self.pendingRedeemCode.length > 0) {
+        body[@"redeemCode"] = self.pendingRedeemCode;
+    }
 
     __weak typeof(self) weakSelf = self;
     [[MembershipRequest shared] verifyPurchaseWithBody:body success:^(HTTPResponse * _Nullable responseObject) {
@@ -1764,8 +1846,13 @@
         dispatch_async(dispatch_get_main_queue(), ^{
             [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
             weakSelf.pendingPlanId = nil;
+            weakSelf.pendingRedeemCode = nil;
+            weakSelf.hasAppliedRedeemDiscount = NO;
+            weakSelf.redeemAppleProductId = nil;
+            weakSelf.redeemPlanId = nil;
             // 刷新会员状态
             [weakSelf loadRemoteData];
+            [weakSelf refreshRedeemBannerState];
             // 弹出成功提示
             UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"开通成功"
                                                                            message:@"会员权益已激活，尽情享受吧！"
@@ -1781,8 +1868,7 @@
             [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
             NSString *msg = @"购买成功，但服务器验证失败，请联系客服处理";
             if ([error isKindOfClass:[APIError class]]) {
-                APIError *ae = (APIError *)error;
-                if (ae.businessMessage.length) msg = ae.businessMessage;
+                msg = [(APIError *)error displayMessageWithFallback:msg];
             }
             UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"验证失败"
                                                                            message:msg
@@ -1839,12 +1925,33 @@
     [[MembershipRequest shared] redeemCodeWithBody:@{@"code": code} success:^(HTTPResponse * _Nullable responseObject) {
         dispatch_async(dispatch_get_main_queue(), ^{
             [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+            id raw = responseObject.dataObject ?: responseObject.data;
+            PNRedeemResult *result = [PNRedeemResult yy_modelWithJSON:raw];
+            // 礼包入口若误输入付费码/邀请付费码，引导走订阅支付
+            if (result.needPayment && result.appleProductId.length > 0) {
+                weakSelf.hasAppliedRedeemDiscount = YES;
+                weakSelf.pendingRedeemCode = code;
+                weakSelf.redeemAppleProductId = result.appleProductId;
+                if (result.planId.length > 0) {
+                    weakSelf.redeemPlanId = result.planId;
+                }
+                [[LoadingManager sharedManager] showError:@"该码需支付后激活，已为你应用优惠" inView:weakSelf.view];
+                [weakSelf switchToGiftMode:NO];
+                [weakSelf reloadPlanCardsPreservingIndex];
+                return;
+            }
             weakSelf.giftPromptLabel.hidden = YES;
             weakSelf.giftCodeTapAreaBtn.hidden = YES;
             weakSelf.giftRedeemBtn.hidden = YES;
             weakSelf.giftSuccessWrap.hidden = NO;
             weakSelf.giftSuccessLabel.hidden = NO;
-            weakSelf.giftSuccessLabel.text = @"兑换成功";
+            NSString *expireText = [weakSelf displayDateText:result.expireTime];
+            if (expireText.length > 0) {
+                weakSelf.giftSuccessLabel.text = [NSString stringWithFormat:@"激活成功\n到期：%@", expireText];
+                weakSelf.giftSuccessLabel.numberOfLines = 0;
+            } else {
+                weakSelf.giftSuccessLabel.text = @"兑换成功";
+            }
             // 刷新会员状态
             [weakSelf loadRemoteData];
         });
@@ -1853,8 +1960,7 @@
             [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
             NSString *msg = @"兑换失败，请检查礼包码";
             if ([error isKindOfClass:[APIError class]]) {
-                APIError *ae = (APIError *)error;
-                if (ae.businessMessage.length) msg = ae.businessMessage;
+                msg = [(APIError *)error displayMessageWithFallback:msg];
             }
             [[LoadingManager sharedManager] showError:msg inView:weakSelf.view];
         });

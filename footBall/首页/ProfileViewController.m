@@ -873,11 +873,12 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
 
 - (void)onDeleteAccount {
     PNCommonAlertViewController *alert = [PNCommonAlertViewController new];
-    alert.alertTitle = NSLocalizedString(@"settings_delete_account_alert_title", nil);
+    // 设计稿：标题「提示」、确认钮绿色「确认」，正文分行警示
+    alert.alertTitle = NSLocalizedString(@"settings_alert_title", @"提示");
     alert.message = NSLocalizedString(@"settings_delete_account_alert_message", nil);
     alert.cancelTitle = NSLocalizedString(@"cancel", nil);
-    alert.confirmTitle = NSLocalizedString(@"settings_delete_account_confirm", nil);
-    alert.confirmDestructive = YES;
+    alert.confirmTitle = NSLocalizedString(@"confirm", @"确认");
+    alert.confirmDestructive = NO;
     __weak typeof(self) weakSelf = self;
     alert.onConfirm = ^{
         [weakSelf beginDeactivateAccountFlow];

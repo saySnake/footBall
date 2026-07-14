@@ -64,6 +64,7 @@
 "verify_code_placeholder" = "Please enter 6-digit code";
 "verify_login_button" = "Log in";
 "verify_resend_button" = "Resend code";
+"verify_resend_countdown" = "Resend in %lds";
 "verify_code_sent" = "Verification code sent";
 
 /* Team Selection */
@@ -279,6 +280,9 @@
 "community_new_friends_subtitle" = "Add new friends";
 "community_scan_add_friend" = "Scan to Add Friend";
 "community_scan_add_friend_subtitle" = "Scan QR name card";
+"community_scan_album" = "Album";
+"community_scan_album_no_qr" = "No QR code found. Please try again.";
+"community_scan_album_invalid" = "Unable to load this image";
 "community_search_result_format" = "Results (%ld)";
 "community_search_no_result" = "No users found";
 "community_search_failed" = "Search failed";
@@ -400,16 +404,16 @@
 "settings_test_version_value" = "Test 1.1";
 "settings_clear_data" = "Clear Data";
 "settings_clear_data_value" = "88 MB";
-"settings_clear_data_confirm" = "Confirm clearing all cached data?";
+"settings_clear_data_confirm" = "Confirm to clear cache\nimmediately";
 "settings_calculating" = "Calculating...";
 "settings_clearing" = "Clearing...";
 "settings_logout" = "Log Out";
-"settings_alert_title" = "Tip";
+"settings_alert_title" = "Notice";
 "settings_logout_confirm" = "Confirm log out";
 "settings_delete_account" = "Delete Account";
-"settings_delete_account_alert_title" = "Delete Account";
-"settings_delete_account_alert_message" = "After deletion, all your data will be permanently removed and cannot be recovered. Are you sure?";
-"settings_delete_account_confirm" = "Delete";
+"settings_delete_account_alert_title" = "Notice";
+"settings_delete_account_alert_message" = "Deleting will immediately erase\nall your data and account\nand cannot be undone";
+"settings_delete_account_confirm" = "Confirm";
 "settings_delete_account_no_phone" = "Unable to get your phone number. Please try again later.";
 "verify_deactivate_title" = "Verify Phone";
 "verify_deactivate_button" = "Confirm Delete";

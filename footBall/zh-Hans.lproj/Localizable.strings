@@ -64,6 +64,7 @@
 "verify_code_placeholder" = "请输入6位验证码";
 "verify_login_button" = "登录";
 "verify_resend_button" = "重新获取验证码";
+"verify_resend_countdown" = "%lds 后重新获取";
 "verify_code_sent" = "验证码已发送";
 
 /* Team Selection */
@@ -279,6 +280,9 @@
 "community_new_friends_subtitle" = "添加新朋友";
 "community_scan_add_friend" = "扫码添加好友";
 "community_scan_add_friend_subtitle" = "扫描二维码名片";
+"community_scan_album" = "相册";
+"community_scan_album_no_qr" = "未识别到二维码，请重试";
+"community_scan_album_invalid" = "无法读取该图片";
 "community_search_result_format" = "搜索结果（%ld）";
 "community_search_no_result" = "未找到相关用户";
 "community_search_failed" = "搜索失败";
@@ -406,16 +410,16 @@
 "settings_test_version_value" = "测试版本1.1";
 "settings_clear_data" = "清除数据";
 "settings_clear_data_value" = "88 MB";
-"settings_clear_data_confirm" = "确认清除所有缓存数据？";
+"settings_clear_data_confirm" = "确认清除后将立即\n清除缓存";
 "settings_calculating" = "计算中...";
 "settings_clearing" = "清除中...";
 "settings_logout" = "退出登录";
 "settings_alert_title" = "提示";
 "settings_logout_confirm" = "确认退出登录";
 "settings_delete_account" = "删除账户";
-"settings_delete_account_alert_title" = "删除账户";
-"settings_delete_account_alert_message" = "账户删除后，您的所有数据将被永久删除且无法恢复。确定要删除吗？";
-"settings_delete_account_confirm" = "删除";
+"settings_delete_account_alert_title" = "提示";
+"settings_delete_account_alert_message" = "删除后将立即注销你的\n所有数据 并删除账户\n且无法撤回";
+"settings_delete_account_confirm" = "确认";
 "settings_delete_account_no_phone" = "无法获取绑定手机号，请稍后重试";
 "verify_deactivate_title" = "验证手机号";
 "verify_deactivate_button" = "确认删除";

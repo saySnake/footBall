@@ -37,7 +37,8 @@ NS_ASSUME_NONNULL_BEGIN
                               success:(nullable APISuccessBlock)success
                               failure:(nullable APIFailureBlock)failure;
 
-/// POST `/api/v1/membership/redeem` — 兑换码/礼包码兑换；body 包含 code 字段
+/// POST `/api/v1/membership/redeem` — 礼包码/兑换码/邀请码兑换；body 包含 code 字段
+/// 成功 data 为 RedeemResultVO（含 needPayment、appleProductId、activateTime、expireTime 等）
 - (void)redeemCodeWithBody:(NSDictionary *)body
                    success:(nullable APISuccessBlock)success
                    failure:(nullable APIFailureBlock)failure;

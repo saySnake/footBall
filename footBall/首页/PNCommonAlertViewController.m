@@ -65,52 +65,54 @@
     [card addSubview:self.titleLabel];
 
     self.messageLabel = [UILabel new];
-    self.messageLabel.font = [UIFont systemFontOfSize:14];
-    self.messageLabel.textColor = [UIColor darkGrayColor];
+    self.messageLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
+    // 设计稿正文为主题绿
+    self.messageLabel.textColor = kAlertGreen;
     self.messageLabel.textAlignment = NSTextAlignmentCenter;
     self.messageLabel.numberOfLines = 0;
     self.messageLabel.text = self.message;
     [card addSubview:self.messageLabel];
 
     self.cancelBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.cancelBtn.backgroundColor = [UIColor colorWithWhite:0.90 alpha:1.0];
+    self.cancelBtn.backgroundColor = [UIColor colorWithWhite:0.93 alpha:1.0];
     self.cancelBtn.layer.cornerRadius = 18;
-    self.cancelBtn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
-    [self.cancelBtn setTitleColor:[UIColor darkGrayColor] forState:UIControlStateNormal];
+    self.cancelBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+    [self.cancelBtn setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
     [self.cancelBtn setTitle:self.cancelTitle forState:UIControlStateNormal];
     [self.cancelBtn addTarget:self action:@selector(onCancelTapped) forControlEvents:UIControlEventTouchUpInside];
     [card addSubview:self.cancelBtn];
 
     self.confirmBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    // 设计稿确认钮统一为主题绿；destructive 保留红色能力但业务按设计可不启用
     self.confirmBtn.backgroundColor = self.confirmDestructive
         ? [UIColor colorWithRed:0.92 green:0.26 blue:0.21 alpha:1.0]
         : kAlertGreen;
     self.confirmBtn.layer.cornerRadius = 18;
-    self.confirmBtn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
+    self.confirmBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
     [self.confirmBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     [self.confirmBtn setTitle:self.confirmTitle forState:UIControlStateNormal];
     [self.confirmBtn addTarget:self action:@selector(onConfirmTapped) forControlEvents:UIControlEventTouchUpInside];
     [card addSubview:self.confirmBtn];
 
     [self.titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(card).offset(18);
+        make.top.equalTo(card).offset(22);
         make.leading.trailing.equalTo(card).insets(UIEdgeInsetsMake(0, 16, 0, 16));
     }];
     [self.messageLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.titleLabel.mas_bottom).offset(10);
-        make.leading.trailing.equalTo(card).insets(UIEdgeInsetsMake(0, 18, 0, 18));
+        make.top.equalTo(self.titleLabel.mas_bottom).offset(14);
+        make.leading.trailing.equalTo(card).insets(UIEdgeInsetsMake(0, 20, 0, 20));
     }];
     [self.cancelBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.messageLabel.mas_bottom).offset(16);
-        make.leading.equalTo(card).offset(18);
+        make.top.equalTo(self.messageLabel.mas_bottom).offset(20);
+        make.leading.equalTo(card).offset(20);
         make.height.mas_equalTo(36);
-        make.bottom.equalTo(card).offset(-16);
+        make.bottom.equalTo(card).offset(-20);
         make.trailing.equalTo(card.mas_centerX).offset(-8);
     }];
     [self.confirmBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.height.bottom.equalTo(self.cancelBtn);
         make.leading.equalTo(card.mas_centerX).offset(8);
-        make.trailing.equalTo(card).offset(-18);
+        make.trailing.equalTo(card).offset(-20);
     }];
 }
 

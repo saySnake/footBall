@@ -69,4 +69,21 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) NSInteger pageSize;
 @end
 
+/// RedeemResultVO — POST /api/v1/membership/redeem 返回
+@interface PNRedeemResult : NSObject <YYModel>
+/// GIFT_CODE / EXCHANGE_CODE / INVITE_CODE
+@property (nonatomic, copy, nullable) NSString *codeType;
+@property (nonatomic, copy, nullable) NSString *planType;
+@property (nonatomic, copy, nullable) NSString *redeemDescription;
+@property (nonatomic, copy, nullable) NSString *activateTime;
+@property (nonatomic, copy, nullable) NSString *expireTime;
+@property (nonatomic, copy, nullable) NSString *discountPrice;
+@property (nonatomic, copy, nullable) NSString *originalPrice;
+@property (nonatomic, copy, nullable) NSString *appleProductId;
+@property (nonatomic, copy, nullable) NSString *planId;
+@property (nonatomic, assign) NSInteger durationDays;
+/// YES：需 Apple IAP；NO：已直接激活会员
+@property (nonatomic, assign) BOOL needPayment;
+@end
+
 NS_ASSUME_NONNULL_END

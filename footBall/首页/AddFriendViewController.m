@@ -10,6 +10,9 @@
 #import "SocialRequest.h"
 #import <SDWebImage/SDWebImage.h>
 #import <AVFoundation/AVFoundation.h>
+#import <PhotosUI/PhotosUI.h>
+#import <CoreImage/CoreImage.h>
+#import <QMUIKit/QMUIKit.h>
 
 #define kAddFriendGreen    [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0] // #285D4B
 #define kAddFriendHeaderBg [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0] // #0D2122
@@ -172,12 +175,13 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 }
 @end
 
-@interface ScanAddFriendViewController : UIViewController <AVCaptureMetadataOutputObjectsDelegate>
+@interface ScanAddFriendViewController : UIViewController <AVCaptureMetadataOutputObjectsDelegate, PHPickerViewControllerDelegate>
 @property (nonatomic, copy) void (^onScanned)(NSString *content);
 @property (nonatomic, strong) AVCaptureSession *captureSession;
 @property (nonatomic, strong) AVCaptureVideoPreviewLayer *previewLayer;
 @property (nonatomic, assign) BOOL didHandleResult;
 @property (nonatomic, strong) dispatch_queue_t sessionQueue;
+@property (nonatomic, strong) UIButton *albumBtn;
 @end
 
 @implementation ScanAddFriendViewController
@@ -208,9 +212,47 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
     tip.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     tip.text = NSLocalizedString(@"community_scan_add_friend_subtitle", nil);
     [self.view addSubview:tip];
+    // 右下角：从手机相册选择二维码图片
+    self.albumBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.albumBtn.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.18];
+    self.albumBtn.layer.cornerRadius = 22;
+    self.albumBtn.clipsToBounds = YES;
+    if (@available(iOS 13.0, *)) {
+        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:18 weight:UIImageSymbolWeightMedium];
+        UIImage *albumIcon = [UIImage systemImageNamed:@"photo.on.rectangle" withConfiguration:cfg];
+        [self.albumBtn setImage:[albumIcon imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
+        self.albumBtn.tintColor = [UIColor whiteColor];
+    } else {
+        [self.albumBtn setTitle:NSLocalizedString(@"community_scan_album", @"相册") forState:UIControlStateNormal];
+        [self.albumBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        self.albumBtn.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    }
+    self.albumBtn.accessibilityLabel = NSLocalizedString(@"community_scan_album", @"相册");
+    [self.albumBtn addTarget:self action:@selector(onAlbumTapped) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.albumBtn];
+
+    UILabel *albumLabel = [UILabel new];
+    albumLabel.text = NSLocalizedString(@"community_scan_album", @"相册");
+    albumLabel.textColor = [UIColor whiteColor];
+    albumLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
+    albumLabel.textAlignment = NSTextAlignmentCenter;
+    [self.view addSubview:albumLabel];
+    [albumLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.trailing.equalTo(self.view).offset(-16);
+        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-12);
+        make.width.mas_greaterThanOrEqualTo(44);
+    }];
+    [self.albumBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(albumLabel);
+        make.bottom.equalTo(albumLabel.mas_top).offset(-4);
+        make.size.mas_equalTo(CGSizeMake(44, 44));
+    }];
+
     [tip mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self.view);
-        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-36);
+        make.centerY.equalTo(self.albumBtn);
+        make.leading.greaterThanOrEqualTo(self.view).offset(24);
+        make.trailing.lessThanOrEqualTo(self.albumBtn.mas_leading).offset(-12);
     }];
 
     UIView *focus = [UIView new];
@@ -243,6 +285,113 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 
 - (void)onBack {
     [self.navigationController popViewControllerAnimated:YES];
+}
+
+- (void)onAlbumTapped {
+    if (self.didHandleResult) return;
+    [self stopCaptureSessionIfNeeded];
+
+    PHPickerConfiguration *config = [[PHPickerConfiguration alloc] init];
+    config.filter = [PHPickerFilter imagesFilter];
+    config.selectionLimit = 1;
+    PHPickerViewController *picker = [[PHPickerViewController alloc] initWithConfiguration:config];
+    picker.delegate = self;
+    picker.modalPresentationStyle = UIModalPresentationPageSheet;
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)picker:(PHPickerViewController *)picker didFinishPicking:(NSArray<PHPickerResult *> *)results API_AVAILABLE(ios(14)) {
+    [picker dismissViewControllerAnimated:YES completion:^{
+        PHPickerResult *result = results.firstObject;
+        if (!result) {
+            [self startCaptureSessionIfNeeded];
+            return;
+        }
+        if (![result.itemProvider canLoadObjectOfClass:UIImage.class]) {
+            [self startCaptureSessionIfNeeded];
+            [QMUITips showError:NSLocalizedString(@"community_scan_album_invalid", @"无法读取该图片") inView:self.view hideAfterDelay:1.5];
+            return;
+        }
+        __weak typeof(self) weakSelf = self;
+        [result.itemProvider loadObjectOfClass:UIImage.class completionHandler:^(__kindof id<NSItemProviderReading>  _Nullable object, NSError * _Nullable error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                __strong typeof(weakSelf) self = weakSelf;
+                if (!self) return;
+                UIImage *image = [object isKindOfClass:UIImage.class] ? (UIImage *)object : nil;
+                if (!image || error) {
+                    [self startCaptureSessionIfNeeded];
+                    [QMUITips showError:NSLocalizedString(@"community_scan_album_invalid", @"无法读取该图片") inView:self.view hideAfterDelay:1.5];
+                    return;
+                }
+                [self handlePickedAlbumImage:image];
+            });
+        }];
+    }];
+}
+
+- (void)handlePickedAlbumImage:(UIImage *)image {
+    NSString *content = [self qrContentFromImage:image];
+    if (content.length == 0) {
+        [self startCaptureSessionIfNeeded];
+        [QMUITips showInfo:NSLocalizedString(@"community_scan_album_no_qr", @"未识别到二维码，请重试") inView:self.view hideAfterDelay:1.8];
+        return;
+    }
+    [self finishWithScannedContent:content];
+}
+
+- (nullable NSString *)qrContentFromImage:(UIImage *)image {
+    return [self qrContentFromImage:image allowDownscale:YES];
+}
+
+- (nullable NSString *)qrContentFromImage:(UIImage *)image allowDownscale:(BOOL)allowDownscale {
+    if (!image) return nil;
+    CIImage *ciImage = [[CIImage alloc] initWithImage:image];
+    if (!ciImage) {
+        CGImageRef cg = image.CGImage;
+        if (!cg) return nil;
+        ciImage = [CIImage imageWithCGImage:cg];
+    }
+    if (!ciImage) return nil;
+
+    CIDetector *detector = [CIDetector detectorOfType:CIDetectorTypeQRCode
+                                              context:nil
+                                              options:@{ CIDetectorAccuracy: CIDetectorAccuracyHigh }];
+    NSArray<CIFeature *> *features = [detector featuresInImage:ciImage];
+    for (CIFeature *feature in features) {
+        if ([feature isKindOfClass:CIQRCodeFeature.class]) {
+            NSString *msg = [(CIQRCodeFeature *)feature messageString];
+            if (msg.length > 0) return msg;
+        }
+    }
+
+    // 高分辨率图偶发识别失败：缩小后再试一次
+    if (allowDownscale) {
+        CGFloat maxSide = MAX(image.size.width * image.scale, image.size.height * image.scale);
+        if (maxSide > 1200) {
+            CGFloat scale = 1200.0 / maxSide;
+            CGSize size = CGSizeMake(image.size.width * image.scale * scale, image.size.height * image.scale * scale);
+            UIGraphicsBeginImageContextWithOptions(size, YES, 1.0);
+            [image drawInRect:CGRectMake(0, 0, size.width, size.height)];
+            UIImage *scaled = UIGraphicsGetImageFromCurrentImageContext();
+            UIGraphicsEndImageContext();
+            if (scaled) {
+                return [self qrContentFromImage:scaled allowDownscale:NO];
+            }
+        }
+    }
+    return nil;
+}
+
+- (void)finishWithScannedContent:(NSString *)content {
+    if (self.didHandleResult || content.length == 0) return;
+    self.didHandleResult = YES;
+    [self stopCaptureSessionIfNeeded];
+    [self.navigationController popViewControllerAnimated:YES];
+    if (self.onScanned) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            self.onScanned(content);
+        });
+    }
 }
 
 - (void)ensureCameraPermissionAndStart {
@@ -321,14 +470,7 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
     if (![obj isKindOfClass:AVMetadataMachineReadableCodeObject.class]) return;
     NSString *content = obj.stringValue ?: @"";
     if (content.length == 0) return;
-    self.didHandleResult = YES;
-    [self stopCaptureSessionIfNeeded];
-    [self.navigationController popViewControllerAnimated:YES];
-    if (self.onScanned) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            self.onScanned(content);
-        });
-    }
+    [self finishWithScannedContent:content];
 }
 
 - (void)startCaptureSessionIfNeeded {

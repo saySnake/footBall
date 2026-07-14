@@ -285,8 +285,8 @@ static UIColor * SettingsPageBackgroundColor(void) {
 
 - (void)onClearData {
     PNCommonAlertViewController *alert = [PNCommonAlertViewController new];
-    alert.alertTitle = NSLocalizedString(@"settings_clear_data", nil);
-    alert.message = NSLocalizedString(@"settings_clear_data_confirm", @"确认清除所有缓存数据？");
+    alert.alertTitle = NSLocalizedString(@"settings_alert_title", @"提示");
+    alert.message = NSLocalizedString(@"settings_clear_data_confirm", @"确认清除后将立即\n清除缓存");
     alert.cancelTitle = NSLocalizedString(@"cancel", nil);
     alert.confirmTitle = NSLocalizedString(@"confirm", nil);
     __weak typeof(self) weakSelf = self;

@@ -153,4 +153,66 @@ static char kRetryCountKey;
            self.businessCode == 401;
 }
 
++ (NSString *)normalizedBusinessCode:(NSString *)businessCode {
+    if (![businessCode isKindOfClass:NSString.class] || businessCode.length == 0) {
+        return @"";
+    }
+    NSString *trimmed = [[businessCode stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] uppercaseString];
+    // 文档示例可能写成 70022 / 070022，后端实际为 140022
+    if ([trimmed hasPrefix:@"0"] && trimmed.length > 1) {
+        // 保留完整前导零版本用于查表；同时返回去掉前导零的变体在查表侧覆盖
+    }
+    return trimmed;
+}
+
++ (nullable NSString *)localizedMessageForBusinessCode:(nullable NSString *)businessCode
+                                             fallback:(nullable NSString *)fallback {
+    NSString *code = [self normalizedBusinessCode:businessCode];
+    if (code.length == 0) {
+        return fallback;
+    }
+    // 去掉前导零后再匹配一次（70022 ↔ 070022）
+    NSString *stripped = [code stringByReplacingOccurrencesOfString:@"^0+" withString:@"" options:NSRegularExpressionSearch range:NSMakeRange(0, code.length)];
+
+    static NSDictionary<NSString *, NSString *> *kInviteCodeMessages;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        // 以后端 fc-mono ErrorCode 1400xx 为准；同时兼容文档中的 0700xx / 70022 写法
+        kInviteCodeMessages = @{
+            @"140022": @"该邀请码已被禁用",
+            @"140023": @"该邀请码已过期",
+            @"140024": @"该邀请码使用次数已达上限",
+            @"140025": @"该邀请码配置异常，请联系客服",
+            @"140026": @"该邀请码仅限测试用户使用",
+            @"070022": @"该邀请码已被禁用",
+            @"070023": @"该邀请码已过期",
+            @"070024": @"该邀请码使用次数已达上限",
+            @"070025": @"该邀请码配置异常，请联系客服",
+            @"070026": @"该邀请码仅限测试用户使用",
+            @"70022": @"该邀请码已被禁用",
+            @"70023": @"该邀请码已过期",
+            @"70024": @"该邀请码使用次数已达上限",
+            @"70025": @"该邀请码配置异常，请联系客服",
+            @"70026": @"该邀请码仅限测试用户使用",
+        };
+    });
+
+    NSString *mapped = kInviteCodeMessages[code] ?: kInviteCodeMessages[stripped];
+    return mapped.length > 0 ? mapped : fallback;
+}
+
+- (NSString *)displayMessageWithFallback:(nullable NSString *)fallback {
+    NSString *mapped = [APIError localizedMessageForBusinessCode:self.businessCode fallback:nil];
+    if (mapped.length > 0) {
+        return mapped;
+    }
+    if (self.businessMessage.length > 0) {
+        return self.businessMessage;
+    }
+    if (self.localizedDescription.length > 0) {
+        return self.localizedDescription;
+    }
+    return fallback ?: @"请求失败";
+}
+
 @end

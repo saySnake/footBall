@@ -210,7 +210,7 @@ FOUNDATION_EXPORT NSString * const APIPathValueCommunityFriendData(NSString *fri
 FOUNDATION_EXPORT NSString * const APIPathValueMembershipPlans;
 /// Apple IAP收据验证并激活会员
 FOUNDATION_EXPORT NSString * const APIPathValueMembershipPurchase;
-/// 兑换码/礼包码兑换
+/// 兑换码/礼包码/邀请码兑换
 FOUNDATION_EXPORT NSString * const APIPathValueMembershipRedeem;
 /// 获取当前用户会员状态
 FOUNDATION_EXPORT NSString * const APIPathValueMembershipStatus;
