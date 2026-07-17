@@ -148,28 +148,23 @@ NSString * const APIPathValueMatchVerify(NSString *matchId) {
 #pragma mark - 邮票模块
 NSString * const APIPathValueStampsList = @"/api/v1/stamps/list";
 NSString * const APIPathValueStampsSelectable = @"/api/v1/stamps/selectable";
-FOUNDATION_EXPORT NSString * const APIPathValueAddStamps(NSString *stampId) {
-    return [NSString stringWithFormat:@"/api/v1/stamps/%@",stampId];
+NSString * APIPathValueStampsCategoryAll(NSString *categoryId) {
+    return [NSString stringWithFormat:@"/api/v1/stamps/categories/%@/stamps", categoryId];
 }
-NSString * const APIPathValueUpdateStamps(NSString *stampId) {
-    return [NSString stringWithFormat:@"/api/v1/stamps/%@",stampId];
+NSString * APIPathValueStampDetail(NSString *stampId) {
+    return [NSString stringWithFormat:@"/api/v1/stamps/%@/detail", stampId];
 }
-NSString * const APIPathValueDeleteStamps(NSString *stampId) {
-    return [NSString stringWithFormat:@"/api/v1/stamps/%@",stampId];
+NSString * APIPathValueStampShow(NSString *stampId) {
+    return [NSString stringWithFormat:@"/api/v1/stamps/%@/show", stampId];
 }
-NSString * const APIPathValueStampsCategories = @"/api/v1/stamps/my-stamps";
-NSString * const APIPathValueStampsCategoryAll(NSString *categoryId) {
-    return [NSString stringWithFormat:@"/api/v1/stamps/categories/%@/stamps",categoryId];
+NSString * APIPathValueStampHide(NSString *stampId) {
+    return [NSString stringWithFormat:@"/api/v1/stamps/%@/hide", stampId];
 }
-NSString * const APIPathValueStampDetail(NSString *stampId) {
-    return [NSString stringWithFormat:@"/api/v1/stamps/%@/detail",stampId];
+NSString * APIPathValueStampReplace(NSString *stampId) {
+    return [NSString stringWithFormat:@"/api/v1/stamps/%@/replace", stampId];
 }
-NSString * const APIPathValueStampsQuota = @"/api/v1/stamps/quota";
-NSString * const APIPathValueStampsSelect(NSString *stampId) {
-    return [NSString stringWithFormat:@"/api/v1/stamps/select/%@",stampId];
-}
-NSString * const APIPathValueStampPosition(NSString *stampId) {
-    return [NSString stringWithFormat:@"/api/v1/stamps/%@/position",stampId];
+NSString * APIPathValueStampPosition(NSString *stampId) {
+    return [NSString stringWithFormat:@"/api/v1/stamps/%@/position", stampId];
 }
 
 #pragma mark - 关注模块

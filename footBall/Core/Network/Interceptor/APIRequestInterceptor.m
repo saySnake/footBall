@@ -165,7 +165,8 @@
             NSLog(@"✅ [API Request] token重复刷新，等待刷新完成");
         }
         return nil;
-    } else {
+    } else
+    {
         // 若上游已构造好业务错误，直接透传，避免丢失 businessCode / businessMessage。
         APIError *apiError = [error isKindOfClass:APIError.class] ? (APIError *)error : [APIError errorFromNSError:error];
         

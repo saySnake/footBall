@@ -130,28 +130,22 @@ FOUNDATION_EXPORT NSString * const APIPathValueMatchInteractionsView(NSString *m
 FOUNDATION_EXPORT NSString * const APIPathValueMatchVerify(NSString *matchId);
 
 #pragma mark - 邮票模块
-/// 邮票主页
+/// 主页已展示邮票列表
 FOUNDATION_EXPORT NSString * const APIPathValueStampsList;
-/// 可选择邮票（按分类分组）
+/// 我的邮票仓库（按分类分组，仅已拥有）
 FOUNDATION_EXPORT NSString * const APIPathValueStampsSelectable;
-/// POST 添加主页邮票
-FOUNDATION_EXPORT NSString * const APIPathValueAddStamps(NSString *stampId);
-/// PUT 更新主页邮票
-FOUNDATION_EXPORT NSString * const APIPathValueUpdateStamps(NSString *stampId);
-/// DELETE 删除主页邮票
-FOUNDATION_EXPORT NSString * const APIPathValueDeleteStamps(NSString *stampId);
-/// 获取邮票动态分类列表
-FOUNDATION_EXPORT NSString * const APIPathValueStampsCategories;
 /// 查看指定分类全部邮票（网格布局）
-FOUNDATION_EXPORT NSString * const APIPathValueStampsCategoryAll(NSString *categoryId);
-/// 获取邮票详情（图片、描述、获取日期、解锁条件、稀有度）
-FOUNDATION_EXPORT NSString * const APIPathValueStampDetail(NSString *stampId);
-/// 获取邮票配额信息（已认证场次、已选邮票数、是否可添加、会员状态）
-FOUNDATION_EXPORT NSString * const APIPathValueStampsQuota;
-/// POST 用户选择添加邮票
-FOUNDATION_EXPORT NSString * const APIPathValueStampsSelect(NSString *stampId);
-/// PUT 更新邮票位置
-FOUNDATION_EXPORT NSString * const APIPathValueStampPosition(NSString *stampId);
+FOUNDATION_EXPORT NSString * APIPathValueStampsCategoryAll(NSString *categoryId);
+/// 获取邮票详情（查看后清除 isNew）
+FOUNDATION_EXPORT NSString * APIPathValueStampDetail(NSString *stampId);
+/// POST 展示邮票到主页
+FOUNDATION_EXPORT NSString * APIPathValueStampShow(NSString *stampId);
+/// POST 从主页隐藏邮票
+FOUNDATION_EXPORT NSString * APIPathValueStampHide(NSString *stampId);
+/// POST 更换主页展示邮票
+FOUNDATION_EXPORT NSString * APIPathValueStampReplace(NSString *stampId);
+/// POST 更新展示位置
+FOUNDATION_EXPORT NSString * APIPathValueStampPosition(NSString *stampId);
 #pragma mark - 关注模块
 /// POST关注用户 / DELETE取消关注用户
 FOUNDATION_EXPORT NSString * const APIPathValueFollowsUser(NSString *userId);

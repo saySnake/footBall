@@ -21,6 +21,9 @@ static const CGFloat kStampFilterRowHeight = 40;
 /// 分类标题与上一 section 网格底部、下一 section 网格顶部的间距（各 15pt）
 static const CGFloat kStampAlbumSectionTitleTopGap = 15;
 static const CGFloat kStampAlbumSectionTitleBottomGap = 15;
+/// 每组固定十宫格：5 列 × 2 行，单格边长 = 网格宽度 / 5
+static const NSInteger kStampAlbumGridColumns = 5;
+static const NSInteger kStampAlbumGridCount = 10;
 
 static CGFloat StampAlbumSectionHeaderHeight(void) {
     UIFont *titleFont = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
@@ -81,6 +84,8 @@ static NSString *StampAlbumNormalizedCategoryTitle(NSString *rawTitle, NSInteger
         flow.sectionInset = UIEdgeInsetsZero;
         _collectionView = [[UICollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:flow];
         _collectionView.backgroundColor = [UIColor whiteColor];
+        _collectionView.layer.borderWidth = 0.5;
+        _collectionView.layer.borderColor = [UIColor colorWithWhite:0.88 alpha:1.0].CGColor;
         _collectionView.dataSource = self;
         _collectionView.delegate = self;
         _collectionView.scrollEnabled = NO;
@@ -100,12 +105,22 @@ static NSString *StampAlbumNormalizedCategoryTitle(NSString *rawTitle, NSInteger
 }
 
 - (void)configureWithItems:(NSArray<PNStampAlbumItem *> *)items tableWidth:(CGFloat)tableWidth {
-    self.items = items ?: @[];
+    NSMutableArray<PNStampAlbumItem *> *display = [NSMutableArray arrayWithCapacity:kStampAlbumGridCount];
+    NSArray<PNStampAlbumItem *> *src = items ?: @[];
+    NSInteger take = MIN((NSInteger)src.count, kStampAlbumGridCount);
+    for (NSInteger i = 0; i < take; i++) {
+        [display addObject:src[i]];
+    }
+    while ((NSInteger)display.count < kStampAlbumGridCount) {
+        PNStampAlbumItem *pad = [[PNStampAlbumItem alloc] init];
+        pad.stampId = @"";
+        [display addObject:pad];
+    }
+    self.items = [display copy];
     CGFloat inner = MAX(0, tableWidth - 32);
-    self.itemSide = inner > 0 ? floor(inner / 5.0) : 0;
-    NSInteger n = self.items.count;
-    NSInteger rows = n > 0 ? (n + 4) / 5 : 0;
-    CGFloat h = rows * self.itemSide + MAX(0, rows - 1) * 0.5;
+    self.itemSide = inner > 0 ? floor(inner / (CGFloat)kStampAlbumGridColumns) : 0;
+    NSInteger rows = kStampAlbumGridCount / kStampAlbumGridColumns;
+    CGFloat h = rows * self.itemSide;
     [_collectionView mas_updateConstraints:^(MASConstraintMaker *make) {
         make.height.mas_equalTo(h);
     }];
@@ -114,12 +129,13 @@ static NSString *StampAlbumNormalizedCategoryTitle(NSString *rawTitle, NSInteger
 }
 
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
-    return self.items.count;
+    return kStampAlbumGridCount;
 }
 
 - (__kindof UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
     StampAlbumStampCell *c = [collectionView dequeueReusableCellWithReuseIdentifier:@"StampAlbumStampCell" forIndexPath:indexPath];
-    [c configureWithStampItem:self.items[indexPath.item] indexPath:indexPath totalCount:self.items.count columnCount:5];
+    PNStampAlbumItem *item = (indexPath.item < (NSInteger)self.items.count) ? self.items[indexPath.item] : nil;
+    [c configureWithStampItem:item indexPath:indexPath totalCount:kStampAlbumGridCount columnCount:kStampAlbumGridColumns];
     return c;
 }
 
@@ -128,6 +144,9 @@ static NSString *StampAlbumNormalizedCategoryTitle(NSString *rawTitle, NSInteger
         return;
     }
     PNStampAlbumItem *it = self.items[indexPath.item];
+    if (![it.stampId isKindOfClass:NSString.class] || it.stampId.length == 0) {
+        return;
+    }
     if (self.onSelectItem) {
         self.onSelectItem(it);
     }

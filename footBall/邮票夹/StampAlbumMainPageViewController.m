@@ -17,6 +17,8 @@
 #import "StampAlbumCategoryViewController.h"
 #import "StampUnlockPopupViewController.h"
 #import "MembershipCenterViewController.h"
+#import "MembershipRequest.h"
+#import "MembershipModels.h"
 #import "CommunityRequest.h"
 #import "PNMatchInfoInputViewController.h"
 #import "TeamsRequest.h"
@@ -45,7 +47,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     PassportStampGridItemViewStateAdd,//添加
     PassportStampGridItemViewStateUnlock,//解锁
     PassportStampGridItemViewStateUpdate,//更换
-    PassportStampGridItemViewStateDelete,//长按等待删除
+    PassportStampGridItemViewStateDelete,//长按等待隐藏
     PassportStampGridItemViewStateViewOnly,//他人主页只读
 };
 @interface PassportStampGridItemView : UIButton
@@ -124,7 +126,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 @property (nonatomic, copy) void (^onClickUnLock)(NSInteger index,PassportStampGridItem *item);
 //更新
 @property (nonatomic, copy) void (^onClickStamp)(NSInteger index,PassportStampGridItem *item);
-//删除
+//隐藏（从主页移除展示）
 @property (nonatomic, copy) void (^onClickDelete)(NSInteger index,PassportStampGridItem *item);
 @property (nonatomic, assign) BOOL viewOnly;
 
@@ -448,10 +450,8 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) PassportHeader2Card *headerCard;
 @property (nonatomic, strong) NSArray <PassportStampSheetCardItem *> *items;
-/// 邮票配额（仅自己护照页使用）
+/// 会员状态（控制非免费格是否可展示）
 @property (nonatomic, assign) BOOL stampIsMember;
-@property (nonatomic, assign) NSInteger stampFreeQuota;
-@property (nonatomic, assign) NSInteger stampMaxCount;
 
 @end
 
@@ -473,7 +473,6 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     if (self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil]) {
         NSCalendar *cal = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
         _year = [cal component:NSCalendarUnitYear fromDate:[NSDate date]];
-        _stampFreeQuota = STAMP_ITEAM_FREE;
     }
     return self;
 }
@@ -481,14 +480,13 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     if (self = [super init]) {
         _viewModel = viewModel;
         _year = year;
-        _stampFreeQuota = STAMP_ITEAM_FREE;
     }
     return self;
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    // 从会员中心等页面返回时刷新配额与锁状态（首次 push 时 isMovingToParentViewController 为 YES，跳过避免重复请求）
+    // 从会员中心等页面返回时刷新展示位与锁状态（首次 push 时 isMovingToParentViewController 为 YES，跳过避免重复请求）
     if (!self.isMovingToParentViewController && self.targetUserId.length == 0) {
         [self loadStampCollection];
         [self loadPassportDataForceRefresh:NO];
@@ -519,15 +517,8 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     return self.stampIsMember;
 }
 
-- (void)applyStampQuota:(PNStampQuota *)quota {
-    if (!quota) {
-        return;
-    }
-    self.stampIsMember = quota.isMember;
-    if (quota.freeQuota > 0) {
-        self.stampFreeQuota = quota.freeQuota;
-    }
-    self.stampMaxCount = quota.maxStampCount;
+- (void)applyMembershipStatus:(PNMembershipStatus *)status {
+    self.stampIsMember = status.isMember;
 }
 
 - (void)setupRefresh {
@@ -646,10 +637,10 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         album.didSelected = ^(PNStampAlbumItem * _Nonnull stamp) {
             //header只有一组,坐标分组从1开始
             NSString *position = [NSString stringWithFormat:@"1,%ld",index];
-            [StampRequest.shared addStamp:stamp.stampId position:position success:^(HTTPResponse * _Nullable responseObject) {
+            [StampRequest.shared showStamp:stamp.stampId position:position success:^(HTTPResponse * _Nullable responseObject) {
                 [weakSelf loadStampCollection];
             } failure:^(NSError * _Nonnull error) {
-                [QMUITips showError:error.localizedDescription];
+                [QMUITips showError:[weakSelf stampErrorMessage:error]];
             }];
         };
         [weakSelf.navigationController pushViewController:album animated:YES];
@@ -657,10 +648,10 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     header.bottomGridView.onClickStamp = ^(NSInteger index, PassportStampGridItem *item) {
         StampAlbumCategoryViewController *album = StampAlbumCategoryViewController.alloc.init;
         album.didSelected = ^(PNStampAlbumItem * _Nonnull stamp) {
-            [StampRequest.shared updateOldStamp:item.stamp.stampId newStamp:stamp.stampId success:^(HTTPResponse * _Nullable responseObject) {
+            [StampRequest.shared replaceStamp:item.stamp.stampId newStampId:stamp.stampId success:^(HTTPResponse * _Nullable responseObject) {
                 [weakSelf loadStampCollection];
             } failure:^(NSError * _Nonnull error) {
-                [QMUITips showError:error.localizedDescription];
+                [QMUITips showError:[weakSelf stampErrorMessage:error]];
             }];
         };
         [weakSelf.navigationController pushViewController:album animated:YES];
@@ -669,11 +660,11 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         [weakSelf presentStampUnlockDialog];
     };
     header.bottomGridView.onClickDelete = ^(NSInteger index, PassportStampGridItem *item) {
-        // 删除
-        [StampRequest.shared deleteStamp:item.stamp.stampId success:^(HTTPResponse * _Nullable responseObject) {
+        // 隐藏（保留拥有关系）
+        [StampRequest.shared hideStamp:item.stamp.stampId success:^(HTTPResponse * _Nullable responseObject) {
             [weakSelf loadStampCollection];
         } failure:^(NSError * _Nonnull error) {
-            [QMUITips showError:error.localizedDescription];
+            [QMUITips showError:[weakSelf stampErrorMessage:error]];
         }];
     };
     }
@@ -767,13 +758,16 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     }
 
     __block NSArray<PNStampAlbumItem *> *stamps = @[];
-    __block PNStampQuota *quota = nil;
+    __block PNMembershipStatus *memberStatus = nil;
     dispatch_group_t group = dispatch_group_create();
 
     dispatch_group_enter(group);
-    [StampRequest.shared getStampQuotaSuccess:^(HTTPResponse * _Nullable responseObject) {
-        if ([responseObject.dataObject isKindOfClass:PNStampQuota.class]) {
-            quota = (PNStampQuota *)responseObject.dataObject;
+    [MembershipRequest.shared getMembershipStatusSuccess:^(HTTPResponse * _Nullable responseObject) {
+        id raw = responseObject.dataObject ?: responseObject.data;
+        if ([raw isKindOfClass:PNMembershipStatus.class]) {
+            memberStatus = (PNMembershipStatus *)raw;
+        } else {
+            memberStatus = [PNMembershipStatus yy_modelWithJSON:raw];
         }
         dispatch_group_leave(group);
     } failure:^(NSError * _Nonnull error) {
@@ -791,7 +785,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     }];
 
     dispatch_group_notify(group, dispatch_get_main_queue(), ^{
-        [weakSelf applyStampQuota:quota];
+        [weakSelf applyMembershipStatus:memberStatus];
         [weakSelf reloadStamps:stamps];
         [weakSelf.tableView.mj_header endRefreshing];
     });
@@ -873,10 +867,10 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
             // NSInteger section = row * 2 + 2 + (0 or 1) 坐标分组从1开始
             NSInteger section = indexPath.row*2 + 2;
             NSString *position = [NSString stringWithFormat:@"%ld,%ld",section,index];
-            [StampRequest.shared addStamp:stamp.stampId position:position success:^(HTTPResponse * _Nullable responseObject) {
+            [StampRequest.shared showStamp:stamp.stampId position:position success:^(HTTPResponse * _Nullable responseObject) {
                 [weakSelf loadStampCollection];
             } failure:^(NSError * _Nonnull error) {
-                [QMUITips showError:error.localizedDescription];
+                [QMUITips showError:[weakSelf stampErrorMessage:error]];
             }];
         };
         [weakSelf.navigationController pushViewController:album animated:YES];
@@ -889,10 +883,10 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
             if (oldId.length == 0 || newId.length == 0) {
                 return;
             }
-            [StampRequest.shared updateOldStamp:oldId newStamp:newId success:^(HTTPResponse * _Nullable responseObject) {
+            [StampRequest.shared replaceStamp:oldId newStampId:newId success:^(HTTPResponse * _Nullable responseObject) {
                 [weakSelf loadStampCollection];
             } failure:^(NSError * _Nonnull error) {
-                [QMUITips showError:error.localizedDescription];
+                [QMUITips showError:[weakSelf stampErrorMessage:error]];
             }];
         };
         [weakSelf.navigationController pushViewController:album animated:YES];
@@ -905,10 +899,10 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         if (sid.length == 0) {
             return;
         }
-        [StampRequest.shared deleteStamp:sid success:^(HTTPResponse * _Nullable responseObject) {
+        [StampRequest.shared hideStamp:sid success:^(HTTPResponse * _Nullable responseObject) {
             [weakSelf loadStampCollection];
         } failure:^(NSError * _Nonnull error) {
-            [QMUITips showError:error.localizedDescription];
+            [QMUITips showError:[weakSelf stampErrorMessage:error]];
         }];
     };
     c.bottomGridView.onClickAdd = ^(NSInteger index, PassportStampGridItem *item) {
@@ -917,10 +911,10 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
             // NSInteger section = row * 2 + 2 + (0 or 1) 坐标分组从1开始
             NSInteger section = indexPath.row*2 + 2 + 1;
             NSString *position = [NSString stringWithFormat:@"%ld,%ld",section,index];
-            [StampRequest.shared addStamp:stamp.stampId position:position success:^(HTTPResponse * _Nullable responseObject) {
+            [StampRequest.shared showStamp:stamp.stampId position:position success:^(HTTPResponse * _Nullable responseObject) {
                 [weakSelf loadStampCollection];
             } failure:^(NSError * _Nonnull error) {
-                [QMUITips showError:error.localizedDescription];
+                [QMUITips showError:[weakSelf stampErrorMessage:error]];
             }];
         };
         [weakSelf.navigationController pushViewController:album animated:YES];
@@ -933,10 +927,10 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
             if (oldId.length == 0 || newId.length == 0) {
                 return;
             }
-            [StampRequest.shared updateOldStamp:oldId newStamp:newId success:^(HTTPResponse * _Nullable responseObject) {
+            [StampRequest.shared replaceStamp:oldId newStampId:newId success:^(HTTPResponse * _Nullable responseObject) {
                 [weakSelf loadStampCollection];
             } failure:^(NSError * _Nonnull error) {
-                [QMUITips showError:error.localizedDescription];
+                [QMUITips showError:[weakSelf stampErrorMessage:error]];
             }];
         };
         [weakSelf.navigationController pushViewController:album animated:YES];
@@ -949,10 +943,10 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         if (sid.length == 0) {
             return;
         }
-        [StampRequest.shared deleteStamp:sid success:^(HTTPResponse * _Nullable responseObject) {
+        [StampRequest.shared hideStamp:sid success:^(HTTPResponse * _Nullable responseObject) {
             [weakSelf loadStampCollection];
         } failure:^(NSError * _Nonnull error) {
-            [QMUITips showError:error.localizedDescription];
+            [QMUITips showError:[weakSelf stampErrorMessage:error]];
         }];
     };
     } else {
@@ -981,6 +975,13 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     } else {
         _titleLabel.text = NSLocalizedString(@"passport_nav_title", nil) ?: @"我的护照";
     }
+}
+
+- (NSString *)stampErrorMessage:(NSError *)error {
+    if ([error isKindOfClass:APIError.class]) {
+        return [(APIError *)error displayMessageWithFallback:error.localizedDescription ?: @"操作失败"];
+    }
+    return error.localizedDescription.length > 0 ? error.localizedDescription : @"操作失败";
 }
 
 - (void)dealloc {

@@ -100,7 +100,7 @@
 
         // 测试环境 1
         [[BVAPPEnvironmentHostItemModel alloc] initWithProduct:2
-                                                        domain:@"112.126.56.42"
+                                                        domain:@"112.126.56.42:8443"
                                                      domainUrl:@""
                                                      apiPrefix:@""
                                                    displayName:@"test1"
@@ -109,7 +109,7 @@
                         
         // 生产环境 - TF签和appstore
         [[BVAPPEnvironmentHostItemModel alloc] initWithProduct:1 
-                                                        domain:@"112.126.56.42"
+                                                        domain:@"112.126.56.42:8443"
                                                      domainUrl:@""
                                                      apiPrefix:@"" 
                                                    displayName:@"appstore"
