@@ -193,7 +193,7 @@ static UIColor *PNFigmaSocialCircleBG(void) {
     [self.agreeCheckButton setImage:checkOn forState:UIControlStateSelected];
     [self.agreeCheckButton setImage:checkOff forState:UIControlStateNormal];
     self.agreeCheckButton.tintColor = PNFigmaGreen();
-    self.agreeCheckButton.selected = YES;
+    self.agreeCheckButton.selected = NO;
     [self.agreeCheckButton addTarget:self action:@selector(toggleAgree) forControlEvents:UIControlEventTouchUpInside];
     
     self.agreementPrefixLabel = [[UILabel alloc] init];
