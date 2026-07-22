@@ -52,9 +52,9 @@ static const CGFloat kStampAlbumGridBorderWidth = 0.5;
         outer = 2;
     }
     _circleView.layer.cornerRadius = outer * 0.5;
-    _circleView.frame = CGRectMake((w - outer) * 0.5, (h - outer) * 0.5, outer, outer);
+    _circleView.frame = CGRectMake((w - outer) * 0.5, (h - outer) * 0.5, outer-4, outer-4);
     // 略小于外圆，露出边框（与宫格线同宽）
-    CGFloat iconD = MAX(0, outer - kStampAlbumGridBorderWidth * 2);
+    CGFloat iconD = MAX(0, outer - kStampAlbumGridBorderWidth * 2-6);
     _iconView.layer.cornerRadius = iconD * 0.5;
     _iconView.clipsToBounds = YES;
     _iconView.frame = CGRectMake((w - iconD) * 0.5, (h - iconD) * 0.5, iconD, iconD);

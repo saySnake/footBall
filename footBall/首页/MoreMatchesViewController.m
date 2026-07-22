@@ -44,7 +44,7 @@ static UIImage *kMoreMatchesCalendarBarIcon(void) {
     return nil;
 }
 
-/// 解析比赛时间字段（接口可能用多种字段名与格式，见 Match 的 matchDate 映射）。
+/// 解析比赛时间：无时区后缀按东八区（Asia/Shanghai）；展示侧再用系统时区。
 static NSDate *kMoreMatchesDateFromRawString(NSString *raw) {
     if (raw.length == 0) return nil;
     NSString *s = [raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
@@ -79,6 +79,7 @@ static NSDate *kMoreMatchesDateFromRawString(NSString *raw) {
         }
     }
 
+    // 带时区的 ISO（含 Z / 偏移）
     if (@available(iOS 11.0, *)) {
         NSISO8601DateFormatter *iso = [[NSISO8601DateFormatter alloc] init];
         iso.formatOptions = NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
@@ -91,20 +92,37 @@ static NSDate *kMoreMatchesDateFromRawString(NSString *raw) {
 
     NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
     fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    NSArray<NSString *> *formats = @[
+
+    NSArray<NSString *> *zonedFormats = @[
         @"yyyy-MM-dd'T'HH:mm:ssZ",
         @"yyyy-MM-dd'T'HH:mm:ss.SSSZ",
         @"yyyy-MM-dd'T'HH:mm:ssXXX",
         @"yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
         @"yyyy-MM-dd'T'HH:mm:ss'Z'",
         @"yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+    ];
+    for (NSString *f in zonedFormats) {
+        fmt.dateFormat = f;
+        fmt.timeZone = nil;
+        NSDate *d = [fmt dateFromString:s];
+        if (d) return d;
+    }
+
+    // 无时区墙钟：后端约定 UTC+8，如 2026-04-25T03:00:00
+    NSTimeZone *shanghai = [NSTimeZone timeZoneWithName:@"Asia/Shanghai"] ?: [NSTimeZone timeZoneForSecondsFromGMT:8 * 3600];
+    fmt.timeZone = shanghai;
+    NSArray<NSString *> *naiveFormats = @[
+        @"yyyy-MM-dd'T'HH:mm:ss.SSS",
+        @"yyyy-MM-dd'T'HH:mm:ss",
+        @"yyyy-MM-dd'T'HH:mm",
+        @"yyyy-MM-dd HH:mm:ss.SSS",
         @"yyyy-MM-dd HH:mm:ss",
         @"yyyy-MM-dd HH:mm",
         @"yyyy/MM/dd HH:mm:ss",
         @"yyyy/MM/dd HH:mm",
         @"yyyy-MM-dd",
     ];
-    for (NSString *f in formats) {
+    for (NSString *f in naiveFormats) {
         fmt.dateFormat = f;
         NSDate *d = [fmt dateFromString:s];
         if (d) return d;
@@ -619,6 +637,7 @@ static NSInteger const kMoreMatchesPageSize = 50;
     NSDate *date = kMoreMatchesDateFromRawString(matchDate);
     if (!date) return @"--:--";
     NSDateFormatter *output = [[NSDateFormatter alloc] init];
+    output.timeZone = [NSTimeZone localTimeZone];
     output.dateFormat = @"HH:mm";
     return [output stringFromDate:date];
 }

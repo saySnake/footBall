@@ -999,6 +999,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     NSDate *date = [self dateFromRaw:raw];
     if (!date) return @"--:--";
     NSDateFormatter *fmt = NSDateFormatter.new;
+    fmt.timeZone = [NSTimeZone localTimeZone];
     fmt.locale = [NSLocale currentLocale];
     [fmt setLocalizedDateFormatFromTemplate:@"Hm"];
     return [fmt stringFromDate:date];
@@ -1009,6 +1010,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     NSDate *date = [self dateFromRaw:raw];
     if (!date) return @"";
     NSDateFormatter *fmt = NSDateFormatter.new;
+    fmt.timeZone = [NSTimeZone localTimeZone];
     fmt.locale = [NSLocale currentLocale];
     [fmt setLocalizedDateFormatFromTemplate:@"EEE"];
     return [fmt stringFromDate:date];
@@ -1019,6 +1021,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     NSDate *date = [self dateFromRaw:raw];
     if (!date) return @"--";
     NSDateFormatter *fmt = NSDateFormatter.new;
+    fmt.timeZone = [NSTimeZone localTimeZone];
     fmt.locale = [NSLocale currentLocale];
     [fmt setLocalizedDateFormatFromTemplate:@"d MMM yy"];
     return [fmt stringFromDate:date];
@@ -1277,6 +1280,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     [self saveHomeOfflineCache];
 }
 
+/// 后端 matchDate 无时区后缀时按东八区（Asia/Shanghai）解析；展示再用系统时区。
 - (NSDate *)dateFromRaw:(NSString *)raw {
     if (raw.length == 0) return nil;
     NSString *s = [raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
@@ -1309,6 +1313,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
             return [NSDate dateWithTimeIntervalSince1970:v];
         }
     }
+    // 带时区的 ISO（含 Z / 偏移）
     if (@available(iOS 11.0, *)) {
         NSISO8601DateFormatter *iso = [[NSISO8601DateFormatter alloc] init];
         iso.formatOptions = NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
@@ -1318,22 +1323,41 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
         d = [iso dateFromString:s];
         if (d) return d;
     }
+
     NSDateFormatter *fmt = NSDateFormatter.new;
     fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    NSArray<NSString *> *formats = @[
+
+    // 显式带时区的格式
+    NSArray<NSString *> *zonedFormats = @[
         @"yyyy-MM-dd'T'HH:mm:ssZ",
         @"yyyy-MM-dd'T'HH:mm:ss.SSSZ",
         @"yyyy-MM-dd'T'HH:mm:ssXXX",
         @"yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
         @"yyyy-MM-dd'T'HH:mm:ss'Z'",
         @"yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+    ];
+    for (NSString *format in zonedFormats) {
+        fmt.dateFormat = format;
+        fmt.timeZone = nil;
+        NSDate *date = [fmt dateFromString:s];
+        if (date) return date;
+    }
+
+    // 无时区墙钟时间：后端约定为 UTC+8（如 2026-04-25T03:00:00）
+    NSTimeZone *shanghai = [NSTimeZone timeZoneWithName:@"Asia/Shanghai"] ?: [NSTimeZone timeZoneForSecondsFromGMT:8 * 3600];
+    fmt.timeZone = shanghai;
+    NSArray<NSString *> *naiveFormats = @[
+        @"yyyy-MM-dd'T'HH:mm:ss.SSS",
+        @"yyyy-MM-dd'T'HH:mm:ss",
+        @"yyyy-MM-dd'T'HH:mm",
+        @"yyyy-MM-dd HH:mm:ss.SSS",
         @"yyyy-MM-dd HH:mm:ss",
         @"yyyy-MM-dd HH:mm",
         @"yyyy/MM/dd HH:mm:ss",
         @"yyyy/MM/dd HH:mm",
         @"yyyy-MM-dd",
     ];
-    for (NSString *format in formats) {
+    for (NSString *format in naiveFormats) {
         fmt.dateFormat = format;
         NSDate *date = [fmt dateFromString:s];
         if (date) return date;
@@ -1345,6 +1369,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     NSDate *date = [self dateFromRaw:raw];
     if (!date) return @"-";
     NSDateFormatter *fmt = NSDateFormatter.new;
+    fmt.timeZone = [NSTimeZone localTimeZone];
     fmt.dateFormat = @"yyyy-MM";
     return [fmt stringFromDate:date];
 }
@@ -1353,6 +1378,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     NSDate *date = [self dateFromRaw:raw];
     if (!date) return @"--:--";
     NSDateFormatter *fmt = NSDateFormatter.new;
+    fmt.timeZone = [NSTimeZone localTimeZone];
     fmt.dateFormat = @"HH:mm";
     return [fmt stringFromDate:date];
 }
@@ -1361,6 +1387,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     NSDate *date = [self dateFromRaw:raw];
     if (!date) return @"--";
     NSDateFormatter *fmt = NSDateFormatter.new;
+    fmt.timeZone = [NSTimeZone localTimeZone];
     fmt.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"zh_CN"];
     fmt.dateFormat = @"yyyy年MM月dd日";
     return [fmt stringFromDate:date];
