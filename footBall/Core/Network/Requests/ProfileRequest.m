@@ -66,6 +66,34 @@
     }];
 }
 
+- (void)getPassportIconsForUserId:(NSString *)userId
+                          success:(APISuccessBlock)success
+                          failure:(APIFailureBlock)failure {
+    if (userId.length == 0) {
+        if (failure) failure([NSError errorWithDomain:@"ProfileRequestErrorDomain" code:-1 userInfo:@{ NSLocalizedDescriptionKey: @"用户ID不能为空" }]);
+        return;
+    }
+    [[APIManager sharedManager] GET:APIPathValuePassportIcons(userId) parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
+        if (responseObject.success) {
+            id raw = responseObject.data;
+            NSArray *list = nil;
+            if ([raw isKindOfClass:NSArray.class]) {
+                list = raw;
+            } else if ([raw isKindOfClass:NSDictionary.class]) {
+                id inner = ((NSDictionary *)raw)[@"list"] ?: ((NSDictionary *)raw)[@"items"] ?: ((NSDictionary *)raw)[@"data"];
+                if ([inner isKindOfClass:NSArray.class]) list = inner;
+            }
+            NSArray<PNPassportIconItem *> *icons = [NSArray yy_modelArrayWithClass:PNPassportIconItem.class json:list ?: @[]];
+            responseObject.dataObject = icons ?: @[];
+            if (success) success(responseObject);
+        } else {
+            if (failure) failure([APIError errorWithResponse:responseObject]);
+        }
+    } failure:^(NSError * _Nonnull error) {
+        if (failure) failure(error);
+    }];
+}
+
 - (void)getMyPassportMatchRecordsWithYear:(nullable NSString *)year
                                       tab:(nullable NSString *)tab
                                    status:(nullable NSString *)status

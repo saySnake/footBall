@@ -124,4 +124,14 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
+/// UserIconItemVO — 护照底部图标坑位（`GET /api/v1/passport/icons/{userId}`）
+@interface PNPassportIconItem : NSObject <YYModel>
+/// 坑位编号：1A~8A、1B~8B
+@property (nonatomic, copy) NSString *position;
+/// 已签名的图标 URL，空坑位为 nil
+@property (nonatomic, copy, nullable) NSString *iconUrl;
+/// 图标名称，空坑位为 nil
+@property (nonatomic, copy, nullable) NSString *iconName;
+@end
+
 NS_ASSUME_NONNULL_END

@@ -336,6 +336,7 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
         m.header2CityCount = 0;
         m.header2CountryCount = 0;
         m.header2FollowedTeamLogoURLs = @[];
+        m.header2IconItems = @[];
         return;
     }
 
@@ -364,6 +365,9 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
         }
     }
     m.header2FollowedTeamLogoURLs = [logos copy];
+    if (!m.header2IconItems) {
+        m.header2IconItems = @[];
+    }
 }
 
 /// 暗色统计卡四行：与 PassportDarkStatsCardCell 行序一致（总时长 / 赛季天数 / 周末工作日比 / 昼夜比）。

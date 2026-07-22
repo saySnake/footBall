@@ -190,6 +190,8 @@ FOUNDATION_EXPORT NSString * const APIPathValuePrivacySettings;
 FOUNDATION_EXPORT NSString * const APIPathValuePassportMe;
 /// 查看他人护照
 FOUNDATION_EXPORT NSString * const APIPathValuePassportUser(NSString *userId);
+/// 获取用户护照底部图标坑位（16 个）
+FOUNDATION_EXPORT NSString * const APIPathValuePassportIcons(NSString *userId);
 /// 获取当前用户观赛记录列表
 FOUNDATION_EXPORT NSString * const APIPathValuePassportMeRecords;
 #pragma mark - 社区模块

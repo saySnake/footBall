@@ -5,6 +5,7 @@
 
 #import "PassportHeader2View.h"
 #import "PassportViewModel.h"
+#import "Passport.h"
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
 
@@ -38,7 +39,8 @@ static UIColor *PassportCircleStrokeColor(void) {
 @property (nonatomic, strong) UILabel *countriesValueLabel;
 @property (nonatomic, strong) UILabel *countriesUnitLabel;
 
-@property (nonatomic, strong) NSArray<UIView *> *iconCircles;
+@property (nonatomic, strong) NSArray<UIView *> *iconCirclesA; // 上行 1A~8A
+@property (nonatomic, strong) NSArray<UIView *> *iconCirclesB; // 下行 1B~8B
 @end
 
 @implementation PassportHeader2View
@@ -67,7 +69,6 @@ static UIColor *PassportCircleStrokeColor(void) {
 - (void)layoutSubviews {
     [super layoutSubviews];
     if (CGRectIsEmpty(self.bounds)) return;
-//    [self rebuildGridLayer];
 }
 
 // MARK: - Public
@@ -158,6 +159,49 @@ static UIColor *PassportCircleStrokeColor(void) {
             iv.image = nil;
         }
     }
+
+    [self applyPassportIcons:model.header2IconItems];
+}
+
+/// 按接口固定顺序(1A,1B,...,8A,8B)渲染 16 坑位；A 行在上、B 行在下
+- (void)applyPassportIcons:(NSArray<PNPassportIconItem *> *)items {
+    if (self.iconCirclesA.count < 8 || self.iconCirclesB.count < 8) {
+        return;
+    }
+    NSMutableDictionary<NSString *, PNPassportIconItem *> *map = [NSMutableDictionary dictionary];
+    for (PNPassportIconItem *item in items ?: @[]) {
+        if (![item isKindOfClass:PNPassportIconItem.class] || item.position.length == 0) continue;
+        map[item.position] = item;
+    }
+    for (NSInteger col = 1; col <= 8; col++) {
+        NSString *posA = [NSString stringWithFormat:@"%ldA", (long)col];
+        NSString *posB = [NSString stringWithFormat:@"%ldB", (long)col];
+        [self applyIconItem:map[posA] toCircle:self.iconCirclesA[(NSUInteger)(col - 1)]];
+        [self applyIconItem:map[posB] toCircle:self.iconCirclesB[(NSUInteger)(col - 1)]];
+    }
+}
+
+- (void)applyIconItem:(PNPassportIconItem *)item toCircle:(UIView *)circle {
+    if (!circle) return;
+    for (UIView *sub in circle.subviews.copy) {
+        [sub removeFromSuperview];
+    }
+    NSString *url = item.iconUrl;
+    if (url.length == 0) {
+        return;
+    }
+    UIImageView *iv = [[UIImageView alloc] init];
+    iv.contentMode = UIViewContentModeScaleAspectFill;
+    iv.clipsToBounds = YES;
+    iv.tag = 0xEE01;
+    [circle addSubview:iv];
+    [iv mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(circle);
+    }];
+    [iv sd_setImageWithURL:[NSURL URLWithString:url] placeholderImage:nil];
+    if (item.iconName.length > 0) {
+        circle.accessibilityLabel = item.iconName;
+    }
 }
 
 // MARK: - UI
@@ -179,32 +223,6 @@ static UIColor *PassportCircleStrokeColor(void) {
     l.textAlignment = NSTextAlignmentCenter;
     l.numberOfLines = 2;
     return l;
-}
-
-/// 底部邮票格：仅展示资源图，无数据时保持空圆
-- (void)applyStampImageNamed:(NSString *)imageName toIconCircleAtIndex:(NSInteger)index {
-    if (index < 0 || index >= (NSInteger)self.iconCircles.count) {
-        return;
-    }
-    UIView *circle = self.iconCircles[(NSUInteger)index];
-    for (UIView *sub in circle.subviews.copy) {
-        [sub removeFromSuperview];
-    }
-    if (imageName.length == 0) {
-        return;
-    }
-    UIImage *img = [UIImage imageNamed:imageName];
-    if (!img) {
-        return;
-    }
-    UIImageView *iv = [[UIImageView alloc] initWithImage:img];
-    iv.contentMode = UIViewContentModeScaleAspectFill;
-    iv.clipsToBounds = YES;
-    iv.tag = 0xEE01;
-    [circle addSubview:iv];
-    [iv mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.edges.equalTo(circle);
-    }];
 }
 
 - (void)buildContent {
@@ -468,21 +486,22 @@ static UIColor *PassportCircleStrokeColor(void) {
         make.width.height.equalTo(@(wh));
         make.top.equalTo(rightPlaceholder1.mas_bottom);
     }];
-    // 第四排占位
-    for (int i=0; i<8; i++) {
+    // 第四排：A 行坑位 1A~8A
+    NSMutableArray *iconsA = [NSMutableArray arrayWithCapacity:8];
+    for (int i = 0; i < 8; i++) {
         UIView *c = [self circleContainer];
         [self addSubview:c];
         [c mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(self).offset(wh*3);
+            make.top.equalTo(self).offset(wh * 3);
             make.width.height.equalTo(@(wh));
-            make.centerX.equalTo(self).multipliedBy((2*i+1)/8.0);
+            make.centerX.equalTo(self).multipliedBy((2 * i + 1) / 8.0);
         }];
+        [iconsA addObject:c];
     }
-    
+    self.iconCirclesA = iconsA;
 
-    
-    // 底部一排 8 格：第 2 位 pass_red，末位 2026_year（铺满圆格），其余无数据
-    NSMutableArray *icons = [NSMutableArray arrayWithCapacity:8];
+    // 第五排（底部）：B 行坑位 1B~8B
+    NSMutableArray *iconsB = [NSMutableArray arrayWithCapacity:8];
     for (NSInteger i = 0; i < 8; i++) {
         UIView *c = [self circleContainer];
         [self addSubview:c];
@@ -491,27 +510,9 @@ static UIColor *PassportCircleStrokeColor(void) {
             make.bottom.equalTo(self);
             make.width.height.mas_equalTo(wh);
         }];
-        [icons addObject:c];
+        [iconsB addObject:c];
     }
-    self.iconCircles = icons;
-
-    static NSArray<NSString *> *stampAssetNames;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        stampAssetNames = @[
-            @"",
-            @"pass_red",
-            @"",
-            @"",
-            @"",
-            @"",
-            @"",
-            @"2026_year",
-        ];
-    });
-    for (NSInteger i = 0; i < (NSInteger)stampAssetNames.count; i++) {
-        [self applyStampImageNamed:stampAssetNames[i] toIconCircleAtIndex:i];
-    }
+    self.iconCirclesB = iconsB;
 }
 
 // MARK: - Grid

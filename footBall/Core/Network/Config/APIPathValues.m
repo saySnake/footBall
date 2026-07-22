@@ -204,6 +204,9 @@ NSString * const APIPathValuePassportMe = @"/api/v1/passport/me";
 NSString * const APIPathValuePassportUser(NSString *userId) {
     return [NSString stringWithFormat:@"/api/v1/passport/%@",userId];
 }
+NSString * const APIPathValuePassportIcons(NSString *userId) {
+    return [NSString stringWithFormat:@"/api/v1/passport/icons/%@", userId];
+}
 NSString * const APIPathValuePassportMeRecords = @"/api/v1/passport/me/records";
 
 #pragma mark - 社区模块

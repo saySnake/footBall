@@ -9,6 +9,7 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @class PNPassport;
+@class PNPassportIconItem;
 
 /// 护照页展示数据（合并接口 PNPassport 与设计稿占位，便于后续对接完整 API）
 @interface PassportViewModel : NSObject
@@ -58,6 +59,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) NSInteger header2CountryCount;
 /// 关注球队队徽 URL，最多取 5 个填满底部前 5 圆
 @property (nonatomic, copy) NSArray<NSString *> *header2FollowedTeamLogoURLs;
+/// 护照底部 16 坑位图标（顺序：1A,1B,2A,2B,...,8A,8B）
+@property (nonatomic, copy) NSArray<PNPassportIconItem *> *header2IconItems;
 
 @property (nonatomic, copy) NSString *regularSeasonTitle;
 @property (nonatomic, copy) NSString *avgDurationTitle;

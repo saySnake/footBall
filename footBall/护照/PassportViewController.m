@@ -330,6 +330,20 @@ static UIColor *PassportPageBg(void) {
         [weakSelf.tableView reloadData];
         [weakSelf invalidatePassportHeaderLayoutCache];
         [weakSelf.view setNeedsLayout];
+        // 软拉取底部 16 坑位图标；失败不影响护照主体展示
+        NSString *iconUserId = isOther ? weakSelf.targetUserId : (p.userId.length ? p.userId : (AuthManager.sharedManager.user.profile.userId ?: AuthManager.sharedManager.user.userId));
+        if (iconUserId.length > 0) {
+            [[ProfileRequest shared] getPassportIconsForUserId:iconUserId success:^(HTTPResponse * _Nullable responseObject) {
+                if (generation != weakSelf.passportLoadGeneration) {
+                    return;
+                }
+                NSArray *icons = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+                weakSelf.viewModel.header2IconItems = icons;
+                [weakSelf.passportHeader configureWithModel:weakSelf.viewModel];
+            } failure:^(NSError * _Nonnull error) {
+                // ignore: 图标接口失败时保持空坑位
+            }];
+        }
     };
     void (^handleFailure)(NSError *) = ^(NSError *error) {
         if (generation != weakSelf.passportLoadGeneration) {

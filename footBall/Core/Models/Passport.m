@@ -45,6 +45,31 @@ static NSString * _Nullable PNPassportStringFromJson(id v) {
 }
 @end
 
+@implementation PNPassportIconItem
++ (NSDictionary<NSString *, id> *)modelCustomPropertyMapper {
+    return @{
+        @"iconUrl": @[ @"iconUrl", @"icon_url", @"url" ],
+        @"iconName": @[ @"iconName", @"icon_name", @"name" ],
+        @"position": @[ @"position", @"slot", @"slotPosition" ],
+    };
+}
+
+- (BOOL)modelCustomTransformFromDictionary:(NSDictionary *)dic {
+    if ([self.position isKindOfClass:NSString.class]) {
+        self.position = [[self.position stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] uppercaseString];
+    }
+    if ([self.iconUrl isKindOfClass:NSString.class]) {
+        self.iconUrl = [self.iconUrl stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (self.iconUrl.length == 0) self.iconUrl = nil;
+    }
+    if ([self.iconName isKindOfClass:NSString.class]) {
+        self.iconName = [self.iconName stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (self.iconName.length == 0) self.iconName = nil;
+    }
+    return YES;
+}
+@end
+
 @implementation PNPassport
 
 + (NSDictionary<NSString *, id> *)modelContainerPropertyGenericClass {

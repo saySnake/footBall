@@ -30,6 +30,11 @@ NS_ASSUME_NONNULL_BEGIN
                      success:(nullable APISuccessBlock)success
                      failure:(nullable APIFailureBlock)failure;
 
+/// GET `/api/v1/passport/icons/{userId}` — 护照底部 16 坑位图标；`dataObject` 为 `NSArray<PNPassportIconItem *>`
+- (void)getPassportIconsForUserId:(NSString *)userId
+                          success:(nullable APISuccessBlock)success
+                          failure:(nullable APIFailureBlock)failure;
+
 /// GET `/api/v1/passport/me/records` — 我的观赛记录列表分页
 /// @param year   年份，nil 时后端默认当前年份
 /// @param tab    标签筛选：`future`（未来）/ `past`（过去），nil 不筛选
