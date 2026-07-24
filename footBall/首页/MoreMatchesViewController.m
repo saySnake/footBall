@@ -6,6 +6,7 @@
 #import "MoreMatchesViewController.h"
 #import "MoreDatePickerController.h"
 #import "APIError.h"
+#import "PNBackendDateTime.h"
 #import <Masonry/Masonry.h>
 
 static UIColor *kMoreMatchesCardBG(void) {
@@ -44,90 +45,9 @@ static UIImage *kMoreMatchesCalendarBarIcon(void) {
     return nil;
 }
 
-/// 解析比赛时间：无时区后缀按东八区（Asia/Shanghai）；展示侧再用系统时区。
+/// 解析比赛时间：后端无时区按东八区；展示按手机时区。
 static NSDate *kMoreMatchesDateFromRawString(NSString *raw) {
-    if (raw.length == 0) return nil;
-    NSString *s = [raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if (s.length == 0) return nil;
-
-    BOOL allDigits = YES;
-    for (NSUInteger i = 0; i < s.length; i++) {
-        unichar ch = [s characterAtIndex:i];
-        if (ch < '0' || ch > '9') {
-            allDigits = NO;
-            break;
-        }
-    }
-    if (allDigits && s.length >= 10) {
-        long long n = [s longLongValue];
-        if (n > 1000000000000LL) {
-            return [NSDate dateWithTimeIntervalSince1970:n / 1000.0];
-        }
-        if (n > 1000000000LL) {
-            return [NSDate dateWithTimeIntervalSince1970:(NSTimeInterval)n];
-        }
-    }
-    // Unix 时间戳带小数秒：整串须能完整 scan 为 double，避免 ISO 串里的毫秒被误当成数字
-    if ([s containsString:@"."]) {
-        NSScanner *scanner = [NSScanner scannerWithString:s];
-        double v = 0;
-        if ([scanner scanDouble:&v] && scanner.atEnd && v > 1e9) {
-            if (v > 1e12) {
-                return [NSDate dateWithTimeIntervalSince1970:v / 1000.0];
-            }
-            return [NSDate dateWithTimeIntervalSince1970:v];
-        }
-    }
-
-    // 带时区的 ISO（含 Z / 偏移）
-    if (@available(iOS 11.0, *)) {
-        NSISO8601DateFormatter *iso = [[NSISO8601DateFormatter alloc] init];
-        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
-        NSDate *d = [iso dateFromString:s];
-        if (d) return d;
-        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime;
-        d = [iso dateFromString:s];
-        if (d) return d;
-    }
-
-    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
-    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-
-    NSArray<NSString *> *zonedFormats = @[
-        @"yyyy-MM-dd'T'HH:mm:ssZ",
-        @"yyyy-MM-dd'T'HH:mm:ss.SSSZ",
-        @"yyyy-MM-dd'T'HH:mm:ssXXX",
-        @"yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
-        @"yyyy-MM-dd'T'HH:mm:ss'Z'",
-        @"yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
-    ];
-    for (NSString *f in zonedFormats) {
-        fmt.dateFormat = f;
-        fmt.timeZone = nil;
-        NSDate *d = [fmt dateFromString:s];
-        if (d) return d;
-    }
-
-    // 无时区墙钟：后端约定 UTC+8，如 2026-04-25T03:00:00
-    NSTimeZone *shanghai = [NSTimeZone timeZoneWithName:@"Asia/Shanghai"] ?: [NSTimeZone timeZoneForSecondsFromGMT:8 * 3600];
-    fmt.timeZone = shanghai;
-    NSArray<NSString *> *naiveFormats = @[
-        @"yyyy-MM-dd'T'HH:mm:ss.SSS",
-        @"yyyy-MM-dd'T'HH:mm:ss",
-        @"yyyy-MM-dd'T'HH:mm",
-        @"yyyy-MM-dd HH:mm:ss.SSS",
-        @"yyyy-MM-dd HH:mm:ss",
-        @"yyyy-MM-dd HH:mm",
-        @"yyyy/MM/dd HH:mm:ss",
-        @"yyyy/MM/dd HH:mm",
-        @"yyyy-MM-dd",
-    ];
-    for (NSString *f in naiveFormats) {
-        fmt.dateFormat = f;
-        NSDate *d = [fmt dateFromString:s];
-        if (d) return d;
-    }
-    return nil;
+    return [PNBackendDateTime dateFromBackendString:raw];
 }
 
 /// 比赛行右侧收藏图标：优先使用资源图 match_star，缺失时回退 SF Symbol。
@@ -636,8 +556,7 @@ static NSInteger const kMoreMatchesPageSize = 50;
 - (NSString *)timeTextFromMatchDate:(NSString *)matchDate {
     NSDate *date = kMoreMatchesDateFromRawString(matchDate);
     if (!date) return @"--:--";
-    NSDateFormatter *output = [[NSDateFormatter alloc] init];
-    output.timeZone = [NSTimeZone localTimeZone];
+    NSDateFormatter *output = [PNBackendDateTime displayFormatter];
     output.dateFormat = @"HH:mm";
     return [output stringFromDate:date];
 }

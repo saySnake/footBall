@@ -20,6 +20,7 @@
 #import "MatchRecordModels.h"
 #import "Match.h"
 #import "MatchRequest.h"
+#import "PNBackendDateTime.h"
 
 #define kDiscoverHeaderBg     [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0]   // #0D2122
 #define kDiscoverGreen        [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0]   // #285D4B
@@ -33,71 +34,6 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     DiscoverMatchTypeUpcoming,
     DiscoverMatchTypeFinished
 };
-
-/// 与 MoreMatches 一致的比赛时间字符串解析（多字段名见 Match.m）
-static NSDate *DiscoverDateFromRawString(NSString *raw) {
-    if (raw.length == 0) return nil;
-    NSString *s = [raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if (s.length == 0) return nil;
-
-    BOOL allDigits = YES;
-    for (NSUInteger i = 0; i < s.length; i++) {
-        unichar ch = [s characterAtIndex:i];
-        if (ch < '0' || ch > '9') {
-            allDigits = NO;
-            break;
-        }
-    }
-    if (allDigits && s.length >= 10) {
-        long long n = [s longLongValue];
-        if (n > 1000000000000LL) {
-            return [NSDate dateWithTimeIntervalSince1970:n / 1000.0];
-        }
-        if (n > 1000000000LL) {
-            return [NSDate dateWithTimeIntervalSince1970:(NSTimeInterval)n];
-        }
-    }
-    if ([s containsString:@"."]) {
-        NSScanner *scanner = [NSScanner scannerWithString:s];
-        double v = 0;
-        if ([scanner scanDouble:&v] && scanner.atEnd && v > 1e9) {
-            if (v > 1e12) {
-                return [NSDate dateWithTimeIntervalSince1970:v / 1000.0];
-            }
-            return [NSDate dateWithTimeIntervalSince1970:v];
-        }
-    }
-    if (@available(iOS 11.0, *)) {
-        NSISO8601DateFormatter *iso = [[NSISO8601DateFormatter alloc] init];
-        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
-        NSDate *d = [iso dateFromString:s];
-        if (d) return d;
-        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime;
-        d = [iso dateFromString:s];
-        if (d) return d;
-    }
-    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
-    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    NSArray<NSString *> *formats = @[
-        @"yyyy-MM-dd'T'HH:mm:ssZ",
-        @"yyyy-MM-dd'T'HH:mm:ss.SSSZ",
-        @"yyyy-MM-dd'T'HH:mm:ssXXX",
-        @"yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
-        @"yyyy-MM-dd'T'HH:mm:ss'Z'",
-        @"yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
-        @"yyyy-MM-dd HH:mm:ss",
-        @"yyyy-MM-dd HH:mm",
-        @"yyyy/MM/dd HH:mm:ss",
-        @"yyyy/MM/dd HH:mm",
-        @"yyyy-MM-dd",
-    ];
-    for (NSString *f in formats) {
-        fmt.dateFormat = f;
-        NSDate *d = [fmt dateFromString:s];
-        if (d) return d;
-    }
-    return nil;
-}
 
 static BOOL DiscoverIsPendingVerificationStatus(NSString *status) {
     if (status.length == 0) return NO;
@@ -1649,7 +1585,7 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
 - (NSString *)shortTimeText:(NSString *)raw {
     NSDate *date = [self dateFromRaw:raw];
     if (!date) return @"--:--";
-    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+    NSDateFormatter *fmt = [PNBackendDateTime displayFormatter];
     fmt.dateFormat = @"HH:mm";
     return [fmt stringFromDate:date];
 }
@@ -1657,13 +1593,14 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
 - (NSString *)shortDateText:(NSString *)raw {
     NSDate *date = [self dateFromRaw:raw];
     if (!date) return @"--";
-    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+    NSDateFormatter *fmt = [PNBackendDateTime displayFormatter];
+    fmt.locale = [NSLocale currentLocale];
     fmt.dateFormat = @"dd MMM, yyyy";
     return [fmt stringFromDate:date];
 }
 
 - (NSDate *)dateFromRaw:(NSString *)raw {
-    return DiscoverDateFromRawString(raw);
+    return [PNBackendDateTime dateFromBackendString:raw];
 }
 
 

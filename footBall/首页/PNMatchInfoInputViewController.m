@@ -12,6 +12,7 @@
 #import "MatchRecordModels.h"
 #import "LoadingManager.h"
 #import "APIError.h"
+#import "PNBackendDateTime.h"
 
 static UIColor *PNInputGreenColor(void) {
     // 统一使用 ColorManager 的主色，方便以后适配黑天/白天皮肤
@@ -1135,31 +1136,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
 }
 
 - (nullable NSDate *)pn_dateFromBackendDateTime:(NSString *)s {
-    if (s.length == 0) {
-        return nil;
-    }
-    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
-    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    fmt.timeZone = [NSTimeZone localTimeZone];
-    NSArray<NSString *> *formats = @[
-        @"yyyy-MM-dd'T'HH:mm:ss",
-        @"yyyy-MM-dd'T'HH:mm:ss.SSS",
-        @"yyyy-MM-dd HH:mm:ss",
-        @"yyyy-MM-dd"
-    ];
-    for (NSString *f in formats) {
-        fmt.dateFormat = f;
-        NSDate *d = [fmt dateFromString:s];
-        if (d) {
-            return d;
-        }
-    }
-    if (@available(iOS 11.0, *)) {
-        NSISO8601DateFormatter *iso = [[NSISO8601DateFormatter alloc] init];
-        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime;
-        return [iso dateFromString:s];
-    }
-    return nil;
+    return [PNBackendDateTime dateFromBackendString:s];
 }
 
 - (void)pn_refreshPillButtonsFromSelection {

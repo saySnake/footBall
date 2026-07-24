@@ -13,6 +13,7 @@
 #import "HTTPResponse.h"
 #import <QMUIKit/QMUITips.h>
 #import "PNMatchInfoInputViewController.h"
+#import "PNBackendDateTime.h"
 
 #define kDetailGreen  [UIColor colorWithRed:0.157 green:0.365 blue:0.294 alpha:1.0]
 #define kDetailBg     [UIColor colorWithRed:0.965 green:0.965 blue:0.965 alpha:1.0]
@@ -600,40 +601,14 @@
 #pragma mark - Date helpers
 
 - (NSDate *)parseDateFromRaw:(NSString *)raw {
-    if (raw.length == 0) return nil;
-    NSString *s = [raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if (s.length == 0) return nil;
-    BOOL allDigits = YES;
-    for (NSUInteger i = 0; i < s.length; i++) {
-        unichar ch = [s characterAtIndex:i];
-        if (ch < '0' || ch > '9') { allDigits = NO; break; }
-    }
-    if (allDigits && s.length >= 10) {
-        long long n = [s longLongValue];
-        if (n > 1000000000000LL) return [NSDate dateWithTimeIntervalSince1970:n / 1000.0];
-        if (n > 1000000000LL) return [NSDate dateWithTimeIntervalSince1970:(NSTimeInterval)n];
-    }
-    if (@available(iOS 11.0, *)) {
-        NSISO8601DateFormatter *iso = [[NSISO8601DateFormatter alloc] init];
-        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
-        NSDate *d = [iso dateFromString:raw]; if (d) return d;
-        iso.formatOptions = NSISO8601DateFormatWithInternetDateTime;
-        d = [iso dateFromString:raw]; if (d) return d;
-    }
-    NSDateFormatter *f = [[NSDateFormatter alloc] init];
-    f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    for (NSString *fmt in @[@"yyyy-MM-dd'T'HH:mm:ssZ", @"yyyy-MM-dd'T'HH:mm:ss", @"yyyy-MM-dd'T'HH:mm:ss.SSS", @"yyyy-MM-dd HH:mm:ss", @"yyyy-MM-dd HH:mm", @"yyyy-MM-dd"]) {
-        f.dateFormat = fmt;
-        NSDate *d = [f dateFromString:raw]; if (d) return d;
-    }
-    return nil;
+    return [PNBackendDateTime dateFromBackendString:raw];
 }
 
 /// "Sun, 18 Feb 25"
 - (NSString *)weekdayDateText:(NSString *)raw {
     NSDate *d = [self parseDateFromRaw:raw];
     if (!d) return @"-";
-    NSDateFormatter *f = [[NSDateFormatter alloc] init];
+    NSDateFormatter *f = [PNBackendDateTime displayFormatter];
     f.locale = [NSLocale localeWithLocaleIdentifier:@"zh_Hans_CN"];
     f.dateFormat = @"yyyy年M月d日";
     return [f stringFromDate:d];
@@ -643,7 +618,7 @@
 - (NSString *)timeText:(NSString *)raw {
     NSDate *d = [self parseDateFromRaw:raw];
     if (!d) return @"--:--";
-    NSDateFormatter *f = [[NSDateFormatter alloc] init];
+    NSDateFormatter *f = [PNBackendDateTime displayFormatter];
     f.dateFormat = @"HH:mm";
     return [f stringFromDate:d];
 }
@@ -652,7 +627,7 @@
 - (NSString *)fullDateTimeText:(NSString *)raw {
     NSDate *d = [self parseDateFromRaw:raw];
     if (!d) return raw.length ? raw : @"-";
-    NSDateFormatter *f = [[NSDateFormatter alloc] init];
+    NSDateFormatter *f = [PNBackendDateTime displayFormatter];
     f.dateFormat = @"yyyy-MM-dd HH:mm";
     return [f stringFromDate:d];
 }
