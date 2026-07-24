@@ -83,6 +83,18 @@
 - (void)onUpdateTapped {
     NSString *urlString = self.info.storeUrl;
     if (urlString.length == 0) {
+        // 未配置商店链接时至少给出反馈，避免按钮无响应
+        NSString *msg = NSLocalizedString(@"force_update_no_store_url", nil);
+        if (msg.length == 0 || [msg isEqualToString:@"force_update_no_store_url"]) {
+            msg = @"暂未配置更新地址，请前往 App Store 搜索更新";
+        }
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil
+                                                                       message:msg
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"ok", nil) ?: @"好的"
+                                                  style:UIAlertActionStyleDefault
+                                                handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
         return;
     }
     NSURL *url = [NSURL URLWithString:urlString];

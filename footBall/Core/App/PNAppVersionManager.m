@@ -10,11 +10,15 @@
 #import "APIError.h"
 #import <AFNetworking/AFNetworking.h>
 
+/// 临时关闭版本检查 / 强制更新（改回 YES 即恢复）
+static const BOOL kPNAppVersionCheckEnabled = NO;
+
 @interface PNAppVersionManager ()
 
-@property (nonatomic, weak, readwrite) UIWindow *forceUpdateWindow;
+@property (nonatomic, strong, readwrite, nullable) UIWindow *forceUpdateWindow;
 @property (nonatomic, strong, nullable) PNAppVersionInfo *cachedForceInfo;
 @property (nonatomic, assign) BOOL isChecking;
+@property (nonatomic, strong) NSMutableArray *pendingCompletions;
 
 @end
 
@@ -25,6 +29,7 @@
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         instance = [[PNAppVersionManager alloc] init];
+        instance.pendingCompletions = [NSMutableArray array];
     });
     return instance;
 }
@@ -41,17 +46,20 @@
 
 - (void)checkForceUpdateWithCompletion:(void (^)(BOOL, PNAppVersionInfo * _Nullable, NSError * _Nullable))completion {
     if (!completion) return;
+    if (!kPNAppVersionCheckEnabled) {
+        completion(NO, nil, nil);
+        return;
+    }
     if (self.forceUpdateWindow) {
         completion(YES, self.cachedForceInfo, nil);
         return;
     }
+    [self.pendingCompletions addObject:[completion copy]];
     if (self.isChecking) {
-        completion(NO, nil, nil);
         return;
     }
     self.isChecking = YES;
     [[AppVersionRequest shared] checkVersionSuccess:^(HTTPResponse * _Nullable responseObject) {
-        self.isChecking = NO;
         PNAppVersionInfo *info = [responseObject.dataObject isKindOfClass:PNAppVersionInfo.class]
             ? responseObject.dataObject
             : [PNAppVersionInfo yy_modelWithJSON:responseObject.data];
@@ -59,30 +67,38 @@
         if (needs) {
             self.cachedForceInfo = info;
         }
-        completion(needs, info, nil);
+        [self finishCheckWithNeeds:needs info:info error:nil];
     } failure:^(NSError * _Nonnull error) {
-        self.isChecking = NO;
-        completion(NO, nil, error);
+        [self finishCheckWithNeeds:NO info:nil error:error];
     }];
 }
 
+- (void)finishCheckWithNeeds:(BOOL)needs info:(PNAppVersionInfo *)info error:(NSError *)error {
+    self.isChecking = NO;
+    NSArray *callbacks = [self.pendingCompletions copy];
+    [self.pendingCompletions removeAllObjects];
+    for (void (^cb)(BOOL, PNAppVersionInfo *, NSError *) in callbacks) {
+        cb(needs, info, error);
+    }
+}
+
 - (void)presentForceUpdateOnWindow:(UIWindow *)window info:(PNAppVersionInfo *)info {
+    if (!kPNAppVersionCheckEnabled) return;
     if (!window || !info) return;
     self.cachedForceInfo = info;
-    if (self.forceUpdateWindow) {
+    // 已在强制更新页则只刷新文案所需数据，避免重复替换 root
+    if (self.forceUpdateWindow && [window.rootViewController isKindOfClass:PNForceUpdateViewController.class]) {
         return;
     }
+    // 直接挂到主 window.root，强引用 window；避免额外 overlay + weak 导致弹层被释放、只剩空白启动页
     PNForceUpdateViewController *vc = [[PNForceUpdateViewController alloc] initWithVersionInfo:info];
-    UIWindow *overlay = [[UIWindow alloc] initWithWindowScene:window.windowScene];
-    overlay.frame = window.bounds;
-    overlay.windowLevel = UIWindowLevelAlert + 1;
-    overlay.rootViewController = vc;
-    overlay.hidden = NO;
-    [overlay makeKeyAndVisible];
-    self.forceUpdateWindow = overlay;
+    window.rootViewController = vc;
+    [window makeKeyAndVisible];
+    self.forceUpdateWindow = window;
 }
 
 - (void)handleAPIErrorIfNeeded:(NSError *)error {
+    if (!kPNAppVersionCheckEnabled) return;
     APIError *apiError = [error isKindOfClass:APIError.class] ? (APIError *)error : nil;
     if (![apiError.businessCode isEqualToString:PNAppVersionOutdatedErrorCode]) {
         return;

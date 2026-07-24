@@ -28,8 +28,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (nullable UIWindow *)keyWindow;
 
-/// 强制更新遮罩 window（存在时表示用户须先更新）
-@property (nonatomic, weak, readonly, nullable) UIWindow *forceUpdateWindow;
+/// 强制更新所占用的主 window（非 nil 表示正在拦截，须先更新）
+@property (nonatomic, strong, readonly, nullable) UIWindow *forceUpdateWindow;
 
 @end
 
