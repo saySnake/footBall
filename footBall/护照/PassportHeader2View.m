@@ -500,14 +500,14 @@ static UIColor *PassportCircleStrokeColor(void) {
     }
     self.iconCirclesA = iconsA;
 
-    // 第五排（底部）：B 行坑位 1B~8B
+    // 第五排（底部）：B 行坑位 1B~8B，与 A 行水平分布保持一致
     NSMutableArray *iconsB = [NSMutableArray arrayWithCapacity:8];
     for (NSInteger i = 0; i < 8; i++) {
         UIView *c = [self circleContainer];
         [self addSubview:c];
         [c mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.left.equalTo(self).offset(wh * i);
-            make.bottom.equalTo(self);
+            make.centerX.equalTo(self).multipliedBy((2 * i + 1) / 8.0);
+            make.top.equalTo(self).offset(wh * 4);
             make.width.height.mas_equalTo(wh);
         }];
         [iconsB addObject:c];
