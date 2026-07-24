@@ -16,7 +16,7 @@
                         <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="20260724230117_113_494.jpg" translatesAutoresizingMaskIntoConstraints="NO" id="PcD-1i-0D8">
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="20260725000725_127_494.png" translatesAutoresizingMaskIntoConstraints="NO" id="PcD-1i-0D8">
                                 <rect key="frame" x="131.66666666666666" y="306" width="129.99999999999997" height="130"/>
                                 <constraints>
                                     <constraint firstAttribute="width" constant="130" id="7jd-tC-ccg"/>
@@ -46,6 +46,6 @@
         </scene>
     </scenes>
     <resources>
-        <image name="20260724230117_113_494.jpg" width="491.51998901367188" height="491.51998901367188"/>
+        <image name="20260725000725_127_494.png" width="491.51998901367188" height="491.51998901367188"/>
     </resources>
 </document>

@@ -49,7 +49,7 @@
 
 - (void)setupUI {
     self.logoImageView = [[UIImageView alloc] init];
-    self.logoImageView.image = [UIImage imageNamed:@"1"];
+    self.logoImageView.image = [UIImage imageNamed:@"20260725000725_127_494"];
     self.logoImageView.contentMode = UIViewContentModeScaleAspectFit;
     
     self.titleLabel = [[UILabel alloc] init];
