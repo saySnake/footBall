@@ -465,6 +465,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         if (!self) return;
         MembershipCenterViewController *member = [[MembershipCenterViewController alloc] init];
         member.initialPlanIndex = initialPlanIndex;
+        member.hidesBottomBarWhenPushed = YES;
         [self.navigationController pushViewController:member animated:YES];
     };
     [self presentViewController:vc animated:NO completion:nil];
@@ -817,6 +818,17 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         [weakSelf.headerCard configureWithModel:weakSelf.viewModel];
         [weakSelf.tableView reloadData];
         [weakSelf.view setNeedsLayout];
+        // 软拉取底部 16 坑位图标；失败不影响主体展示（与护照页一致）
+        NSString *iconUserId = isOther ? weakSelf.targetUserId : (p.userId.length ? p.userId : (AuthManager.sharedManager.user.profile.userId ?: AuthManager.sharedManager.user.userId));
+        if (iconUserId.length > 0) {
+            [[ProfileRequest shared] getPassportIconsForUserId:iconUserId success:^(HTTPResponse * _Nullable responseObject) {
+                NSArray *icons = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
+                weakSelf.viewModel.header2IconItems = icons;
+                [weakSelf.headerCard configureWithModel:weakSelf.viewModel];
+            } failure:^(NSError * _Nonnull error) {
+                // ignore: 图标接口失败时保持空坑位
+            }];
+        }
     };
     void (^handleFailure)(NSError *) = ^(NSError *error) {
         [weakSelf hideLoading];
