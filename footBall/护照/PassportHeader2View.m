@@ -98,7 +98,7 @@ static UIColor *PassportCircleStrokeColor(void) {
         strongSelf.avatarView.contentMode = UIViewContentModeScaleAspectFill;
     }];
 
-    self.cityLabel.text = model.userCity.length ? model.userCity : @"—";
+    self.cityLabel.text = model.userCity.length ? model.userCity : @"--";
 
     self.matchesLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, model.header2YearMatchCount)];
     NSString *matchUnit = NSLocalizedString(@"passport_unit_matches", nil);
@@ -108,7 +108,7 @@ static UIColor *PassportCircleStrokeColor(void) {
     self.matchesUnitLabel.text = matchUnit;
 
     BOOL hasGen = model.header2GenerationMainText.length > 0;
-    self.afterLabel.text = hasGen ? model.header2GenerationMainText : @"—";
+    self.afterLabel.text = hasGen ? model.header2GenerationMainText : @"--";
     NSString *genSuffix = NSLocalizedString(@"passport_unit_generation_suffix", nil);
     if (!genSuffix.length || [genSuffix isEqualToString:@"passport_unit_generation_suffix"]) {
         genSuffix = @"后";
@@ -248,7 +248,7 @@ static UIColor *PassportCircleStrokeColor(void) {
     [self addSubview:cityCircle];
     _cityLabel = [self circleTextLabelWithFont:[UIFont systemFontOfSize:16 weight:UIFontWeightBold]];
     _cityLabel.numberOfLines = 1;
-    _cityLabel.text = @"上海";
+    _cityLabel.text = @"--";
     [cityCircle addSubview:_cityLabel];
     [_cityLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(cityCircle);
@@ -297,7 +297,7 @@ static UIColor *PassportCircleStrokeColor(void) {
         make.height.equalTo(@(wh));
     }];
     _matchesLabel = [self circleTextLabelWithFont:FontManager.sharedManager.font26Regular];
-    _matchesLabel.text = @"11";
+    _matchesLabel.text = @"--";
     [matchesCircle addSubview:_matchesLabel];
     [_matchesLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.center.equalTo(matchesCircle);
@@ -322,7 +322,7 @@ static UIColor *PassportCircleStrokeColor(void) {
         make.width.height.mas_equalTo(wh);
     }];
     _afterLabel = [self circleTextLabelWithFont:FontManager.sharedManager.font24Regular];
-    _afterLabel.text = @"05";
+    _afterLabel.text = @"--";
     [afterCircle addSubview:_afterLabel];
     [_afterLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerY.equalTo(afterCircle);
@@ -370,7 +370,7 @@ static UIColor *PassportCircleStrokeColor(void) {
     _minutesValueLabel = [[UILabel alloc] init];
     _minutesValueLabel.font = FontManager.sharedManager.font26Regular;
     _minutesValueLabel.textColor = [UIColor blackColor];
-    _minutesValueLabel.text = @"9500";
+    _minutesValueLabel.text = @"--";
     [minutesPill addSubview:_minutesValueLabel];
     _minutesUnitLabel = [[UILabel alloc] init];
     _minutesUnitLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
@@ -403,7 +403,7 @@ static UIColor *PassportCircleStrokeColor(void) {
     _goalsValueLabel = [[UILabel alloc] init];
     _goalsValueLabel.font = FontManager.sharedManager.font26Regular;
     _goalsValueLabel.textColor = [UIColor blackColor];
-    _goalsValueLabel.text = @"30";
+    _goalsValueLabel.text = @"--";
     [goalsPill addSubview:_goalsValueLabel];
     _goalsUnitLabel = [[UILabel alloc] init];
     _goalsUnitLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
@@ -429,7 +429,7 @@ static UIColor *PassportCircleStrokeColor(void) {
         make.width.mas_equalTo(wh);
     }];
     _citiesValueLabel = [self circleTextLabelWithFont:FontManager.sharedManager.font26Regular];
-    _citiesValueLabel.text = @"20";
+    _citiesValueLabel.text = @"--";
     _citiesValueLabel.numberOfLines = 1;
     [citiesCircle addSubview:_citiesValueLabel];
     _citiesUnitLabel = [[UILabel alloc] init];
@@ -455,7 +455,7 @@ static UIColor *PassportCircleStrokeColor(void) {
         make.width.mas_equalTo(wh);
     }];
     _countriesValueLabel = [self circleTextLabelWithFont:FontManager.sharedManager.font26Regular];
-    _countriesValueLabel.text = @"6";
+    _countriesValueLabel.text = @"--";
     _countriesValueLabel.numberOfLines = 1;
     [countriesCircle addSubview:_countriesValueLabel];
     _countriesUnitLabel = [[UILabel alloc] init];

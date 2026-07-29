@@ -23,7 +23,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSString *promoButtonTitle;
 
 #pragma mark - 护照头部 PassportHeaderView
-/// 用户区第一行：护照代号展示（如 NO.0088）
+/// 用户区第一行：护照代号展示（无数据时为空/“--”）
 @property (nonatomic, copy) NSString *headerPassportCodeLine;
 /// 周折线图：周一至周日 7 个值，范围 0～100（由 weeklyFrequency 归一化）
 @property (nonatomic, copy) NSArray<NSNumber *> *headerWeekLineValues;

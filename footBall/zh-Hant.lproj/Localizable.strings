@@ -138,6 +138,7 @@
 "passport_year_tab_format" = "%ld年";
 "passport_header_no_prefix" = "NO.";
 "passport_header2_city_placeholder" = "選擇城市";
+"passport_currency_cny" = "人民幣";
 "passport_unit_matches" = "場";
 "passport_unit_generation_suffix" = "後";
 "passport_unit_minutes_short" = "分鐘";

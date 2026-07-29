@@ -138,6 +138,7 @@
 "passport_year_tab_format" = "%ld";
 "passport_header_no_prefix" = "NO.";
 "passport_header2_city_placeholder" = "City";
+"passport_currency_cny" = "CNY";
 "passport_unit_matches" = " matches";
 "passport_unit_generation_suffix" = "s";
 "passport_unit_minutes_short" = " min";

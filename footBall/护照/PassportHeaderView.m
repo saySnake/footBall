@@ -321,12 +321,12 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
     UILabel *unitLbl = UILabel.new;
     unitLbl.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
     unitLbl.textColor = [UIColor colorWithHexString:@"#000000"];
-    unitLbl.text = @"人民币";
+    unitLbl.text = NSLocalizedString(@"passport_currency_cny", nil);
     [view addSubview:unitLbl];
     UILabel *amountLbl = UILabel.new;
     amountLbl.font = FontManager.sharedManager.font26Regular;
     amountLbl.textColor = [UIColor colorWithHexString:@"#060606"];
-    amountLbl.text = @"999,999.99";
+    amountLbl.text = @"--";
     [view addSubview:amountLbl];
     self.moneyAmountLabel = amountLbl;
 
@@ -512,13 +512,15 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
         return;
     }
     
-    self.idLabel.text = model.headerPassportCodeLine.length ? model.headerPassportCodeLine : @"NO.0088";
+    self.idLabel.text = model.headerPassportCodeLine.length ? model.headerPassportCodeLine : @"--";
     self.nameLabel.text = model.nickname.length ? model.nickname : @"";
     
     if ([self.lineChartView isKindOfClass:[PassportWeekLineChartView class]]) {
         PassportWeekLineChartView *chart = (PassportWeekLineChartView *)self.lineChartView;
         if (model.headerWeekLineValues.count == 7) {
             chart.weekValues = model.headerWeekLineValues;
+        } else {
+            chart.weekValues = @[ @0, @0, @0, @0, @0, @0, @0 ];
         }
     }
     
@@ -527,7 +529,7 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
     self.greenCardLabel.text = [NSString stringWithFormat:@"%ld", (long)model.headerCleanMatches];
     
     if (self.moneyAmountLabel) {
-        self.moneyAmountLabel.text = model.headerSpendingAmountText.length ? model.headerSpendingAmountText : @"0.00";
+        self.moneyAmountLabel.text = model.headerSpendingAmountText.length ? model.headerSpendingAmountText : @"--";
     }
     
     if (self.worldMapView) {

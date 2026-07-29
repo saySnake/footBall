@@ -57,7 +57,7 @@ static NSString * const kProfileFollowedTeamsKey = @"profile_followed_teams";
 }
 
 + (NSArray<NSString *> *)defaultFollowedTeamIds {
-    return @[ @"mancity", @"wolves", @"liverpool", @"nforest" ];
+    return @[];
 }
 
 + (NSArray<NSString *> *)loadFollowedTeamIds {

@@ -737,12 +737,17 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     }
 
     _nameLabel = [[UILabel alloc] init];
-    _nameLabel.text = @"CHALLENGER";
+    _nameLabel.text = @"--";
     _nameLabel.font = [UIFont boldSystemFontOfSize:15];
     _nameLabel.textColor = [UIColor whiteColor];
 
     _headerDateLabel = [[UILabel alloc] init];
-    _headerDateLabel.text = @"February 20, 2025";
+    {
+        NSDateFormatter *df = [[NSDateFormatter alloc] init];
+        df.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
+        df.dateFormat = @"MMMM d, yyyy";
+        _headerDateLabel.text = [df stringFromDate:[NSDate date]];
+    }
     _headerDateLabel.font = [UIFont systemFontOfSize:11];
     _headerDateLabel.textColor = [UIColor colorWithWhite:0.75 alpha:1.0];
 
@@ -780,11 +785,11 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
         return l;
     };
 
-    _statAValue = makeValue(); UILabel *statADesc = makeDesc(NSLocalizedString(@"discover_stat_matches", nil) ?: @"总场次");
-    _statBValue = makeValue(); UILabel *statBDesc = makeDesc(NSLocalizedString(@"discover_stat_duration", nil) ?: @"总观看时长");
-    _statCValue = makeValue(); UILabel *statCDesc = makeDesc(NSLocalizedString(@"discover_stat_venues", nil) ?: @"总球场数");
-    _statDValue = makeValue(); UILabel *statDDesc = makeDesc(NSLocalizedString(@"discover_stat_league", nil) ?: @"联赛");
-    _statEValue = makeValue(); UILabel *statEDesc = makeDesc(NSLocalizedString(@"discover_stat_country", nil) ?: @"国家");
+    _statAValue = makeValue(); _statAValue.text = @"--"; UILabel *statADesc = makeDesc(NSLocalizedString(@"discover_stat_matches", nil) ?: @"总场次");
+    _statBValue = makeValue(); _statBValue.text = @"--"; UILabel *statBDesc = makeDesc(NSLocalizedString(@"discover_stat_duration", nil) ?: @"总观看时长");
+    _statCValue = makeValue(); _statCValue.text = @"--"; UILabel *statCDesc = makeDesc(NSLocalizedString(@"discover_stat_venues", nil) ?: @"总球场数");
+    _statDValue = makeValue(); _statDValue.text = @"--"; UILabel *statDDesc = makeDesc(NSLocalizedString(@"discover_stat_league", nil) ?: @"联赛");
+    _statEValue = makeValue(); _statEValue.text = @"--"; UILabel *statEDesc = makeDesc(NSLocalizedString(@"discover_stat_country", nil) ?: @"国家");
 
     [header addSubview:_statAValue];
     [header addSubview:statADesc];
@@ -959,15 +964,15 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
         return l;
     };
 
-    UILabel *w40 = bigNum(); w40.text = @"40";
+    UILabel *w40 = bigNum(); w40.text = @"--";
     UILabel *w40d = smallLab(NSLocalizedString(@"discover_win", nil) ?: @"胜利");
-    UILabel *d20 = bigNum(); d20.text = @"20";
+    UILabel *d20 = bigNum(); d20.text = @"--";
     UILabel *d20d = smallLab(NSLocalizedString(@"discover_draw", nil) ?: @"平局");
-    UILabel *l30 = bigNum(); l30.text = @"30";
+    UILabel *l30 = bigNum(); l30.text = @"--";
     UILabel *l30d = smallLab(NSLocalizedString(@"discover_loss", nil) ?: @"失败");
-    UILabel *k2 = bigNum(); k2.text = @"2";
+    UILabel *k2 = bigNum(); k2.text = @"--";
     UILabel *k2d = smallLab(NSLocalizedString(@"discover_eliminated", nil) ?: @"淘汰");
-    UILabel *q2 = bigNum(); q2.text = @"2";
+    UILabel *q2 = bigNum(); q2.text = @"--";
     UILabel *q2d = smallLab(NSLocalizedString(@"discover_qualified", nil) ?: @"出线");
     self.leagueWinValueLabel = w40;
     self.leagueDrawValueLabel = d20;

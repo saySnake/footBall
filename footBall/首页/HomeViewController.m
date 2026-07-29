@@ -687,11 +687,16 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
         _avatarView.tintColor = [UIColor whiteColor];
     }
     _challengerLabel = [[UILabel alloc] init];
-    _challengerLabel.text = NSLocalizedString(@"home_challenger", nil);
+    _challengerLabel.text = @"--";
     _challengerLabel.font = [UIFont boldSystemFontOfSize:16];
     _challengerLabel.textColor = [UIColor whiteColor];
     _dateLabel = [[UILabel alloc] init];
-    _dateLabel.text = @"February 20, 2025";
+    {
+        NSDateFormatter *df = [[NSDateFormatter alloc] init];
+        df.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
+        df.dateFormat = @"MMMM d, yyyy";
+        _dateLabel.text = [df stringFromDate:[NSDate date]];
+    }
     _dateLabel.font = [UIFont systemFontOfSize:12];
     _dateLabel.textColor = [UIColor colorWithWhite:0.75 alpha:1.0];
     [_headerView addSubview:_avatarView];
@@ -838,7 +843,8 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
 
 - (void)updateLocalizedStrings {
     [super updateLocalizedStrings];
-    _challengerLabel.text = NSLocalizedString(@"home_challenger", nil);
+    NSString *nickname = AuthManager.sharedManager.user.profile.nickname;
+    _challengerLabel.text = nickname.length > 0 ? nickname : @"--";
     _titleLabel.text = NSLocalizedString(@"home_view_matches", nil);
     [_moreBtn setTitle:NSLocalizedString(@"home_more", nil) forState:UIControlStateNormal];
     [self buildTeams];
@@ -863,14 +869,6 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
 }
 
 - (UIView *)cardWithModel:(Match *)m bg:(UIColor *)bg textColor:(UIColor *)textColor showScore:(BOOL)showScore {
-    if (!m) {
-        m = Match.new;
-        m.homeTeamName = @"-";
-        m.awayTeamName = @"-";
-        m.matchDate = @"";
-        m.homeScore = 0;
-        m.awayScore = 0;
-    }
     UIView *card = [[UIView alloc] init];
     card.backgroundColor = bg;
     card.semanticContentAttribute = UISemanticContentAttributeForceLeftToRight;
@@ -890,7 +888,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     timeL.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
     timeL.textColor = [textColor colorWithAlphaComponent:0.96];
     UILabel *dateL = [[UILabel alloc] init];
-    dateL.text = detailText;
+    dateL.text = detailText.length ? detailText : @"--";
     dateL.font = [UIFont systemFontOfSize:11 weight:UIFontWeightRegular];
     dateL.textColor = [textColor colorWithAlphaComponent:0.75];
     UIImageView *homeIcon = [[UIImageView alloc] init];
@@ -912,8 +910,8 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     if (m.awayTeamLogo.length > 0) {
         [awayIcon sd_setImageWithURL:[NSURL URLWithString:m.awayTeamLogo] placeholderImage:placeImg];
     }
-    NSString *homeScore = [NSString stringWithFormat:@"%ld", (long)m.homeScore];
-    NSString *awayScore = [NSString stringWithFormat:@"%ld", (long)m.awayScore];
+    NSString *homeScore = m ? [NSString stringWithFormat:@"%ld", (long)m.homeScore] : @"--";
+    NSString *awayScore = m ? [NSString stringWithFormat:@"%ld", (long)m.awayScore] : @"--";
     UILabel *homeL = [[UILabel alloc] init];
     homeL.text = kHomeFeaturedTeamDisplayName(m.homeTeamName);
     homeL.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
@@ -1093,7 +1091,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
 }
 
 - (void)refreshDiscoverLikeGuestState {
-    _challengerLabel.text = NSLocalizedString(@"home_challenger", nil);
+    _challengerLabel.text = @"--";
     NSDateFormatter *df = [[NSDateFormatter alloc] init];
     df.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
     df.dateFormat = @"MMMM d, yyyy";
@@ -1264,7 +1262,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     NSString *avatar = AuthManager.sharedManager.user.profile.avatar ?: AuthManager.sharedManager.user.avatar;
     [_avatarView sd_setImageWithURL:[NSURL URLWithString:avatar]];
     NSString *nickname = AuthManager.sharedManager.user.profile.nickname;
-    _challengerLabel.text = nickname.length > 0 ? nickname : (NSLocalizedString(@"home_challenger", nil) ?: @"CHALLENGER");
+    _challengerLabel.text = nickname.length > 0 ? nickname : @"--";
     NSDateFormatter *df = [[NSDateFormatter alloc] init];
     df.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
     df.dateFormat = @"MMMM d, yyyy";

@@ -78,7 +78,7 @@ static UIBezierPath *PassportSmoothLineThroughPoints(CGPoint *pts, NSInteger cou
         }
         self.xLabels = xs;
 
-        _weekValues = @[ @15, @32, @48, @75, @38, @62, @28 ];
+        _weekValues = @[ @0, @0, @0, @0, @0, @0, @0 ];
     }
     return self;
 }
@@ -147,7 +147,7 @@ static UIBezierPath *PassportSmoothLineThroughPoints(CGPoint *pts, NSInteger cou
 
     NSMutableArray<NSNumber *> *vals = [self.weekValues mutableCopy];
     if (vals.count != 7) {
-        vals = [@[ @15, @32, @48, @75, @38, @62, @28 ] mutableCopy];
+        vals = [@[ @0, @0, @0, @0, @0, @0, @0 ] mutableCopy];
     }
     CGPoint pts[7];
     for (NSInteger i = 0; i < 7; i++) {

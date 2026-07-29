@@ -977,14 +977,11 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     if (self.homeName.length > 0 && self.awayName.length > 0) {
         self.matchField.text = [NSString stringWithFormat:@"%@ VS %@", self.homeName, self.awayName];
     }
-    NSDictionary<NSString *, NSString *> *defaultEmotion = [[self pn_emotionOptionsData] firstObject];
-    [self pn_applyEmotionOption:defaultEmotion];
-    self.selectedWatchInfo = @"在球场";
-    self.selectedSeat = @"VIP看台";
-    self.selectedReason = @"球迷";
+    self.selectedWatchInfo = @"";
+    self.selectedSeat = @"";
+    self.selectedReason = @"";
     [self.selectedIdentities removeAllObjects];
-    [self.selectedIdentities addObject:@"球迷"];
-    [self.selectedIdentities addObject:@"媒体记者"];
+    [self pn_applyEmotionOption:nil];
     
     self.priceField.text = @"";
     self.selectedDate = [NSDate date];
@@ -1079,18 +1076,15 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         self.matchField.text = [NSString stringWithFormat:@"%@ VS %@", self.homeName, self.awayName];
     }
 
-    self.selectedWatchInfo = [self pn_serverValueOrFallback:self.watchButtons serverValue:detail.viewingLocation fallback:@"在球场"];
-    self.selectedSeat = [self pn_serverValueOrFallback:self.seatButtons serverValue:detail.standType fallback:@"VIP看台"];
-    self.selectedReason = [self pn_serverValueOrFallback:self.reasonButtons serverValue:detail.watchReason fallback:@"球迷"];
+    self.selectedWatchInfo = [self pn_serverValueOrFallback:self.watchButtons serverValue:detail.viewingLocation fallback:@""];
+    self.selectedSeat = [self pn_serverValueOrFallback:self.seatButtons serverValue:detail.standType fallback:@""];
+    self.selectedReason = [self pn_serverValueOrFallback:self.reasonButtons serverValue:detail.watchReason fallback:@""];
 
     [self.selectedIdentities removeAllObjects];
     for (NSString *ident in detail.viewingIdentities) {
         if ([ident isKindOfClass:NSString.class] && ident.length > 0) {
             [self.selectedIdentities addObject:ident];
         }
-    }
-    if (self.selectedIdentities.count == 0) {
-        [self.selectedIdentities addObject:@"球迷"];
     }
     [self pn_trimIdentitiesToMaxCount];
     if (![self pn_isSeatSelectionAllowed]) {
@@ -1100,7 +1094,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     if (detail.ticketPrice.length > 0) {
         self.priceField.text = detail.ticketPrice;
     } else {
-        self.priceField.text = @"0";
+        self.priceField.text = @"";
     }
 
     NSDate *kick = [self pn_dateFromBackendDateTime:detail.matchDateTime];
@@ -1111,9 +1105,6 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [self refreshDateTimeButtons];
 
     NSDictionary<NSString *, NSString *> *emotionOpt = [self pn_emotionOptionForValue:detail.postMatchEmotion];
-    if (!emotionOpt) {
-        emotionOpt = [[self pn_emotionOptionsData] firstObject];
-    }
     [self pn_applyEmotionOption:emotionOpt];
 
     self.commentView.text = detail.notes ?: @"";

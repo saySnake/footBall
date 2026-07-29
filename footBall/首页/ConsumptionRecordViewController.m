@@ -304,11 +304,11 @@ static void kConsumeSetLabelLineHeight(UILabel *label, CGFloat lineHeight) {
     }
     if ([v isKindOfClass:[NSString class]]) {
         NSString *s = [(NSString *)v stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        if (s.length == 0) return @"-0";
+        if (s.length == 0) return @"--";
         if ([s hasPrefix:@"-"]) return s;
         return [NSString stringWithFormat:@"-%@", s];
     }
-    return @"-0";
+    return @"--";
 }
 
 - (void)updateConsumeEmptyState {

@@ -261,19 +261,19 @@ static CGFloat PCAbilityMaxLabelWidthForTitles(NSArray<NSString *> *titles, UIFo
         _percent = [[UILabel alloc] init];
         _percent.font = FontManager.sharedManager.font75Regular;
         _percent.textColor = [UIColor whiteColor];
-        _percent.text = @"0%";
+        _percent.text = @"--";
         [_card addSubview:_percent];
 
         _suffix = [[UILabel alloc] init];
         _suffix.font = [UIFont systemFontOfSize:30 weight:UIFontWeightSemibold];
         _suffix.textColor = [UIColor whiteColor];
-        _suffix.text = @"都在看球";
+        _suffix.text = NSLocalizedString(@"passport_growth_ok", nil);
         [_card addSubview:_suffix];
 
         _bottomLine = [[UILabel alloc] init];
         _bottomLine.font = FontManager.sharedManager.font11Regular;
         _bottomLine.textColor = [UIColor whiteColor];
-        _bottomLine.text = @"睡眠按8小时为例";
+        _bottomLine.text = @"";
         [_card addSubview:_bottomLine];
 
         [_card mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -304,7 +304,7 @@ static CGFloat PCAbilityMaxLabelWidthForTitles(NSArray<NSString *> *titles, UIFo
 }
 
 - (void)configureWithModel:(PassportViewModel *)model {
-    _topLine.text = model.growthHeadline.length ? model.growthHeadline : @"2025年睡醒时间里的";
+    _topLine.text = model.growthHeadline.length ? model.growthHeadline : @"";
     //个人2026年份 总看球总天数 除以 天（365-121睡眠天数）算出%
     // TODO: growthSubtitle 目前被复用为 percent 或底部文案，占位逻辑较随意；等后端提供“睡醒时间占比%”与“说明文案”后拆成两个字段更清晰。
     NSString *t = [model.growthSubtitle stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
