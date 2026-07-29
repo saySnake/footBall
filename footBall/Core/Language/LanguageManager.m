@@ -33,20 +33,33 @@ static NSString *const kUserDefaultsLanguageKey = @"AppCurrentLanguage";
 - (instancetype)init {
     self = [super init];
     if (self) {
-        // 从UserDefaults读取保存的语言设置
-        NSInteger savedLanguage = [[NSUserDefaults standardUserDefaults] integerForKey:kUserDefaultsLanguageKey];
-        if (savedLanguage > 0) {
-            _currentLanguage = (AppLanguage)savedLanguage;
-        } else {
-            _currentLanguage = AppLanguageSystem;
-        }
-        
+        // ⚠️ 临时：强制简体中文，不读取用户设置、不跟随系统。
+        // 原因：英文 / 繁中语言文件尚未校对完成，统一显示中文。
+        // 待所有语言文件校对完成后，恢复为下方注释中的原逻辑即可。
+        _currentLanguage = AppLanguageChinese;
         [self updateLanguageBundle];
+
+        // 原逻辑（恢复时启用）：
+        // NSInteger savedLanguage = [[NSUserDefaults standardUserDefaults] integerForKey:kUserDefaultsLanguageKey];
+        // if (savedLanguage > 0) {
+        //     _currentLanguage = (AppLanguage)savedLanguage;
+        // } else {
+        //     _currentLanguage = AppLanguageSystem;
+        // }
+        // [self updateLanguageBundle];
     }
     return self;
 }
 
 - (void)setLanguage:(AppLanguage)language {
+    // ⚠️ 临时：拦截一切切换请求，统一中文。
+    // 待语言文件校对完成后删除此 if 块，恢复用户可切换。
+    if (language != AppLanguageChinese) {
+        NSLog(@"🌐 语言切换被拦截（临时统一中文）：请求=%@，已忽略。",
+              [LanguageManager displayNameForLanguage:language]);
+        language = AppLanguageChinese;
+    }
+
     AppLanguage oldLanguage = _currentLanguage;
     if (oldLanguage == language) {
         return;
