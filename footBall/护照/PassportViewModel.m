@@ -371,20 +371,33 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
 }
 
 /// 暗色统计卡四行：与 PassportDarkStatsCardCell 行序一致（总时长 / 赛季天数 / 周末工作日比 / 昼夜比）。
+/// 天数展示最多 2 位小数，去掉多余尾零（如 1.50→1.5，1.00→1）
++ (NSString *)seasonDaysNumberText:(double)days {
+    if (days < 0 || days != days) {
+        days = 0;
+    }
+    NSString *s = [NSString stringWithFormat:@"%.2f", days];
+    while ([s containsString:@"."] && ([s hasSuffix:@"0"] || [s hasSuffix:@"."])) {
+        s = [s substringToIndex:s.length - 1];
+    }
+    return s.length ? s : @"0";
+}
+
 + (NSString *)seasonDaysLineFromPassport:(nullable PNPassport *)passport {
     if (!passport) {
         return @"";
     }
+    NSString *unit = NSLocalizedString(@"passport_days_unit", nil) ?: @"天";
     NSString *raw = [passport.seasonDays stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (raw.length) {
-        return [NSString stringWithFormat:@"%@ %@", raw, NSLocalizedString(@"passport_days_unit", nil) ?: @"天"];
+        return [NSString stringWithFormat:@"%@ %@", [self seasonDaysNumberText:raw.doubleValue], unit];
     }
     NSInteger minutes = MAX(0, passport.yearTotalWatchTime);
     if (minutes <= 0) {
         return @"";
     }
     double days = minutes / (24.0 * 60.0);
-    return [NSString stringWithFormat:@"%.3f %@", days, NSLocalizedString(@"passport_days_unit", nil) ?: @"天"];
+    return [NSString stringWithFormat:@"%@ %@", [self seasonDaysNumberText:days], unit];
 }
 
 + (NSString *)awakeWatchPercentDisplay:(nullable NSString *)awake {

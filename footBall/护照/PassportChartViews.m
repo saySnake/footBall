@@ -39,24 +39,47 @@
 
 - (void)setValues:(NSArray<NSNumber *> *)values {
     _values = [values copy];
+    self.lastBarLayoutSize = CGSizeZero;
+    [self setNeedsLayout];
+}
+
+- (void)setMaxValue:(CGFloat)maxValue {
+    if (fabs(_maxValue - maxValue) < 0.001) return;
+    _maxValue = maxValue;
+    self.lastBarLayoutSize = CGSizeZero;
     [self setNeedsLayout];
 }
 
 - (void)setXTitles:(NSArray<NSString *> *)xTitles {
     _xTitles = [xTitles copy];
+    self.lastBarLayoutSize = CGSizeZero;
     [self setNeedsLayout];
 }
 
 - (void)setBarWidth:(CGFloat)barWidth {
     _barWidth = barWidth;
+    self.lastBarLayoutSize = CGSizeZero;
     [self setNeedsLayout];
+}
+
+/// 数据峰值 → Y 轴上限：至少 10，并向上取整到 10 的倍数
++ (CGFloat)adaptiveMaxValueForValues:(NSArray<NSNumber *> *)values {
+    CGFloat peak = 0;
+    for (NSNumber *n in values) {
+        if (![n isKindOfClass:NSNumber.class]) continue;
+        peak = MAX(peak, n.doubleValue);
+    }
+    if (peak < 10) {
+        peak = 10;
+    }
+    return ceil(peak / 10.0) * 10.0;
 }
 
 - (void)layoutSubviews {
     [super layoutSubviews];
     if (self.bounds.size.width <= 0 || self.bounds.size.height <= 0) return;
     if (CGSizeEqualToSize(self.lastBarLayoutSize, self.bounds.size) &&
-        [self.lastBarValues isEqualToArray:self.values]) {
+        [self.lastBarValues isEqualToArray:self.values ?: @[]]) {
         return;
     }
     self.lastBarLayoutSize = self.bounds.size;
@@ -76,7 +99,7 @@
 
     CGFloat w = self.bounds.size.width;
     CGFloat h = self.bounds.size.height;
-    CGFloat maxV = self.maxValue > 0 ? self.maxValue : 100;
+    CGFloat maxV = self.maxValue > 0 ? self.maxValue : [PassportBarChartView adaptiveMaxValueForValues:self.values];
     UIColor *c = self.barColor ?: [UIColor colorWithRed:0.2 green:0.55 blue:0.45 alpha:1.0];
 
     // 预留坐标轴文字空间
@@ -88,9 +111,13 @@
     CGFloat plotW = MAX(1, w - leftAxisW);
     CGFloat plotH = MAX(1, h - topValueH - bottomAxisH);
 
-    // y 轴刻度（系统 10）
-    // 设计稿：0～100，按 20 等分
-    NSArray<NSNumber *> *yTicks = @[ @0, @20, @40, @60, @80, @100 ];
+    // y 轴刻度：0～maxV 均分 5 段（共 6 个刻度）
+    NSMutableArray<NSNumber *> *yTicks = [NSMutableArray arrayWithCapacity:6];
+    const NSInteger ySteps = 5;
+    for (NSInteger i = 0; i <= ySteps; i++) {
+        CGFloat v = maxV * ((CGFloat)i / (CGFloat)ySteps);
+        [yTicks addObject:@(llround(v))];
+    }
     for (NSNumber *t in yTicks) {
         UILabel *yl = [[UILabel alloc] init];
         yl.font = [UIFont systemFontOfSize:10];

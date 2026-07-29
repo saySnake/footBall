@@ -15,6 +15,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSArray<NSString *> *xTitles;
 /// 固定柱宽，设计稿为 20
 @property (nonatomic, assign) CGFloat barWidth;
+/// 数据峰值 → Y 轴上限：至少 10，并向上取整到 10 的倍数
++ (CGFloat)adaptiveMaxValueForValues:(nullable NSArray<NSNumber *> *)values;
 @end
 
 @interface PassportDonutChartView : UIView

@@ -395,13 +395,12 @@ static CGFloat PCAbilityMaxLabelWidthForTitles(NSArray<NSString *> *titles, UIFo
     /**
      X轴在表示地点
      Y轴表示去过的频次
-     表格Y轴 最大值需要自适应，例如最高Y值是83 那么表格最高值是100
-     表格Y轴 最大值需要自适应，例如最高Y值是53 那么表格最高值是60
+     表格Y轴最大值自适应：取数据峰值，不足 10 按 10，再向上取整到 10 的倍数（如 53→60、83→90）
      最高值做高亮
      数据从信息填写得来
      */
-    _chart.maxValue = 100;
     _chart.xTitles = (model.goalTrendXTitles.count > 0) ? model.goalTrendXTitles : _chart.xTitles;
+    _chart.maxValue = [PassportBarChartView adaptiveMaxValueForValues:model.goalTrendValues];
     _chart.values = model.goalTrendValues;
 }
 
