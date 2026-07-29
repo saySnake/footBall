@@ -49,6 +49,8 @@
 "phone_country_code_default" = "+86";
 "phone_input_placeholder" = "請輸入手機號";
 "phone_get_code_button" = "取得驗證碼";
+"phone_toast_invalid_phone" = "請輸入正確的手機號";
+"phone_toast_agree_required" = "請先勾選並同意法律條款和隱私協議";
 "phone_agreement_text" = "同意《法律條款和隱私協議》";
 "phone_agreement_prefix" = "同意";
 "phone_agreement_link" = "《法律條款和隱私協議》";

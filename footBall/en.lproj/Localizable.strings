@@ -49,6 +49,8 @@
 "phone_country_code_default" = "+86";
 "phone_input_placeholder" = "Please enter phone number";
 "phone_get_code_button" = "Get verification code";
+"phone_toast_invalid_phone" = "Please enter a valid phone number";
+"phone_toast_agree_required" = "Please agree to the Terms and Privacy Policy first";
 "phone_agreement_text" = "Agree to Terms and Privacy Policy";
 "phone_agreement_prefix" = "Agree to ";
 "phone_agreement_link" = "Terms and Privacy Policy";

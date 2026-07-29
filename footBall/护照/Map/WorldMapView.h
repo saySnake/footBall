@@ -18,7 +18,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSArray *goneCountries;
 @property (nonatomic, strong) NSArray *ungoCountries;
 
-/// 加载并绘制 GeoJSON
+/// 异步加载并绘制 GeoJSON（读文件 / JSON 解析在后台，图层构建回主线程）
 - (void)loadGeoJSON;
 
 /// 在异步赋值 oftenCountries / goneCountries / ungoCountries 后调用，重绘各国填充色（可在任意线程调用，内部切回主线程）

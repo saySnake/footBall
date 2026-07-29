@@ -8,8 +8,9 @@
 #import "AuthManager.h"
 #import "APIManager.h"
 #import "APIEnvironmentManager.h"
+#import "PNKeychainStore.h"
 
-// Token存储Key
+// Token / 用户资料存储 Key（Keychain；旧版曾明文写在 UserDefaults）
 static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
 
 @interface AuthManager ()
@@ -112,7 +113,7 @@ static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
         return;
     }
 #if DEBUG
-    NSLog(@"[Auth] refreshToken 请求前: %@", refreshToken.length ? refreshToken : @"(空)");
+    NSLog(@"[Auth] refreshToken 请求前: %@", refreshToken.length ? @"有" : @"(空)");
 #endif
     [[APIManager sharedManager] POST:APIPathValueRefreshToken parameters:@{@"refreshToken":refreshToken} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
@@ -125,7 +126,7 @@ static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
             self.user.expiresIn = expiresIn;
             [self saveUser];
 #if DEBUG
-            NSLog(@"[Auth] refreshToken 刷新后: %@", self.user.refreshToken.length ? self.user.refreshToken : @"(空)");
+            NSLog(@"[Auth] refreshToken 刷新后: %@", self.user.refreshToken.length ? @"有" : @"(空)");
 #endif
             success(responseObject);
         } else {
@@ -186,26 +187,38 @@ static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
 }
 - (void)saveUser {
     NSString *userJson = [self.user yy_modelToJSONString];
-    [[NSUserDefaults standardUserDefaults] setObject:userJson forKey:kCurrentUserKey];
-}
--(void)removeUser {
-    _user = nil;
+    if (userJson.length > 0) {
+        [PNKeychainStore setString:userJson forKey:kCurrentUserKey];
+    } else {
+        [PNKeychainStore removeItemForKey:kCurrentUserKey];
+    }
+    // 清除旧版明文缓存，避免敏感数据残留在 UserDefaults / plist
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:kCurrentUserKey];
 }
+
+- (void)removeUser {
+    _user = nil;
+    [PNKeychainStore removeItemForKey:kCurrentUserKey];
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kCurrentUserKey];
+}
+
 #pragma mark - Private Methods
 
 - (void)loadTokenFromStorage {
-    // 从本地加载Token
-    NSString *user = [[NSUserDefaults standardUserDefaults] stringForKey:kCurrentUserKey];
-    if (user && user.length > 0) {
-        _user = [User yy_modelWithJSON:user];
-        NSLog(@"📂 已从本地加载User");
-#if DEBUG
-        if (_user.refreshToken.length > 0) {
-            NSLog(@"[Auth] 本地 refreshToken: %@", _user.refreshToken);
-        } else {
-            NSLog(@"[Auth] 本地 refreshToken: (空)");
+    NSString *user = [PNKeychainStore stringForKey:kCurrentUserKey];
+    if (!user.length) {
+        // 兼容升级：从 UserDefaults 明文迁移到 Keychain
+        user = [[NSUserDefaults standardUserDefaults] stringForKey:kCurrentUserKey];
+        if (user.length > 0) {
+            [PNKeychainStore setString:user forKey:kCurrentUserKey];
+            [[NSUserDefaults standardUserDefaults] removeObjectForKey:kCurrentUserKey];
         }
+    }
+    if (user.length > 0) {
+        _user = [User yy_modelWithJSON:user];
+#if DEBUG
+        NSLog(@"📂 已从 Keychain 加载 User（refreshToken %@）",
+              _user.refreshToken.length > 0 ? @"有" : @"空");
 #endif
     }
 }

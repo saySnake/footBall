@@ -228,8 +228,8 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "游牧足球";
 				INFOPLIST_KEY_NSCameraUsageDescription = "需要访问相机以拍摄并上传认证或内容图片";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "用于获取比赛认证的当前位置";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问相册以选择头像、认证材料或观赛照片";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "需要访问相册以保存您的二维码名片图片";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问相册以选择头像、认证材料或观赛照片";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -266,8 +266,8 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "游牧足球";
 				INFOPLIST_KEY_NSCameraUsageDescription = "需要访问相机以拍摄并上传认证或内容图片";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "用于获取比赛认证的当前位置";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问相册以选择头像、认证材料或观赛照片";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "需要访问相册以保存您的二维码名片图片";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问相册以选择头像、认证材料或观赛照片";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;

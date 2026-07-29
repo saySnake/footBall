@@ -37,6 +37,8 @@ static BOOL WMStringLooksLikeISOAlpha2(NSString *s) {
 /// 已解析的 GeoJSON，等布局出有效 bounds 后再 build（避免首次 load 时 bounds 为 0 画不出）
 @property (nonatomic, strong, nullable) NSDictionary *geoJSONData;
 @property (nonatomic, assign) CGSize lastBuiltBoundsSize;
+/// 异步加载代数，避免重复 load / 页面销毁后回调写回旧数据
+@property (nonatomic, assign) NSInteger geoJSONLoadGeneration;
 
 @property (nonatomic, assign) CGFloat currentScale;
 @property (nonatomic, assign) CGPoint currentTranslation;            // 以 view 坐标为基准的平移
@@ -160,24 +162,39 @@ static BOOL WMStringLooksLikeISOAlpha2(NSString *s) {
     self.geoJSONData = nil;
     self.lastBuiltBoundsSize = CGSizeMake(-1, -1);
 
+    NSInteger generation = ++self.geoJSONLoadGeneration;
     NSString *name = @"world-zh";
     NSString *ext = @"json";
 
-    NSURL *url = [[NSBundle mainBundle] URLForResource:name withExtension:ext];
-    if (!url) { NSLog(@"WorldMapView: cannot find %@.%@ in bundle", name, ext); return; }
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSURL *url = [[NSBundle mainBundle] URLForResource:name withExtension:ext];
+        if (!url) {
+            NSLog(@"WorldMapView: cannot find %@.%@ in bundle", name, ext);
+            return;
+        }
 
-    NSData *data = [NSData dataWithContentsOfURL:url];
-    if (!data) return;
+        NSData *data = [NSData dataWithContentsOfURL:url];
+        if (!data) {
+            NSLog(@"WorldMapView: failed to read %@.%@", name, ext);
+            return;
+        }
 
-    NSError *err = nil;
-    id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&err];
-    if (err || ![json isKindOfClass:[NSDictionary class]]) {
-        NSLog(@"WorldMapView: invalid geojson: %@", err);
-        return;
-    }
+        NSError *err = nil;
+        id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&err];
+        if (err || ![json isKindOfClass:[NSDictionary class]]) {
+            NSLog(@"WorldMapView: invalid geojson: %@", err);
+            return;
+        }
 
-    self.geoJSONData = (NSDictionary *)json;
-    [self rebuildMapLayersIfNeeded];
+        NSDictionary *geoJSON = (NSDictionary *)json;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (generation != self.geoJSONLoadGeneration) {
+                return;
+            }
+            self.geoJSONData = geoJSON;
+            [self rebuildMapLayersIfNeeded];
+        });
+    });
 }
 
 /// bounds 有效且尺寸变化时才重建路径（首次布局前 bounds 为 0 时无法投影）

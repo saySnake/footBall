@@ -350,11 +350,6 @@ static UIColor *PNFigmaSocialCircleBG(void) {
         return NO;
     }
 
-    BOOL validPhone = (next.length == kMaxLen);
-    BOOL enabled = validPhone && self.agreeCheckButton.selected;
-    self.getCodeButton.enabled = enabled;
-    self.getCodeButton.alpha = enabled ? 1.0 : 0.5;
-
     return YES;
 }
 
@@ -364,25 +359,31 @@ static UIColor *PNFigmaSocialCircleBG(void) {
 
 - (void)toggleAgree {
     self.agreeCheckButton.selected = !self.agreeCheckButton.selected;
-    [self updateButtonState];
 }
 
 - (void)updateButtonState {
-    BOOL validPhone = self.phoneTextField.text.length == 11;
-    BOOL enabled = validPhone && self.agreeCheckButton.selected;
-    self.getCodeButton.enabled = enabled;
-    self.getCodeButton.alpha = enabled ? 1.0 : 0.5;
+    // 获取验证码按钮保持可点，校验放在点击时提示
+    self.getCodeButton.enabled = YES;
+    self.getCodeButton.alpha = 1.0;
 }
 
 - (void)getCodeTapped {
-    if (!self.getCodeButton.enabled) {
+    NSString *phone = [self.phoneTextField.text ?: @"" stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (phone.length != 11) {
+        NSString *msg = NSLocalizedString(@"phone_toast_invalid_phone", nil) ?: @"请输入正确的手机号";
+        [QMUITips showInfo:msg];
+        return;
+    }
+    if (!self.agreeCheckButton.selected) {
+        NSString *msg = NSLocalizedString(@"phone_toast_agree_required", nil) ?: @"请先勾选并同意法律条款和隐私协议";
+        [QMUITips showInfo:msg];
         return;
     }
     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
-    [AuthManager.sharedManager sendVerifyCode:self.phoneTextField.text success:^(HTTPResponse *response) {
+    [AuthManager.sharedManager sendVerifyCode:phone success:^(HTTPResponse *response) {
         [MBProgressHUD hideHUDForView:self.view animated:YES];
         VerifyCodeViewController *vc = VerifyCodeViewController.alloc.init;
-        vc.phoneNumber = self.phoneTextField.text;
+        vc.phoneNumber = phone;
         [self.navigationController pushViewController:vc animated:YES];
     } failure:^(NSError * _Nonnull error) {
         [MBProgressHUD hideHUDForView:self.view animated:YES];
