@@ -956,6 +956,34 @@ static CGFloat PCTacticalLegendRowHeight(void) {
     return 62.0;
 }
 
+/// 观赛身份环图色板（多于色数时循环使用，避免挤成同一色）
+static NSArray<UIColor *> *PCTacticalIdentityPalette(void) {
+    static NSArray<UIColor *> *colors;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSArray<NSString *> *hexes = @[
+            @"#CCFFDC", @"#62D486", @"#5CB793", @"#3D8B7A", @"#285D4B", @"#1B3C3E",
+            @"#A8E6C3", @"#7BC99A", @"#4AA882", @"#2E6B5C", @"#0F2E30", @"#8FD4A8",
+            @"#B8F0D0", @"#45B38A", @"#1F4A42", @"#6ED4A0", @"#347A68", @"#0A2426",
+            @"#9ADDBC", @"#58C49A",
+        ];
+        NSMutableArray<UIColor *> *arr = [NSMutableArray arrayWithCapacity:hexes.count];
+        for (NSString *h in hexes) {
+            [arr addObject:[UIColor colorWithHexString:h]];
+        }
+        colors = [arr copy];
+    });
+    return colors;
+}
+
+static UIColor *PCTacticalIdentityColorAtIndex(NSUInteger index) {
+    NSArray<UIColor *> *cols = PCTacticalIdentityPalette();
+    if (cols.count == 0) {
+        return [UIColor colorWithHexString:@"#5CB793"];
+    }
+    return cols[index % cols.count];
+}
+
 @implementation PassportTacticalCell {
     UIView *_card;
     UILabel *_title;
@@ -1052,24 +1080,15 @@ static CGFloat PCTacticalLegendRowHeight(void) {
 - (void)configureWithModel:(PassportViewModel *)model {
     [self prepareForReuse];
     _title.text = model.tacticalTitle;
-    //2026赛季 具体用了几种身份看就写几 不能大于6
     _subtitle.attributedText = PCTacticalIdentitySubtitle(model.tacticalIdentityCount);
     
-    //在2026赛季 以最多6种身份观看比赛 具体占比做出饼图 假如身份A和B都在一场比赛里使用 可以叠加
+    // 环形图数据已在 ViewModel 收成「前 5 + 其他」；色板按扇区索引取色
     NSMutableArray *ratios = [NSMutableArray array];
-    NSArray<UIColor *> *cols = @[
-        [UIColor colorWithHexString:@"#CCFFDC"],
-        [UIColor colorWithHexString:@"#62D486"],
-        [UIColor colorWithHexString:@"#5CB793"],
-        [UIColor colorWithHexString:@"#3D8B7A"],
-        [UIColor colorWithHexString:@"#285D4B"],
-        [UIColor colorWithHexString:@"#1B3C3E"],
-    ];
     NSMutableArray *colors = [NSMutableArray array];
     NSUInteger i = 0;
     for (NSDictionary *seg in model.tacticalSegments) {
         [ratios addObject:seg[@"p"] ?: @0];
-        [colors addObject:cols[MIN(i, cols.count - 1)]];
+        [colors addObject:PCTacticalIdentityColorAtIndex(i)];
         i++;
     }
     _donut.lineWidth = 40;
@@ -1083,7 +1102,7 @@ static CGFloat PCTacticalLegendRowHeight(void) {
     _donut.ringTrackExtraWidth = 10;
     _donut.segmentGapPoints = 5;
 
-    // 观赛身份图例：每行 3 个（最多 6 种身份 → 2 行）
+    // 观赛身份图例：每行 3 个
     UIFont *legFont = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
     NSArray<NSDictionary *> *segs = model.tacticalSegments ?: @[];
     NSUInteger nSeg = segs.count;
@@ -1098,7 +1117,7 @@ static CGFloat PCTacticalLegendRowHeight(void) {
             NSDictionary *seg = segs[i];
             UIView *cell = [[UIView alloc] init];
             UIView *dot = [[UIView alloc] init];
-            dot.backgroundColor = cols[MIN(i, cols.count - 1)];
+            dot.backgroundColor = PCTacticalIdentityColorAtIndex(i);
             dot.layer.cornerRadius = 8;
             dot.clipsToBounds = YES;
             UILabel *l = [[UILabel alloc] init];

@@ -99,8 +99,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSArray<NSDictionary *> *abilityItems;
 
 @property (nonatomic, copy) NSString *tacticalTitle;
-/// 副标题中的身份种类数量，如「我以 3 种身份看比赛」中的 3
+/// 副标题中的身份种类数量，如「我以 3 种身份看比赛」中的 3（真实种类数，含被汇总进「其他」的）
 @property (nonatomic, assign) NSInteger tacticalIdentityCount;
+/// 环形图扇区：频次前 5 + 可选「其他」；元素为 @{ @"p": NSNumber 占比, @"title": NSString }
 @property (nonatomic, strong) NSArray<NSDictionary *> *tacticalSegments;
 
 @property (nonatomic, copy) NSString *recentGoalsTitle;

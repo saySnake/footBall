@@ -517,6 +517,7 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     m.abilityItems = [PassportViewModel abilityItemsOrderedFromStandDist:standList];
 
     //观赛身份 tactical：用 identityDist（有 count/percentage）构建 segments
+    // 环形图只展示频次最高的前 5 项，其余汇总为「其他」；副标题仍用真实身份种类数
     m.tacticalTitle = NSLocalizedString(@"passport_tactical_identity_title", nil) ?: @"观赛身份";
     NSMutableArray<PNIdentityDist *> *filteredIdentities = [NSMutableArray array];
     for (PNIdentityDist *d in identityList) {
@@ -539,13 +540,28 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     for (PNIdentityDist *d in filteredIdentities) {
         totalIdentity += MAX(0, (double)d.count);
     }
+    static const NSUInteger kTacticalChartTopCount = 5;
     NSMutableArray<NSDictionary *> *segs = [NSMutableArray array];
-    for (PNIdentityDist *d in filteredIdentities) {
-        double p = totalIdentity > 0 ? ((double)MAX(0, d.count) / totalIdentity) : 0;
-        [segs addObject:@{ @"p": @(p), @"title": d.identity ?: @"" }];
+    double otherCount = 0;
+    for (NSUInteger i = 0; i < filteredIdentities.count; i++) {
+        PNIdentityDist *d = filteredIdentities[i];
+        double c = MAX(0, (double)d.count);
+        if (i < kTacticalChartTopCount) {
+            double p = totalIdentity > 0 ? (c / totalIdentity) : 0;
+            [segs addObject:@{ @"p": @(p), @"title": d.identity ?: @"" }];
+        } else {
+            otherCount += c;
+        }
+    }
+    if (otherCount > 0 && totalIdentity > 0) {
+        NSString *otherTitle = NSLocalizedString(@"passport_legend_other", nil);
+        if (!otherTitle.length || [otherTitle isEqualToString:@"passport_legend_other"]) {
+            otherTitle = @"其他";
+        }
+        [segs addObject:@{ @"p": @(otherCount / totalIdentity), @"title": otherTitle }];
     }
     m.tacticalSegments = [segs copy];
-    m.tacticalIdentityCount = m.tacticalSegments.count;
+    m.tacticalIdentityCount = (NSInteger)filteredIdentities.count;
 
     // 观赛后的情绪：与输入信息页 7 种情绪顺序一致
     NSArray<NSDictionary *> *emotionBars = [PassportViewModel emotionMetricBarsOrderedFromEmotionDist:emotionList];
