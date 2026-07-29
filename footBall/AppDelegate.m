@@ -15,9 +15,9 @@
 #import "APIAppMetadataInterceptor.h"
 #import "AuthManager.h"
 #import "PagFilePreloader.h"
-#import <DoraemonKit/DoraemonManager.h>
 
 #ifdef DEBUG
+#import <DoraemonKit/DoraemonManager.h>
 #import <easydebug/EasyDebug.h>
 #import "EasyDebugPositionConfig.h"
 #endif

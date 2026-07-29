@@ -9,8 +9,8 @@
 #import "MainTabBarController.h"
 #import "AuthManager.h"
 #import "ThemeObserverView.h"
-#import <DoraemonKit/DoraemonManager.h>
 #ifdef DEBUG
+#import <DoraemonKit/DoraemonManager.h>
 #import "BVAPPDebugTool.h"
 #import "BVAPPEnvironmentHostManager.h"
 #endif

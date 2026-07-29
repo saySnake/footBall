@@ -15,7 +15,7 @@ target 'footBall' do
   pod 'YYCategories'
   pod 'YYModel'
   pod 'IQKeyboardManager'
-  pod 'DoraemonKit'
+  pod 'DoraemonKit', :configurations => ['Debug']
   pod 'libpag'
   pod 'SocketRocket'
   pod 'QMUIKit'

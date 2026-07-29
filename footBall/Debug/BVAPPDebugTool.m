@@ -121,4 +121,10 @@
 
 @end
 
+#else
+
+@implementation BVAPPDebugTool
++ (void)setup {}
+@end
+
 #endif
