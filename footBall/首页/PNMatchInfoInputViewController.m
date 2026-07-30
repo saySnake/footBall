@@ -89,6 +89,9 @@ static NSSet<NSString *> *PNSeatAllowedWatchLocations(void) {
 @property (nonatomic, strong) NSMutableSet<NSString *> *selectedIdentities;
 
 @property (nonatomic, strong) UILabel *headerTitleLabel;
+@property (nonatomic, strong) UIButton *confirmBtn;
+/// 编辑模式详情加载失败：禁止确认，避免默认值覆盖服务端真实记录
+@property (nonatomic, assign) BOOL editDetailLoadFailed;
 
 // 记录进入页面前 IQKeyboardManager 的启用状态，方便恢复
 @property (nonatomic, assign) BOOL iqPreviouslyEnabled;
@@ -862,6 +865,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     confirmBtn.layer.masksToBounds = NO;
     [confirmBtn addTarget:self action:@selector(onConfirmTapped) forControlEvents:UIControlEventTouchUpInside];
     [content addSubview:confirmBtn];
+    self.confirmBtn = confirmBtn;
     [confirmBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(commentView.mas_bottom).offset(20);
         // Figma 设计为左右 24 间距，按钮更窄
@@ -1033,6 +1037,9 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
 - (void)loadInitialFormData {
     if (self.recordId.length > 0) {
         self.headerTitleLabel.text = @"编辑信息";
+        self.editDetailLoadFailed = NO;
+        self.confirmBtn.enabled = NO;
+        self.confirmBtn.alpha = 0.5;
         [[LoadingManager sharedManager] showLoadingInView:self.view];
         __weak typeof(self) weakSelf = self;
         [[MatchRequest shared] getMatchRecordDetail:self.recordId success:^(HTTPResponse * _Nullable responseObject) {
@@ -1044,14 +1051,15 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
                 detail = [PNMatchRecordDetail yy_modelWithJSON:responseObject.data];
             }
             if (detail) {
+                weakSelf.editDetailLoadFailed = NO;
+                weakSelf.confirmBtn.enabled = YES;
+                weakSelf.confirmBtn.alpha = 1.0;
                 [weakSelf applyFromDetail:detail];
             } else {
-                [weakSelf fillDefaultValues];
-                [[LoadingManager sharedManager] showError:@"加载观赛记录失败" inView:weakSelf.view];
+                [weakSelf pn_markEditDetailLoadFailedWithMessage:@"加载观赛记录失败，请重试"];
             }
         } failure:^(NSError * _Nonnull error) {
             [[LoadingManager sharedManager] hideLoadingInView:weakSelf.view];
-            [weakSelf fillDefaultValues];
             NSString *msg = error.localizedDescription ?: @"网络错误";
             if ([error isKindOfClass:[APIError class]]) {
                 APIError *ae = (APIError *)error;
@@ -1059,12 +1067,32 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
                     msg = ae.businessMessage;
                 }
             }
-            [[LoadingManager sharedManager] showError:msg inView:weakSelf.view];
+            [weakSelf pn_markEditDetailLoadFailedWithMessage:msg];
         }];
     } else {
         self.headerTitleLabel.text = @"输入信息";
         [self fillDefaultValues];
     }
+}
+
+- (void)pn_markEditDetailLoadFailedWithMessage:(NSString *)message {
+    self.editDetailLoadFailed = YES;
+    self.confirmBtn.enabled = NO;
+    self.confirmBtn.alpha = 0.5;
+    NSString *msg = message.length ? message : @"加载失败";
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:(NSLocalizedString(@"settings_alert_title", nil) ?: @"提示")
+                                                                   message:msg
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    __weak typeof(self) weakSelf = self;
+    [alert addAction:[UIAlertAction actionWithTitle:(NSLocalizedString(@"cancel", nil) ?: @"取消")
+                                              style:UIAlertActionStyleCancel
+                                            handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:(NSLocalizedString(@"retry", nil) ?: @"重试")
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction * _Nonnull action) {
+        [weakSelf loadInitialFormData];
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)applyFromDetail:(PNMatchRecordDetail *)detail {
@@ -1234,6 +1262,10 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
 
 - (void)onConfirmTapped {
     [self.view endEditing:YES];
+    if (self.editDetailLoadFailed) {
+        [[LoadingManager sharedManager] showText:@"请先重新加载观赛记录" inView:self.view];
+        return;
+    }
     NSString *errMsg = nil;
     if (![self pn_validateBeforeSubmit:&errMsg]) {
         [[LoadingManager sharedManager] showText:errMsg inView:self.view];

@@ -273,9 +273,8 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
     
     // 生成请求唯一标识（用于跟踪重试次数）
     NSString *requestKey = [NSString stringWithFormat:@"%@_%ld_%p", fullURL, (long)method, parameters];
-    __block void (^wrappedFailure)(id,id) = nil;
-    __weak typeof(wrappedFailure) weakWrappedFailure = wrappedFailure;
-    wrappedFailure = ^(NSURLSessionDataTask * task,NSError *error) {
+    __block void (^wrappedFailure)(id, id) = nil;
+    wrappedFailure = ^(NSURLSessionDataTask *task, NSError *error) {
 
         // 转换为APIError
         APIError *apiError = APIParseBusinessErrorFromNSError(error);
@@ -312,7 +311,12 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
                             if (success) {
                                 success(task,responseObject);
                             }
-                        } failure:weakWrappedFailure]; // 使用相同的wrappedFailure，继续重试逻辑
+                        } failure:^(NSURLSessionDataTask *t, NSError *e) {
+                            // 必须捕获 __block wrappedFailure 本身，不能用 __weak 拷贝（会永远是 nil）
+                            if (wrappedFailure) {
+                                wrappedFailure(t, e);
+                            }
+                        }];
                     }
                 }];
                 if (!interceptedError) {
@@ -377,7 +381,11 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
                     if (success) {
                         success(task,responseObject);
                     }
-                } failure:weakWrappedFailure]; // 使用相同的wrappedFailure，继续重试逻辑
+                } failure:^(NSURLSessionDataTask *t, NSError *e) {
+                    if (wrappedFailure) {
+                        wrappedFailure(t, e);
+                    }
+                }];
             });
             return; // 重试中，不调用失败回调
         }

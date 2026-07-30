@@ -117,6 +117,8 @@
 @property (nonatomic, strong) NSMutableDictionary<NSString *, SKProduct *> *skProducts;
 /// IAP：当前正在购买的 planId（用于购买成功后上报服务端）
 @property (nonatomic, copy) NSString *pendingPlanId;
+/// 支付/拉商品进行中，防连点导致 HUD 叠层卡死
+@property (nonatomic, assign) BOOL payInFlight;
 @end
 
 @implementation MembershipCenterViewController
@@ -1313,19 +1315,22 @@
     f.benefitIcons = @[@"trophy.fill", @"shippingbox.fill", @"number.square.fill", @"globe", @"tshirt.fill"];
 
     if (self.hasAppliedRedeemDiscount) {
-        m.originalPrice = m.price;
-        m.price = @"22";
-        m.payPrice = @"22";
-
-        y.originalPrice = y.price;
-        y.price = @"188";
-        y.payPrice = @"188";
-
-        l.originalPrice = l.price;
-        l.price = @"698";
-        l.payPrice = @"698";
-
-        f.originalPrice = @"";
+        // 折扣只作用在兑换码对应的方案上，避免所有卡片都显示折后价误导用户
+        NSString *pid = self.redeemPlanId ?: @"";
+        void (^applyDiscount)(MCPlan *, NSString *) = ^(MCPlan *plan, NSString *discountPrice) {
+            if (!plan || discountPrice.length == 0) return;
+            plan.originalPrice = plan.price;
+            plan.price = discountPrice;
+            plan.payPrice = discountPrice;
+        };
+        if ([pid isEqualToString:@"1"]) {
+            applyDiscount(m, @"22");
+        } else if ([pid isEqualToString:@"2"]) {
+            applyDiscount(y, @"188");
+        } else if ([pid isEqualToString:@"3"]) {
+            applyDiscount(l, @"698");
+        }
+        // planId=4 创始人通常无折扣；未知 planId 不改价
     }
 
     self.plans = @[m, y, l, f];
@@ -1645,7 +1650,7 @@
 }
 
 - (void)updatePayButtonState {
-    BOOL enabled = self.agreementCheckBtn.selected;
+    BOOL enabled = self.agreementCheckBtn.selected && !self.payInFlight;
     self.payBtn.enabled = enabled;
     self.payBtn.alpha = enabled ? 1.0 : 0.55;
 }
@@ -1665,14 +1670,21 @@
     NSString *appleProductId = nil;
     NSString *planId = nil;
 
-    // 折扣场景：优先使用兑换码返回的折扣商品 ID（对应 App Store 里的折扣价商品）
-    if (self.hasAppliedRedeemDiscount && self.redeemAppleProductId.length > 0) {
+    // 折扣场景：仅当当前选中卡就是兑换码对应方案时，才用折扣商品 ID
+    NSArray<NSString *> *expectedPlanIds = @[ @"1", @"2", @"3", @"4" ];
+    NSString *selectedPlanId = (self.currentIndex >= 0 && self.currentIndex < (NSInteger)expectedPlanIds.count)
+        ? expectedPlanIds[self.currentIndex] : nil;
+    BOOL useRedeemDiscount = self.hasAppliedRedeemDiscount
+        && self.redeemAppleProductId.length > 0
+        && selectedPlanId.length > 0
+        && (self.redeemPlanId.length == 0 || [self.redeemPlanId isEqualToString:selectedPlanId]);
+
+    if (useRedeemDiscount) {
         appleProductId = self.redeemAppleProductId;
-        planId = self.redeemPlanId;
+        planId = self.redeemPlanId.length ? self.redeemPlanId : selectedPlanId;
         NSLog(@"[Pay] 折扣模式: appleProductId=%@, planId=%@", appleProductId, planId);
     } else if (self.apiPlans.count > 0) {
-        NSArray<NSString *> *expectedPlanIds = @[ @"1", @"2", @"3", @"4" ];
-        NSString *expectedPlanId = (self.currentIndex >= 0 && self.currentIndex < (NSInteger)expectedPlanIds.count) ? expectedPlanIds[self.currentIndex] : nil;
+        NSString *expectedPlanId = selectedPlanId;
         PNMemberPlan *target = nil;
         // 优先按 planId 精确匹配，避免服务端返回顺序/缺项导致 index 对错方案。
         if (expectedPlanId.length > 0) {
@@ -1709,6 +1721,10 @@
         return;
     }
 
+    if (self.payInFlight) {
+        return;
+    }
+
     self.pendingPlanId = planId;
 
     // 如果已缓存该产品，直接发起购买；否则先向 App Store 请求产品信息
@@ -1727,8 +1743,15 @@
         [[LoadingManager sharedManager] showError:@"商品标识无效，请稍后重试" inView:self.view];
         return;
     }
-    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+    if (self.payInFlight) {
+        return;
+    }
+    self.payInFlight = YES;
+    self.payBtn.enabled = NO;
+    // cancel 不会走 didFail，先清掉可能残留的 HUD，避免叠层卡死
     [self.productsRequest cancel];
+    [MBProgressHUD hideHUDForView:self.view animated:NO];
+    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
     self.productsRequest = [[SKProductsRequest alloc] initWithProductIdentifiers:[NSSet setWithObject:productId]];
     self.productsRequest.delegate = self;
     [self.productsRequest start];
@@ -1746,6 +1769,8 @@
 - (void)productsRequest:(SKProductsRequest *)request didReceiveResponse:(SKProductsResponse *)response {
     dispatch_async(dispatch_get_main_queue(), ^{
         [MBProgressHUD hideHUDForView:self.view animated:YES];
+        self.payInFlight = NO;
+        [self updatePayButtonState];
         // 缓存所有返回的产品
         for (SKProduct *product in response.products) {
             self.skProducts[product.productIdentifier] = product;
@@ -1764,6 +1789,8 @@
 - (void)request:(SKRequest *)request didFailWithError:(NSError *)error {
     dispatch_async(dispatch_get_main_queue(), ^{
         [MBProgressHUD hideHUDForView:self.view animated:YES];
+        self.payInFlight = NO;
+        [self updatePayButtonState];
         NSString *msg = error.localizedDescription ?: @"获取商品信息失败，请稍后重试";
         [[LoadingManager sharedManager] showError:msg inView:self.view];
     });
@@ -2016,7 +2043,7 @@
     [self updateCardInteractiveScaleForOffset:scrollView.contentOffset.x];
     CGFloat pageW = 222.0;
     NSInteger nearest = (NSInteger)llround(scrollView.contentOffset.x / pageW);
-    nearest = MAX(0, MIN(nearest, self.plans.count - 1));
+    nearest = MAX(0, MIN(nearest, (NSInteger)self.plans.count - 1));
     if (nearest != self.currentIndex) {
         [self refreshPlanInfoAtIndex:nearest];
     }
@@ -2043,7 +2070,7 @@
     } else {
         idx = (NSInteger)llround(targetContentOffset->x / pageW);
     }
-    idx = MAX(0, MIN(idx, self.plans.count - 1));
+    idx = MAX(0, MIN(idx, (NSInteger)self.plans.count - 1));
     targetContentOffset->x = idx * pageW;
     targetContentOffset->y = 0;
     [self refreshPlanInfoAtIndex:idx];
@@ -2053,14 +2080,14 @@
     CGFloat pageW = 222.0;
     CGFloat x = self.cardScrollView.contentOffset.x;
     NSInteger idx = (NSInteger)llround(x / pageW);
-    idx = MAX(0, MIN(idx, self.plans.count - 1));
+    idx = MAX(0, MIN(idx, (NSInteger)self.plans.count - 1));
     [self applyPlanAtIndex:idx animated:YES];
 }
 
 - (void)onSwipePlan:(UISwipeGestureRecognizer *)gesture {
     if (self.showingGiftCode) return;
     NSInteger next = self.currentIndex + (gesture.direction == UISwipeGestureRecognizerDirectionLeft ? 1 : -1);
-    next = MAX(0, MIN(next, self.plans.count - 1));
+    next = MAX(0, MIN(next, (NSInteger)self.plans.count - 1));
     if (next != self.currentIndex) {
         [self applyPlanAtIndex:next animated:YES];
     }

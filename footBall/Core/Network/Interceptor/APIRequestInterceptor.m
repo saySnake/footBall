@@ -138,6 +138,7 @@
     if (httpResp.statusCode == 401 && AuthManager.sharedManager.isLoggedIn && ![task.currentRequest.URL.path containsString:APIPathValueRefreshToken]) {
         [self.callbacks addObject:tokenRefreshed];
         if (!self.refreshingToken) {
+            self.refreshingToken = YES;
             NSLog(@"✅ [API Request] token过期，开始刷新token");
             [AuthManager.sharedManager refreshTokenSuccess:^(HTTPResponse * _Nonnull response) {
                 if (response.success) {

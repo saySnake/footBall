@@ -168,6 +168,8 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
 @property (nonatomic, copy, nullable) NSString *uploadedAvatarKey;
 /// 相机 dismiss 会触发 viewWillAppear；上传中避免旧头像覆盖当前预览图。
 @property (nonatomic, assign) BOOL avatarUploadInProgress;
+/// 有未保存的本地编辑时，跳过 viewWillAppear 的服务端覆盖
+@property (nonatomic, assign) BOOL profileEditingDirty;
 @end
 
 @implementation PersonalInfoViewController
@@ -184,6 +186,9 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    if (self.profileEditingDirty || self.avatarNeedsUpload || self.avatarUploadInProgress) {
+        return;
+    }
     [self reloadProfileFromServer];
 }
 
@@ -359,6 +364,7 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
     }];
     self.nickLeft = [self addLeftLabelToCard:self.nickCard];
     self.nickField = [self addRightTextFieldToCard:self.nickCard];
+    [self.nickField addTarget:self action:@selector(onProfileFieldEdited:) forControlEvents:UIControlEventEditingChanged];
     // 昵称输入框：固定左边距为 50，右边距 16，宽度确定，避免首次成为响应者时内容显示不全
     [self.nickField mas_remakeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(self.nickCard).offset(50);
@@ -638,14 +644,27 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
     }
 }
 
+- (void)onProfileFieldEdited:(UITextField *)sender {
+    self.profileEditingDirty = YES;
+}
+
 - (void)onChipTapped:(UIButton *)sender {
     // 多选：单个 toggle
     BOOL isSelected = CGColorEqualToColor(sender.layer.borderColor, kPIGreen.CGColor);
     [self setChipSelected:sender selected:!isSelected];
+    self.profileEditingDirty = YES;
 }
 
-- (void)onMale { self.maleOption.checked = YES; self.femaleOption.checked = NO; }
-- (void)onFemale { self.maleOption.checked = NO; self.femaleOption.checked = YES; }
+- (void)onMale {
+    self.maleOption.checked = YES;
+    self.femaleOption.checked = NO;
+    self.profileEditingDirty = YES;
+}
+- (void)onFemale {
+    self.maleOption.checked = NO;
+    self.femaleOption.checked = YES;
+    self.profileEditingDirty = YES;
+}
 
 - (void)endEditing { [self.view endEditing:YES]; }
 
@@ -810,6 +829,7 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
     sheet.onConfirm = ^(NSDate *date) {
         weakSelf.birthDate = date;
         weakSelf.birthValue.text = [weakSelf formatDate:date];
+        weakSelf.profileEditingDirty = YES;
     };
     [self presentViewController:sheet animated:NO completion:nil];
 }
@@ -826,6 +846,7 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
     sheet.onConfirm = ^(NSDate *date) {
         weakSelf.firstMatchDate = date;
         weakSelf.firstYearValue.text = [weakSelf formatDate:date];
+        weakSelf.profileEditingDirty = YES;
     };
     [self presentViewController:sheet animated:NO completion:nil];
 }
@@ -870,6 +891,9 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
 
     self.avatarView.image = image;
     self.avatarNeedsUpload = YES;
+    // 重选图必须清掉旧 key，否则 onSave 会优先提交上一张成功上传的头像
+    self.uploadedAvatarKey = nil;
+    self.profileEditingDirty = YES;
     NSLog(@"[AvatarDebug] avatarNeedsUpload set to YES, image size=%.0fx%.0f", image.size.width, image.size.height);
     // 选完照片立即上传，不等用户点保存
     [self uploadAvatarImage:image];
@@ -972,6 +996,8 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
                 [AuthManager.sharedManager saveUser];
                 [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
                 weakSelf.avatarNeedsUpload = NO;
+                weakSelf.uploadedAvatarKey = nil;
+                weakSelf.profileEditingDirty = NO;
                 [weakSelf.navigationController popViewControllerAnimated:YES];
                 [[LoadingManager sharedManager] showSuccess:NSLocalizedString(@"profile_save_success", nil)];
             } failure:^(NSError * _Nonnull error) {
@@ -990,6 +1016,8 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
                 [AuthManager.sharedManager saveUser];
                 [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
                 weakSelf.avatarNeedsUpload = NO;
+                weakSelf.uploadedAvatarKey = nil;
+                weakSelf.profileEditingDirty = NO;
                 [weakSelf.navigationController popViewControllerAnimated:YES];
                 [[LoadingManager sharedManager] showSuccess:NSLocalizedString(@"profile_save_success", nil)];
             }];
@@ -1003,15 +1031,8 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
         }];
     };
 
-    if (self.uploadedAvatarKey.length > 0) {
-        // 已提前上传成功，直接用缓存的 objectKey
-        NSLog(@"[AvatarDebug] onSave: using cached uploadedAvatarKey=%@", self.uploadedAvatarKey);
-        p.avatar = self.uploadedAvatarKey;
-        putProfile();
-        return;
-    }
-
     if (self.avatarNeedsUpload) {
+        // 有待上传的新图时优先上传，不能被旧的 uploadedAvatarKey 抢先
         UIImage *avatarImage = self.avatarView.image;
         NSData *jpeg = UIImageJPEGRepresentation(avatarImage, 0.85);
         NSLog(@"[AvatarDebug] onSave: avatarNeedsUpload=YES, image=%@, jpegLength=%lu",
@@ -1036,6 +1057,7 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
                     [[LoadingManager sharedManager] showError:NSLocalizedString(@"profile_avatar_upload_fail", nil) ?: @"头像上传失败，请重试" inView:weakSelf.view];
                     return;
                 }
+                weakSelf.uploadedAvatarKey = url;
                 p.avatar = url;
                 putProfile();
             } failure:^(NSError * _Nonnull error) {
@@ -1052,6 +1074,15 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
             return;
         }
     }
+
+    if (self.uploadedAvatarKey.length > 0) {
+        // 已提前上传成功，直接用缓存的 objectKey
+        NSLog(@"[AvatarDebug] onSave: using cached uploadedAvatarKey=%@", self.uploadedAvatarKey);
+        p.avatar = self.uploadedAvatarKey;
+        putProfile();
+        return;
+    }
+
     NSLog(@"[AvatarDebug] onSave: avatarNeedsUpload=NO, skip upload");
     putProfile();
 }

@@ -12,6 +12,7 @@
 
 @property (nonatomic, strong, nullable) ThirdPartyAuthSuccessBlock appleSuccessBlock;
 @property (nonatomic, strong, nullable) ThirdPartyAuthFailureBlock appleFailureBlock;
+@property (nonatomic, strong, nullable) ASAuthorizationController *appleAuthController;
 
 @end
 
@@ -58,10 +59,11 @@
     ASAuthorizationAppleIDRequest *request = [provider createRequest];
     request.requestedScopes = @[ASAuthorizationScopeFullName, ASAuthorizationScopeEmail];
     
-    // 创建授权控制器
+    // 创建授权控制器（必须强引用持有，否则 ARC 可能提前释放导致回调丢失）
     ASAuthorizationController *controller = [[ASAuthorizationController alloc] initWithAuthorizationRequests:@[request]];
     controller.delegate = self;
     controller.presentationContextProvider = self;
+    self.appleAuthController = controller;
     
     // 发起授权请求
     [controller performRequests];
@@ -121,6 +123,18 @@
         // 清除回调
         self.appleSuccessBlock = nil;
         self.appleFailureBlock = nil;
+        self.appleAuthController = nil;
+    } else {
+        // 非 Apple ID 凭证（如密码自动填充）也必须回调，否则上层 loading 永久卡死
+        NSError *error = [NSError errorWithDomain:@"ThirdPartyAuthErrorDomain"
+                                             code:-2
+                                         userInfo:@{NSLocalizedDescriptionKey: @"未获取到有效的 Apple ID 凭证"}];
+        if (self.appleFailureBlock) {
+            self.appleFailureBlock(ThirdPartyAuthTypeApple, error);
+        }
+        self.appleSuccessBlock = nil;
+        self.appleFailureBlock = nil;
+        self.appleAuthController = nil;
     }
 }
 
@@ -136,6 +150,7 @@
     // 清除回调
     self.appleSuccessBlock = nil;
     self.appleFailureBlock = nil;
+    self.appleAuthController = nil;
 }
 
 #pragma mark - ASAuthorizationControllerPresentationContextProviding

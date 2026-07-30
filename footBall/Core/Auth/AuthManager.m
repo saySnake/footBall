@@ -122,7 +122,9 @@ static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
             NSString *refreshToken = data[@"refreshToken"];
             NSInteger expiresIn = [data[@"expiresIn"] integerValue];
             self.user.accessToken = accessToken;
-            self.user.refreshToken = refreshToken;
+            if ([refreshToken isKindOfClass:NSString.class] && refreshToken.length > 0) {
+                self.user.refreshToken = refreshToken;
+            }
             self.user.expiresIn = expiresIn;
             [self saveUser];
 #if DEBUG

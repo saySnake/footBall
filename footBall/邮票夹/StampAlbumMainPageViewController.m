@@ -114,7 +114,12 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         self.backgroundColor = [UIColor colorWithHexString:@"#E9E9E9"];
         self.lockView.image = [UIImage imageNamed:@"lock_icon"];
         self.lockView.hidden = NO;
-        [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
+        if (item.stamp) {
+            [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
+        } else {
+            [self sd_cancelImageLoadForState:UIControlStateNormal];
+            [self setImage:nil forState:UIControlStateNormal];
+        }
     }
 }
 @end
@@ -725,15 +730,33 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         if (position.count == 2) {
             NSInteger section = position.firstObject.integerValue;
             NSInteger index = position.lastObject.integerValue;
+            if (index < 0 || index >= STAMP_SECTION_ITEMS) {
+#if DEBUG
+                NSLog(@"[StampAlbum] skip invalid index position=%@", stamps[i].position);
+#endif
+                continue;
+            }
             if (section < 2) {
-                headerItem.bottomItems[index].stamp = stamps[i];
+                if ((NSUInteger)index < headerItem.bottomItems.count) {
+                    headerItem.bottomItems[index].stamp = stamps[i];
+                }
             } else {
                 NSInteger row = (section - 2) / 2;
+                if (row < 0 || (NSUInteger)row >= self.items.count) {
+#if DEBUG
+                    NSLog(@"[StampAlbum] skip invalid row position=%@", stamps[i].position);
+#endif
+                    continue;
+                }
                 PassportStampSheetCardItem *item = self.items[row];
                 if (section%2 == 0) {
-                    item.topItems[index].stamp = stamps[i];
+                    if ((NSUInteger)index < item.topItems.count) {
+                        item.topItems[index].stamp = stamps[i];
+                    }
                 } else {
-                    item.bottomItems[index].stamp = stamps[i];
+                    if ((NSUInteger)index < item.bottomItems.count) {
+                        item.bottomItems[index].stamp = stamps[i];
+                    }
                 }
             }
             
@@ -848,7 +871,8 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         }];
     } else {
         [[ProfileRequest shared] getMyPassportWithYear:y bypassCache:forceRefresh success:^(HTTPResponse * _Nullable responseObject) {
-            handleSuccess(responseObject.dataObject);
+            PNPassport *p = [responseObject.dataObject isKindOfClass:PNPassport.class] ? responseObject.dataObject : nil;
+            handleSuccess(p);
         } failure:^(NSError * _Nonnull error) {
             handleFailure(error);
         }];

@@ -402,7 +402,7 @@ static UIColor *PassportPageBg(void) {
         }];
     } else {
         [[ProfileRequest shared] getMyPassportWithYear:y bypassCache:forceRefresh success:^(HTTPResponse * _Nullable responseObject) {
-            PNPassport *p = responseObject.dataObject;
+            PNPassport *p = [responseObject.dataObject isKindOfClass:PNPassport.class] ? responseObject.dataObject : nil;
             handleSuccess(p);
         } failure:^(NSError * _Nonnull error) {
             handleFailure(error);

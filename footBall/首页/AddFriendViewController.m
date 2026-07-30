@@ -175,7 +175,7 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 }
 @end
 
-@interface ScanAddFriendViewController : UIViewController <AVCaptureMetadataOutputObjectsDelegate, PHPickerViewControllerDelegate>
+@interface ScanAddFriendViewController : UIViewController <AVCaptureMetadataOutputObjectsDelegate, PHPickerViewControllerDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate>
 @property (nonatomic, copy) void (^onScanned)(NSString *content);
 @property (nonatomic, strong) AVCaptureSession *captureSession;
 @property (nonatomic, strong) AVCaptureVideoPreviewLayer *previewLayer;
@@ -291,13 +291,40 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
     if (self.didHandleResult) return;
     [self stopCaptureSessionIfNeeded];
 
-    PHPickerConfiguration *config = [[PHPickerConfiguration alloc] init];
-    config.filter = [PHPickerFilter imagesFilter];
-    config.selectionLimit = 1;
-    PHPickerViewController *picker = [[PHPickerViewController alloc] initWithConfiguration:config];
+    if (@available(iOS 14.0, *)) {
+        PHPickerConfiguration *config = [[PHPickerConfiguration alloc] init];
+        config.filter = [PHPickerFilter imagesFilter];
+        config.selectionLimit = 1;
+        PHPickerViewController *picker = [[PHPickerViewController alloc] initWithConfiguration:config];
+        picker.delegate = self;
+        picker.modalPresentationStyle = UIModalPresentationPageSheet;
+        [self presentViewController:picker animated:YES completion:nil];
+        return;
+    }
+
+    // iOS 13：PHPicker 不可用，回退系统相册
+    UIImagePickerController *picker = [[UIImagePickerController alloc] init];
+    picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
     picker.delegate = self;
-    picker.modalPresentationStyle = UIModalPresentationPageSheet;
+    picker.allowsEditing = NO;
     [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary<UIImagePickerControllerInfoKey,id> *)info {
+    UIImage *image = info[UIImagePickerControllerOriginalImage];
+    [picker dismissViewControllerAnimated:YES completion:^{
+        if (!image) {
+            [self startCaptureSessionIfNeeded];
+            return;
+        }
+        [self handlePickedAlbumImage:image];
+    }];
+}
+
+- (void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
+    [picker dismissViewControllerAnimated:YES completion:^{
+        [self startCaptureSessionIfNeeded];
+    }];
 }
 
 - (void)picker:(PHPickerViewController *)picker didFinishPicking:(NSArray<PHPickerResult *> *)results API_AVAILABLE(ios(14)) {

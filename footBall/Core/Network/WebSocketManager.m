@@ -125,8 +125,8 @@
         return;
     }
     
-    // 断开旧连接
-    [self disconnect];
+    // 断开旧连接（不重置 reconnectCount，否则重连上限形同虚设）
+    [self closeSocketPreservingReconnectCount];
     
     // 创建WebSocket请求
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
@@ -158,7 +158,8 @@
     [self.webSocket open];
 }
 
-- (void)disconnect {
+/// 仅关闭 socket / 停心跳，保留重连计数（供 reconnect → connect 使用）
+- (void)closeSocketPreservingReconnectCount {
     [self stopReconnectTimer];
     [self stopHeartbeatTimer];
     
@@ -172,7 +173,10 @@
     if (self.statusBlock) {
         self.statusBlock(self.status);
     }
-    
+}
+
+- (void)disconnect {
+    [self closeSocketPreservingReconnectCount];
     self.reconnectCount = 0;
 }
 
@@ -278,8 +282,13 @@
 - (void)startReconnectTimer {
     [self stopReconnectTimer];
     
+    // 指数退避：3s, 6s, 12s… 上限 60s（reconnectCount 在 reconnect 内递增，此处用当前值）
+    NSTimeInterval base = MAX(self.reconnectInterval, 1.0);
+    NSTimeInterval interval = MIN(60.0, base * pow(2.0, (double)MAX(0, self.reconnectCount)));
+    NSLog(@"WebSocket将在 %.1f 秒后重连（已失败 %ld 次）", interval, (long)self.reconnectCount);
+    
     __weak typeof(self) weakSelf = self;
-    self.reconnectTimer = [NSTimer scheduledTimerWithTimeInterval:self.reconnectInterval
+    self.reconnectTimer = [NSTimer scheduledTimerWithTimeInterval:interval
                                                            repeats:NO
                                                              block:^(NSTimer * _Nonnull timer) {
         [weakSelf reconnect];
