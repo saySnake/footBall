@@ -21,6 +21,9 @@
 "success" = "Success";
 "network_error" = "Network Error";
 "unknown_error" = "Unknown Error";
+"retry" = "Retry";
+"match_detail_load_failed" = "Failed to load match details. Please try again.";
+"match_detail_missing_id" = "Missing record ID. Unable to load details.";
 
 /* Home */
 "home_title" = "Home";
@@ -34,6 +37,7 @@
 "tab_profile" = "Profile";
 "home_all_teams" = "All";
 "home_more" = "More";
+"home_schedule_empty" = "No matches";
 "home_challenger" = "CHALLENGER";
 "home_match_time_pill" = "06:30";
 "team_name_burnley" = "Burnley";
@@ -125,6 +129,9 @@
 "discover_verified_ticket" = "Verified Ticket";
 "discover_verified_minutes_format" = "Verified %ld min";
 "discover_verify_match" = "Verify Match";
+"discover_list_network_error" = "Network Error";
+"discover_list_network_error_hint" = "Check your connection, pull to refresh, or tap to retry";
+"discover_list_empty" = "No matches";
 
 /* Map legend */
 "map_legend_often" = "Often visited";

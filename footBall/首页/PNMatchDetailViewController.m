@@ -47,6 +47,9 @@
 @property (nonatomic, strong) UIButton *confirmBtn;
 @property (nonatomic, assign) BOOL isEditingNotes;
 @property (nonatomic, strong) PNMatchRecordDetail *currentDetail;
+@property (nonatomic, assign) BOOL isLoadingDetail;
+@property (nonatomic, assign) BOOL isShowingLoadFailureAlert;
+@property (nonatomic, copy) NSString *pendingLoadFailureMessage;
 @end
 
 @implementation PNMatchDetailViewController
@@ -61,6 +64,15 @@
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     [self.navigationController setNavigationBarHidden:YES animated:animated];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    if (self.pendingLoadFailureMessage) {
+        NSString *msg = self.pendingLoadFailureMessage;
+        self.pendingLoadFailureMessage = nil;
+        [self presentLoadFailureAlertWithMessage:msg];
+    }
 }
 
 #pragma mark - Build UI
@@ -497,20 +509,33 @@
 
 - (void)loadRemoteData {
     NSString *rid = self.recordId;
-    if (rid.length == 0) return;
+    if (rid.length == 0) {
+        [self presentLoadFailureAlertWithMessage:(NSLocalizedString(@"match_detail_missing_id", nil) ?: @"记录ID缺失，无法加载详情")];
+        return;
+    }
+    if (self.isLoadingDetail) return;
+    self.isLoadingDetail = YES;
     __weak typeof(self) weakSelf = self;
     [[MatchRequest shared] getMatchRecordDetail:rid success:^(HTTPResponse * _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        self.isLoadingDetail = NO;
         PNMatchRecordDetail *detail = nil;
         if ([responseObject.dataObject isKindOfClass:PNMatchRecordDetail.class]) {
             detail = responseObject.dataObject;
         } else if ([responseObject.data isKindOfClass:NSDictionary.class]) {
             detail = [PNMatchRecordDetail yy_modelWithJSON:responseObject.data];
         }
-        if (!detail) return;
+        if (!detail) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [weakSelf presentLoadFailureAlertWithMessage:nil];
+            });
+            return;
+        }
         dispatch_async(dispatch_get_main_queue(), ^{
             [weakSelf applyDetail:detail];
         });
-        // 用 matchId 拉比赛详情，获取队徽 URL
+        // 用 matchId 拉比赛详情，获取队徽 URL（失败不影响主内容，不弹窗）
         NSString *mid = detail.matchId ?: weakSelf.matchId;
         if (mid.length == 0) return;
         [[MatchRequest shared] getMatchDetail:mid success:^(HTTPResponse * _Nullable r2) {
@@ -528,7 +553,48 @@
                 }
             });
         } failure:nil];
-    } failure:^(NSError * _Nonnull error) {}];
+    } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        self.isLoadingDetail = NO;
+        NSString *msg = error.localizedDescription;
+        if (msg.length == 0) {
+            msg = NSLocalizedString(@"network_error", nil);
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [weakSelf presentLoadFailureAlertWithMessage:msg];
+        });
+    }];
+}
+
+- (void)presentLoadFailureAlertWithMessage:(NSString *)message {
+    if (!self.isViewLoaded) return;
+    NSString *msg = message.length ? message : (NSLocalizedString(@"match_detail_load_failed", nil) ?: @"赛事详情加载失败，请重试");
+    // 请求很快失败时可能尚未入窗，等 viewDidAppear 再弹
+    if (self.view.window == nil) {
+        self.pendingLoadFailureMessage = msg;
+        return;
+    }
+    if (self.isShowingLoadFailureAlert || self.presentedViewController) return;
+    self.isShowingLoadFailureAlert = YES;
+
+    NSString *title = NSLocalizedString(@"settings_alert_title", nil) ?: @"提示";
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
+                                                                   message:msg
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    __weak typeof(self) weakSelf = self;
+    [alert addAction:[UIAlertAction actionWithTitle:(NSLocalizedString(@"cancel", nil) ?: @"取消")
+                                              style:UIAlertActionStyleCancel
+                                            handler:^(UIAlertAction * _Nonnull action) {
+        weakSelf.isShowingLoadFailureAlert = NO;
+    }]];
+    [alert addAction:[UIAlertAction actionWithTitle:(NSLocalizedString(@"retry", nil) ?: @"重试")
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction * _Nonnull action) {
+        weakSelf.isShowingLoadFailureAlert = NO;
+        [weakSelf loadRemoteData];
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)applyDetail:(PNMatchRecordDetail *)d {

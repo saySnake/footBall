@@ -222,6 +222,13 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     match.verificationStatus = status;
 }
 
+typedef NS_ENUM(NSInteger, DiscoverVerifiedPillStyle) {
+    DiscoverVerifiedPillStyleVerify = 0,   // 认证比赛
+    DiscoverVerifiedPillStyleVerified,     // 已认证
+    DiscoverVerifiedPillStylePending,      // 待审核
+    DiscoverVerifiedPillStyleReverify,     // 重新认证
+};
+
 @interface DiscoverMatchCell : UITableViewCell
 @property (nonatomic, strong) UIView *cardView;
 @property (nonatomic, strong) UIImageView *homeLogo;
@@ -235,6 +242,8 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
 @property (nonatomic, strong) UIButton *verifiedPill;
 /// 底行日期布局：leading / 相对 verifiedPill 垂直对齐（避免 cellForRow 里 remakeConstraints）
 - (void)setDateLabelLeading:(BOOL)leading alignToVerifiedPill:(BOOL)alignToVerified;
+/// 按模型一次性刷新列表样式（含认证 pill），避免 cellForRow 四分支漏设导致复用串味
+- (void)configureWithMatch:(DiscoverMatch *)match;
 @end
 
 @interface DiscoverMatchCell ()
@@ -245,6 +254,8 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
 @property (nonatomic, assign) BOOL dateLayoutLeading;
 @property (nonatomic, assign) BOOL dateLayoutAlignVerified;
 @property (nonatomic, assign) BOOL dateLayoutConfigured;
+- (void)applyVerifiedPillStyle:(DiscoverVerifiedPillStyle)style title:(NSString *)title;
+- (void)resetActionButtonsForReuse;
 @end
 
 @implementation DiscoverMatchCell
@@ -439,6 +450,111 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     }
 }
 
+- (void)applyVerifiedPillStyle:(DiscoverVerifiedPillStyle)style title:(NSString *)title {
+    NSString *resolvedTitle = title ?: @"";
+    UIImage *icon = [UIImage imageNamed:@"weizhi"];
+    switch (style) {
+        case DiscoverVerifiedPillStyleVerified: {
+            if (resolvedTitle.length == 0) {
+                resolvedTitle = (NSLocalizedString(@"auth_cert_status_approved", nil) ?: @"已认证");
+            }
+            self.verifiedPill.backgroundColor = [UIColor colorWithRed:6/255.0 green:15/255.0 blue:15/255.0 alpha:1.0];
+            UIColor *green = [UIColor colorWithRed:0.298 green:0.851 blue:0.392 alpha:1.0];
+            [self.verifiedPill setTitleColor:green forState:UIControlStateNormal];
+            [self.verifiedPill setImage:icon forState:UIControlStateNormal];
+            self.verifiedPill.tintColor = green;
+            break;
+        }
+        case DiscoverVerifiedPillStylePending: {
+            if (resolvedTitle.length == 0) {
+                resolvedTitle = (NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"待审核");
+            }
+            self.verifiedPill.backgroundColor = [UIColor colorWithRed:0.42 green:0.42 blue:0.42 alpha:1.0];
+            [self.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+            [self.verifiedPill setImage:nil forState:UIControlStateNormal];
+            self.verifiedPill.tintColor = [UIColor whiteColor];
+            break;
+        }
+        case DiscoverVerifiedPillStyleReverify: {
+            if (resolvedTitle.length == 0) {
+                resolvedTitle = (NSLocalizedString(@"auth_cert_retry", nil) ?: @"重新认证");
+            }
+            self.verifiedPill.backgroundColor = [UIColor colorWithRed:0.82 green:0.30 blue:0.28 alpha:1.0];
+            [self.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+            [self.verifiedPill setImage:icon forState:UIControlStateNormal];
+            self.verifiedPill.tintColor = [UIColor whiteColor];
+            break;
+        }
+        case DiscoverVerifiedPillStyleVerify:
+        default: {
+            if (resolvedTitle.length == 0) {
+                resolvedTitle = (NSLocalizedString(@"discover_verify_match", nil) ?: @"认证比赛");
+            }
+            self.verifiedPill.backgroundColor = kDiscoverPillGreen;
+            [self.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+            [self.verifiedPill setImage:icon forState:UIControlStateNormal];
+            self.verifiedPill.tintColor = [UIColor whiteColor];
+            break;
+        }
+    }
+    [self.verifiedPill setTitle:resolvedTitle forState:UIControlStateNormal];
+    self.verifiedPill.layer.borderWidth = 0;
+    self.verifiedPill.layer.borderColor = [UIColor clearColor].CGColor;
+    self.verifiedPill.hidden = NO;
+}
+
+- (void)resetActionButtonsForReuse {
+    [self.inputButton removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+    [self.verifiedPill removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+    self.inputButton.hidden = NO;
+    [self.inputButton setTitle:(NSLocalizedString(@"discover_input_info", nil) ?: @"输入信息") forState:UIControlStateNormal];
+    [self.inputButton setImage:[UIImage imageNamed:@"edit_icon"] forState:UIControlStateNormal];
+    // 认证 pill 回到默认「认证比赛」，避免 pending(无图)/已认证色值残留到下一行
+    [self applyVerifiedPillStyle:DiscoverVerifiedPillStyleVerify title:nil];
+    self.verifiedPill.hidden = YES;
+}
+
+- (void)configureWithMatch:(DiscoverMatch *)match {
+    if (!match) return;
+
+    self.homeLabel.text = match.homeName;
+    self.awayLabel.text = match.awayName;
+    self.dateLabel.text = match.dateText;
+    self.cardView.backgroundColor = (match.type == DiscoverMatchTypeFinished) ? kDiscoverFinishedCardBg : kDiscoverCellBg;
+    self.inputButton.hidden = match.hasInputInfo;
+
+    if (match.type == DiscoverMatchTypeUpcoming) {
+        // 未来观赛不展示认证按钮，但仍重置为默认样式，防止复用后短暂露错色
+        [self applyVerifiedPillStyle:DiscoverVerifiedPillStyleVerify title:nil];
+        self.verifiedPill.hidden = YES;
+        self.scoreLabel.text = match.timeText.length ? match.timeText : @"--:--";
+        self.scoreLabel.layer.borderWidth = 0.5;
+        self.scoreLabel.layer.borderColor = kDiscoverGreen.CGColor;
+        self.scoreLabel.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.18];
+        self.scoreLabel.textColor = kDiscoverGreen;
+        self.scoreLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+        [self setDateLabelLeading:match.hasInputInfo alignToVerifiedPill:NO];
+        return;
+    }
+
+    self.scoreLabel.text = match.scoreText.length ? match.scoreText : @"0 : 0";
+    self.scoreLabel.layer.borderWidth = 0;
+    self.scoreLabel.backgroundColor = [UIColor clearColor];
+    self.scoreLabel.textColor = [UIColor blackColor];
+    self.scoreLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightBold];
+
+    DiscoverVerifiedPillStyle style = DiscoverVerifiedPillStyleVerify;
+    if (match.hasVerified) {
+        style = DiscoverVerifiedPillStyleVerified;
+    } else if (match.hasPendingVerification) {
+        style = DiscoverVerifiedPillStylePending;
+    } else if (match.needsReverify) {
+        style = DiscoverVerifiedPillStyleReverify;
+    }
+    [self applyVerifiedPillStyle:style title:match.verifiedText];
+    [self setDateLabelLeading:match.hasInputInfo alignToVerifiedPill:match.hasInputInfo];
+}
+
 - (void)prepareForReuse {
     [super prepareForReuse];
     self.cardView.backgroundColor = kDiscoverCellBg;
@@ -447,9 +563,6 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     self.scoreLabel.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.18];
     self.scoreLabel.textColor = kDiscoverGreen;
     self.scoreLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-    self.verifiedPill.backgroundColor = kDiscoverPillGreen;
-    [self.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    self.verifiedPill.layer.borderWidth = 0;
     [self.homeLogo sd_cancelCurrentImageLoad];
     [self.awayLogo sd_cancelCurrentImageLoad];
     self.homeLogo.image = nil;
@@ -458,6 +571,7 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     self.awayLabel.text = nil;
     self.scoreLabel.text = nil;
     self.dateLabel.text = nil;
+    [self resetActionButtonsForReuse];
     [self setDateLabelLeading:NO alignToVerifiedPill:NO];
 }
 
@@ -504,6 +618,14 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
 @property (nonatomic, strong) NSArray<DiscoverMatch *> *upcomingMatches;
 @property (nonatomic, strong) NSArray<DiscoverMatch *> *finishedMatches;
 @property (nonatomic, assign) DiscoverMatchType currentType;
+
+/// 列表区空态 / 网络异常占位（table 高度为 0 时 backgroundView 不可见，故单独撑高）
+@property (nonatomic, strong) UIView *listEmptyBackgroundView;
+@property (nonatomic, strong) UILabel *listEmptyTitleLabel;
+@property (nonatomic, strong) UILabel *listEmptyDetailLabel;
+@property (nonatomic, assign) BOOL discoverUpcomingLoadFailed;
+@property (nonatomic, assign) BOOL discoverFinishedLoadFailed;
+@property (nonatomic, assign) BOOL discoverRemoteLoadCompleted;
 
 /// 联赛信息卡片大数字（对接 PNStatistics.teamRecord）
 @property (nonatomic, strong) UILabel *leagueWinValueLabel;
@@ -566,7 +688,7 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     [self setupDiscoverRefresh];
     [self refreshDiscoverHeader];
     [self switchToType:DiscoverMatchTypeUpcoming];
-    [self restoreCachedDataIfNeeded];
+//    [self restoreCachedDataIfNeeded];
     // 首次加载数据放在 viewDidLoad，避免 viewWillAppear 每次重拉导致闪烁
     [self loadRemoteDataForceRefresh:NO];
 
@@ -1349,6 +1471,9 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     if (!AuthManager.sharedManager.isLoggedIn) {
         self.upcomingMatches = @[];
         self.finishedMatches = @[];
+        self.discoverUpcomingLoadFailed = NO;
+        self.discoverFinishedLoadFailed = NO;
+        self.discoverRemoteLoadCompleted = YES;
         [self refreshTabs];
         [self applyStatisticsUnknown];
         finishLoading();
@@ -1369,6 +1494,7 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
         upReqSuccess = YES;
         dispatch_group_leave(group);
     } failure:^(NSError * _Nonnull error) {
+        (void)error;
         dispatch_group_leave(group);
     }];
 
@@ -1379,6 +1505,7 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
         finReqSuccess = YES;
         dispatch_group_leave(group);
     } failure:^(NSError * _Nonnull error) {
+        (void)error;
         dispatch_group_leave(group);
     }];
 
@@ -1389,6 +1516,7 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
         statsReqSuccess = YES;
         dispatch_group_leave(group);
     } failure:^(NSError * _Nonnull error) {
+        (void)error;
         // 失败不刷成 0，也不沿用无法校验的假战绩：无有效缓存时显示 --
         if (!weakSelf.discoverStatsCacheValid) {
             [weakSelf applyStatisticsUnknown];
@@ -1397,6 +1525,9 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     }];
 
     dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+        weakSelf.discoverUpcomingLoadFailed = !upReqSuccess;
+        weakSelf.discoverFinishedLoadFailed = !finReqSuccess;
+        weakSelf.discoverRemoteLoadCompleted = YES;
         if (upReqSuccess) {
             weakSelf.upcomingMatches = [weakSelf discoverMatchesFrom:upList type:DiscoverMatchTypeUpcoming];
         }
@@ -1675,7 +1806,94 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     [self.upcomingPill setTitle:[NSString stringWithFormat:fmtUpcoming, (long)self.upcomingMatches.count] forState:UIControlStateNormal];
     [self.finishedPill setTitle:[NSString stringWithFormat:fmtFinished, (long)self.finishedMatches.count] forState:UIControlStateNormal];
     [self.tableView reloadData];
+    [self updateDiscoverListEmptyState];
+}
+
+- (void)ensureListEmptyBackgroundView {
+    if (self.listEmptyBackgroundView) return;
+    UIView *bg = [[UIView alloc] init];
+    bg.backgroundColor = [UIColor whiteColor];
+    UIImageView *iv = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"friend_nodata"]];
+    iv.contentMode = UIViewContentModeScaleAspectFit;
+    [bg addSubview:iv];
+    UILabel *title = [[UILabel alloc] init];
+    title.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+    title.textColor = [UIColor colorWithRed:0.35 green:0.37 blue:0.40 alpha:1.0];
+    title.textAlignment = NSTextAlignmentCenter;
+    [bg addSubview:title];
+    UILabel *detail = [[UILabel alloc] init];
+    detail.font = [UIFont systemFontOfSize:13 weight:UIFontWeightRegular];
+    detail.textColor = [UIColor colorWithRed:0.60 green:0.62 blue:0.65 alpha:1.0];
+    detail.textAlignment = NSTextAlignmentCenter;
+    detail.numberOfLines = 2;
+    [bg addSubview:detail];
+    [iv mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(bg);
+        make.centerY.equalTo(bg).offset(-36);
+        make.width.height.mas_equalTo(120);
+    }];
+    [title mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(iv.mas_bottom).offset(14);
+        make.leading.equalTo(bg).offset(24);
+        make.trailing.equalTo(bg).offset(-24);
+    }];
+    [detail mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(title.mas_bottom).offset(8);
+        make.leading.equalTo(bg).offset(24);
+        make.trailing.equalTo(bg).offset(-24);
+    }];
+    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onDiscoverListEmptyRetryTapped)];
+    [bg addGestureRecognizer:tap];
+    self.listEmptyTitleLabel = title;
+    self.listEmptyDetailLabel = detail;
+    self.listEmptyBackgroundView = bg;
+}
+
+/// 当前 Tab 列表为空时：加载失败 → 网络异常占位；成功空列表 → 暂无数据
+- (void)updateDiscoverListEmptyState {
+    NSInteger rows = [self currentDataSource].count;
+    if (rows > 0 || !self.discoverRemoteLoadCompleted) {
+        self.tableView.backgroundView = nil;
+        [self updateTableHeight];
+        return;
+    }
+
+    BOOL failed = (self.currentType == DiscoverMatchTypeUpcoming)
+        ? self.discoverUpcomingLoadFailed
+        : self.discoverFinishedLoadFailed;
+    [self ensureListEmptyBackgroundView];
+    if (failed) {
+        NSString *title = NSLocalizedString(@"discover_list_network_error", nil);
+        if (!title.length || [title isEqualToString:@"discover_list_network_error"]) {
+            title = NSLocalizedString(@"network_error", nil) ?: @"网络异常";
+        }
+        NSString *detail = NSLocalizedString(@"discover_list_network_error_hint", nil);
+        if (!detail.length || [detail isEqualToString:@"discover_list_network_error_hint"]) {
+            detail = @"请检查网络后下拉刷新，或点击重试";
+        }
+        self.listEmptyTitleLabel.text = title;
+        self.listEmptyDetailLabel.text = detail;
+        self.listEmptyDetailLabel.hidden = NO;
+    } else {
+        NSString *title = NSLocalizedString(@"discover_list_empty", nil);
+        if (!title.length || [title isEqualToString:@"discover_list_empty"]) {
+            title = NSLocalizedString(@"community_empty_no_data", nil) ?: @"暂无数据";
+        }
+        self.listEmptyTitleLabel.text = title;
+        self.listEmptyDetailLabel.text = @"";
+        self.listEmptyDetailLabel.hidden = YES;
+    }
+    self.tableView.backgroundView = self.listEmptyBackgroundView;
     [self updateTableHeight];
+}
+
+- (void)onDiscoverListEmptyRetryTapped {
+    if (!AuthManager.sharedManager.isLoggedIn) return;
+    BOOL failed = (self.currentType == DiscoverMatchTypeUpcoming)
+        ? self.discoverUpcomingLoadFailed
+        : self.discoverFinishedLoadFailed;
+    if (!failed) return;
+    [self loadRemoteDataForceRefresh:YES];
 }
 
 - (NSString *)shortTimeText:(NSString *)raw {
@@ -1714,7 +1932,7 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     self.upcomingPill.titleLabel.font = [UIFont systemFontOfSize:14 weight:(upcomingSel ? UIFontWeightSemibold : UIFontWeightMedium)];
     self.finishedPill.titleLabel.font = [UIFont systemFontOfSize:14 weight:(upcomingSel ? UIFontWeightMedium : UIFontWeightSemibold)];
     [self.tableView reloadData];
-    [self updateTableHeight];
+    [self updateDiscoverListEmptyState];
 }
 
 - (void)onUpcomingTapped {
@@ -1752,7 +1970,12 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
 - (void)updateTableHeight {
     NSInteger rows = [self currentDataSource].count;
     CGFloat rowH = (self.currentType == DiscoverMatchTypeFinished) ? 101.f : 97.f;
-    self.tableHeightConstraint.offset = rows * rowH;
+    CGFloat height = rows * rowH;
+    // 空列表占位需要可视高度，否则 table 高度为 0，backgroundView 看不见
+    if (rows == 0 && self.discoverRemoteLoadCompleted && self.tableView.backgroundView != nil) {
+        height = 220.f;
+    }
+    self.tableHeightConstraint.offset = height;
     [self.view layoutIfNeeded];
 }
 
@@ -1771,10 +1994,7 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     DiscoverMatchCell *cell = [tableView dequeueReusableCellWithIdentifier:@"DiscoverMatchCell" forIndexPath:indexPath];
     DiscoverMatch *m = [self currentDataSource][indexPath.row];
 
-    cell.homeLabel.text = m.homeName;
-    cell.awayLabel.text = m.awayName;
-    cell.dateLabel.text = m.dateText;
-    cell.cardView.backgroundColor = (m.type == DiscoverMatchTypeFinished) ? kDiscoverFinishedCardBg : kDiscoverCellBg;
+    [cell configureWithMatch:m];
 
     NSURL *homeURL = m.homeLogoURL.length ? [NSURL URLWithString:m.homeLogoURL] : nil;
     NSURL *awayURL = m.awayLogoURL.length ? [NSURL URLWithString:m.awayLogoURL] : nil;
@@ -1787,62 +2007,11 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     cell.homeLogo.contentMode = UIViewContentModeScaleAspectFit;
     cell.awayLogo.contentMode = UIViewContentModeScaleAspectFit;
 
-    if (m.type == DiscoverMatchTypeUpcoming) {
-        // 未来观赛也按真实状态渲染：已提交输入信息后隐藏“输入信息”按钮
-        cell.inputButton.hidden = m.hasInputInfo;
-        // 需求：未来观赛不显示“认证比赛”按钮
-        cell.verifiedPill.hidden = YES;
-        cell.scoreLabel.text = m.timeText.length ? m.timeText : @"--:--";
-        cell.scoreLabel.layer.borderWidth = 0.5;
-        cell.scoreLabel.layer.borderColor = kDiscoverGreen.CGColor;
-        cell.scoreLabel.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.18];
-        cell.scoreLabel.textColor = kDiscoverGreen;
-        cell.scoreLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-        [cell setDateLabelLeading:m.hasInputInfo alignToVerifiedPill:NO];
-        [cell.inputButton removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
-        [cell.inputButton addTarget:self action:@selector(onInputInfoButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
-        [cell.verifiedPill removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
-        //DEBUG: 调试用
-//        [cell.verifiedPill addTarget:self action:@selector(onVerifyMatchButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
-
-    } else {
-        cell.inputButton.hidden = m.hasInputInfo;
-        cell.verifiedPill.hidden = NO;
-        cell.scoreLabel.text = m.scoreText.length ? m.scoreText : @"0 : 0";
-        cell.scoreLabel.layer.borderWidth = 0;
-        cell.scoreLabel.backgroundColor = [UIColor clearColor];
-        cell.scoreLabel.textColor = [UIColor blackColor];
-        cell.scoreLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightBold];
-        if (m.hasVerified) {
-            [cell.verifiedPill setTitle:m.verifiedText forState:UIControlStateNormal];
-            cell.verifiedPill.backgroundColor = [UIColor colorWithRed:6/255.0 green:15/255.0 blue:15/255.0 alpha:1.0];
-            [cell.verifiedPill setTitleColor:[UIColor colorWithRed:0.298 green:0.851 blue:0.392 alpha:1.0] forState:UIControlStateNormal];
-            [cell.verifiedPill setImage:[UIImage imageNamed:@"weizhi"] forState:UIControlStateNormal];
-            cell.verifiedPill.tintColor = [UIColor colorWithRed:0.298 green:0.851 blue:0.392 alpha:1.0];
-        } else if (m.hasPendingVerification) {
-            [cell.verifiedPill setTitle:(m.verifiedText.length ? m.verifiedText : (NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"待审核")) forState:UIControlStateNormal];
-            cell.verifiedPill.backgroundColor = [UIColor colorWithRed:0.42 green:0.42 blue:0.42 alpha:1.0];
-            [cell.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-            [cell.verifiedPill setImage:nil forState:UIControlStateNormal];
-            cell.verifiedPill.tintColor = [UIColor whiteColor];
-        } else if (m.needsReverify) {
-            [cell.verifiedPill setTitle:(m.verifiedText.length ? m.verifiedText : (NSLocalizedString(@"auth_cert_retry", nil) ?: @"重新认证")) forState:UIControlStateNormal];
-            cell.verifiedPill.backgroundColor = [UIColor colorWithRed:0.82 green:0.30 blue:0.28 alpha:1.0];
-            [cell.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-            [cell.verifiedPill setImage:[UIImage imageNamed:@"weizhi"] forState:UIControlStateNormal];
-            cell.verifiedPill.tintColor = [UIColor whiteColor];
-        } else {
-            [cell.verifiedPill setTitle:(NSLocalizedString(@"discover_verify_match", nil) ?: @"认证比赛") forState:UIControlStateNormal];
-            cell.verifiedPill.backgroundColor = kDiscoverPillGreen;
-            [cell.verifiedPill setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-            [cell.verifiedPill setImage:[UIImage imageNamed:@"weizhi"] forState:UIControlStateNormal];
-            cell.verifiedPill.tintColor = [UIColor whiteColor];
-        }
-        [cell setDateLabelLeading:m.hasInputInfo alignToVerifiedPill:m.hasInputInfo];
-        [cell.verifiedPill removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+    [cell.inputButton removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+    [cell.verifiedPill removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+    [cell.inputButton addTarget:self action:@selector(onInputInfoButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
+    if (m.type == DiscoverMatchTypeFinished) {
         [cell.verifiedPill addTarget:self action:@selector(onVerifyMatchButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
-        [cell.inputButton removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
-        [cell.inputButton addTarget:self action:@selector(onInputInfoButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
     }
 
     return cell;

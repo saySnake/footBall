@@ -353,10 +353,16 @@ static NSString *kHomeTeamIdString(id raw) {
 @property (nonatomic, strong) UIView *twoCardsContainer;
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) MASConstraint *tableHeightConstraint;
+@property (nonatomic, strong) UIView *scheduleEmptyBackgroundView;
+@property (nonatomic, strong) UILabel *scheduleEmptyTitleLabel;
 /// 防止切 tab 时反复触发全量请求，记录上次加载时间
 @property (nonatomic, assign) NSTimeInterval lastLoadTime;
 /// 是否正在加载中，防止并发请求
 @property (nonatomic, assign) BOOL isLoadingSchedule;
+/// 当前选中球队的赛程首屏是否已返回（未返回前不展示空态，避免切队闪一下）
+@property (nonatomic, assign) BOOL scheduleListSettled;
+/// 赛程请求序号：切队递增，用于丢弃过期回调
+@property (nonatomic, assign) NSInteger scheduleRequestSeq;
 /// 赛程分页
 @property (nonatomic, assign) NSInteger scheduleCurrentPage;
 @property (nonatomic, assign) BOOL scheduleHasMore;
@@ -566,7 +572,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     self.selectedTeamId = nil;
     self.scheduleCurrentPage = 0;
     self.scheduleHasMore = YES;
-    [self restoreHomeOfflineCacheIfNeeded];
+//    [self restoreHomeOfflineCacheIfNeeded];
     [self filterData];
 
     // super 内会调一次 -setupUI；切勿在本方法末尾再调 setupUI，否则 header/body/scroll/table 会重复添加，出现叠在一起的重复布局
@@ -844,17 +850,83 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
 
 - (void)updateTableHeight {
     CFTimeInterval t0 = CACurrentMediaTime();
-    if (!_tableView || !self.sortedDateKeys.count) return;
+    if (!_tableView) return;
     CGFloat headerH = 40.f, footerH = 0.01f, rowH = 103.f;
     CGFloat total = 0;
     for (NSString *key in self.sortedDateKeys) {
         NSInteger rows = self.groupedMatches[key].count;
         total += headerH + footerH + rows * rowH;
     }
-    if (total <= 0) return;
+    BOOL noRows = (self.sortedDateKeys.count == 0 || total <= 0);
+    // 仅在首屏请求完成后才展示「暂无比赛」，切队加载中保持空白不闪空态
+    BOOL showEmpty = noRows && self.scheduleListSettled;
+    [self updateHomeScheduleEmptyState:showEmpty];
+    if (showEmpty) {
+        total = 220.f;
+    } else if (noRows) {
+        total = 0.f;
+    }
     self.tableHeightConstraint.offset = total;
     [self.view setNeedsLayout];
-    NSLog(@"[HomeDebug] updateTableHeight total=%.1f sections=%ld cost=%.3f", total, (long)self.sortedDateKeys.count, CACurrentMediaTime() - t0);
+    NSLog(@"[HomeDebug] updateTableHeight total=%.1f sections=%ld showEmpty=%d settled=%d cost=%.3f",
+          total, (long)self.sortedDateKeys.count, showEmpty, self.scheduleListSettled, CACurrentMediaTime() - t0);
+}
+
+- (void)ensureScheduleEmptyBackgroundView {
+    if (self.scheduleEmptyBackgroundView) return;
+    UIView *bg = [[UIView alloc] init];
+    bg.backgroundColor = kHomeContentBg;
+    UIImageView *iv = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"friend_nodata"]];
+    iv.contentMode = UIViewContentModeScaleAspectFit;
+    [bg addSubview:iv];
+    UILabel *title = [[UILabel alloc] init];
+    title.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+    title.textColor = [UIColor colorWithRed:0.35 green:0.37 blue:0.40 alpha:1.0];
+    title.textAlignment = NSTextAlignmentCenter;
+    title.numberOfLines = 2;
+    [bg addSubview:title];
+    [iv mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(bg);
+        make.centerY.equalTo(bg).offset(-24);
+        make.width.height.mas_equalTo(120);
+    }];
+    [title mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(iv.mas_bottom).offset(14);
+        make.leading.equalTo(bg).offset(24);
+        make.trailing.equalTo(bg).offset(-24);
+    }];
+    self.scheduleEmptyTitleLabel = title;
+    self.scheduleEmptyBackgroundView = bg;
+}
+
+- (void)updateHomeScheduleEmptyState:(BOOL)empty {
+    if (!empty) {
+        self.tableView.backgroundView = nil;
+        return;
+    }
+    [self ensureScheduleEmptyBackgroundView];
+    NSString *title = NSLocalizedString(@"home_schedule_empty", nil);
+    if (!title.length || [title isEqualToString:@"home_schedule_empty"]) {
+        title = NSLocalizedString(@"discover_list_empty", nil) ?: @"暂无比赛";
+    }
+    self.scheduleEmptyTitleLabel.text = title;
+    self.tableView.backgroundView = self.scheduleEmptyBackgroundView;
+}
+
+/// 无赛程时隐藏上拉 footer，避免空态下方再露出「没有更多数据」
+- (void)updateScheduleFooterVisibility {
+    BOOL hasData = self.dataSource.count > 0;
+    if (!hasData) {
+        [self.scrollView.mj_footer endRefreshing];
+        self.scrollView.mj_footer.hidden = YES;
+        return;
+    }
+    self.scrollView.mj_footer.hidden = NO;
+    if (self.scheduleHasMore) {
+        [self.scrollView.mj_footer resetNoMoreData];
+    } else {
+        [self.scrollView.mj_footer endRefreshingWithNoMoreData];
+    }
 }
 
 - (void)updateLocalizedStrings {
@@ -1041,7 +1113,9 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     MJRefreshAutoNormalFooter *footer = [MJRefreshAutoNormalFooter footerWithRefreshingBlock:^{
         [weakSelf loadMoreScheduleMatches];
     }];
-    footer.automaticallyHidden = YES;
+    // 显式由 updateScheduleFooterVisibility 控制显隐；无数据时必须隐藏
+    footer.automaticallyHidden = NO;
+    footer.hidden = YES;
     footer.stateLabel.font = [UIFont systemFontOfSize:12];
     _scrollView.mj_footer = footer;
 }
@@ -1199,12 +1273,20 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
 }
 
 - (void)fetchScheduleMatchesReset:(BOOL)reset {
-    if (self.isLoadingSchedule) return;
+    if (self.isLoadingSchedule) {
+        if (!reset) return;
+        // 切队/下拉刷新允许覆盖进行中的请求；旧回调靠 scheduleRequestSeq 丢弃
+        self.isLoadingSchedule = NO;
+    }
     if (!reset && !self.scheduleHasMore) {
         [self.scrollView.mj_footer endRefreshingWithNoMoreData];
         return;
     }
     self.isLoadingSchedule = YES;
+    if (reset) {
+        self.scheduleRequestSeq += 1;
+    }
+    NSInteger reqSeq = self.scheduleRequestSeq;
     __weak typeof(self) weakSelf = self;
     [self ensureDefaultSelectedTeamIfNeeded];
 
@@ -1213,8 +1295,8 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     NSInteger pageNum = reset ? 1 : MAX(self.scheduleCurrentPage + 1, 1);
     NSArray<Match *> *previous = [self.dataSource copy];
 #if DEBUG
-    NSLog(@"[HomeDebug] schedule page=%ld teamId=%@ myTeamOnly=%d pageSize=%ld",
-          (long)pageNum, teamId ?: @"(nil)", myTeamOnly, (long)kHomeScheduleFetchPageSize);
+    NSLog(@"[HomeDebug] schedule page=%ld teamId=%@ myTeamOnly=%d pageSize=%ld seq=%ld",
+          (long)pageNum, teamId ?: @"(nil)", myTeamOnly, (long)kHomeScheduleFetchPageSize, (long)reqSeq);
     NSLog(@"[HomeDebug] schedule curl:\n%@",
           [self home_monthUpcomingScheduleCurlWithTeamId:teamId page:pageNum pageSize:kHomeScheduleFetchPageSize myTeamOnly:myTeamOnly]);
 #endif
@@ -1226,6 +1308,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
                                                          success:^(HTTPResponse * _Nullable responseObject) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
+        if (reqSeq != self.scheduleRequestSeq) return;
         self.isLoadingSchedule = NO;
         NSArray<Match *> *list = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
         if (reset) {
@@ -1240,6 +1323,9 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
                                                               pageNum:pageNum
                                                              pageSize:kHomeScheduleFetchPageSize
                                                             listCount:list.count];
+        if (reset) {
+            self.scheduleListSettled = YES;
+        }
         NSLog(@"[HomeDebug] schedule page done page=%ld count=%ld batch=%ld hasMore=%d elapsed=%.3f",
               (long)pageNum, (long)self.dataSource.count, (long)list.count, self.scheduleHasMore,
               CACurrentMediaTime() - self.homeDebugLoadStartAt);
@@ -1247,25 +1333,25 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
         [self updateTableHeight];
         [self saveHomeOfflineCache];
         [self.scrollView.mj_header endRefreshing];
-        if (self.scheduleHasMore) {
-            [self.scrollView.mj_footer endRefreshing];
-            [self.scrollView.mj_footer resetNoMoreData];
-        } else {
-            [self.scrollView.mj_footer endRefreshingWithNoMoreData];
-        }
+        [self updateScheduleFooterVisibility];
     } failure:^(NSError * _Nonnull error) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
+        if (reqSeq != self.scheduleRequestSeq) return;
         self.isLoadingSchedule = NO;
         NSLog(@"[HomeDebug] schedule page failed page=%ld error=%@", (long)pageNum, error.localizedDescription);
         // 仅网络失败时保留旧数据；成功但为空已在 success 分支清空
         if (reset && previous.count > 0 && self.dataSource.count == 0) {
             self.dataSource = [previous mutableCopy];
-            [self filterData];
-            [self updateTableHeight];
         }
+        if (reset) {
+            self.scheduleListSettled = YES;
+        }
+        [self filterData];
+        [self updateTableHeight];
         [self.scrollView.mj_header endRefreshing];
         [self.scrollView.mj_footer endRefreshing];
+        [self updateScheduleFooterVisibility];
     }];
 }
 
@@ -1360,9 +1446,13 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     [collectionView reloadData];
     self.scheduleCurrentPage = 0;
     self.scheduleHasMore = YES;
-    // 切换球队时先清空列表，避免短暂展示上一支球队数据
+    // 切换球队：先清数据，等请求回来再决定是否展示空态，避免先闪「暂无比赛」
+    self.scheduleListSettled = NO;
+    // 允许立刻发起新请求；进行中的旧回调由 scheduleRequestSeq 丢弃
+    self.isLoadingSchedule = NO;
     [self.dataSource removeAllObjects];
     [self filterData];
+    [self updateScheduleFooterVisibility];
     [self fetchFeatureMatchs];
     [self fetchScheduleMatchesReset:YES];
     [self saveHomeOfflineCache];

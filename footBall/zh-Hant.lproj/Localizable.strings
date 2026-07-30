@@ -21,6 +21,9 @@
 "success" = "成功";
 "network_error" = "網路錯誤";
 "unknown_error" = "未知錯誤";
+"retry" = "重試";
+"match_detail_load_failed" = "賽事詳情載入失敗，請重試";
+"match_detail_missing_id" = "記錄 ID 缺失，無法載入詳情";
 
 /* Home */
 "home_title" = "首頁";
@@ -34,6 +37,7 @@
 "tab_profile" = "我的";
 "home_all_teams" = "全部";
 "home_more" = "更多";
+"home_schedule_empty" = "暫無比賽";
 "home_challenger" = "CHALLENGER";
 "home_match_time_pill" = "06:30";
 "team_name_burnley" = "伯恩利";
@@ -125,6 +129,9 @@
 "discover_verified_ticket" = "認證球票";
 "discover_verified_minutes_format" = "已認證%ld分鐘";
 "discover_verify_match" = "認證比賽";
+"discover_list_network_error" = "網路異常";
+"discover_list_network_error_hint" = "請檢查網路後下拉重新整理，或點擊重試";
+"discover_list_empty" = "暫無比賽";
 
 /* Map legend */
 "map_legend_often" = "經常去";

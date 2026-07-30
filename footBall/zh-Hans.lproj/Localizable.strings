@@ -21,6 +21,9 @@
 "success" = "成功";
 "network_error" = "网络错误";
 "unknown_error" = "未知错误";
+"retry" = "重试";
+"match_detail_load_failed" = "赛事详情加载失败，请重试";
+"match_detail_missing_id" = "记录ID缺失，无法加载详情";
 
 /* Home */
 "home_title" = "首页";
@@ -34,6 +37,7 @@
 "tab_profile" = "我的";
 "home_all_teams" = "全部";
 "home_more" = "更多";
+"home_schedule_empty" = "暂无比赛";
 "home_challenger" = "CHALLENGER";
 "home_match_time_pill" = "06:30";
 "team_name_burnley" = "伯恩利";
@@ -125,6 +129,9 @@
 "discover_verified_ticket" = "认证球票";
 "discover_verified_minutes_format" = "已认证%ld分钟";
 "discover_verify_match" = "认证比赛";
+"discover_list_network_error" = "网络异常";
+"discover_list_network_error_hint" = "请检查网络后下拉刷新，或点击重试";
+"discover_list_empty" = "暂无比赛";
 
 /* Map legend */
 "map_legend_often" = "经常去";
