@@ -106,6 +106,7 @@ static const NSInteger kVCResendCountdownSeconds = 60;
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
     [self stopCaretBlink];
+    [self stopResendCountdown];
 }
 
 #pragma mark - Resend countdown
@@ -369,12 +370,16 @@ static const NSInteger kVCResendCountdownSeconds = 60;
 
 - (void)startCaretBlink {
     [self stopCaretBlink];
-    self.caretBlinkTimer = [NSTimer scheduledTimerWithTimeInterval:0.53 target:self selector:@selector(caretBlinkTick) userInfo:nil repeats:YES];
+    __weak typeof(self) weakSelf = self;
+    self.caretBlinkTimer = [NSTimer scheduledTimerWithTimeInterval:0.53 repeats:YES block:^(NSTimer * _Nonnull timer) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) {
+            [timer invalidate];
+            return;
+        }
+        self.caretView.alpha = self.caretView.alpha < 0.5 ? 1.0 : 0.15;
+    }];
     [[NSRunLoop mainRunLoop] addTimer:self.caretBlinkTimer forMode:NSRunLoopCommonModes];
-}
-
-- (void)caretBlinkTick {
-    self.caretView.alpha = self.caretView.alpha < 0.5 ? 1.0 : 0.15;
 }
 
 - (void)stopCaretBlink {
@@ -491,6 +496,8 @@ static const NSInteger kVCResendCountdownSeconds = 60;
 }
 
 - (void)routeToLoginAfterDeactivate {
+    [self stopCaretBlink];
+    [self stopResendCountdown];
     UIWindow *window = self.view.window;
     if (!window) {
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
@@ -513,6 +520,8 @@ static const NSInteger kVCResendCountdownSeconds = 60;
 }
 
 - (void)goToHome {
+    [self stopCaretBlink];
+    [self stopResendCountdown];
     MainTabBarController *tabBar = [[MainTabBarController alloc] init];
     UIWindow *window = self.view.window ?: [UIApplication sharedApplication].windows.firstObject;
     if (window) {

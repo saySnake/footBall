@@ -80,7 +80,6 @@ static CGSize kPAGridCellSizeForGridWidth(CGFloat gridWidth) {
     self.hidesBottomBarWhenPushed = YES;
     self.shouldShowNavigationBar = NO;
     self.view.backgroundColor = kPAPageBg;
-    self.completed = NO;
     self.uploadedImages = [NSMutableArray array];
 }
 
@@ -356,7 +355,8 @@ static CGSize kPAGridCellSizeForGridWidth(CGFloat gridWidth) {
 
 - (void)refreshState {
     NSString *status = [VerificationRequest shared].cachedVerificationStatus.professionalStatus ?: @"";
-    BOOL approvedByAPI = [[status uppercaseString] isEqualToString:@"APPROVED"];
+    NSString *u = [status uppercaseString];
+    BOOL approvedByAPI = [u isEqualToString:@"APPROVED"] || [u isEqualToString:@"VERIFIED"] || [u isEqualToString:@"PASSED"];
     self.completed = approvedByAPI;
 
     BOOL showUnverified = !self.completed;

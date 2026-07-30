@@ -477,29 +477,25 @@ static BOOL WMStringLooksLikeISOAlpha2(NSString *s) {
     self.contentLayer.transform = t;
 }
 
-/// 限制拖拽范围：不让地图完全拖出屏幕（简单版本）
+/// 限制拖拽范围：缩放后按内容溢出计算，可拖至边缘
 - (CGPoint)clampedTranslationForScale:(CGFloat)scale translation:(CGPoint)translation {
     CGSize viewSize = self.bounds.size;
+    if (viewSize.width < 1 || viewSize.height < 1) {
+        return translation;
+    }
 
-    // contentLayer 基准大小 = viewSize，缩放后大小：
     CGSize scaled = CGSizeMake(viewSize.width * scale, viewSize.height * scale);
-
-    // 我们允许最多露出一点空白（padding）
-    CGFloat pad = 40.0;
-
-    // 由于内容与 view 同大，translation=0 时内容左上对齐；
-    // 为了更直观，通常你会希望初始居中：这里给一个“居中基准”
-    // 让地图初始居中：
     CGPoint base = CGPointMake((viewSize.width - scaled.width) / 2.0,
                                (viewSize.height - scaled.height) / 2.0);
 
-    // 允许在 base 的基础上拖动，但不超过边界
-    CGFloat minX = base.x - pad;
-    CGFloat maxX = base.x + pad;
-    CGFloat minY = base.y - pad;
-    CGFloat maxY = base.y + pad;
+    CGFloat overflowX = MAX(0, (scaled.width - viewSize.width) / 2.0);
+    CGFloat overflowY = MAX(0, (scaled.height - viewSize.height) / 2.0);
 
-    // 当 scaled < viewSize 时，min/max 会反过来，这时固定在 base
+    CGFloat minX = base.x - overflowX;
+    CGFloat maxX = base.x + overflowX;
+    CGFloat minY = base.y - overflowY;
+    CGFloat maxY = base.y + overflowY;
+
     if (scaled.width <= viewSize.width) { minX = maxX = base.x; }
     if (scaled.height <= viewSize.height) { minY = maxY = base.y; }
 

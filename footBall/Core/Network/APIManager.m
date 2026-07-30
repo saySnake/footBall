@@ -9,6 +9,7 @@
 #import "APIEnvironmentManager.h"
 #import "APIRequestInterceptor.h"
 #import "APIError.h"
+#import "AuthManager.h"
 #import <YYModel/YYModel.h>
 NSString * const TokenExpiredNotification = @"TokenExpiredNotification";
 
@@ -101,6 +102,35 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
     return apiError;
 }
 
+static NSString *APIStableRequestKey(NSString *method, NSString *URL, id parameters) {
+    NSString *paramPart = @"";
+    if (parameters) {
+        if ([NSJSONSerialization isValidJSONObject:parameters]) {
+            NSData *data = [NSJSONSerialization dataWithJSONObject:parameters
+                                                           options:NSJSONWritingSortedKeys
+                                                             error:nil];
+            if (data.length > 0) {
+                paramPart = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] ?: @"";
+            }
+        } else if ([parameters isKindOfClass:NSString.class]) {
+            paramPart = (NSString *)parameters;
+        } else {
+            paramPart = [parameters description];
+        }
+    }
+    return [NSString stringWithFormat:@"%@_%@_%lu", method, URL, (unsigned long)paramPart.hash];
+}
+
+static BOOL APIShouldDeferFailureForTokenRefresh(id<APIRequestInterceptor> interceptor, NSInteger statusCode) {
+    if (statusCode != 401 || !AuthManager.sharedManager.isLoggedIn) {
+        return NO;
+    }
+    if ([interceptor isKindOfClass:APIErrorHandlingInterceptor.class]) {
+        return ((APIErrorHandlingInterceptor *)interceptor).refreshingToken;
+    }
+    return NO;
+}
+
 @interface APIManager ()
 
 @property (nonatomic, strong) AFHTTPSessionManager *sessionManager;
@@ -127,7 +157,7 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
         // baseURL 已废弃，统一使用 APIEnvironmentManager 管理环境配置
         _baseURL = @"";
         _timeoutInterval = 15.0;
-        _maxRetryCount = 0; // 默认最大重试3次
+        _maxRetryCount = 3; // 默认最大重试3次
         _retryInterval = 2.0; // 默认重试间隔2秒
         _commonHeaders = @{};
         _tasks = [NSMutableArray array];
@@ -248,11 +278,7 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
         }
     }
     
-    // 设置请求头到sessionManager（用于AFNetworking）
-    for (NSString *key in interceptedRequest.allHTTPHeaderFields.allKeys) {
-        [self.sessionManager.requestSerializer setValue:interceptedRequest.allHTTPHeaderFields[key] 
-                                     forHTTPHeaderField:key];
-    }
+    NSDictionary<NSString *, NSString *> *requestHeaders = interceptedRequest.allHTTPHeaderFields;
     // 包装成功和失败回调，执行响应拦截器
     __weak typeof(self) weakSelf = self;
      void (^wrappedSuccess)(id,id) = ^(NSURLSessionDataTask * task,id responseObject) {
@@ -272,7 +298,7 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
     };
     
     // 生成请求唯一标识（用于跟踪重试次数）
-    NSString *requestKey = [NSString stringWithFormat:@"%@_%ld_%p", fullURL, (long)method, parameters];
+    NSString *requestKey = APIStableRequestKey([self HTTPMethodString:method], fullURL, parameters);
     __block void (^wrappedFailure)(id, id) = nil;
     wrappedFailure = ^(NSURLSessionDataTask *task, NSError *error) {
 
@@ -286,7 +312,10 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
         apiError.retryInterval = weakSelf.retryInterval;
         
         // 获取当前重试次数
-        NSNumber *currentRetryCount = weakSelf.retryCountMap[requestKey];
+        NSNumber *currentRetryCount = nil;
+        @synchronized (weakSelf) {
+            currentRetryCount = weakSelf.retryCountMap[requestKey];
+        }
         apiError.retryCount = currentRetryCount ? [currentRetryCount integerValue] : 0;
         
         // 执行错误拦截器
@@ -306,8 +335,9 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
                                          parameters:parameters
                                             headers:headers
                                             success:^(NSURLSessionDataTask * task,id responseObject) {
-                            // 重试成功，清理重试计数
-                            [weakSelf.retryCountMap removeObjectForKey:requestKey];
+                            @synchronized (weakSelf) {
+                                [weakSelf.retryCountMap removeObjectForKey:requestKey];
+                            }
                             if (success) {
                                 success(task,responseObject);
                             }
@@ -321,12 +351,14 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
                 }];
                 if (!interceptedError) {
                     // 错误已被拦截器处理：
-                    // - 401 刷新 token：拦截器会异步触发 tokenRefreshed 回调，此处应直接 return（避免提前回调 failure）
-                    // - 其他错误：即使拦截器选择静默处理，也必须回调 failure，避免上层 loading 卡死
-                    [weakSelf.retryCountMap removeObjectForKey:requestKey]; // 清理重试计数
+                    // - 401 且已登录且正在刷新 token：拦截器会异步触发 tokenRefreshed 回调，此处应直接 return
+                    // - 其他错误（含静默/版本/未登录 401）：必须回调 failure，避免上层 loading 卡死
+                    @synchronized (weakSelf) {
+                        [weakSelf.retryCountMap removeObjectForKey:requestKey];
+                    }
                     NSHTTPURLResponse *httpResp = (NSHTTPURLResponse *)task.response;
                     NSInteger status = [httpResp isKindOfClass:NSHTTPURLResponse.class] ? httpResp.statusCode : 0;
-                    if (status == 401) {
+                    if (APIShouldDeferFailureForTokenRefresh(interceptor, status)) {
                         return;
                     }
                     if (failure) {
@@ -338,11 +370,12 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
             } else if ([interceptor respondsToSelector:@selector(interceptError:task:)]) {
                 NSError *interceptedError = [interceptor interceptError:finalError task:task];
                 if (!interceptedError) {
-                    // 同上：仅允许 401 刷新 token 不回调 failure，其余情况必须回调 failure
-                    [weakSelf.retryCountMap removeObjectForKey:requestKey]; // 清理重试计数
+                    @synchronized (weakSelf) {
+                        [weakSelf.retryCountMap removeObjectForKey:requestKey];
+                    }
                     NSHTTPURLResponse *httpResp = (NSHTTPURLResponse *)task.response;
                     NSInteger status = [httpResp isKindOfClass:NSHTTPURLResponse.class] ? httpResp.statusCode : 0;
-                    if (status == 401) {
+                    if (APIShouldDeferFailureForTokenRefresh(interceptor, status)) {
                         return;
                     }
                     if (failure) {
@@ -361,7 +394,9 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
             finalAPIError.retryCount < weakSelf.maxRetryCount) {
             // 增加重试次数
             finalAPIError.retryCount = finalAPIError.retryCount + 1;
-            weakSelf.retryCountMap[requestKey] = @(finalAPIError.retryCount);
+            @synchronized (weakSelf) {
+                weakSelf.retryCountMap[requestKey] = @(finalAPIError.retryCount);
+            }
             
             NSLog(@"🔄 准备第 %ld 次重试（最大 %ld 次），间隔 %.1f 秒", 
                   (long)finalAPIError.retryCount, 
@@ -376,8 +411,9 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
                                  parameters:parameters
                                     headers:headers
                                     success:^(NSURLSessionDataTask * task,id responseObject) {
-                    // 重试成功，清理重试计数
-                    [weakSelf.retryCountMap removeObjectForKey:requestKey];
+                    @synchronized (weakSelf) {
+                        [weakSelf.retryCountMap removeObjectForKey:requestKey];
+                    }
                     if (success) {
                         success(task,responseObject);
                     }
@@ -390,8 +426,9 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
             return; // 重试中，不调用失败回调
         }
         
-        // 清理重试计数
-        [weakSelf.retryCountMap removeObjectForKey:requestKey];
+        @synchronized (weakSelf) {
+            [weakSelf.retryCountMap removeObjectForKey:requestKey];
+        }
         
         // 统一错误处理回调
         if (weakSelf.errorHandler) {
@@ -414,7 +451,7 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
         case HTTPMethodGET: {
             task = [self.sessionManager GET:fullURL
                                   parameters:parameters
-                                     headers:nil
+                                     headers:requestHeaders
                                     progress:nil
                                      success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
                 [weakSelf.tasks removeObject:task];
@@ -429,7 +466,7 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
         case HTTPMethodPOST: {
             task = [self.sessionManager POST:fullURL
                                    parameters:parameters
-                                      headers:nil
+                                      headers:requestHeaders
                                      progress:nil
                                       success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
                 [weakSelf.tasks removeObject:task];
@@ -444,7 +481,7 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
         case HTTPMethodPUT: {
             task = [self.sessionManager PUT:fullURL
                                  parameters:parameters
-                                    headers:nil
+                                    headers:requestHeaders
                                     success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
                 [weakSelf.tasks removeObject:task];
                 wrappedSuccess(task,responseObject);
@@ -458,7 +495,7 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
         case HTTPMethodDELETE: {
             task = [self.sessionManager DELETE:fullURL
                                     parameters:parameters
-                                       headers:nil
+                                       headers:requestHeaders
                                        success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
                 [weakSelf.tasks removeObject:task];
                 wrappedSuccess(task,responseObject);
@@ -472,7 +509,7 @@ static APIError *APIParseBusinessErrorFromNSError(NSError *error) {
         case HTTPMethodPATCH: {
             task = [self.sessionManager PATCH:fullURL
                                    parameters:parameters
-                                      headers:nil
+                                      headers:requestHeaders
                                       success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
                 [weakSelf.tasks removeObject:task];
                 wrappedSuccess(task,responseObject);

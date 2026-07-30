@@ -72,9 +72,11 @@ static NSString * const kPNMatchVerifyPhotoCellId = @"PNMatchVerifyPhotoCell";
 @property (nonatomic, assign) BOOL isResolvingLocation;
 @property (nonatomic, strong) NSDate *locateStartAt;
 @property (nonatomic, strong) CLLocation *bestCandidateLocation;
+@property (nonatomic, strong) NSTimer *locateTimeoutTimer;
 
 @property (nonatomic, strong) UIButton *confirmButton;
 @property (nonatomic, strong) UIButton *relocateButton;
+@property (nonatomic, assign) BOOL confirmInFlight;
 
 @end
 
@@ -91,6 +93,11 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
 
     [self buildUI];
     [self startLocate];
+}
+
+- (void)dealloc {
+    _locationManager.delegate = nil;
+    [self invalidateLocateTimeoutTimer];
 }
 
 - (void)viewDidLayoutSubviews {
@@ -139,10 +146,6 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
         });
         return;
     }
-}
-
-- (void)dealloc {
-    _locationManager.delegate = nil;
 }
 
 - (void)buildUI {
@@ -483,6 +486,24 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
 
 #pragma mark - Location
 
+- (void)invalidateLocateTimeoutTimer {
+    [self.locateTimeoutTimer invalidate];
+    self.locateTimeoutTimer = nil;
+}
+
+- (void)handleLocateTimeout {
+    if (!self.locateStartAt) return;
+    [self invalidateLocateTimeoutTimer];
+    [self.locationManager stopUpdatingLocation];
+    self.isResolvingLocation = NO;
+    self.locationLabel.text = @"定位超时，请重试";
+    self.currentAddress = @"";
+    self.coordinate = kCLLocationCoordinate2DInvalid;
+    self.relocateButton.enabled = YES;
+    [self.relocateButton setTitle:@"重定位" forState:UIControlStateNormal];
+    [self updateConfirmButtonState];
+}
+
 - (void)startLocate {
     if (![CLLocationManager locationServicesEnabled]) {
         self.locationLabel.text = @"定位服务未开启";
@@ -531,6 +552,12 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
     [self.relocateButton setTitle:@"定位中" forState:UIControlStateNormal];
     [self updateConfirmButtonState];
 
+    [self invalidateLocateTimeoutTimer];
+    __weak typeof(self) weakSelf = self;
+    self.locateTimeoutTimer = [NSTimer scheduledTimerWithTimeInterval:15.0 repeats:NO block:^(NSTimer * _Nonnull timer) {
+        [weakSelf handleLocateTimeout];
+    }];
+
     // 先请求一次，再开启连续定位，直到拿到新鲜且精度足够的点
     [self.locationManager requestLocation];
     [self.locationManager startUpdatingLocation];
@@ -563,6 +590,7 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
 
 - (void)locationManager:(CLLocationManager *)manager didFailWithError:(NSError *)error {
     dispatch_async(dispatch_get_main_queue(), ^{
+        [self invalidateLocateTimeoutTimer];
         [self.locationManager stopUpdatingLocation];
         self.locationLabel.text = @"定位失败";
         self.currentAddress = @"";
@@ -576,6 +604,7 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
 - (void)locationManager:(CLLocationManager *)manager didUpdateLocations:(NSArray<CLLocation *> *)locations {
     if (@available(iOS 14.0, *)) {
         if (manager.accuracyAuthorization == CLAccuracyAuthorizationReducedAccuracy) {
+            [self invalidateLocateTimeoutTimer];
             [self.locationManager stopUpdatingLocation];
             self.locationLabel.text = @"请开启精确定位";
             self.currentAddress = @"";
@@ -605,6 +634,7 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
     if (!hasGoodPrecision && !canFallbackUseBest) {
         // 若暂无新鲜点，继续等；超时则给出提示
         if (self.locateStartAt && elapsed > 15.0) {
+            [self invalidateLocateTimeoutTimer];
             [self.locationManager stopUpdatingLocation];
             self.locationLabel.text = @"定位超时，请重试";
             self.currentAddress = @"";
@@ -619,6 +649,7 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
     if (self.isResolvingLocation) {
         return;
     }
+    [self invalidateLocateTimeoutTimer];
     [self.locationManager stopUpdatingLocation];
     self.isResolvingLocation = YES;
     
@@ -677,6 +708,11 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
 #pragma mark - Confirm
 
 - (void)updateConfirmButtonState {
+    if (self.confirmInFlight) {
+        self.confirmButton.enabled = NO;
+        self.confirmButton.alpha = 0.4;
+        return;
+    }
     BOOL hasValidCoordinate = CLLocationCoordinate2DIsValid(self.coordinate) &&
                               fabs(self.coordinate.latitude) > 0.000001 &&
                               fabs(self.coordinate.longitude) > 0.000001;
@@ -686,30 +722,52 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
 }
 
 - (void)onConfirm {
-    // 提交逻辑留给后端集成，这里先回调上层并关闭弹层
-    // 把所有image转成data上传至oss，把返回的所有oss的objectKey上传至自己后端
+    if (self.confirmInFlight) return;
+    self.confirmInFlight = YES;
+    self.confirmButton.enabled = NO;
+    self.confirmButton.alpha = 0.4;
+
     NSMutableArray *urls = [NSMutableArray arrayWithCapacity:_photos.count];
+    __block NSInteger uploadFailures = 0;
     dispatch_group_t group = dispatch_group_create();
-    for (int i=0; i<_photos.count; i++) {
+    for (int i = 0; i < _photos.count; i++) {
         NSData *data = UIImageJPEGRepresentation(_photos[i], 0.5);
+        if (!data) {
+            uploadFailures++;
+            continue;
+        }
         dispatch_group_enter(group);
         [FileRequest.shared uploadImage:data type:ImageObjectTypeMatch success:^(HTTPResponse * _Nullable responseObject) {
-            [urls addObject:responseObject.dataObject];
+            id objectKey = responseObject.dataObject;
+            if ([objectKey isKindOfClass:[NSString class]] && [(NSString *)objectKey length] > 0) {
+                [urls addObject:objectKey];
+            } else {
+                uploadFailures++;
+            }
             dispatch_group_leave(group);
         } failure:^(NSError * _Nonnull error) {
+            uploadFailures++;
             dispatch_group_leave(group);
         }];
     }
     dispatch_group_notify(group, dispatch_get_main_queue(), ^{
-       //调用比赛认证接口上传所有path至服务器
+        if (uploadFailures > 0 || urls.count < 2) {
+            self.confirmInFlight = NO;
+            [self updateConfirmButtonState];
+            [QMUITips showError:@"照片上传失败，请重试"];
+            return;
+        }
         NSString *verifyId = self.matchId.length > 0 ? self.matchId : self.recordId;
-        [MatchRequest.shared verifyMatchRecord:verifyId body:@{@"photoUrls":urls,@"latitude":@(self.coordinate.latitude),@"longitude":@(self.coordinate.longitude),@"address":self.currentAddress ?: @""} success:^(HTTPResponse * _Nullable responseObject) {
+        [MatchRequest.shared verifyMatchRecord:verifyId body:@{@"photoUrls": urls, @"latitude": @(self.coordinate.latitude), @"longitude": @(self.coordinate.longitude), @"address": self.currentAddress ?: @""} success:^(HTTPResponse * _Nullable responseObject) {
+            self.confirmInFlight = NO;
             [[NSNotificationCenter defaultCenter] postNotificationName:PNMatchRecordDidUpdateNotification object:nil];
             if (self.completion) {
                 self.completion();
             }
             [self dismissWithCardAnimation];
         } failure:^(NSError * _Nonnull error) {
+            self.confirmInFlight = NO;
+            [self updateConfirmButtonState];
             [QMUITips showError:error.localizedDescription];
         }];
     });

@@ -743,10 +743,6 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
         }
         [self setChipSelected:self.chipButtons[i] selected:on];
     }
-    if (tags.count == 0 && self.chipButtons.count > 7) {
-        [self setChipSelected:self.chipButtons[1] selected:YES];
-        [self setChipSelected:self.chipButtons[7] selected:YES];
-    }
     [self layoutChips];
 
     if (self.avatarNeedsUpload || self.avatarUploadInProgress) {

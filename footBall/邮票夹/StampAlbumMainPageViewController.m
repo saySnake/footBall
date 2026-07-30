@@ -457,6 +457,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 @property (nonatomic, strong) NSArray <PassportStampSheetCardItem *> *items;
 /// 会员状态（控制非免费格是否可展示）
 @property (nonatomic, assign) BOOL stampIsMember;
+@property (nonatomic, assign) NSInteger passportLoadGeneration;
 
 @end
 
@@ -524,6 +525,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 }
 
 - (void)applyMembershipStatus:(PNMembershipStatus *)status {
+    if (!status) return;
     self.stampIsMember = status.isMember;
 }
 
@@ -809,7 +811,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     }];
 
     dispatch_group_notify(group, dispatch_get_main_queue(), ^{
-        [weakSelf applyMembershipStatus:memberStatus];
+        if (memberStatus) {
+            [weakSelf applyMembershipStatus:memberStatus];
+        }
         [weakSelf reloadStamps:stamps];
         [weakSelf.tableView.mj_header endRefreshing];
     });
@@ -820,6 +824,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 
 - (void)loadPassportDataForceRefresh:(BOOL)forceRefresh {
     __weak typeof(self) weakSelf = self;
+    NSInteger generation = ++self.passportLoadGeneration;
     BOOL isPullRefresh = self.tableView.mj_header.isRefreshing;
     if (!isPullRefresh) {
         [self showLoading];
@@ -827,6 +832,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     NSString *y = [NSString stringWithFormat:@"%ld", (long)self.year];
     BOOL isOther = self.targetUserId.length > 0;
     void (^handleSuccess)(PNPassport *) = ^(PNPassport *p) {
+        if (generation != weakSelf.passportLoadGeneration) {
+            return;
+        }
         [weakSelf hideLoading];
         [weakSelf.tableView.mj_header endRefreshing];
         weakSelf.viewModel = [PassportViewModel viewModelWithPassport:p year:weakSelf.year];
@@ -845,6 +853,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         NSString *iconUserId = isOther ? weakSelf.targetUserId : (p.userId.length ? p.userId : (AuthManager.sharedManager.user.profile.userId ?: AuthManager.sharedManager.user.userId));
         if (iconUserId.length > 0) {
             [[ProfileRequest shared] getPassportIconsForUserId:iconUserId success:^(HTTPResponse * _Nullable responseObject) {
+                if (generation != weakSelf.passportLoadGeneration) {
+                    return;
+                }
                 NSArray *icons = [responseObject.dataObject isKindOfClass:NSArray.class] ? responseObject.dataObject : @[];
                 weakSelf.viewModel.header2IconItems = icons;
                 [weakSelf.headerCard configureWithModel:weakSelf.viewModel];
@@ -854,10 +865,18 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         }
     };
     void (^handleFailure)(NSError *) = ^(NSError *error) {
+        if (generation != weakSelf.passportLoadGeneration) {
+            return;
+        }
         [weakSelf hideLoading];
         [weakSelf.tableView.mj_header endRefreshing];
         [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
-        weakSelf.viewModel = [PassportViewModel viewModelWithPassport:nil year:weakSelf.year];
+        if (!weakSelf.viewModel) {
+            weakSelf.viewModel = [PassportViewModel viewModelWithPassport:nil year:weakSelf.year];
+        }
+        [weakSelf.headerCard configureWithModel:weakSelf.viewModel];
+        [weakSelf.tableView reloadData];
+        [weakSelf.view setNeedsLayout];
     };
     if (isOther) {
         [[ProfileRequest shared] getPassportForUserId:self.targetUserId year:y success:^(HTTPResponse * _Nullable responseObject) {

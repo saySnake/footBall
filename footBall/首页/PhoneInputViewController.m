@@ -362,9 +362,11 @@ static UIColor *PNFigmaSocialCircleBG(void) {
 }
 
 - (void)updateButtonState {
-    // 获取验证码按钮保持可点，校验放在点击时提示
-    self.getCodeButton.enabled = YES;
-    self.getCodeButton.alpha = 1.0;
+    NSCharacterSet *nonDigits = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
+    NSString *digits = [[self.phoneTextField.text ?: @"" componentsSeparatedByCharactersInSet:nonDigits] componentsJoinedByString:@""];
+    BOOL valid = digits.length == 11;
+    self.getCodeButton.enabled = valid;
+    self.getCodeButton.alpha = valid ? 1.0 : 0.55;
 }
 
 - (void)getCodeTapped {

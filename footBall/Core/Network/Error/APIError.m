@@ -42,7 +42,7 @@ static char kRetryCountKey;
                                               userInfo:userInfo];
     error.underlyingError = underlyingError;
     error.handlingStrategy = [APIError defaultHandlingStrategyForCode:code];
-    error.maxRetryCount = 0; // 默认最大重试3次
+    error.maxRetryCount = 3; // 默认最大重试3次
     error.retryInterval = 2.0; // 默认重试间隔2秒
     
     return error;
@@ -144,13 +144,24 @@ static char kRetryCountKey;
 }
 
 - (BOOL)isServerError {
-    return self.code == APIErrorCodeServerError ||
-           self.businessCode >= 500;
+    if (self.code == APIErrorCodeServerError) {
+        return YES;
+    }
+    if ([self.businessCode isKindOfClass:NSString.class] && self.businessCode.length > 0) {
+        NSInteger code = self.businessCode.integerValue;
+        return code >= 500 && code < 600;
+    }
+    return NO;
 }
 
 - (BOOL)isAuthenticationError {
-    return self.code == APIErrorCodeUnauthorized ||
-           self.businessCode == 401;
+    if (self.code == APIErrorCodeUnauthorized) {
+        return YES;
+    }
+    if ([self.businessCode isKindOfClass:NSString.class] && self.businessCode.length > 0) {
+        return self.businessCode.integerValue == 401;
+    }
+    return NO;
 }
 
 + (NSString *)normalizedBusinessCode:(NSString *)businessCode {

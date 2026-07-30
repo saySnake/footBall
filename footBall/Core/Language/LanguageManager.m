@@ -164,12 +164,21 @@ static NSString *const kUserDefaultsLanguageKey = @"AppCurrentLanguage";
 
 + (NSString *)localizedStringForKey:(NSString *)key arguments:(NSArray *)arguments {
     NSString *format = [self localizedStringForKey:key comment:nil];
-    
-    if (arguments && arguments.count > 0) {
-        return [NSString stringWithFormat:format, arguments];
+    return [self stringWithFormat:format arguments:arguments];
+}
+
++ (NSString *)stringWithFormat:(NSString *)format arguments:(NSArray *)arguments {
+    if (!arguments || arguments.count == 0) {
+        return format;
     }
-    
-    return format;
+    switch (arguments.count) {
+        case 1: return [NSString stringWithFormat:format, arguments[0]];
+        case 2: return [NSString stringWithFormat:format, arguments[0], arguments[1]];
+        case 3: return [NSString stringWithFormat:format, arguments[0], arguments[1], arguments[2]];
+        case 4: return [NSString stringWithFormat:format, arguments[0], arguments[1], arguments[2], arguments[3]];
+        case 5: return [NSString stringWithFormat:format, arguments[0], arguments[1], arguments[2], arguments[3], arguments[4]];
+        default: return format;
+    }
 }
 
 + (NSArray<NSString *> *)supportedLanguages {

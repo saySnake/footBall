@@ -536,6 +536,9 @@ static NSInteger const kMoreMatchesPageSize = 50;
         } else {
             self.hasMore = sorted.count >= kMoreMatchesPageSize;
         }
+        if (sorted.count == 0) {
+            self.hasMore = NO;
+        }
 
         [self.tableView reloadData];
         [self moreMatches_updateFooterState];

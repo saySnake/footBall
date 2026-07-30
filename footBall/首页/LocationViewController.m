@@ -1003,28 +1003,31 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
 - (void)loadRemoteRanks {
     [self loadLeaderboardForPeriod:@"week" completion:^(NSArray<PNLeaderboardEntry *> *items) {
+        if (!items) return;
         self.weekRanks = items;
         [self.tableView reloadData];
         [self updateCommunityEmptyState];
     }];
     [self loadLeaderboardForPeriod:@"month" completion:^(NSArray<PNLeaderboardEntry *> *items) {
+        if (!items) return;
         self.monthRanks = items;
         [self.tableView reloadData];
         [self updateCommunityEmptyState];
     }];
     [self loadLeaderboardForPeriod:@"season" completion:^(NSArray<PNLeaderboardEntry *> *items) {
+        if (!items) return;
         self.seasonRanks = items;
         [self.tableView reloadData];
         [self updateCommunityEmptyState];
     }];
 }
 
-- (void)loadLeaderboardForPeriod:(NSString *)period completion:(void(^)(NSArray<PNLeaderboardEntry *> *items))completion {
+- (void)loadLeaderboardForPeriod:(NSString *)period completion:(void(^)(NSArray<PNLeaderboardEntry *> * _Nullable items))completion {
     [ProfileRequest.shared getLeaderboardWithPeriod:period page:1 pageSize:30 success:^(HTTPResponse * _Nullable responseObject) {
         PNLeaderboard *board = [responseObject.dataObject isKindOfClass:PNLeaderboard.class] ? responseObject.dataObject : nil;
         completion(board.list ?: @[]);
     } failure:^(NSError * _Nonnull error) {
-        completion(@[]);
+        completion(nil);
     }];
 }
 

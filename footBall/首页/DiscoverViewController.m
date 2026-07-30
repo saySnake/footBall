@@ -35,12 +35,23 @@ typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     DiscoverMatchTypeFinished
 };
 
-static BOOL DiscoverIsPendingVerificationStatus(NSString *status) {
+static BOOL DiscoverIsRejectedVerificationStatus(NSString *status) {
     if (status.length == 0) return NO;
     NSString *s = status.lowercaseString;
-    if ([s containsString:@"reject"] || [s containsString:@"refuse"] || [s containsString:@"fail"] || [s containsString:@"拒"]) {
+    return [s containsString:@"reject"] ||
+           [s containsString:@"refuse"] ||
+           [s containsString:@"fail"] ||
+           [s containsString:@"拒"] ||
+           [s containsString:@"未通过"] ||
+           [s containsString:@"不通过"];
+}
+
+static BOOL DiscoverIsPendingVerificationStatus(NSString *status) {
+    if (status.length == 0) return NO;
+    if (DiscoverIsRejectedVerificationStatus(status)) {
         return NO;
     }
+    NSString *s = status.lowercaseString;
     return [s isEqualToString:@"pending"] ||
            [s isEqualToString:@"in_review"] ||
            [s isEqualToString:@"reviewing"] ||
@@ -51,8 +62,7 @@ static BOOL DiscoverIsPendingVerificationStatus(NSString *status) {
            [s containsString:@"pending"] ||
            [s containsString:@"review"] ||
            [s isEqualToString:@"审核中"] ||
-           [s isEqualToString:@"待审核"] ||
-           [s containsString:@"审核"];
+           [s isEqualToString:@"待审核"];
 }
 
 static BOOL DiscoverIsApprovedVerificationStatus(NSString *status) {
@@ -112,11 +122,8 @@ static NSString *DiscoverNormalizedRecordStatus(NSDictionary *row) {
     if (status.length == 0) status = DiscoverStringFromAny(row[@"status"]);
     if (status.length > 0) {
         if (DiscoverIsApprovedVerificationStatus(status)) return @"VERIFIED";
+        if (DiscoverIsRejectedVerificationStatus(status)) return @"REJECTED";
         if (DiscoverIsPendingVerificationStatus(status)) return @"PENDING";
-        NSString *s = status.lowercaseString;
-        if ([s containsString:@"reject"] || [s containsString:@"refuse"] || [s containsString:@"fail"] || [s containsString:@"拒"]) {
-            return @"REJECTED";
-        }
         if (DiscoverIsUnverifiedVerificationStatus(status)) {
             return @"UNVERIFIED";
         }
@@ -829,8 +836,12 @@ typedef NS_ENUM(NSInteger, DiscoverVerifiedPillStyle) {
             payload[@"stats"] = old[@"stats"];
         }
     }
-    [[NSUserDefaults standardUserDefaults] setObject:payload forKey:[self discoverCacheKey]];
-    [[NSUserDefaults standardUserDefaults] synchronize];
+    NSString *cacheKey = [self discoverCacheKey];
+    NSDictionary *payloadCopy = [payload copy];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        [[NSUserDefaults standardUserDefaults] setObject:payloadCopy forKey:cacheKey];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+    });
 }
 
 - (void)restoreCachedDataIfNeeded {
@@ -1535,7 +1546,7 @@ typedef NS_ENUM(NSInteger, DiscoverVerifiedPillStyle) {
             weakSelf.finishedMatches = [weakSelf discoverMatchesFrom:finList type:DiscoverMatchTypeFinished];
         }
         [weakSelf refreshTabs];
-        [weakSelf refreshFinishedPendingStatusByDetail];
+        [weakSelf refreshFinishedStatusFromPassportRecords];
         [weakSelf discoverClearStalePendingAfterVerificationRefresh];
         if (upReqSuccess || finReqSuccess || statsReqSuccess) {
             [weakSelf saveDiscoverOfflineCache];
@@ -1673,6 +1684,7 @@ typedef NS_ENUM(NSInteger, DiscoverVerifiedPillStyle) {
         }
         if (changed) {
             [weakSelf.tableView reloadData];
+            [weakSelf saveDiscoverOfflineCache];
         }
         });
         
@@ -1712,6 +1724,7 @@ typedef NS_ENUM(NSInteger, DiscoverVerifiedPillStyle) {
             NSString *matchId = DiscoverStringFromAny(row[@"matchId"]);
             if (matchId.length == 0) matchId = DiscoverStringFromAny(row[@"match_id"]);
             if (matchId.length == 0) continue;
+            if (![DiscoverNormalizedRecordStatus(row) isEqualToString:@"VERIFIED"]) continue;
             @synchronized(verifiedMatchIds) {
                 [verifiedMatchIds addObject:matchId];
             }
@@ -2119,7 +2132,10 @@ typedef NS_ENUM(NSInteger, DiscoverVerifiedPillStyle) {
         match.needsReverify = NO;
         match.verifiedText = (NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"待审核");
         [weakSelf.tableView reloadData];
-        [weakSelf loadRemoteDataForceRefresh:YES];
+        [weakSelf saveDiscoverOfflineCache];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [weakSelf loadRemoteDataForceRefresh:YES];
+        });
     };
     [self presentViewController:vc animated:NO completion:nil];
 }

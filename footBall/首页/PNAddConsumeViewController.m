@@ -24,6 +24,12 @@ static UIColor *kAddConsumePlaceholder(void) {
     return [UIColor colorWithRed:0.435f green:0.435f blue:0.435f alpha:1.0f];
 }
 
+static NSDecimalNumber *PNAddConsumeDecimalFromInput(NSString *raw) {
+    NSString *s = [[raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]
+                   stringByReplacingOccurrencesOfString:@"," withString:@"."];
+    return [NSDecimalNumber decimalNumberWithString:s locale:[NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"]];
+}
+
 @interface PNAddConsumeViewController () <UIImagePickerControllerDelegate, UINavigationControllerDelegate>
 @property (nonatomic, strong) UIView *dimmingView;
 @property (nonatomic, strong) UIView *cardView;
@@ -41,6 +47,8 @@ static UIColor *kAddConsumePlaceholder(void) {
 @property (nonatomic, copy, nullable) NSString *uploadedPhotoKey;
 /// 图片正在上传中
 @property (nonatomic, assign) BOOL photoUploading;
+/// 选图/upload 代际，忽略过期的上传回调
+@property (nonatomic, assign) NSInteger photoUploadGeneration;
 
 @property (nonatomic, strong) UITextField *itemField;
 @property (nonatomic, strong) UITextField *priceField;
@@ -449,11 +457,12 @@ static UIColor *kAddConsumePlaceholder(void) {
     if (!imgData) return;
 
     self.photoUploading = YES;
+    NSInteger uploadToken = ++self.photoUploadGeneration;
     __weak typeof(self) weakSelf = self;
     [FileRequest.shared uploadImage:imgData type:ImageObjectTypeConsumption success:^(HTTPResponse * _Nullable responseObject) {
         dispatch_async(dispatch_get_main_queue(), ^{
             __strong typeof(weakSelf) self = weakSelf;
-            if (!self) return;
+            if (!self || uploadToken != self.photoUploadGeneration) return;
             self.photoUploading = NO;
             NSString *key = [responseObject.dataObject isKindOfClass:[NSString class]] ? responseObject.dataObject : nil;
             self.uploadedPhotoKey = key;
@@ -461,7 +470,7 @@ static UIColor *kAddConsumePlaceholder(void) {
     } failure:^(NSError * _Nonnull error) {
         dispatch_async(dispatch_get_main_queue(), ^{
             __strong typeof(weakSelf) self = weakSelf;
-            if (!self) return;
+            if (!self || uploadToken != self.photoUploadGeneration) return;
             self.photoUploading = NO;
             self.uploadedPhotoKey = nil;
             // 上传失败，清除已选图片，提示用户重新选择
@@ -574,7 +583,7 @@ static UIColor *kAddConsumePlaceholder(void) {
         return;
     }
 
-    NSDecimalNumber *amount = [NSDecimalNumber decimalNumberWithString:priceStr];
+    NSDecimalNumber *amount = PNAddConsumeDecimalFromInput(priceStr);
     if ([amount isEqualToNumber:[NSDecimalNumber notANumber]] || [amount compare:[NSDecimalNumber zero]] != NSOrderedDescending) {
         NSString *msg = NSLocalizedString(@"add_consume_error_price_invalid", nil) ?: @"请输入有效金额";
         [[LoadingManager sharedManager] showError:msg inView:self.view];

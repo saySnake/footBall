@@ -81,7 +81,6 @@ static CGFloat const kRAVerifiedBackImageToCaption = 8.f;   // 稿 643−638 约
     self.hidesBottomBarWhenPushed = YES;
     self.shouldShowNavigationBar = NO;
     self.view.backgroundColor = kRAPageBg;
-    self.completed = NO;
     self.frontImage = nil;
     self.backImage = nil;
 }
@@ -437,7 +436,8 @@ static CGFloat const kRAVerifiedBackImageToCaption = 8.f;   // 稿 643−638 约
 
 - (void)refreshState {
     NSString *status = [VerificationRequest shared].cachedVerificationStatus.realnameStatus ?: @"";
-    BOOL approvedByAPI = [[status uppercaseString] isEqualToString:@"APPROVED"];
+    NSString *u = [status uppercaseString];
+    BOOL approvedByAPI = [u isEqualToString:@"APPROVED"] || [u isEqualToString:@"VERIFIED"] || [u isEqualToString:@"PASSED"];
     self.completed = approvedByAPI;
 
     BOOL showUnverified = !self.completed;

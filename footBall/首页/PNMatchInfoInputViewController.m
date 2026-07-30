@@ -35,6 +35,16 @@ static CGFloat PNInputSectionSpacing(void) {
     return 20.0;
 }
 
+static double PNInputDoubleFromDecimalField(NSString *raw) {
+    NSString *s = [[raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]
+                   stringByReplacingOccurrencesOfString:@"," withString:@"."];
+    NSDecimalNumber *num = [NSDecimalNumber decimalNumberWithString:s locale:[NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"]];
+    if ([num isEqualToNumber:[NSDecimalNumber notANumber]]) {
+        return 0.0;
+    }
+    return [num doubleValue];
+}
+
 static const NSInteger kPNMaxViewingIdentityCount = 6;
 
 NSString * const PNMatchRecordDidUpdateNotification = @"PNMatchRecordDidUpdateNotification";
@@ -1209,7 +1219,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     m[@"viewingIdentities"] = self.selectedIdentities.count > 0 ? [self.selectedIdentities allObjects] : @[];
     m[@"onlineViewingMethods"] = @[];
     m[@"watchReason"] = self.selectedReason ?: @"";
-    m[@"ticketPrice"] = @([self.priceField.text ?: @"0" doubleValue]);
+    m[@"ticketPrice"] = @(PNInputDoubleFromDecimalField(self.priceField.text ?: @"0"));
     m[@"matchDateTime"] = [self pn_isoMatchDateTimeString];
     m[@"postMatchEmotion"] = self.selectedEmotion ?: @"";
     m[@"notes"] = self.commentView.text ?: @"";

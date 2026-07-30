@@ -35,11 +35,13 @@
             _currentEnvironment = APIEnvironmentAppStore;
         #endif
         
-        // 尝试从UserDefaults读取保存的环境配置
+        // 尝试从UserDefaults读取保存的环境配置（仅 Debug）
+        #ifdef DEBUG
         NSNumber *savedEnvironment = [[NSUserDefaults standardUserDefaults] objectForKey:@"APIEnvironment"];
         if (savedEnvironment) {
             _currentEnvironment = [savedEnvironment integerValue];
         }
+        #endif
         
         // 初始化时同步服务器地址（从 BVAPPEnvironmentHostManager）
         #ifdef DEBUG

@@ -265,15 +265,27 @@ static NSArray<NSString *> *PNStringArray(id value) {
 
     NSDictionary *rnObj = d[@"realName"];
     if ([rnObj isKindOfClass:[NSDictionary class]]) {
-        NSString *st = rnObj[@"status"] ?: rnObj[@"state"];
-        if (st.length) rn = @([st isEqualToString:@"approved"] || [st isEqualToString:@"verified"] || [st isEqualToString:@"passed"]);
-        else if (rnObj[@"verified"]) rn = rnObj[@"verified"];
+        id stRaw = rnObj[@"status"] ?: rnObj[@"state"];
+        if ([stRaw isKindOfClass:[NSString class]]) {
+            NSString *st = [(NSString *)stRaw lowercaseString];
+            if (st.length > 0) {
+                rn = @([st isEqualToString:@"approved"] || [st isEqualToString:@"verified"] || [st isEqualToString:@"passed"]);
+            }
+        } else if (rnObj[@"verified"]) {
+            rn = rnObj[@"verified"];
+        }
     }
     NSDictionary *prObj = d[@"professional"];
     if ([prObj isKindOfClass:[NSDictionary class]]) {
-        NSString *st = prObj[@"status"] ?: prObj[@"state"];
-        if (st.length) pr = @([st isEqualToString:@"approved"] || [st isEqualToString:@"verified"] || [st isEqualToString:@"passed"]);
-        else if (prObj[@"verified"]) pr = prObj[@"verified"];
+        id stRaw = prObj[@"status"] ?: prObj[@"state"];
+        if ([stRaw isKindOfClass:[NSString class]]) {
+            NSString *st = [(NSString *)stRaw lowercaseString];
+            if (st.length > 0) {
+                pr = @([st isEqualToString:@"approved"] || [st isEqualToString:@"verified"] || [st isEqualToString:@"passed"]);
+            }
+        } else if (prObj[@"verified"]) {
+            pr = prObj[@"verified"];
+        }
     }
 
     if (rn) [AuthStateStore setRealNameAuthCompleted:parseBool(rn)];

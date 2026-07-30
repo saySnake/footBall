@@ -464,8 +464,12 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
         @"profile": profile,
         @"savedAt": @([[NSDate date] timeIntervalSince1970]),
     };
-    [[NSUserDefaults standardUserDefaults] setObject:payload forKey:[self homeCacheKey]];
-    [[NSUserDefaults standardUserDefaults] synchronize];
+    NSString *cacheKey = [self homeCacheKey];
+    NSDictionary *payloadCopy = [payload copy];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        [[NSUserDefaults standardUserDefaults] setObject:payloadCopy forKey:cacheKey];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+    });
 }
 
 - (void)restoreHomeOfflineCacheIfNeeded {
@@ -1274,7 +1278,10 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
 
 - (void)fetchScheduleMatchesReset:(BOOL)reset {
     if (self.isLoadingSchedule) {
-        if (!reset) return;
+        if (!reset) {
+            [self.scrollView.mj_footer endRefreshing];
+            return;
+        }
         // 切队/下拉刷新允许覆盖进行中的请求；旧回调靠 scheduleRequestSeq 丢弃
         self.isLoadingSchedule = NO;
     }

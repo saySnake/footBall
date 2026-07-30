@@ -136,7 +136,9 @@
 - (nullable NSError *)interceptError:(NSError *)error task:(NSURLSessionDataTask *)task tokenRefreshed:(nonnull void (^)(BOOL))tokenRefreshed{
     NSHTTPURLResponse *httpResp = (NSHTTPURLResponse *)task.response;
     if (httpResp.statusCode == 401 && AuthManager.sharedManager.isLoggedIn && ![task.currentRequest.URL.path containsString:APIPathValueRefreshToken]) {
-        [self.callbacks addObject:tokenRefreshed];
+        @synchronized (self) {
+            [self.callbacks addObject:tokenRefreshed];
+        }
         if (!self.refreshingToken) {
             self.refreshingToken = YES;
             NSLog(@"✅ [API Request] token过期，开始刷新token");
@@ -193,9 +195,13 @@
     }
 }
 - (void)_callback:(BOOL)success {
-    [self.callbacks enumerateObjectsUsingBlock:^(void(^callback)(BOOL), NSUInteger idx, BOOL * _Nonnull stop) {
+    NSArray<void (^)(BOOL)> *pendingCallbacks = nil;
+    @synchronized (self) {
+        pendingCallbacks = [self.callbacks copy];
+        [self.callbacks removeAllObjects];
+    }
+    [pendingCallbacks enumerateObjectsUsingBlock:^(void (^callback)(BOOL), NSUInteger idx, BOOL * _Nonnull stop) {
         callback(success);
     }];
-    [self.callbacks removeAllObjects];
 }
 @end

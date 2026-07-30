@@ -521,6 +521,7 @@
 @property (nonatomic, strong) NSArray<Team *> *allTeams;
 @property (nonatomic, strong) NSArray<Team *> *filteredTeams;
 @property (nonatomic, strong) NSMutableArray<Team *> *selectedTeams;
+@property (nonatomic, assign) NSInteger searchDebounceToken;
 
 @end
 
@@ -534,19 +535,32 @@
     self.navigationItem.leftBarButtonItem = nil;
     self.navigationItem.hidesBackButton = YES;
     
+    self.selectedTeams = [NSMutableArray array];
     [self buildData];
     [self setupUI];
 }
 
-- (void)buildData {    
+- (void)buildData {
+    [self fetchTeamsForKeyword:@""];
+}
+
+- (void)fetchTeamsForKeyword:(NSString *)keyword {
+    __weak typeof(self) weakSelf = self;
+    NSString *kw = keyword ?: @"";
     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
-    [TeamsRequest.shared searchTeams:@"" leagueId:nil page:1 pageSize:20 success:^(HTTPResponse <NSArray<Team*>*>* _Nullable responseObject) {
+    [TeamsRequest.shared searchTeams:kw leagueId:nil page:1 pageSize:100 success:^(HTTPResponse <NSArray<Team*>*>* _Nullable responseObject) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
         [MBProgressHUD hideHUDForView:self.view animated:YES];
-        self.allTeams = responseObject.dataObject;
-        self.filteredTeams = responseObject.dataObject;
-        self.selectedTeams = [NSMutableArray array];
+        self.allTeams = responseObject.dataObject ?: @[];
+        self.filteredTeams = self.allTeams;
+        if (!self.selectedTeams) {
+            self.selectedTeams = [NSMutableArray array];
+        }
         [self.collectionView reloadData];
     } failure:^(NSError * _Nonnull error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
         [MBProgressHUD hideHUDForView:self.view animated:YES];
         [QMUITips showError:error.localizedDescription];
     }];
@@ -699,20 +713,22 @@
 #pragma mark - Search
 
 - (void)searchTextDidChange:(UITextField *)textField {
-    NSString *searchText = textField.text ?: @"";
-    if (searchText.length == 0) {
-        self.filteredTeams = self.allTeams;
-    } else {
-        NSPredicate *predicate = [NSPredicate predicateWithBlock:^BOOL(Team *evaluatedObject, NSDictionary<NSString *,id> * _Nullable bindings) {
-            return [evaluatedObject.name containsString:searchText];
-        }];
-        self.filteredTeams = [self.allTeams filteredArrayUsingPredicate:predicate];
-    }
-    [self.collectionView reloadData];
+    NSString *kw = [textField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    self.searchDebounceToken += 1;
+    NSInteger token = self.searchDebounceToken;
+    __weak typeof(self) weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self || token != self.searchDebounceToken) return;
+        [self fetchTeamsForKeyword:kw];
+    });
 }
 
 - (BOOL)textFieldShouldReturn:(UITextField *)textField {
     [textField resignFirstResponder];
+    NSString *kw = [textField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    self.searchDebounceToken += 1;
+    [self fetchTeamsForKeyword:kw];
     return YES;
 }
 

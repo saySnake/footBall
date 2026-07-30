@@ -1139,14 +1139,18 @@
 
 /// 用服务端方案数据更新本地 MCPlan 的价格和 appleProductId
 - (void)applyAPIPlansToUI:(NSArray<PNMemberPlan *> *)apiPlans {
-    if (apiPlans.count == 0 || self.plans.count == 0) return;
-    // 按 planId 升序排列（1=月, 2=年, 3=永久, 4=创始人），与本地 plans 数组顺序一致
-    NSArray<PNMemberPlan *> *sorted = [apiPlans sortedArrayUsingComparator:^NSComparisonResult(PNMemberPlan *a, PNMemberPlan *b) {
+    if (apiPlans.count == 0) return;
+    [self reloadPlanCardsPreservingIndex];
+}
+
+- (void)mergeAPIPlansIntoPlans:(NSArray<MCPlan *> *)plans {
+    if (self.apiPlans.count == 0 || plans.count == 0) return;
+    NSArray<PNMemberPlan *> *sorted = [self.apiPlans sortedArrayUsingComparator:^NSComparisonResult(PNMemberPlan *a, PNMemberPlan *b) {
         return [a.planId compare:b.planId options:NSNumericSearch];
     }];
-    for (NSInteger i = 0; i < (NSInteger)sorted.count && i < (NSInteger)self.plans.count; i++) {
+    for (NSInteger i = 0; i < (NSInteger)sorted.count && i < (NSInteger)plans.count; i++) {
         PNMemberPlan *api = sorted[i];
-        MCPlan *local = self.plans[i];
+        MCPlan *local = plans[i];
         if (api.price.length > 0) {
             local.price = api.price;
             local.payPrice = api.price;
@@ -1155,7 +1159,6 @@
             local.title = api.name;
         }
     }
-    [self reloadPlanCardsPreservingIndex];
 }
 
 /// 根据会员状态更新 banner 文案
@@ -1314,6 +1317,9 @@
     f.benefits = @[@"终身全部权益", @"未来产品优先体验权", @"APP 内专属编号徽章", @"创始人社群", @"限定编号球衣"];
     f.benefitIcons = @[@"trophy.fill", @"shippingbox.fill", @"number.square.fill", @"globe", @"tshirt.fill"];
 
+    NSArray<MCPlan *> *builtPlans = @[m, y, l, f];
+    [self mergeAPIPlansIntoPlans:builtPlans];
+
     if (self.hasAppliedRedeemDiscount) {
         // 折扣只作用在兑换码对应的方案上，避免所有卡片都显示折后价误导用户
         NSString *pid = self.redeemPlanId ?: @"";
@@ -1333,7 +1339,7 @@
         // planId=4 创始人通常无折扣；未知 planId 不改价
     }
 
-    self.plans = @[m, y, l, f];
+    self.plans = builtPlans;
 }
 
 - (void)refreshPlanInfoAtIndex:(NSInteger)idx {
@@ -1982,6 +1988,10 @@
                 [weakSelf reloadPlanCardsPreservingIndex];
                 return;
             }
+            weakSelf.hasAppliedRedeemDiscount = NO;
+            weakSelf.pendingRedeemCode = nil;
+            weakSelf.redeemAppleProductId = nil;
+            weakSelf.redeemPlanId = nil;
             weakSelf.giftPromptLabel.hidden = YES;
             weakSelf.giftCodeTapAreaBtn.hidden = YES;
             weakSelf.giftRedeemBtn.hidden = YES;

@@ -31,10 +31,15 @@ static NSString *const kUserDefaultsThemeKey = @"AppCurrentTheme";
 - (instancetype)init {
     self = [super init];
     if (self) {
-        // 从UserDefaults读取保存的主题设置
-        NSInteger savedTheme = [[NSUserDefaults standardUserDefaults] integerForKey:kUserDefaultsThemeKey];
-        if (savedTheme >= 0 && savedTheme <= 2) {
-            _currentTheme = (AppTheme)savedTheme;
+        // 从UserDefaults读取保存的主题设置（integerForKey 缺失时返回 0，与 AppThemeLight 冲突）
+        id savedObj = [[NSUserDefaults standardUserDefaults] objectForKey:kUserDefaultsThemeKey];
+        if (savedObj != nil) {
+            NSInteger savedTheme = [savedObj integerValue];
+            if (savedTheme >= AppThemeLight && savedTheme <= AppThemeAuto) {
+                _currentTheme = (AppTheme)savedTheme;
+            } else {
+                _currentTheme = AppThemeAuto;
+            }
         } else {
             _currentTheme = AppThemeAuto;
         }
@@ -52,6 +57,10 @@ static NSString *const kUserDefaultsThemeKey = @"AppCurrentTheme";
 
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (void)setCurrentTheme:(AppTheme)currentTheme {
+    [self setTheme:currentTheme];
 }
 
 - (void)setTheme:(AppTheme)theme {

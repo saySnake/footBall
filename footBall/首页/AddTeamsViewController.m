@@ -367,6 +367,12 @@ static CGFloat const kAddTeamCheckBadgeD = 24.f;
         [[LoadingManager sharedManager] showError:msg inView:self.view];
         return;
     }
+    NSSet<NSString *> *selectedSet = [NSSet setWithArray:ids];
+    for (NSString *pid in self.preselectedTeamIds ?: @[]) {
+        if (pid.length > 0 && ![selectedSet containsObject:pid]) {
+            [[TeamsRequest shared] cancelFollowTeam:pid success:nil failure:nil];
+        }
+    }
     if (self.onConfirmBlock) self.onConfirmBlock(ids);
     [self.navigationController popViewControllerAnimated:YES];
 }

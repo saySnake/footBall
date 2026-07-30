@@ -490,12 +490,12 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     }
     NSInteger teamWins = tr ? tr.wins : 0;
     float winRateVal = tr ? tr.winRate : 0.f;
-    m.possessionLeftLine1 = [NSString stringWithFormat:@"%ld", (long)teamWins];
-    m.possessionLeftLine2 = [NSString stringWithFormat:@"%.0f", winRateVal];
     CGFloat winRate01 = (CGFloat)winRateVal;
     if (winRate01 > 1.0f) {
         winRate01 = winRate01 / 100.f;
     }
+    m.possessionLeftLine1 = [NSString stringWithFormat:@"%ld", (long)teamWins];
+    m.possessionLeftLine2 = [NSString stringWithFormat:@"%.0f", winRate01 * 100.f];
     m.possessionCenterPercent = MIN(1, MAX(0, winRate01));
 
     // 空间维度（球场 / 城市 / 国家覆盖）
