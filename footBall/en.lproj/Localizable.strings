@@ -235,6 +235,7 @@
 "passport_legend_draw" = "D";
 "passport_legend_loss" = "L";
 "passport_legend_other" = "Other";
+"passport_chart_load_failed" = "Failed to load. Pull to refresh or tap reload.";
 
 /* Add Consume */
 "add_consume_title" = "Add Expense";

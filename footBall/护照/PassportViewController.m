@@ -36,6 +36,12 @@ static UIColor *PassportPageBg(void) {
 @property (nonatomic, assign) NSInteger passportLoadGeneration;
 @property (nonatomic, assign) CGFloat passportHeaderCachedWidth;
 @property (nonatomic, assign) CGFloat passportHeaderCachedHeight;
+/// 当前展示是否为接口失败空态（九图各空状态，而非全 0）
+@property (nonatomic, assign) BOOL passportLoadFailed;
+/// 是否曾成功加载过护照（刷新失败时保留旧数据）
+@property (nonatomic, assign) BOOL passportHasLoadedSuccessfully;
+/// 当前 viewModel 对应的赛季年（用于判断刷新失败是否可保留）
+@property (nonatomic, assign) NSInteger passportLoadedYear;
 @end
 
 @implementation PassportViewController
@@ -74,8 +80,10 @@ static UIColor *PassportPageBg(void) {
 //        StampAlbumMainPageViewController *vc = [[StampAlbumMainPageViewController alloc] initWithViewModel:m year:weakSelf.selectedYear];
 //        [weakSelf.navigationController pushViewController:vc animated:YES];
 //    };
-    self.viewModel = [PassportViewModel viewModelWithPassport:nil year:self.selectedYear];
-    [self.passportHeader configureWithModel:self.viewModel];
+    self.viewModel = nil;
+    self.passportLoadFailed = NO;
+    self.passportHasLoadedSuccessfully = NO;
+    [self.passportHeader applyLoadFailedEmptyAppearance];
     [self.tableView reloadData];
     [self loadPassportData];
     
@@ -198,6 +206,7 @@ static UIColor *PassportPageBg(void) {
     [_tableView registerClass:[PassportTacticalCell class] forCellReuseIdentifier:@"tact"];
     [_tableView registerClass:[PassportMetricBarsCell class] forCellReuseIdentifier:@"metric"];
     [_tableView registerClass:[PassportOutcomeCell class] forCellReuseIdentifier:@"out"];
+    [_tableView registerClass:[PassportChartEmptyStateCell class] forCellReuseIdentifier:@"chartEmpty"];
 }
 
 - (void)buildTableHeader {
@@ -310,6 +319,9 @@ static UIColor *PassportPageBg(void) {
         }
         [weakSelf hideLoading];
         [weakSelf.tableView.mj_header endRefreshing];
+        weakSelf.passportLoadFailed = NO;
+        weakSelf.passportHasLoadedSuccessfully = YES;
+        weakSelf.passportLoadedYear = weakSelf.selectedYear;
         weakSelf.viewModel = [PassportViewModel viewModelWithPassport:p year:weakSelf.selectedYear];
         // 查看自己的护照时，用本地 AuthManager 的真实头像和城市覆盖接口返回的占位数据
         if (!isOther) {
@@ -351,9 +363,19 @@ static UIColor *PassportPageBg(void) {
         }
         [weakSelf hideLoading];
         [weakSelf.tableView.mj_header endRefreshing];
-        [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
-        weakSelf.viewModel = [PassportViewModel viewModelWithPassport:nil year:weakSelf.selectedYear];
-        [weakSelf.passportHeader configureWithModel:weakSelf.viewModel];
+        // 同赛季下拉刷新失败：保留原图表，只 toast，避免刷成全 0
+        if (weakSelf.passportHasLoadedSuccessfully &&
+            weakSelf.viewModel &&
+            !weakSelf.passportLoadFailed &&
+            weakSelf.passportLoadedYear == weakSelf.selectedYear) {
+            [weakSelf showError:error.localizedDescription ?: (NSLocalizedString(@"network_error", nil) ?: @"")];
+            return;
+        }
+        // 首次加载 / 换年失败：各分区展示空状态，不写入 0 数据
+        weakSelf.passportLoadFailed = YES;
+        weakSelf.viewModel = nil;
+        [weakSelf.passportHeader applyLoadFailedEmptyAppearance];
+        [weakSelf.yearStrip setYears:[weakSelf recentFiveYears] selectedYear:weakSelf.selectedYear];
         [weakSelf.tableView reloadData];
         [weakSelf invalidatePassportHeaderLayoutCache];
         [weakSelf.view setNeedsLayout];
@@ -430,10 +452,43 @@ static UIColor *PassportPageBg(void) {
 #pragma mark - UITableView
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    if (self.passportLoadFailed) {
+        return 9;
+    }
     return self.viewModel ? 9 : 0;
 }
 
+- (NSString *)passportChartTitleAtIndex:(NSInteger)index {
+    NSInteger y = self.selectedYear;
+    switch (index) {
+        case 0: return NSLocalizedString(@"passport_year_total_watch_time", nil) ?: @"年度总观赛时长";
+        case 1: {
+            NSString *suffix = NSLocalizedString(@"passport_growth_wake_suffix", nil) ?: @"年睡醒时间里的";
+            return [NSString stringWithFormat:@"%ld%@", (long)y, suffix];
+        }
+        case 2: return [NSString stringWithFormat:@"%ld年观赛数据", (long)y];
+        case 3: return [NSString stringWithFormat:NSLocalizedString(@"passport_followed_team_win_rate_title", nil) ?: @"%ld年我关注的主队胜率", (long)y];
+        case 4: return NSLocalizedString(@"passport_position_strength", nil) ?: @"空间维度";
+        case 5: return NSLocalizedString(@"passport_ability_detail", nil) ?: @"线下观赛数据观";
+        case 6: return NSLocalizedString(@"passport_tactical_identity_title", nil) ?: @"观赛身份";
+        case 7: return NSLocalizedString(@"passport_metric_prompt", nil) ?: @"看球之后，我更容易：";
+        case 8: {
+            NSString *t = NSLocalizedString(@"passport_online_viewing_title", nil);
+            if (!t.length || [t isEqualToString:@"passport_online_viewing_title"]) {
+                t = NSLocalizedString(@"passport_outcome_vs_last", nil) ?: @"线上观赛数据";
+            }
+            return t;
+        }
+        default: return @"";
+    }
+}
+
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (self.passportLoadFailed) {
+        PassportChartEmptyStateCell *empty = [tableView dequeueReusableCellWithIdentifier:@"chartEmpty" forIndexPath:indexPath];
+        [empty configureWithTitle:[self passportChartTitleAtIndex:indexPath.row]];
+        return empty;
+    }
     PassportViewModel *m = self.viewModel;
     switch (indexPath.row) {
         case 0: {
@@ -487,6 +542,9 @@ static UIColor *PassportPageBg(void) {
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (self.passportLoadFailed) {
+        return 168;
+    }
     // DarkStatsCardCell 使用叠压布局（负间距），某些系统版本 AutomaticDimension 计算会偏小甚至为 0，直接给固定高度更稳
     if (indexPath.row == 1) {
         return 197;
@@ -524,6 +582,9 @@ static UIColor *PassportPageBg(void) {
 }
 
 - (CGFloat)tableView:(UITableView *)tableView estimatedHeightForRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (self.passportLoadFailed) {
+        return 168;
+    }
     if (indexPath.row == 1) {
         return 197;
     }

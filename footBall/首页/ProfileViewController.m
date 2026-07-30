@@ -236,9 +236,9 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
 - (void)loadProfileRemoteData {
     if (!AuthManager.sharedManager.isLoggedIn) {
         [self applyUserProfile:nil];
-        self.stat1Num.text = @"0";
-        self.stat2Num.text = @"0";
-        self.stat3Num.text = @"0";
+        self.stat1Num.text = @"--";
+        self.stat2Num.text = @"--";
+        self.stat3Num.text = @"--";
         self.apiFollowedTeams = @[];
         [self updateTeamsCardUI];
         return;
@@ -266,8 +266,8 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
         weakSelf.stat1Num.text = [NSString stringWithFormat:@"%ld", (long)friendCount];
         weakSelf.stat2Num.text = [NSString stringWithFormat:@"%ld", (long)followingCount];
     } failure:^(NSError * _Nonnull error) {
-        weakSelf.stat1Num.text = @"0";
-        weakSelf.stat2Num.text = @"0";
+        weakSelf.stat1Num.text = @"--";
+        weakSelf.stat2Num.text = @"--";
     }];
 
     [[ProfileRequest shared] getMyStatisticsWithPeriod:@"all" success:^(HTTPResponse * _Nullable responseObject) {
@@ -275,7 +275,7 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
         NSInteger matches = stats.basicStats ? MAX(stats.basicStats.totalMatches, 0) : 0;
         weakSelf.stat3Num.text = [NSString stringWithFormat:@"%ld", (long)matches];
     } failure:^(NSError * _Nonnull error) {
-        weakSelf.stat3Num.text = @"0";
+        weakSelf.stat3Num.text = @"--";
     }];
 
     [[TeamsRequest shared] getFollowTeamsSuccess:^(HTTPResponse * _Nullable responseObject) {
@@ -482,7 +482,7 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
         make.height.mas_equalTo(52);
     }];
 
-    NSArray *nums = @[@"0", @"0", @"0"];
+    NSArray *nums = @[@"--", @"--", @"--"];
     self.stat1Num = [UILabel new]; self.stat1Title = [UILabel new];
     self.stat2Num = [UILabel new]; self.stat2Title = [UILabel new];
     self.stat3Num = [UILabel new]; self.stat3Title = [UILabel new];

@@ -163,6 +163,25 @@ static UIColor *PassportCircleStrokeColor(void) {
     [self applyPassportIcons:model.header2IconItems];
 }
 
+- (void)applyLoadFailedEmptyAppearance {
+    self.cityLabel.text = @"--";
+    self.matchesLabel.text = @"--";
+    self.afterLabel.text = @"--";
+    self.afterUnitLabel.hidden = YES;
+    self.minutesValueLabel.text = @"--";
+    self.goalsValueLabel.text = @"--";
+    self.citiesValueLabel.text = @"--";
+    self.countriesValueLabel.text = @"--";
+    for (UIView *circle in self.teamIconCircles) {
+        UIImageView *iv = (UIImageView *)[circle viewWithTag:0xFF];
+        if ([iv isKindOfClass:UIImageView.class]) {
+            [iv sd_cancelCurrentImageLoad];
+            iv.image = nil;
+        }
+    }
+    [self applyPassportIcons:@[]];
+}
+
 /// 按接口固定顺序(1A,1B,...,8A,8B)渲染 16 坑位；A 行在上、B 行在下
 - (void)applyPassportIcons:(NSArray<PNPassportIconItem *> *)items {
     if (self.iconCirclesA.count < 8 || self.iconCirclesB.count < 8) {

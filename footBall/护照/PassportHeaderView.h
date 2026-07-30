@@ -15,6 +15,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) void (^onPassportHeader2Tap)(void);
 
 - (void)configureWithModel:(PassportViewModel *)model;
+/// 接口失败空态：数字用「--」，图表清空，避免显示 0 被当成真实观赛数据
+- (void)applyLoadFailedEmptyAppearance;
 @end
 
 NS_ASSUME_NONNULL_END

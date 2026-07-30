@@ -664,7 +664,8 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
 - (nullable NSDate *)dateFromAPIBirthString:(NSString *)s {
     if (s.length == 0) return nil;
     NSDateFormatter *f = [[NSDateFormatter alloc] init];
-    f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    f.locale = [NSLocale currentLocale];
+    f.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
     NSArray<NSString *> *fmts = @[ @"yyyy-MM-dd", @"yyyy-MM-dd'T'HH:mm:ss.SSSZ", @"yyyy/MM/dd" ];
     for (NSString *fmt in fmts) {
         f.dateFormat = fmt;
@@ -766,7 +767,8 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
     p.gender = self.maleOption.checked ? UserGenderMale : UserGenderFemale;
 
     NSDateFormatter *apiFmt = [[NSDateFormatter alloc] init];
-    apiFmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    apiFmt.locale = [NSLocale currentLocale];
+    apiFmt.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
     apiFmt.dateFormat = @"yyyy-MM-dd";
     p.birthDate = [apiFmt stringFromDate:self.birthDate ?: [NSDate date]];
 

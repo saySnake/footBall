@@ -322,7 +322,8 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
         if (d) return d;
     }
     NSDateFormatter *f = [[NSDateFormatter alloc] init];
-    f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    f.locale = [NSLocale currentLocale];
+    f.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
     f.dateFormat = @"yyyy-MM-dd HH:mm:ss";
     NSDate *d = [f dateFromString:trimmed];
     if (d) return d;

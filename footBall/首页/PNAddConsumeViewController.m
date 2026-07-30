@@ -508,7 +508,8 @@ static UIColor *kAddConsumePlaceholder(void) {
 - (NSString *)expenseDateStringForAPI {
     NSDate *d = self.selectedDate ?: [NSDate date];
     NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
-    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    fmt.locale = [NSLocale currentLocale];
+    fmt.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
     fmt.timeZone = [NSTimeZone localTimeZone];
     // 服务端 expenseDate 是 LocalDate，只接受 yyyy-MM-dd 格式
     fmt.dateFormat = @"yyyy-MM-dd";

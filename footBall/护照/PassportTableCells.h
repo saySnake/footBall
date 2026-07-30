@@ -46,4 +46,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)configureWithModel:(PassportViewModel *)model;
 @end
 
+/// 护照图表加载失败时的分区空状态（避免刷成 0 被误认为真实数据）
+@interface PassportChartEmptyStateCell : UITableViewCell
+- (void)configureWithTitle:(NSString *)title;
+@end
+
 NS_ASSUME_NONNULL_END

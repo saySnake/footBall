@@ -132,7 +132,8 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
         if (d) return d;
     }
     NSDateFormatter *f = [[NSDateFormatter alloc] init];
-    f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    f.locale = [NSLocale currentLocale];
+    f.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
     for (NSString *fmt in @[@"yyyy-MM-dd'T'HH:mm:ssZ", @"yyyy-MM-dd'T'HH:mm:ss", @"yyyy-MM-dd HH:mm:ss", @"yyyy-MM-dd HH:mm"]) {
         f.dateFormat = fmt;
         NSDate *d = [f dateFromString:s];

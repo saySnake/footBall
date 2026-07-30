@@ -235,6 +235,7 @@
 "passport_legend_draw" = "平";
 "passport_legend_loss" = "负";
 "passport_legend_other" = "其它";
+"passport_chart_load_failed" = "加载失败，下拉或点击刷新重试";
 
 /* Add Consume */
 "add_consume_title" = "添加消费";

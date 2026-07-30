@@ -15,7 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// 后端时间串 → NSDate。无时区后缀按 Asia/Shanghai；带 Z/偏移按串内时区；Unix 时间戳为绝对时间。
 + (nullable NSDate *)dateFromBackendString:(nullable NSString *)raw;
 
-/// 展示用 formatter：已设 localTimeZone + en_US_POSIX（可再改 locale / dateFormat）
+/// 展示用 formatter：已设 currentLocale + localTimeZone（可再改 dateFormat）
 + (NSDateFormatter *)displayFormatter;
 
 @end

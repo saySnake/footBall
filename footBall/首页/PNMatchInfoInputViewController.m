@@ -1154,7 +1154,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     NSDate *date = self.selectedDate ?: [NSDate date];
     NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
     fmt.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
-    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    fmt.locale = [NSLocale currentLocale];
     fmt.timeZone = [NSTimeZone localTimeZone];
     fmt.dateFormat = @"yyyy-MM-dd'T'HH:mm:ss";
     return [fmt stringFromDate:date];

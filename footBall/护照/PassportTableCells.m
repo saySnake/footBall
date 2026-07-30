@@ -1580,3 +1580,64 @@ static UIView *PCOutcomeLegendItemView(NSString *title, NSString *numStr, UIColo
 }
 
 @end
+
+#pragma mark - Chart load-failed empty
+
+@implementation PassportChartEmptyStateCell {
+    UIView *_card;
+    UILabel *_titleLabel;
+    UILabel *_hintLabel;
+}
+
+- (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
+    if (self = [super initWithStyle:style reuseIdentifier:reuseIdentifier]) {
+        self.selectionStyle = UITableViewCellSelectionStyleNone;
+        self.backgroundColor = [UIColor clearColor];
+        self.contentView.backgroundColor = [UIColor clearColor];
+
+        _card = [[UIView alloc] init];
+        _card.backgroundColor = PCLightCard();
+        _card.layer.cornerRadius = 24;
+        _card.clipsToBounds = YES;
+        [self.contentView addSubview:_card];
+
+        _titleLabel = [[UILabel alloc] init];
+        _titleLabel.font = FontManager.sharedManager.font18Regular;
+        _titleLabel.textColor = [UIColor colorWithWhite:0.12 alpha:1.0];
+        _titleLabel.numberOfLines = 1;
+        [_card addSubview:_titleLabel];
+
+        _hintLabel = [[UILabel alloc] init];
+        _hintLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
+        _hintLabel.textColor = [UIColor colorWithWhite:0.55 alpha:1.0];
+        _hintLabel.textAlignment = NSTextAlignmentCenter;
+        _hintLabel.numberOfLines = 0;
+        [_card addSubview:_hintLabel];
+
+        [_card mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.edges.equalTo(self.contentView).insets(UIEdgeInsetsMake(0, 0, 8, 0));
+            make.height.mas_equalTo(160);
+        }];
+        [_titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.leading.equalTo(_card).offset(16);
+            make.trailing.equalTo(_card).offset(-16);
+        }];
+        [_hintLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.centerY.equalTo(_card).offset(8);
+            make.leading.equalTo(_card).offset(24);
+            make.trailing.equalTo(_card).offset(-24);
+        }];
+    }
+    return self;
+}
+
+- (void)configureWithTitle:(NSString *)title {
+    _titleLabel.text = title.length ? title : @"";
+    NSString *hint = NSLocalizedString(@"passport_chart_load_failed", nil);
+    if (!hint.length || [hint isEqualToString:@"passport_chart_load_failed"]) {
+        hint = @"加载失败，下拉或点击刷新重试";
+    }
+    _hintLabel.text = hint;
+}
+
+@end

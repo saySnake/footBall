@@ -94,7 +94,6 @@
 
 + (NSDateFormatter *)displayFormatter {
     NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
-    // 展示跟手机语言/地区；解析固定格式才用 en_US_POSIX
     fmt.locale = [NSLocale currentLocale];
     fmt.timeZone = [NSTimeZone localTimeZone];
     return fmt;

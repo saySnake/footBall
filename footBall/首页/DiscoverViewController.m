@@ -28,7 +28,7 @@
 #define kDiscoverCardBg       [UIColor colorWithRed:0.976 green:0.976 blue:0.976 alpha:1.0]   // #F9F9F9
 #define kDiscoverCellBg       [UIColor colorWithRed:0.961 green:0.961 blue:0.961 alpha:1.0]   // #F5F5F5 未来观赛卡片
 #define kDiscoverFinishedCardBg [UIColor colorWithRed:0.957 green:0.957 blue:0.957 alpha:1.0]   // #F4F4F4 已经观赛卡片（Figma 1:7162）
-static NSString * const kDiscoverOfflineCacheKeyPrefix = @"discover.offline.cache.v1";
+static NSString * const kDiscoverOfflineCacheKeyPrefix = @"discover.offline.cache.v2";
 
 typedef NS_ENUM(NSInteger, DiscoverMatchType) {
     DiscoverMatchTypeUpcoming,
@@ -233,6 +233,18 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
 @property (nonatomic, strong) UILabel *dateLabel;
 @property (nonatomic, strong) UIButton *inputButton;
 @property (nonatomic, strong) UIButton *verifiedPill;
+/// 底行日期布局：leading / 相对 verifiedPill 垂直对齐（避免 cellForRow 里 remakeConstraints）
+- (void)setDateLabelLeading:(BOOL)leading alignToVerifiedPill:(BOOL)alignToVerified;
+@end
+
+@interface DiscoverMatchCell ()
+@property (nonatomic, strong) MASConstraint *dateCenterXConstraint;
+@property (nonatomic, strong) MASConstraint *dateLeadingConstraint;
+@property (nonatomic, strong) MASConstraint *dateCenterYInputConstraint;
+@property (nonatomic, strong) MASConstraint *dateCenterYVerifiedConstraint;
+@property (nonatomic, assign) BOOL dateLayoutLeading;
+@property (nonatomic, assign) BOOL dateLayoutAlignVerified;
+@property (nonatomic, assign) BOOL dateLayoutConfigured;
 @end
 
 @implementation DiscoverMatchCell
@@ -372,11 +384,7 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
             make.width.height.mas_equalTo(0);
         }];
 
-        // 底行：左按钮 — 居中日期 — 右按钮（同一水平线）
-        [_dateLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.centerX.equalTo(card);
-            make.centerY.equalTo(_inputButton);
-        }];
+        // 底行：左按钮 — 居中日期 — 右按钮；日期 H/V 两套约束预装，按状态 activate
         [_inputButton mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(card).offset(16);
             make.bottom.equalTo(card).offset(-12);
@@ -389,8 +397,46 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
             make.height.mas_equalTo(26);
             make.width.mas_greaterThanOrEqualTo(86);
         }];
+        [_dateLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+            self.dateCenterXConstraint = make.centerX.equalTo(card);
+            self.dateLeadingConstraint = make.leading.equalTo(card).offset(16);
+            self.dateCenterYInputConstraint = make.centerY.equalTo(_inputButton);
+            self.dateCenterYVerifiedConstraint = make.centerY.equalTo(_verifiedPill);
+        }];
+        [self.dateLeadingConstraint deactivate];
+        [self.dateCenterYVerifiedConstraint deactivate];
+        _dateLayoutLeading = NO;
+        _dateLayoutAlignVerified = NO;
+        _dateLayoutConfigured = YES;
+        _dateLabel.textAlignment = NSTextAlignmentCenter;
     }
     return self;
+}
+
+- (void)setDateLabelLeading:(BOOL)leading alignToVerifiedPill:(BOOL)alignToVerified {
+    if (self.dateLayoutConfigured &&
+        self.dateLayoutLeading == leading &&
+        self.dateLayoutAlignVerified == alignToVerified) {
+        return;
+    }
+    self.dateLayoutLeading = leading;
+    self.dateLayoutAlignVerified = alignToVerified;
+    self.dateLabel.textAlignment = leading ? NSTextAlignmentLeft : NSTextAlignmentCenter;
+
+    if (leading) {
+        [self.dateCenterXConstraint deactivate];
+        [self.dateLeadingConstraint activate];
+    } else {
+        [self.dateLeadingConstraint deactivate];
+        [self.dateCenterXConstraint activate];
+    }
+    if (alignToVerified) {
+        [self.dateCenterYInputConstraint deactivate];
+        [self.dateCenterYVerifiedConstraint activate];
+    } else {
+        [self.dateCenterYVerifiedConstraint deactivate];
+        [self.dateCenterYInputConstraint activate];
+    }
 }
 
 - (void)prepareForReuse {
@@ -406,6 +452,13 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     self.verifiedPill.layer.borderWidth = 0;
     [self.homeLogo sd_cancelCurrentImageLoad];
     [self.awayLogo sd_cancelCurrentImageLoad];
+    self.homeLogo.image = nil;
+    self.awayLogo.image = nil;
+    self.homeLabel.text = nil;
+    self.awayLabel.text = nil;
+    self.scoreLabel.text = nil;
+    self.dateLabel.text = nil;
+    [self setDateLabelLeading:NO alignToVerifiedPill:NO];
 }
 
 @end
@@ -415,6 +468,8 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
 @interface DiscoverViewController () <UITableViewDataSource, UITableViewDelegate>
 @property (nonatomic, assign) BOOL discoverIsLoadingRemote;
 @property (nonatomic, assign) BOOL discoverPendingForceReload;
+/// 本会话是否已成功拉到统计（仅此时可把战绩写入离线缓存）
+@property (nonatomic, assign) BOOL discoverStatsCacheValid;
 @property (nonatomic, strong) UIScrollView *scrollView;
 @property (nonatomic, strong) UIView *contentView;
 
@@ -624,24 +679,34 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     for (DiscoverMatch *m in self.finishedMatches ?: @[]) {
         [finished addObject:[self dictionaryFromDiscoverMatch:m]];
     }
-    NSDictionary *stats = @{
-        @"statA": self.statAValue.text ?: @"0",
-        @"statB": self.statBValue.text ?: @"0 min",
-        @"statC": self.statCValue.text ?: @"0",
-        @"statD": self.statDValue.text ?: @"0",
-        @"statE": self.statEValue.text ?: @"0",
-        @"leagueWin": self.leagueWinValueLabel.text ?: @"0",
-        @"leagueDraw": self.leagueDrawValueLabel.text ?: @"0",
-        @"leagueLoss": self.leagueLossValueLabel.text ?: @"0",
-        @"leagueElim": self.leagueElimValueLabel.text ?: @"0",
-        @"leagueQual": self.leagueQualValueLabel.text ?: @"0",
-    };
-    NSDictionary *payload = @{
+    NSMutableDictionary *payload = [@{
         @"upcoming": upcoming,
         @"finished": finished,
-        @"stats": stats,
         @"savedAt": @([[NSDate date] timeIntervalSince1970]),
-    };
+    } mutableCopy];
+    // 仅在本会话统计接口成功时写入战绩，避免把「--」或失败残留当成真实数据缓存
+    if (self.discoverStatsCacheValid) {
+        payload[@"statsValid"] = @YES;
+        payload[@"stats"] = @{
+            @"statA": self.statAValue.text ?: @"--",
+            @"statB": self.statBValue.text ?: @"--",
+            @"statC": self.statCValue.text ?: @"--",
+            @"statD": self.statDValue.text ?: @"--",
+            @"statE": self.statEValue.text ?: @"--",
+            @"leagueWin": self.leagueWinValueLabel.text ?: @"--",
+            @"leagueDraw": self.leagueDrawValueLabel.text ?: @"--",
+            @"leagueLoss": self.leagueLossValueLabel.text ?: @"--",
+            @"leagueElim": self.leagueElimValueLabel.text ?: @"--",
+            @"leagueQual": self.leagueQualValueLabel.text ?: @"--",
+        };
+    } else {
+        NSDictionary *old = [[NSUserDefaults standardUserDefaults] objectForKey:[self discoverCacheKey]];
+        if ([old isKindOfClass:NSDictionary.class] && [old[@"statsValid"] boolValue] &&
+            [old[@"stats"] isKindOfClass:NSDictionary.class]) {
+            payload[@"statsValid"] = @YES;
+            payload[@"stats"] = old[@"stats"];
+        }
+    }
     [[NSUserDefaults standardUserDefaults] setObject:payload forKey:[self discoverCacheKey]];
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
@@ -673,18 +738,20 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
         [self refreshTabs];
     }
 
+    // 无 statsValid 标记的旧缓存（含历史假 40/20/30）一律不恢复战绩
     NSDictionary *stats = [payload[@"stats"] isKindOfClass:NSDictionary.class] ? payload[@"stats"] : nil;
-    if (stats) {
-        self.statAValue.text = DiscoverStringFromAny(stats[@"statA"]) ?: self.statAValue.text;
-        self.statBValue.text = DiscoverStringFromAny(stats[@"statB"]) ?: self.statBValue.text;
-        self.statCValue.text = DiscoverStringFromAny(stats[@"statC"]) ?: self.statCValue.text;
-        self.statDValue.text = DiscoverStringFromAny(stats[@"statD"]) ?: self.statDValue.text;
-        self.statEValue.text = DiscoverStringFromAny(stats[@"statE"]) ?: self.statEValue.text;
-        self.leagueWinValueLabel.text = DiscoverStringFromAny(stats[@"leagueWin"]) ?: self.leagueWinValueLabel.text;
-        self.leagueDrawValueLabel.text = DiscoverStringFromAny(stats[@"leagueDraw"]) ?: self.leagueDrawValueLabel.text;
-        self.leagueLossValueLabel.text = DiscoverStringFromAny(stats[@"leagueLoss"]) ?: self.leagueLossValueLabel.text;
-        self.leagueElimValueLabel.text = DiscoverStringFromAny(stats[@"leagueElim"]) ?: self.leagueElimValueLabel.text;
-        self.leagueQualValueLabel.text = DiscoverStringFromAny(stats[@"leagueQual"]) ?: self.leagueQualValueLabel.text;
+    if ([payload[@"statsValid"] boolValue] && stats) {
+        self.statAValue.text = DiscoverStringFromAny(stats[@"statA"]) ?: @"--";
+        self.statBValue.text = DiscoverStringFromAny(stats[@"statB"]) ?: @"--";
+        self.statCValue.text = DiscoverStringFromAny(stats[@"statC"]) ?: @"--";
+        self.statDValue.text = DiscoverStringFromAny(stats[@"statD"]) ?: @"--";
+        self.statEValue.text = DiscoverStringFromAny(stats[@"statE"]) ?: @"--";
+        self.leagueWinValueLabel.text = DiscoverStringFromAny(stats[@"leagueWin"]) ?: @"--";
+        self.leagueDrawValueLabel.text = DiscoverStringFromAny(stats[@"leagueDraw"]) ?: @"--";
+        self.leagueLossValueLabel.text = DiscoverStringFromAny(stats[@"leagueLoss"]) ?: @"--";
+        self.leagueElimValueLabel.text = DiscoverStringFromAny(stats[@"leagueElim"]) ?: @"--";
+        self.leagueQualValueLabel.text = DiscoverStringFromAny(stats[@"leagueQual"]) ?: @"--";
+        self.discoverStatsCacheValid = YES;
     }
 }
 
@@ -744,7 +811,8 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     _headerDateLabel = [[UILabel alloc] init];
     {
         NSDateFormatter *df = [[NSDateFormatter alloc] init];
-        df.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
+        df.locale = [NSLocale currentLocale];
+        df.timeZone = [NSTimeZone localTimeZone];
         df.dateFormat = @"MMMM d, yyyy";
         _headerDateLabel.text = [df stringFromDate:[NSDate date]];
     }
@@ -1170,7 +1238,8 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     NSString *name = p.nickname.length > 0 ? p.nickname : (u.nickname.length > 0 ? u.nickname : @"--");
     self.nameLabel.text = name;
     NSDateFormatter *df = [[NSDateFormatter alloc] init];
-    df.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
+    df.locale = [NSLocale currentLocale];
+    df.timeZone = [NSTimeZone localTimeZone];
     df.dateFormat = @"MMMM d, yyyy";
     self.headerDateLabel.text = [df stringFromDate:[NSDate date]];
 
@@ -1196,8 +1265,22 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     }];
 }
 
+- (void)applyStatisticsUnknown {
+    self.statAValue.text = @"--";
+    self.statBValue.text = @"--";
+    self.statCValue.text = @"--";
+    self.statDValue.text = @"--";
+    self.statEValue.text = @"--";
+    self.leagueWinValueLabel.text = @"--";
+    self.leagueDrawValueLabel.text = @"--";
+    self.leagueLossValueLabel.text = @"--";
+    self.leagueElimValueLabel.text = @"--";
+    self.leagueQualValueLabel.text = @"--";
+    self.discoverStatsCacheValid = NO;
+}
+
 - (void)applyStatistics:(PNStatistics *)statistics {
-    void (^setLeagueDefaults)(void) = ^{
+    void (^setLeagueZeros)(void) = ^{
         self.leagueWinValueLabel.text = @"0";
         self.leagueDrawValueLabel.text = @"0";
         self.leagueLossValueLabel.text = @"0";
@@ -1205,12 +1288,14 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
         self.leagueQualValueLabel.text = @"0";
     };
     if (!statistics) {
+        // 接口成功但无数据：真实空态用 0，不是失败占位
         self.statAValue.text = @"0";
         self.statBValue.text = @"0 min";
         self.statCValue.text = @"0";
         self.statDValue.text = @"0";
         self.statEValue.text = @"0";
-        setLeagueDefaults();
+        setLeagueZeros();
+        self.discoverStatsCacheValid = YES;
         return;
     }
     NSInteger totalMatches = statistics.basicStats ? MAX(statistics.basicStats.totalMatches, 0) : 0;
@@ -1227,7 +1312,8 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
 
     PNStatisticsTeamRecord *tr = statistics.teamRecord;
     if (!tr) {
-        setLeagueDefaults();
+        setLeagueZeros();
+        self.discoverStatsCacheValid = YES;
         return;
     }
     self.leagueWinValueLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(tr.wins, 0)];
@@ -1235,6 +1321,7 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
     self.leagueLossValueLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(tr.losses, 0)];
     self.leagueElimValueLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(tr.eliminated, 0)];
     self.leagueQualValueLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(tr.qualified, 0)];
+    self.discoverStatsCacheValid = YES;
 }
 
 - (void)loadRemoteData {
@@ -1263,7 +1350,7 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
         self.upcomingMatches = @[];
         self.finishedMatches = @[];
         [self refreshTabs];
-        [self applyStatistics:nil];
+        [self applyStatisticsUnknown];
         finishLoading();
         return;
     }
@@ -1302,6 +1389,10 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
         statsReqSuccess = YES;
         dispatch_group_leave(group);
     } failure:^(NSError * _Nonnull error) {
+        // 失败不刷成 0，也不沿用无法校验的假战绩：无有效缓存时显示 --
+        if (!weakSelf.discoverStatsCacheValid) {
+            [weakSelf applyStatisticsUnknown];
+        }
         dispatch_group_leave(group);
     }];
 
@@ -1707,20 +1798,7 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
         cell.scoreLabel.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.18];
         cell.scoreLabel.textColor = kDiscoverGreen;
         cell.scoreLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-        if (m.hasInputInfo) {
-            // 提交后与原型一致，日期移至卡片左下（与底行按钮同高）
-            cell.dateLabel.textAlignment = NSTextAlignmentLeft;
-            [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
-                make.leading.equalTo(cell.cardView).offset(16);
-                make.centerY.equalTo(cell.inputButton);
-            }];
-        } else {
-            cell.dateLabel.textAlignment = NSTextAlignmentCenter;
-            [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
-                make.centerX.equalTo(cell.cardView);
-                make.centerY.equalTo(cell.inputButton);
-            }];
-        }
+        [cell setDateLabelLeading:m.hasInputInfo alignToVerifiedPill:NO];
         [cell.inputButton removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
         [cell.inputButton addTarget:self action:@selector(onInputInfoButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
         [cell.verifiedPill removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
@@ -1760,21 +1838,7 @@ static void DiscoverApplyFinishedVerificationState(DiscoverMatch *match, Match *
             [cell.verifiedPill setImage:[UIImage imageNamed:@"weizhi"] forState:UIControlStateNormal];
             cell.verifiedPill.tintColor = [UIColor whiteColor];
         }
-        if (m.hasInputInfo) {
-            // 已提交输入信息：隐藏左下按钮，日期左移并与右侧认证按钮同高
-            cell.dateLabel.textAlignment = NSTextAlignmentLeft;
-            [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
-                make.leading.equalTo(cell.cardView).offset(16);
-                make.centerY.equalTo(cell.verifiedPill);
-            }];
-        } else {
-            // 未提交输入信息：日期在底行正中
-            cell.dateLabel.textAlignment = NSTextAlignmentCenter;
-            [cell.dateLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
-                make.centerX.equalTo(cell.cardView);
-                make.centerY.equalTo(cell.inputButton);
-            }];
-        }
+        [cell setDateLabelLeading:m.hasInputInfo alignToVerifiedPill:m.hasInputInfo];
         [cell.verifiedPill removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
         [cell.verifiedPill addTarget:self action:@selector(onVerifyMatchButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
         [cell.inputButton removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];

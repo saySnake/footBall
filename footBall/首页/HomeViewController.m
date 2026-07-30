@@ -311,6 +311,21 @@ static NSString *kHomeTeamIdString(id raw) {
 - (void)prepareForReuse {
     [super prepareForReuse];
     [_bookmarkBtn removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+    [_homeLogo sd_cancelCurrentImageLoad];
+    [_awayLogo sd_cancelCurrentImageLoad];
+    _homeLogo.image = nil;
+    _awayLogo.image = nil;
+    _homeLogo.backgroundColor = [UIColor clearColor];
+    _awayLogo.backgroundColor = [UIColor clearColor];
+    _homeLabel.text = nil;
+    _awayLabel.text = nil;
+    _centerLabel.text = nil;
+    _dateLabel.text = nil;
+    [_timePill setTitle:nil forState:UIControlStateNormal];
+    [_bookmarkBtn setImage:nil forState:UIControlStateNormal];
+    _bookmarkBtn.tag = 0;
+    _bookmarkBtn.alpha = 1.0;
+    _bookmarkBtn.tintColor = kHomeMetaIconColor;
 }
 @end
 
@@ -693,7 +708,8 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     _dateLabel = [[UILabel alloc] init];
     {
         NSDateFormatter *df = [[NSDateFormatter alloc] init];
-        df.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
+        df.locale = [NSLocale currentLocale];
+        df.timeZone = [NSTimeZone localTimeZone];
         df.dateFormat = @"MMMM d, yyyy";
         _dateLabel.text = [df stringFromDate:[NSDate date]];
     }
@@ -1093,7 +1109,8 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
 - (void)refreshDiscoverLikeGuestState {
     _challengerLabel.text = @"--";
     NSDateFormatter *df = [[NSDateFormatter alloc] init];
-    df.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
+    df.locale = [NSLocale currentLocale];
+    df.timeZone = [NSTimeZone localTimeZone];
     df.dateFormat = @"MMMM d, yyyy";
     _dateLabel.text = [df stringFromDate:[NSDate date]];
     _avatarView.image = [UIImage imageNamed:kLogoPlaceholder];
@@ -1264,7 +1281,8 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     NSString *nickname = AuthManager.sharedManager.user.profile.nickname;
     _challengerLabel.text = nickname.length > 0 ? nickname : @"--";
     NSDateFormatter *df = [[NSDateFormatter alloc] init];
-    df.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
+    df.locale = [NSLocale currentLocale];
+    df.timeZone = [NSTimeZone localTimeZone];
     df.dateFormat = @"MMMM d, yyyy";
     _dateLabel.text = [df stringFromDate:[NSDate date]];
     [self saveHomeOfflineCache];
@@ -1498,6 +1516,22 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     return msg.length > 0 ? msg : def;
 }
 
+/// 按 matchId 定位当前分组表中的 indexPath（数据刷新后仍可用）
+- (nullable NSIndexPath *)home_indexPathForMatchId:(NSString *)matchId {
+    if (matchId.length == 0 || self.sortedDateKeys.count == 0) {
+        return nil;
+    }
+    for (NSInteger section = 0; section < (NSInteger)self.sortedDateKeys.count; section++) {
+        NSArray<Match *> *rows = self.groupedMatches[self.sortedDateKeys[section]];
+        for (NSInteger row = 0; row < (NSInteger)rows.count; row++) {
+            if ([rows[row].matchId isEqualToString:matchId]) {
+                return [NSIndexPath indexPathForRow:row inSection:section];
+            }
+        }
+    }
+    return nil;
+}
+
 - (void)onHomeFavoriteTapped:(UIButton *)sender {
     NSInteger tag = sender.tag;
     NSInteger section = tag / 10000;
@@ -1508,6 +1542,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
         [QMUITips showError:NSLocalizedString(@"more_matches_favorite_no_id", nil) ?: @"比赛信息不完整，无法收藏"];
         return;
     }
+    NSString *matchId = match.matchId;
     sender.enabled = NO;
     __weak typeof(self) weakSelf = self;
     __weak UIButton *weakBtn = sender;
@@ -1515,8 +1550,15 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
         weakBtn.enabled = YES;
-        // 用 reloadData 替代 reloadRowsAtIndexPaths，避免切 tab 后 indexPath 失效导致死锁
-        [self.tableView reloadData];
+        NSIndexPath *ip = [self home_indexPathForMatchId:matchId];
+        if (!ip) {
+            return;
+        }
+        if (ip.section >= [self.tableView numberOfSections] ||
+            ip.row >= [self.tableView numberOfRowsInSection:ip.section]) {
+            return;
+        }
+        [self.tableView reloadRowsAtIndexPaths:@[ip] withRowAnimation:UITableViewRowAnimationNone];
     };
     if (match.favorited) {
         [[MatchRequest shared] unfavoriteMatch:match.matchId success:^(HTTPResponse * _Nullable responseObject) {

@@ -215,7 +215,8 @@ static void kConsumeSetLabelLineHeight(UILabel *label, CGFloat lineHeight) {
         if (d) return d;
     }
     NSDateFormatter *f = [[NSDateFormatter alloc] init];
-    f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    f.locale = [NSLocale currentLocale];
+    f.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
     NSArray<NSString *> *fmts = @[
         @"yyyy-MM-dd'T'HH:mm:ssZ",
         @"yyyy-MM-dd'T'HH:mm:ss.SSSZ",
@@ -240,7 +241,8 @@ static void kConsumeSetLabelLineHeight(UILabel *label, CGFloat lineHeight) {
     if (e.expenseDate.length >= 10) {
         NSString *s = [e.expenseDate substringToIndex:10];
         NSDateFormatter *f = [[NSDateFormatter alloc] init];
-        f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+        f.locale = [NSLocale currentLocale];
+        f.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
         f.timeZone = [NSTimeZone localTimeZone];
         f.dateFormat = @"yyyy-MM-dd";
         NSDate *d = [f dateFromString:s];
@@ -592,12 +594,14 @@ static void kConsumeSetLabelLineHeight(UILabel *label, CGFloat lineHeight) {
 - (void)reloadRecordsForSelectedDate {
     NSDate *day = self.selectedDate ?: [NSDate date];
     NSDateFormatter *ym = [[NSDateFormatter alloc] init];
-    ym.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    ym.locale = [NSLocale currentLocale];
+    ym.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
     ym.timeZone = [NSTimeZone localTimeZone];
     ym.dateFormat = @"yyyy-MM";
     NSString *monthStr = [ym stringFromDate:day];
     NSDateFormatter *ymd = [[NSDateFormatter alloc] init];
-    ymd.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    ymd.locale = [NSLocale currentLocale];
+    ymd.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
     ymd.timeZone = [NSTimeZone localTimeZone];
     ymd.dateFormat = @"yyyy-MM-dd";
     NSString *dayStr = [ymd stringFromDate:day];

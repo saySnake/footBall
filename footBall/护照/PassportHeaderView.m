@@ -566,6 +566,33 @@ static NSString *PassportHeaderSafeStatAt(NSArray<NSString *> *arr, NSUInteger i
     
 }
 
+- (void)applyLoadFailedEmptyAppearance {
+    self.idLabel.text = @"--";
+    self.nameLabel.text = @"";
+    if ([self.lineChartView isKindOfClass:[PassportWeekLineChartView class]]) {
+        ((PassportWeekLineChartView *)self.lineChartView).weekValues = @[ @0, @0, @0, @0, @0, @0, @0 ];
+    }
+    self.redCardLabel.text = @"--";
+    self.yellowCardLabel.text = @"--";
+    self.greenCardLabel.text = @"--";
+    if (self.moneyAmountLabel) {
+        self.moneyAmountLabel.text = @"--";
+    }
+    if (self.worldMapView) {
+        self.worldMapView.oftenCountries = @[];
+        self.worldMapView.goneCountries = @[];
+        self.worldMapView.ungoCountries = @[];
+        [self.worldMapView reload];
+    }
+    for (NSInteger i = 0; i < 8; i++) {
+        UILabel *lbl = (UILabel *)[self.totalWatchTimeView viewWithTag:0xFF + i];
+        if ([lbl isKindOfClass:UILabel.class]) {
+            lbl.text = @"";
+        }
+    }
+    [self.passportHeader2View applyLoadFailedEmptyAppearance];
+}
+
 - (void)handlePassportHeader2Tap {
     if (self.onPassportHeader2Tap) {
         self.onPassportHeader2Tap();
