@@ -24,7 +24,8 @@ NS_ASSUME_NONNULL_BEGIN
 + (instancetype)shared;
 
 /// 启动事务观察。重复调用安全（内部判断已注册则跳过）。
-/// 仅在用户已登录时调用，否则不上报服务端，事务会被本地 finish 清空。
+/// 在用户已登录时调用；未登录时事务不会 finish 而是保留在队列里，
+/// 下次登录后由 resumePendingTransactions 触发补单（防止已付款事务被永久丢失）。
 - (void)start;
 
 /// 停止观察（登出时调用）。

@@ -77,9 +77,14 @@
         }
 
         if (!loggedIn) {
-            // 未登录：本地 finish 清空，避免队列堆积。
-            // 未登录用户本来也不能购买，残留事务通常是退出登录前的状态。
-            [[SKPaymentQueue defaultQueue] finishTransaction:txn];
+            // 关键：已付款事务（Purchased/Restored）绝不能在未登录时 finish！
+            // 触发场景：用户在登录页发起购买、付款成功后但还没登录成功（验证码还在输入），
+            // 或者购买成功后用户立即 logout。一旦 finish，Apple 不再 re-deliver，
+            // 用户付了钱拿不到会员、客服也无法对账。
+            // 正确策略：保留事务在队列里，下次启动 SceneDelegate 已登录分支会调用
+            // resumePendingTransactions，把这笔事务重新交给 verifyPurchase 流程处理。
+            NSLog(@"[IAP][重要] 未登录但收到已付款事务，保留在队列等待登录后补单: txnId=%@ state=%ld",
+                  txn.transactionIdentifier ?: @"-", (long)txn.transactionState);
             continue;
         }
         [self uploadTransaction:txn];
