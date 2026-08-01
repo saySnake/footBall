@@ -1404,6 +1404,21 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     return [title containsString:@"永久"] || [title containsString:@"终身"] || [title containsString:@"创始"];
 }
 
+/// 本次实际购买的方案是否为永久/终身/创始人类型（非续期商品）。
+/// 通过 pendingPlanId 查 apiPlans（服务端方案），用 durationDays==0 精准判断永久，
+/// 避免异步购买期间用户滑卡片导致 currentIndex 错位、成功文案与实际购买不符。
+- (BOOL)isPurchasedPlanLifetime {
+    NSString *pid = self.pendingPlanId;
+    if (pid.length == 0) return [self isCurrentPlanLifetime]; // 兜底
+    for (PNMemberPlan *plan in self.apiPlans) {
+        if ([plan.planId isEqualToString:pid]) {
+            return plan.durationDays == 0;
+        }
+    }
+    // apiPlans 还没拉到（极端情况）：用本地 plans + currentIndex 兜底
+    return [self isCurrentPlanLifetime];
+}
+
 - (NSString *)cardHintTextForPlan:(MCPlan *)plan {
     if (self.hasAppliedRedeemDiscount) {
         if ([plan.title isEqualToString:@"连续包月"]) return @"限时优惠";
@@ -2014,6 +2029,13 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     }
 
     self.pendingPlanId = planId;
+    // 关键：payInFlight 必须在 startPaymentWithProduct / fetchProductAndPay 调用前就置 YES，
+    // 否则当 skProducts 已缓存（第二次进入 / restore 之后）会走 startPaymentWithProduct 分支
+    // 直接跳过 fetchProductAndPay 里的 payInFlight=YES 设置，导致：
+    // (1) updatePayButtonState 不会禁用侧滑返回手势，用户可在支付中滑动中断
+    // (2) 用户快速连点支付按钮会触发重复 SKPayment
+    self.payInFlight = YES;
+    [self updatePayButtonState];
 
     // 如果已缓存该产品，直接发起购买；否则先向 App Store 请求产品信息
     SKProduct *cachedProduct = self.skProducts[appleProductId];
@@ -2195,7 +2217,10 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
             [weakSelf refreshRedeemBannerState];
             // 弹出成功提示（沙箱环境加注说明，避免测试人员误以为真实扣款）。
             // 永久 / 创始人方案：一次性买断，文案不能暗示自动续期（Apple 3.1.2 合规）。
-            BOOL isLifetime = [weakSelf isCurrentPlanLifetime];
+            // 关键：必须用 pendingPlanId（本次购买的方案）判断，不能用 currentIndex。
+            // 购买是异步流程，用户在等待 Apple 弹窗期间可能滑到其他卡片，
+            // currentIndex 会变成另一个方案，导致成功文案与实际购买不符。
+            BOOL isLifetime = [weakSelf isPurchasedPlanLifetime];
             NSString *title = @"开通成功";
             NSString *message = isLifetime
                 ? @"永久会员已激活，感谢您的支持，尽情享受全部权益！"
@@ -2269,14 +2294,17 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 - (void)paymentQueueRestoreCompletedTransactionsFinished:(SKPaymentQueue *)queue {
     dispatch_async(dispatch_get_main_queue(), ^{
         // 0 笔事务：直接提示并收尾。
-        if (self.restoreTotalCount == 0) {
+        // 注意：必须同时检查 !restoreInFlight，避免与 finishOneRestore 的复位竞态：
+        // 网络快时所有 verifyPurchase 可能在本回调之前完成并触发 finishOneRestore 复位
+        // restoreTotalCount=0，此时进入此分支会重复弹"暂无可恢复"提示。
+        if (self.restoreTotalCount == 0 && self.restoreInFlight) {
             [MBProgressHUD hideHUDForView:self.view animated:YES];
             self.restoreInFlight = NO;
             [self updatePayButtonState];
             [[LoadingManager sharedManager] showError:@"暂无可恢复的购买记录" inView:self.view];
             return;
         }
-        // 有事务：等 handleRestoredTransaction 的回调逐笔完成后再收尾（见 finishRestoreIfNeeded）
+        // 有事务：等 handleRestoredTransaction 的回调逐笔完成后再收尾（见 finishOneRestore）
         NSLog(@"[IAP] restore finished: %ld 笔事务等待上报完成", (long)self.restoreTotalCount);
     });
 }
