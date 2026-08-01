@@ -95,6 +95,9 @@
     LoginChoiceViewController *rootVC = [LoginChoiceViewController new];
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:rootVC];
     self.window.rootViewController = nav;
+    // Token 过期强制退出登录：与 SettingsViewController.routeToLoginAfterLogout 一致，
+    // 停止 IAP 观察者避免换账号后跨账号激活会员。
+    [[PNIAPObserver shared] stop];
 }
 
 - (void)sceneDidDisconnect:(UIScene *)scene {

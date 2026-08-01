@@ -12,6 +12,7 @@
 #import "MainTabBarController.h"
 #import <QMUIKit/QMUIKit.h>
 #import <MBProgressHUD/MBProgressHUD.h>
+#import "PNIAPObserver.h"
 
 /// 六位格子底 #f6f6f6、圆角 6
 static UIColor *kVCBoxBG(void) {
@@ -529,6 +530,9 @@ static const NSInteger kVCResendCountdownSeconds = 60;
     } else {
         [self presentViewController:tabBar animated:YES completion:nil];
     }
+    // 登录成功后启动 IAP 全局观察者（与 TeamSelectionViewController.goToHome 一致）
+    [[PNIAPObserver shared] start];
+    [[PNIAPObserver shared] resumePendingTransactions];
 }
 
 - (void)handleBack {

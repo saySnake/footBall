@@ -12,6 +12,7 @@
 #import <Masonry/Masonry.h>
 #import "ColorManager.h"
 #import "PrivacyAgreementViewController.h"
+#import "PNIAPObserver.h"
 
 static UIColor * SettingsPageBackgroundColor(void) {
     return [UIColor colorWithRed:0.969 green:0.969 blue:0.969 alpha:1.0];
@@ -400,6 +401,11 @@ static UIColor * SettingsPageBackgroundColor(void) {
     [UIView transitionWithView:window duration:0.25 options:UIViewAnimationOptionTransitionCrossDissolve animations:^{
         window.rootViewController = nav;
     } completion:nil];
+
+    // 退出登录必须停止 IAP 全局观察者：避免换账号后观察者把上账号的残留事务
+    // 当作新账号的购买上报，导致跨账号会员激活（支付欺诈风险）。
+    // 重新登录时由登录成功路径（VerifyCode/TeamSelection.goToHome）重新启动。
+    [[PNIAPObserver shared] stop];
 }
 
 @end

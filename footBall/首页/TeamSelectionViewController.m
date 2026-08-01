@@ -8,6 +8,7 @@
 #import <Masonry/Masonry.h>
 #import <math.h>
 #import "LoadingManager.h"
+#import "PNIAPObserver.h"
 
 /// 选择球队确认后展示的「欢迎来到 Pass Nomad」中间页，点击「立即探索」后执行 onExploreBlock 并关闭
 @interface PassNomadWelcomeViewController : UIViewController
@@ -807,6 +808,10 @@
     } else {
         [self presentViewController:tabBar animated:YES completion:nil];
     }
+    // 登录成功后启动 IAP 全局观察者：SceneDelegate 仅在"启动时已登录"才启动 observer，
+    // 首装→登录路径下需要在此启动，否则用户在会员中心 VC 关闭后的未 finish 事务无人兜底。
+    [[PNIAPObserver shared] start];
+    [[PNIAPObserver shared] resumePendingTransactions];
 }
 
 @end

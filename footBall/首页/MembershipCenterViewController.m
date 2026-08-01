@@ -1955,8 +1955,10 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 
 - (void)onTapPay {
     // 支付进行中拦截：按钮现在始终 enabled（为了能弹「请先勾选协议」），
-    // 所以必须在入口显式拦截 payInFlight，避免连点触发重复购买
-    if (self.payInFlight) {
+    // 所以必须在入口显式拦截 payInFlight，避免连点触发重复购买。
+    // 同时拦截 restoreInFlight：restore 进行中再发起购买会让 SKPaymentQueue 状态混乱
+    //（同时有 restore 和 payment 在跑），Apple 行为未定义。
+    if (self.payInFlight || self.restoreInFlight) {
         return;
     }
     if (!self.agreementCheckBtn.selected) {
@@ -2079,7 +2081,10 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 - (void)productsRequest:(SKProductsRequest *)request didReceiveResponse:(SKProductsResponse *)response {
     dispatch_async(dispatch_get_main_queue(), ^{
         [MBProgressHUD hideHUDForView:self.view animated:YES];
-        self.payInFlight = NO;
+        // 注意：这里不能重置 payInFlight=NO！F1 修复后 onTapPay 在调用 fetchProductAndPay
+        // 之前就置 payInFlight=YES，拉到商品后立即进入 startPaymentWithProduct，
+        // 整个购买流程仍未结束。如果这里清掉，到 SKPayment 入队之间用户连点会触发重复购买。
+        // payInFlight 的清零由 SKPaymentTransactionObserver 的 Failed/Purchased 分支负责。
         [self updatePayButtonState];
         // 缓存所有返回的产品
         for (SKProduct *product in response.products) {
@@ -2089,6 +2094,9 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
               [response.products valueForKey:@"productIdentifier"],
               response.invalidProductIdentifiers);
         if (response.products.count == 0) {
+            // 商品无效：才算真正的流程结束，清 payInFlight 让用户可以重试
+            self.payInFlight = NO;
+            [self updatePayButtonState];
             [[LoadingManager sharedManager] showError:@"未找到对应商品，请稍后重试" inView:self.view];
             return;
         }
