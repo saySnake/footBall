@@ -46,8 +46,6 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 @implementation MCPlan @end
 
 @interface MembershipCenterViewController () <UIScrollViewDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, UITextViewDelegate>
-@property (nonatomic, strong) UIView *topGlowView;
-@property (nonatomic, strong) CAGradientLayer *topGlowLayer;
 @property (nonatomic, strong) UIView *navBar;
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UIButton *backBtn;
@@ -221,7 +219,6 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
-    self.topGlowLayer.frame = self.topGlowView.bounds;
     self.bannerGradientLayer.frame = self.bannerCard.bounds;
     self.redeemDialogGradientLayer.frame = self.redeemDialogView.bounds;
     if (self.contentGlassView && self.contentGlassHighlightLayer) {
@@ -237,22 +234,6 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 }
 
 - (void)setupUI {
-    self.topGlowView = [UIView new];
-    self.topGlowView.userInteractionEnabled = NO;
-    [self.view addSubview:self.topGlowView];
-    [self.topGlowView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.leading.trailing.equalTo(self.view);
-        make.height.mas_equalTo(280);
-    }];
-    self.topGlowLayer = [CAGradientLayer layer];
-    self.topGlowLayer.colors = @[
-        (id)[UIColor colorWithRed:0.00 green:0.30 blue:0.26 alpha:0.45].CGColor,
-        (id)[UIColor colorWithRed:0.00 green:0.00 blue:0.00 alpha:0.00].CGColor
-    ];
-    self.topGlowLayer.startPoint = CGPointMake(0.5, 0.0);
-    self.topGlowLayer.endPoint = CGPointMake(0.5, 1.0);
-    [self.topGlowView.layer addSublayer:self.topGlowLayer];
-
     self.navBar = [UIView new];
     self.navBar.backgroundColor = [UIColor clearColor];
     [self.view addSubview:self.navBar];
@@ -361,7 +342,7 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
         make.top.equalTo(self.bannerCard).offset(12);
     }];
     self.bannerSubLabel = [UILabel new];
-    self.bannerSubLabel.text = @"限时兑换码";
+    self.bannerSubLabel.text = @"限时折扣码";
     self.bannerSubLabel.textColor = kMCDiscountMint;
     self.bannerSubLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
     [self.bannerCard addSubview:self.bannerSubLabel];
@@ -370,7 +351,7 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
         make.top.equalTo(self.bannerTitleLabel.mas_bottom).offset(2);
     }];
     self.bannerHintLabel = [UILabel new];
-    self.bannerHintLabel.text = @"使用限时兑换码，解锁专属会员优惠";
+    self.bannerHintLabel.text = @"使用限时折扣码，解锁专属会员优惠";
     self.bannerHintLabel.textColor = kMCDiscountHintGray;
     self.bannerHintLabel.font = [UIFont systemFontOfSize:8 weight:UIFontWeightLight];
     [self.bannerCard addSubview:self.bannerHintLabel];
@@ -380,7 +361,7 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     }];
     self.redeemBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     self.redeemBtn.backgroundColor = [UIColor colorWithRed:40/255.0 green:93/255.0 blue:75/255.0 alpha:1.0];
-    self.redeemBtn.layer.cornerRadius = 11;
+    self.redeemBtn.layer.cornerRadius = 12;
     self.redeemBtn.titleLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightSemibold];
     [self.redeemBtn setTitle:@"去兑换" forState:UIControlStateNormal];
     [self.redeemBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
@@ -397,7 +378,7 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     self.segmentWrap.clipsToBounds = NO;
     [self.view addSubview:self.segmentWrap];
     [self.segmentWrap mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.bannerCard.mas_bottom).offset(12);
+        make.top.equalTo(self.bannerCard.mas_bottom).offset(14);
         make.leading.equalTo(self.view).offset(0);
         make.width.mas_equalTo(280);
         make.height.mas_equalTo(41);
