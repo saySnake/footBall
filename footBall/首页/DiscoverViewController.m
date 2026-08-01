@@ -1532,6 +1532,12 @@ typedef NS_ENUM(NSInteger, DiscoverVerifiedPillStyle) {
         if (!weakSelf.discoverStatsCacheValid) {
             [weakSelf applyStatisticsUnknown];
         }
+        // 仅在用户主动刷新（bypassCache=YES）时弹 toast，
+        // 首次自动加载静默置 -- 避免每次冷启动都弹一次。
+        if (bypassCache) {
+            [[LoadingManager sharedManager] showError:(NSLocalizedString(@"discover_stats_load_failed", nil) ?: @"战绩加载失败，请下拉重试")
+                                               inView:weakSelf.view];
+        }
         dispatch_group_leave(group);
     }];
 

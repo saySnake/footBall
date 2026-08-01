@@ -132,6 +132,7 @@
 "discover_list_network_error" = "Network Error";
 "discover_list_network_error_hint" = "Check your connection, pull to refresh, or tap to retry";
 "discover_list_empty" = "No matches";
+"discover_stats_load_failed" = "Failed to load stats. Pull to retry.";
 
 /* Map legend */
 "map_legend_often" = "Often visited";
@@ -140,6 +141,7 @@
 
 /* Passport */
 "passport_nav_title" = "My Passport";
+"passport_load_failed" = "Failed to load passport. Pull to retry.";
 "passport_points_suffix" = "pts";
 "passport_promo_car" = "Promo";
 "passport_year_tab_format" = "%ld";
@@ -336,6 +338,7 @@
 "profile_identity" = "Identity";
 "profile_save" = "Save";
 "profile_save_success" = "Success";
+"profile_stats_load_failed" = "Failed to load data";
 
 "profile_chip_ultras" = "ULTRAS";
 "profile_chip_fan" = "Fan";
@@ -443,7 +446,6 @@
 "language_traditional_chinese" = "Traditional Chinese";
 
 /* Passport */
-"passport_nav_title" = "My Passport";
 "passport_nav_title_friend" = "Their Passport";
 "passport_suffix" = "'s Passport";
 "stamp_album_suffix" = "'s Stamp Album";

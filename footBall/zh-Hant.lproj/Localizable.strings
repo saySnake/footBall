@@ -132,6 +132,7 @@
 "discover_list_network_error" = "網路異常";
 "discover_list_network_error_hint" = "請檢查網路後下拉重新整理，或點擊重試";
 "discover_list_empty" = "暫無比賽";
+"discover_stats_load_failed" = "戰績載入失敗，請下拉重試";
 
 /* Map legend */
 "map_legend_often" = "經常去";
@@ -140,6 +141,7 @@
 
 /* Passport */
 "passport_nav_title" = "我的護照";
+"passport_load_failed" = "護照載入失敗，請下拉重試";
 "passport_points_suffix" = "分";
 "passport_promo_car" = "特惠購車";
 "passport_year_tab_format" = "%ld年";
@@ -336,6 +338,7 @@
 "profile_identity" = "身份";
 "profile_save" = "保存";
 "profile_save_success" = "成功";
+"profile_stats_load_failed" = "資料載入失敗";
 
 "profile_chip_ultras" = "ULTRAS球迷";
 "profile_chip_fan" = "球迷";
@@ -440,7 +443,6 @@
 "language_traditional_chinese" = "繁體中文";
 
 /* Passport */
-"passport_nav_title" = "我的護照";
 "passport_nav_title_friend" = "TA的護照";
 "passport_suffix" = "的護照";
 "stamp_album_suffix" = "的郵票夾";

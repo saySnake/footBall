@@ -229,11 +229,22 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    [self loadProfileRemoteData];
+    // 进入「我的」tab 自动加载：失败时静默置 --，不打扰用户。
+    // 下拉刷新 / 主动重试场景请调用 loadProfileRemoteDataForceRefresh:YES。
+    [self loadProfileRemoteDataForceRefresh:NO];
 }
 
-/// 个人页：用户资料、好友/关注/观赛场次、关注球队、会员标识
+/// 个人页：用户资料、好友/关注/观赛场次、关注球队、会员标识。
+/// @param forceRefresh NO=静默加载（失败仅置 --）；YES=主动刷新（失败时弹 toast 提示用户）
+- (void)loadProfileRemoteDataForceRefresh:(BOOL)forceRefresh {
+    [self loadProfileRemoteDataInternal:forceRefresh];
+}
+
 - (void)loadProfileRemoteData {
+    [self loadProfileRemoteDataInternal:NO];
+}
+
+- (void)loadProfileRemoteDataInternal:(BOOL)forceRefresh {
     if (!AuthManager.sharedManager.isLoggedIn) {
         [self applyUserProfile:nil];
         self.stat1Num.text = @"--";
@@ -268,6 +279,11 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
     } failure:^(NSError * _Nonnull error) {
         weakSelf.stat1Num.text = @"--";
         weakSelf.stat2Num.text = @"--";
+        // 仅在用户主动刷新时弹 toast，避免每次切到「我的」tab 撞上弱网都弹一次
+        if (forceRefresh) {
+            [QMUITips showError:(NSLocalizedString(@"profile_stats_load_failed", nil) ?: @"数据加载失败")
+                        inView:weakSelf.view hideAfterDelay:2.0];
+        }
     }];
 
     [[ProfileRequest shared] getMyStatisticsWithPeriod:@"all" success:^(HTTPResponse * _Nullable responseObject) {
@@ -276,6 +292,11 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
         weakSelf.stat3Num.text = [NSString stringWithFormat:@"%ld", (long)matches];
     } failure:^(NSError * _Nonnull error) {
         weakSelf.stat3Num.text = @"--";
+        // 仅在用户主动刷新时弹 toast，避免每次切到「我的」tab 撞上弱网都弹一次
+        if (forceRefresh) {
+            [QMUITips showError:(NSLocalizedString(@"profile_stats_load_failed", nil) ?: @"数据加载失败")
+                        inView:weakSelf.view hideAfterDelay:2.0];
+        }
     }];
 
     [[TeamsRequest shared] getFollowTeamsSuccess:^(HTTPResponse * _Nullable responseObject) {
