@@ -2118,9 +2118,12 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
                     self.payInFlight = NO;
                     // 清理本次购买上下文（兑换码 / 折扣商品 ID），避免下次普通购买时
                     // 误带 redeemCode 导致服务端走兑换码激活分支，用错的兑换码激活会员。
+                    // 必须与其他 success/failure 分支清理的字段保持一致（5 字段全清）。
                     self.pendingPlanId = nil;
                     self.pendingRedeemCode = nil;
                     self.hasAppliedRedeemDiscount = NO;
+                    self.redeemAppleProductId = nil;
+                    self.redeemPlanId = nil;
                     [self updatePayButtonState]; // 同步恢复侧滑返回手势
                     if (transaction.error.code == SKErrorPaymentCancelled) {
                         [[LoadingManager sharedManager] showError:@"支付已取消，可重试" inView:self.view];
