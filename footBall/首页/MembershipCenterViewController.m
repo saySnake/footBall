@@ -14,6 +14,7 @@
 #import "MembershipModels.h"
 #import "LoadingManager.h"
 #import "APIError.h"
+#import "PNIAPObserver.h"
 #import <MBProgressHUD/MBProgressHUD.h>
 
 #define kMCPageBg [UIColor colorWithRed:13/255.0 green:33/255.0 blue:34/255.0 alpha:1.0]
@@ -72,6 +73,8 @@
 @property (nonatomic, strong) UIButton *payBtn;
 @property (nonatomic, strong) UIButton *agreementCheckBtn;
 @property (nonatomic, strong) UILabel *agreementLabel;
+/// 恢复购买按钮（Apple 审核要求：非消耗型/订阅类应用必须提供 Restore 入口）
+@property (nonatomic, strong) UIButton *restoreBtn;
 
 @property (nonatomic, strong) UIView *redeemOverlayView;
 @property (nonatomic, strong) UIView *redeemDialogView;
@@ -597,6 +600,21 @@
         make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-62);
     }];
 
+    self.restoreBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.restoreBtn.titleLabel.font = [UIFont systemFontOfSize:10];
+    [self.restoreBtn setTitle:@"恢复购买" forState:UIControlStateNormal];
+    [self.restoreBtn setTitleColor:[UIColor colorWithWhite:0.6 alpha:1.0] forState:UIControlStateNormal];
+    [self.restoreBtn setTitleColor:[UIColor colorWithWhite:0.4 alpha:1.0] forState:UIControlStateHighlighted];
+    self.restoreBtn.titleLabel.adjustsFontSizeToFitWidth = YES;
+    self.restoreBtn.titleLabel.minimumScaleFactor = 0.85;
+    [self.restoreBtn addTarget:self action:@selector(onTapRestore) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.restoreBtn];
+    [self.restoreBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(self.view);
+        make.bottom.equalTo(self.payBtn.mas_top).offset(-6);
+        make.height.mas_equalTo(16);
+    }];
+
     self.agreementCheckBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     self.agreementCheckBtn.layer.borderColor = [UIColor colorWithWhite:0.93 alpha:1.0].CGColor;
     self.agreementCheckBtn.layer.borderWidth = 1;
@@ -634,6 +652,7 @@
     [self.view bringSubviewToFront:self.payBtn];
     [self.view bringSubviewToFront:self.agreementCheckBtn];
     [self.view bringSubviewToFront:self.agreementLabel];
+    [self.view bringSubviewToFront:self.restoreBtn];
 }
 
 - (void)setupRedeemDialog {
@@ -1661,6 +1680,7 @@
     self.payBtn.hidden = giftMode;
     self.agreementCheckBtn.hidden = giftMode;
     self.agreementLabel.hidden = giftMode;
+    self.restoreBtn.hidden = giftMode;
     self.giftContainerView.hidden = !giftMode;
     if (giftMode) {
         if (!wasGiftMode) {
@@ -1850,8 +1870,8 @@
             }
 
             case SKPaymentTransactionStateRestored: {
-                // 恢复购买（此处仅结束事务，不做额外处理）
-                [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
+                // 恢复购买：上报服务端做幂等查询，命中则激活/返回会员信息
+                [self handleRestoredTransaction:transaction];
                 break;
             }
 
@@ -1887,21 +1907,18 @@
 /// 购买成功后，将 transactionId 和 signedTransaction 上报服务端验证
 - (void)handlePurchasedTransaction:(SKPaymentTransaction *)transaction {
     NSString *transactionId = transaction.transactionIdentifier ?: @"";
-    // iOS 15+ 优先使用 JWS signedTransaction；低版本回退到 base64 收据
-    NSString *signedTransaction = @"";
-    if (@available(iOS 15.0, *)) {
-        // 通过 StoreKit 2 的 Transaction.all 获取 JWS 需要 Swift async，
-        // 此处使用 originalTransaction 的 transactionIdentifier 作为凭证，
-        // 服务端可通过 Apple verifyReceipt 或 App Store Server API 验证。
-        // 如需 JWS，可在 Swift 层封装后回调。
-        signedTransaction = transactionId;
-    }
-    // 低版本：使用 appStoreReceiptURL 的 base64 收据
-    if (signedTransaction.length == 0) {
-        NSURL *receiptURL = [[NSBundle mainBundle] appStoreReceiptURL];
-        NSData *receiptData = receiptURL ? [NSData dataWithContentsOfURL:receiptURL] : nil;
-        signedTransaction = receiptData ? [receiptData base64EncodedStringWithOptions:0] : @"";
-    }
+    // 标记给全局观察者：此事务由本 VC 处理，避免重复上报
+    [[PNIAPObserver shared] markTransactionInFlightById:transactionId];
+
+    // 统一使用本机 appStoreReceiptURL 的 base64 收据作为 signedTransaction 上报。
+    // 服务端优先用 transactionId 调用 App Store Server API v2 验证，
+    // 验证失败时降级解析 signedTransaction。
+    // 注意：此值是 base64 编码的整本收据（PKCS#7 container），不是 StoreKit 2 的 JWS。
+    // 服务端若开启 JWS_FALLBACK 强校验，需要走 Server API 主路径（依赖 .p8 配置）。
+    NSURL *receiptURL = [[NSBundle mainBundle] appStoreReceiptURL];
+    NSData *receiptData = receiptURL ? [NSData dataWithContentsOfURL:receiptURL] : nil;
+    NSString *receiptBase64 = receiptData ? [receiptData base64EncodedStringWithOptions:0] : @"";
+    NSString *signedTransaction = receiptBase64;
 
     NSString *planId = self.pendingPlanId ?: @"";
     NSMutableDictionary *body = [@{
@@ -1919,6 +1936,7 @@
     [[MembershipRequest shared] verifyPurchaseWithBody:body success:^(HTTPResponse * _Nullable responseObject) {
         // 服务端验证成功，结束事务
         [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
+        [[PNIAPObserver shared] clearTransactionInFlightById:transactionId];
         dispatch_async(dispatch_get_main_queue(), ^{
             [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
             weakSelf.pendingPlanId = nil;
@@ -1939,9 +1957,12 @@
             [weakSelf presentViewController:alert animated:YES completion:nil];
         });
     } failure:^(NSError * _Nonnull error) {
-        // 服务端验证失败：不 finish 事务，保留收据，下次启动可重试
+        // 服务端验证失败：不 finish 事务，保留收据，下次启动可重试。
+        // 这里清理本地支付状态（payInFlight），否则用户再点支付会被拦截。
         dispatch_async(dispatch_get_main_queue(), ^{
             [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+            weakSelf.payInFlight = NO;
+            [weakSelf updatePayButtonState];
             NSString *msg = @"购买成功，但服务器验证失败，请联系客服处理";
             if ([error isKindOfClass:[APIError class]]) {
                 msg = [(APIError *)error displayMessageWithFallback:msg];
@@ -1958,6 +1979,80 @@
 /// App 启动或进入前台时，处理上次未完成的事务（断网重连等场景）
 - (void)paymentQueue:(SKPaymentQueue *)queue removedTransactions:(NSArray<SKPaymentTransaction *> *)transactions {
     // 事务移除后无需额外处理
+}
+
+#pragma mark - Restore Purchases
+
+/// 用户点击「恢复购买」：调用 SKPaymentQueue restoreCompletedTransactions，
+/// 系统会把该 Apple ID 已完成的非消耗型/订阅事务重新投递到 updatedTransactions。
+- (void)onTapRestore {
+    if (self.payInFlight) {
+        return;
+    }
+    [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+    [[SKPaymentQueue defaultQueue] restoreCompletedTransactions];
+}
+
+/// SKPaymentQueueObserver — 恢复流程开始
+- (void)paymentQueueRestoreCompletedTransactionsFinished:(SKPaymentQueue *)queue {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [MBProgressHUD hideHUDForView:self.view animated:YES];
+        // restore 完成后，handleRestoredTransaction: 会逐笔上报服务端；
+        // 这里根据是否有恢复到事务来提示用户。
+        if (queue.transactions.count == 0) {
+            [[LoadingManager sharedManager] showError:@"暂无可恢复的购买记录" inView:self.view];
+        }
+    });
+}
+
+/// SKPaymentQueueObserver — 恢复流程失败
+- (void)paymentQueue:(SKPaymentQueue *)queue restoreCompletedTransactionsFailedWithError:(NSError *)error {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [MBProgressHUD hideHUDForView:self.view animated:YES];
+        NSString *msg = error.localizedDescription ?: @"恢复购买失败，请稍后重试";
+        [[LoadingManager sharedManager] showError:msg inView:self.view];
+    });
+}
+
+/// 恢复购买拿到一笔事务：把 transactionId 上报服务端做幂等查询，
+/// 服务端按 appleTransactionId 命中已有会员记录，返回 activateTime/expireTime。
+- (void)handleRestoredTransaction:(SKPaymentTransaction *)transaction {
+    NSString *transactionId = transaction.transactionIdentifier ?: @"";
+    if (transactionId.length == 0) {
+        [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
+        return;
+    }
+    NSURL *receiptURL = [[NSBundle mainBundle] appStoreReceiptURL];
+    NSData *receiptData = receiptURL ? [NSData dataWithContentsOfURL:receiptURL] : nil;
+    NSString *receiptBase64 = receiptData ? [receiptData base64EncodedStringWithOptions:0] : @"";
+
+    __weak typeof(self) weakSelf = self;
+    [[MembershipRequest shared] verifyPurchaseWithBody:@{
+        @"transactionId": transactionId,
+        @"signedTransaction": receiptBase64,
+        @"planId": @(0),
+        @"agreementAccepted": @YES,
+        @"restore": @YES
+    } success:^(HTTPResponse * _Nullable responseObject) {
+        // 服务端已识别并返回会员信息，可 finish 事务
+        [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+            [weakSelf loadRemoteData];
+            [[LoadingManager sharedManager] showError:@"恢复成功" inView:weakSelf.view];
+        });
+    } failure:^(NSError * _Nonnull error) {
+        // 服务端未识别（该用户没买过 / 沙箱账号未续费等），也 finish 避免事务堆积
+        [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+            NSString *msg = @"暂无可恢复的购买记录";
+            if ([error isKindOfClass:[APIError class]]) {
+                msg = [(APIError *)error displayMessageWithFallback:msg];
+            }
+            [[LoadingManager sharedManager] showError:msg inView:weakSelf.view];
+        });
+    }];
 }
 
 - (void)onGiftCodeChanged {

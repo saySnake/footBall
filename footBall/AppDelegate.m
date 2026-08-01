@@ -15,6 +15,7 @@
 #import "APIAppMetadataInterceptor.h"
 #import "AuthManager.h"
 #import "PagFilePreloader.h"
+#import "PNIAPObserver.h"
 
 #ifdef DEBUG
 #import <DoraemonKit/DoraemonManager.h>
@@ -133,6 +134,9 @@
     NSLog(@"✅ EasyDebug 已初始化");
 #endif
 
+    // 全局 IAP 事务观察者：仅创建，start 放在 SceneDelegate 装配根 VC 时
+    // （那时用户登录态已确定），避免未登录时把残留事务上报到服务端导致 401。
+    [PNIAPObserver shared];
     
     return YES;
 }
