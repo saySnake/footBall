@@ -310,7 +310,9 @@ static NSString *kHomeTeamIdString(id raw) {
 }
 - (void)prepareForReuse {
     [super prepareForReuse];
+    // 与 DiscoverMatchCell 对齐：复用时必须清空所有可视化字段，否则滚动时会出现上一场比赛的队徽 / 队名 / 比分。
     [_bookmarkBtn removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+    // 取消未完成的图片下载，避免回调把旧比赛队徽绘制到当前 cell 上。
     [_homeLogo sd_cancelCurrentImageLoad];
     [_awayLogo sd_cancelCurrentImageLoad];
     _homeLogo.image = nil;

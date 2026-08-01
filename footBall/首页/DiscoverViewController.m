@@ -1751,20 +1751,30 @@ typedef NS_ENUM(NSInteger, DiscoverVerifiedPillStyle) {
 
     dispatch_group_notify(grp, dispatch_get_main_queue(), ^{
         NSLog(@"[DiscoverDebug] verifiedMatchIds=%@", verifiedMatchIds);
-        BOOL changed = NO;
-        for (DiscoverMatch *match in weakSelf.finishedMatches) {
+        // 只收集真正发生状态变化的 match 及其在 finished 列表中的下标，
+        // 后面只精准 reload 这些行，避免 reloadData 触发整表 cell 走 prepareForReuse →
+        // 重新 configureWithMatch:，造成当前可见行短暂闪烁。
+        NSMutableArray<NSIndexPath *> *changedPaths = [NSMutableArray array];
+        for (NSInteger i = 0; i < (NSInteger)weakSelf.finishedMatches.count; i++) {
+            DiscoverMatch *match = weakSelf.finishedMatches[i];
             if (match.matchId.length == 0) continue;
-            if ([verifiedMatchIds containsObject:match.matchId]) {
-                if (!match.hasVerified) {
-                    match.hasVerified = YES;
-                    match.hasPendingVerification = NO;
-                    match.verifiedText = [NSString stringWithFormat:fmtVerified, (long)90];
-                    changed = YES;
-                }
+            if ([verifiedMatchIds containsObject:match.matchId] && !match.hasVerified) {
+                match.hasVerified = YES;
+                match.hasPendingVerification = NO;
+                match.verifiedText = [NSString stringWithFormat:fmtVerified, (long)90];
+                [changedPaths addObject:[NSIndexPath indexPathForRow:i inSection:0]];
             }
         }
-        if (changed) {
-            [weakSelf.tableView reloadData];
+        // 缓存写入：saveDiscoverOfflineCache 内部已会把 I/O 派发到后台队列，
+        // 这里在主线程触发即可；它收集完 payload 立刻返回，不阻塞 reload。
+        if (changedPaths.count > 0) {
+            BOOL finishedTabVisible = (weakSelf.currentType == DiscoverMatchTypeFinished);
+            // 只在用户当前确实看着 finished 列表时才动 UI；否则下次切到 finished 时
+            // cellForRowAtIndexPath: 自然会读到最新 model，无需此刻刷新。
+            if (finishedTabVisible) {
+                [weakSelf.tableView reloadRowsAtIndexPaths:changedPaths
+                                              withRowAnimation:UITableViewRowAnimationNone];
+            }
             [weakSelf saveDiscoverOfflineCache];
         }
     });
