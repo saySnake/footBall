@@ -154,16 +154,36 @@
     [self loadRemoteData];
     // 注册 StoreKit 支付队列观察者
     [[SKPaymentQueue defaultQueue] addTransactionObserver:self];
+    // 告知全局观察者：本 VC 已激活，事务由 VC 处理（避免双重上报/finish）
+    [[PNIAPObserver shared] setMembershipCenterActive:YES];
+    // 进入会员中心时主动扫描残留事务（掉单恢复）。
+    // 解决 Apple 不会主动 re-deliver 已 Purchased 事务的问题：
+    // 上次 App 被杀或断网导致服务端验证没回时，事务会停留在队列里，
+    // 这里主动拉起后由 VC 走正常的 verifyPurchase 流程。
+    [[PNIAPObserver shared] resumePendingTransactions];
 }
 
 - (void)dealloc {
     [[SKPaymentQueue defaultQueue] removeTransactionObserver:self];
     [self.productsRequest cancel];
+    // VC 销毁后，全局观察者接管兜底处理（如果还有未 finish 事务）
+    [[PNIAPObserver shared] setMembershipCenterActive:NO];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     [self refreshUserProfile];
+    [[PNIAPObserver shared] setMembershipCenterActive:YES];
+    // 每次返回会员中心都扫描一次残留事务（应对被 pop 后回来、断网重连等场景）
+    [[PNIAPObserver shared] resumePendingTransactions];
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    // 注意：这里不切 membershipCenterActive=NO。
+    // 如果购买流程正在异步上报 verifyPurchase 时切了，PNIAPObserver 会"接管"
+    // 但实际上拿不到原 transaction 对象，会导致重复请求/双重 finish。
+    // active 状态仅在 dealloc 时切回 NO（VC 真正销毁后由 observer 兜底）。
 }
 
 - (void)viewDidLayoutSubviews {
@@ -1907,8 +1927,6 @@
 /// 购买成功后，将 transactionId 和 signedTransaction 上报服务端验证
 - (void)handlePurchasedTransaction:(SKPaymentTransaction *)transaction {
     NSString *transactionId = transaction.transactionIdentifier ?: @"";
-    // 标记给全局观察者：此事务由本 VC 处理，避免重复上报
-    [[PNIAPObserver shared] markTransactionInFlightById:transactionId];
 
     // 统一使用本机 appStoreReceiptURL 的 base64 收据作为 signedTransaction 上报。
     // 服务端优先用 transactionId 调用 App Store Server API v2 验证，
@@ -1936,7 +1954,6 @@
     [[MembershipRequest shared] verifyPurchaseWithBody:body success:^(HTTPResponse * _Nullable responseObject) {
         // 服务端验证成功，结束事务
         [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
-        [[PNIAPObserver shared] clearTransactionInFlightById:transactionId];
         dispatch_async(dispatch_get_main_queue(), ^{
             [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
             weakSelf.pendingPlanId = nil;

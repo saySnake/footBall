@@ -72,6 +72,8 @@
         self.window.rootViewController = [[MainTabBarController alloc] init];
         // 已登录：启动 IAP 全局观察者，处理上次被杀进程时遗留的未 finish 事务（掉单恢复）
         [[PNIAPObserver shared] start];
+        // 主动扫描队列中残留事务，触发 verifyPurchase 兜底上报
+        [[PNIAPObserver shared] resumePendingTransactions];
     } else {
         LoginChoiceViewController *loginVC = [LoginChoiceViewController new];
         UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];

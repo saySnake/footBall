@@ -9,8 +9,8 @@
 
 @interface PNIAPObserver ()
 @property (nonatomic, assign) BOOL started;
-/// VC 正在处理的 transactionId 集合（避免重复上报/finish）
-@property (nonatomic, strong) NSMutableSet<NSString *> *inFlightTxnIds;
+/// 会员中心 VC 当前是否激活（激活时由 VC 处理，observer 不重复上报）
+@property (nonatomic, assign, getter=isMembershipCenterActive) BOOL membershipCenterActive;
 @end
 
 @implementation PNIAPObserver
@@ -26,7 +26,7 @@
 
 - (instancetype)init {
     if (self = [super init]) {
-        self.inFlightTxnIds = [NSMutableSet set];
+        _membershipCenterActive = NO;
     }
     return self;
 }
@@ -41,43 +41,44 @@
     if (!self.started) return;
     [[SKPaymentQueue defaultQueue] removeTransactionObserver:self];
     self.started = NO;
-    [self.inFlightTxnIds removeAllObjects];
 }
 
-- (void)markTransactionInFlightById:(NSString *)transactionId {
-    if (transactionId.length == 0) return;
-    @synchronized (self.inFlightTxnIds) {
-        [self.inFlightTxnIds addObject:transactionId];
-    }
+- (void)setMembershipCenterActive:(BOOL)active {
+    self.membershipCenterActive = active;
 }
 
-- (void)clearTransactionInFlightById:(NSString *)transactionId {
-    if (transactionId.length == 0) return;
-    @synchronized (self.inFlightTxnIds) {
-        [self.inFlightTxnIds removeObject:transactionId];
-    }
-}
-
-- (BOOL)isInFlight:(NSString *)transactionId {
-    if (transactionId.length == 0) return NO;
-    @synchronized (self.inFlightTxnIds) {
-        return [self.inFlightTxnIds containsObject:transactionId];
-    }
+/// 主动扫描队列中残留事务（App 启动 / 进入会员中心场景），
+/// 把它们再次交给 updatedTransactions 回调路径处理。
+- (void)resumePendingTransactions {
+    if (!self.started) return;
+    NSArray<SKPaymentTransaction *> *pending = [[SKPaymentQueue defaultQueue] transactions];
+    if (pending.count == 0) return;
+    NSLog(@"[IAP] resumePendingTransactions: 发现 %lu 笔残留事务", (unsigned long)pending.count);
+    // 直接走我们自己的处理逻辑（不调用 [self paymentQueue:updatedTransactions:]，因为那是协议方法）
+    [self handleTransactions:pending];
 }
 
 #pragma mark - SKPaymentTransactionObserver
 
 - (void)paymentQueue:(SKPaymentQueue *)queue updatedTransactions:(NSArray<SKPaymentTransaction *> *)transactions {
-    // 仅处理 VC 未在处理的事务（掉单恢复）；VC 已 inFlight 标记的跳过交给 VC 自己。
+    [self handleTransactions:transactions];
+}
+
+/// 统一处理入口（updatedTransactions 回调与 resumePendingTransactions 共用）
+- (void)handleTransactions:(NSArray<SKPaymentTransaction *> *)transactions {
     BOOL loggedIn = [[AuthManager sharedManager] isLoggedIn];
+
     for (SKPaymentTransaction *txn in transactions) {
-        // 只关心需要上报的状态
+        // 只关心 Purchased / Restored；Purchasing/Failed/Deferred 不上报
         if (txn.transactionState != SKPaymentTransactionStatePurchased
             && txn.transactionState != SKPaymentTransactionStateRestored) {
             continue;
         }
-        NSString *txnId = txn.transactionIdentifier ?: @"";
-        if ([self isInFlight:txnId]) continue;
+
+        // 关键：会员中心 VC 激活时，由 VC 处理（避免双重 finish / 双重 verifyPurchase 请求）
+        if (self.isMembershipCenterActive) {
+            continue;
+        }
 
         if (!loggedIn) {
             // 未登录：本地 finish 清空，避免队列堆积。
@@ -96,7 +97,7 @@
     NSString *receiptBase64 = receiptData ? [receiptData base64EncodedStringWithOptions:0] : @"";
     BOOL isRestore = (transaction.transactionState == SKPaymentTransactionStateRestored);
 
-    // planId 由 VC 在主动支付时设置；这里是兜底恢复场景，传 0 让服务端仅做幂等查询。
+    // 兜底场景拿不到 planId/redeemCode，传 0 让服务端做幂等查询。
     NSDictionary *body = @{
         @"transactionId": transactionId,
         @"signedTransaction": receiptBase64,
@@ -105,20 +106,14 @@
         @"restore": @(isRestore)
     };
 
-    __weak typeof(self) weakSelf = self;
     [[MembershipRequest shared] verifyPurchaseWithBody:body success:^(HTTPResponse * _Nullable responseObject) {
         [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
         NSLog(@"[IAP] 兜底事务上报成功: txnId=%@", transactionId);
-        [weakSelf postMembershipChangedNotification];
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"PNMembershipDidChangeNotification" object:nil];
     } failure:^(NSError * _Nonnull error) {
-        // 上报失败：保留事务不 finish，下次 App 启动会再次尝试。
-        // Apple 不会无限重投，但事务会保留在队列里直至 finish。
+        // 上报失败：保留事务不 finish，下次 App 启动 / 进入会员中心会再次尝试。
         NSLog(@"[IAP] 兜底事务上报失败（保留待重试）: txnId=%@ err=%@", transactionId, error);
     }];
-}
-
-- (void)postMembershipChangedNotification {
-    [[NSNotificationCenter defaultCenter] postNotificationName:@"PNMembershipDidChangeNotification" object:nil];
 }
 
 @end
