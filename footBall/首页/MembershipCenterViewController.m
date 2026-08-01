@@ -2192,7 +2192,7 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
             [weakSelf refreshRedeemBannerState];
             // 弹出成功提示（沙箱环境加注说明，避免测试人员误以为真实扣款）。
             // 永久 / 创始人方案：一次性买断，文案不能暗示自动续期（Apple 3.1.2 合规）。
-            BOOL isLifetime = [self isCurrentPlanLifetime];
+            BOOL isLifetime = [weakSelf isCurrentPlanLifetime];
             NSString *title = @"开通成功";
             NSString *message = isLifetime
                 ? @"永久会员已激活，感谢您的支持，尽情享受全部权益！"
