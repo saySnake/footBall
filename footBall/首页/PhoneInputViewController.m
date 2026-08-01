@@ -382,13 +382,18 @@ static UIColor *PNFigmaSocialCircleBG(void) {
         return;
     }
     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+    __weak typeof(self) weakSelf = self;
     [AuthManager.sharedManager sendVerifyCode:phone success:^(HTTPResponse *response) {
-        [MBProgressHUD hideHUDForView:self.view animated:YES];
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        [MBProgressHUD hideHUDForView:strongSelf.view animated:YES];
         VerifyCodeViewController *vc = VerifyCodeViewController.alloc.init;
         vc.phoneNumber = phone;
-        [self.navigationController pushViewController:vc animated:YES];
+        [strongSelf.navigationController pushViewController:vc animated:YES];
     } failure:^(NSError * _Nonnull error) {
-        [MBProgressHUD hideHUDForView:self.view animated:YES];
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        [MBProgressHUD hideHUDForView:strongSelf.view animated:YES];
         [QMUITips showError:error.localizedDescription];
     }];
 }

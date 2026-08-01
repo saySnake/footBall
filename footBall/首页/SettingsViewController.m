@@ -323,7 +323,14 @@ static UIColor * SettingsPageBackgroundColor(void) {
         if (cachePaths.count > 0) {
             NSString *cachesDir = cachePaths.firstObject;
             NSArray *cacheFiles = [fm contentsOfDirectoryAtPath:cachesDir error:nil];
-            NSSet *keepDirs = [NSSet setWithArray:@[@"Snapshots"]];
+            NSSet *keepDirs = [NSSet setWithArray:@[
+                @"Snapshots",                    // 截图回放系统目录
+                @"com.apple.nsurlsessiond",      // NSURLSession 系统缓存
+                @"CloudKit",                     // CloudKit 容器
+                @"CoreSimulator",                // 模拟器容器（开发期）
+                @"UIKitBadge",                   // 系统角标缓存
+                @"com.apple.assetsd",            // 系统资源服务
+            ]];
             for (NSString *file in cacheFiles) {
                 if ([keepDirs containsObject:file]) continue;
                 [fm removeItemAtPath:[cachesDir stringByAppendingPathComponent:file] error:nil];

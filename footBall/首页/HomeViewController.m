@@ -8,6 +8,7 @@
 #import "RefreshPagHeader.h"
 #import <MJRefresh/MJRefreshAutoNormalFooter.h>
 #import <Masonry/Masonry.h>
+#import <objc/runtime.h>
 #import "ColorManager.h"
 #import "MatchRequest.h"
 #import "APIError.h"
@@ -325,6 +326,8 @@ static NSString *kHomeTeamIdString(id raw) {
     _dateLabel.text = nil;
     [_timePill setTitle:nil forState:UIControlStateNormal];
     [_bookmarkBtn setImage:nil forState:UIControlStateNormal];
+    // 清掉关联的 matchId，避免复用后误以为还是上一场比赛
+    objc_setAssociatedObject(_bookmarkBtn, "home_match_id", nil, OBJC_ASSOCIATION_COPY_NONATOMIC);
     _bookmarkBtn.tag = 0;
     _bookmarkBtn.alpha = 1.0;
     _bookmarkBtn.tintColor = kHomeMetaIconColor;
@@ -1543,6 +1546,9 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
         cell.bookmarkBtn.alpha = 0.5;
     }
     cell.bookmarkBtn.tag = (NSInteger)(indexPath.section * 10000 + indexPath.row);
+    // 用关联值直接记录 matchId，点击时根据 matchId 反查当前 indexPath，
+    // 避免数据刷新后 tag 反推到的 indexPath 指向了另一场比赛（收藏/取消错对象）。
+    objc_setAssociatedObject(cell.bookmarkBtn, "home_match_id", m.matchId, OBJC_ASSOCIATION_COPY_NONATOMIC);
     [cell.bookmarkBtn removeTarget:self action:@selector(onHomeFavoriteTapped:) forControlEvents:UIControlEventTouchUpInside];
     [cell.bookmarkBtn addTarget:self action:@selector(onHomeFavoriteTapped:) forControlEvents:UIControlEventTouchUpInside];
     return cell;
@@ -1632,16 +1638,24 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
 }
 
 - (void)onHomeFavoriteTapped:(UIButton *)sender {
-    NSInteger tag = sender.tag;
-    NSInteger section = tag / 10000;
-    NSInteger row = tag % 10000;
-    NSIndexPath *indexPath = [NSIndexPath indexPathForRow:row inSection:section];
-    Match *match = [self modelAtIndexPath:indexPath];
-    if (match.matchId.length == 0) {
+    // 优先用按钮关联的 matchId 反查当前 indexPath，
+    // 避免数据刷新后 tag 反推错位（点击的是 A 比赛，实际操作了 B 比赛）。
+    NSString *matchId = objc_getAssociatedObject(sender, "home_match_id");
+    NSIndexPath *indexPath = matchId ? [self home_indexPathForMatchId:matchId] : nil;
+    Match *match = indexPath ? [self modelAtIndexPath:indexPath] : nil;
+    // 关联值缺失时回退到 tag（保险），但理论上不应进入此分支
+    if (!match) {
+        NSInteger tag = sender.tag;
+        NSInteger section = tag / 10000;
+        NSInteger row = tag % 10000;
+        indexPath = [NSIndexPath indexPathForRow:row inSection:section];
+        match = [self modelAtIndexPath:indexPath];
+    }
+    if (!match || match.matchId.length == 0) {
         [QMUITips showError:NSLocalizedString(@"more_matches_favorite_no_id", nil) ?: @"比赛信息不完整，无法收藏"];
         return;
     }
-    NSString *matchId = match.matchId;
+    matchId = match.matchId;
     sender.enabled = NO;
     __weak typeof(self) weakSelf = self;
     __weak UIButton *weakBtn = sender;

@@ -203,11 +203,10 @@ static const CGFloat kPillCircleSize = 44.f;
 - (void)onPillButtonTapped:(UIButton *)sender {
     NSInteger index = sender.tag;
     if (index >= 0 && index < self.viewControllers.count) {
+        // 只设置 selectedIndex，通知由 tabBarController:didSelectViewController: 统一发出，
+        // 否则切到社区页时通知会被 post 两次（点击回调 + 系统切换回调）。
         self.selectedIndex = index;
         [self updatePillSelection];
-        if (index == 2) {
-            [[NSNotificationCenter defaultCenter] postNotificationName:@"community_friends_did_change" object:nil];
-        }
     }
 }
 

@@ -542,7 +542,8 @@ static UIColor *PassportPageBg(void) {
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    if (self.passportLoadFailed) {
+    // 失败空态：每个 section 都用统一的占位高度
+    if (self.passportLoadFailed || !self.viewModel) {
         return 168;
     }
     // DarkStatsCardCell 使用叠压布局（负间距），某些系统版本 AutomaticDimension 计算会偏小甚至为 0，直接给固定高度更稳
