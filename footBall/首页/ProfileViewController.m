@@ -767,6 +767,34 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
 
     self.apiFollowedTeams = @[];
     [self updateTeamsCardUI];
+
+    // ===== 诊断：打印关键视图状态，用于排查点击/滚动失效问题 =====
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIScrollView *sv = self.scrollView;
+        NSLog(@"[Profile][Diag] setupUI 完成:");
+        NSLog(@"[Profile][Diag]   self.view=%@ frame=%@ userInteractionEnabled=%d",
+              self.view, NSStringFromCGRect(self.view.frame), self.view.userInteractionEnabled);
+        NSLog(@"[Profile][Diag]   scrollView=%@ frame=%@ contentSize=%@",
+              sv, NSStringFromCGRect(sv.frame), NSStringFromCGSize(sv.contentSize));
+        NSLog(@"[Profile][Diag]   scrollView.scrollEnabled=%d delaysContentTouches=%d",
+              sv.scrollEnabled, sv.delaysContentTouches);
+        NSLog(@"[Profile][Diag]   scrollView.superview=%@ subviews=%@",
+              sv.superview, sv.superview.subviews);
+        NSLog(@"[Profile][Diag]   membershipCard=%@ frame=%@ userInteractionEnabled=%d gestureRecognizers=%@",
+              self.membershipCard, NSStringFromCGRect(self.membershipCard.frame),
+              self.membershipCard.userInteractionEnabled, self.membershipCard.gestureRecognizers);
+        NSLog(@"[Profile][Diag]   membershipCard.allTargets=%@ actions=%@",
+              self.membershipCard.allTargets,
+              [self.membershipCard actionsForTarget:self forControlEvent:UIControlEventTouchUpInside]);
+        // 找到所有覆盖 membershipCard hit-test 区域的兄弟视图
+        CGRect cardFrameInWindow = [self.membershipCard.superview convertRect:self.membershipCard.frame toView:nil];
+        NSLog(@"[Profile][Diag]   membershipCard 在 window 内的 frame=%@", NSStringFromCGRect(cardFrameInWindow));
+        // 自顶向下 hit-test
+        UIView *hitView = [self.view.window hitTest:CGPointMake(cardFrameInWindow.origin.x + 10,
+                                                                 cardFrameInWindow.origin.y + 10)
+                                            withEvent:nil];
+        NSLog(@"[Profile][Diag]   在卡片内一点 hitTest 命中：%@", hitView);
+    });
 }
 
 - (void)updateTeamsCardUI {
@@ -962,10 +990,13 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
 }
 
 - (void)openMembershipCenter {
+    NSLog(@"[Profile][Diag] openMembershipCenter 触发，准备 push");
     MembershipCenterViewController *vc = [MembershipCenterViewController new];
     vc.initialPlanIndex = 0;
     vc.hidesBottomBarWhenPushed = YES;
     [self.navigationController pushViewController:vc animated:YES];
+    NSLog(@"[Profile][Diag] openMembershipCenter navigationController=%@, push 后 topVC=%@",
+          self.navigationController, self.navigationController.topViewController);
 }
 
 @end

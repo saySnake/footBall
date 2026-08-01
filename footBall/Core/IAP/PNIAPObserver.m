@@ -43,10 +43,6 @@
     self.started = NO;
 }
 
-- (void)setMembershipCenterActive:(BOOL)active {
-    self.membershipCenterActive = active;
-}
-
 /// 主动扫描队列中残留事务（App 启动 / 进入会员中心场景），
 /// 把它们再次交给 updatedTransactions 回调路径处理。
 - (void)resumePendingTransactions {
