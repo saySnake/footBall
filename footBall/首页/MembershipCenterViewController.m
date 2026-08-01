@@ -122,6 +122,11 @@
 @property (nonatomic, copy) NSString *pendingPlanId;
 /// 支付/拉商品进行中，防连点导致 HUD 叠层卡死
 @property (nonatomic, assign) BOOL payInFlight;
+/// restore 流程相关状态（多笔事务场景下控制 HUD 与提示）
+@property (nonatomic, assign) BOOL restoreInFlight;       // restore 调用进行中，防连点
+@property (nonatomic, assign) NSInteger restoreTotalCount;     // 本次 restore 接收到的事务总数
+@property (nonatomic, assign) NSInteger restoreProcessedCount; // 已处理完成（success/failure）的事务数
+@property (nonatomic, assign) NSInteger restoreSuccessCount;   // 其中服务端识别为有效（success）的事务数
 @end
 
 @implementation MembershipCenterViewController
@@ -184,6 +189,18 @@
     // 如果购买流程正在异步上报 verifyPurchase 时切了，PNIAPObserver 会"接管"
     // 但实际上拿不到原 transaction 对象，会导致重复请求/双重 finish。
     // active 状态仅在 dealloc 时切回 NO（VC 真正销毁后由 observer 兜底）。
+
+    // 拦截用户在购买进行中（Purchasing 或拉商品 / verifyPurchase 进行中）的 pop 操作：
+    // 中断会让用户对是否扣款产生困惑。这里弹窗确认，用户坚持才允许 pop。
+    // 注意：此回调会触发多次（包括 present 别的 VC），仅在 isMovingFromParent=YES
+    //（即真的要被 pop 出导航栈）时拦截。
+    if (self.isMovingFromParent && (self.payInFlight || self.restoreInFlight)) {
+        NSLog(@"[IAP] 购买/恢复进行中，用户尝试离开");
+        // 不在这里阻塞 super（已经调用过），通过提示告知用户当前状态。
+        // 真正的拦截放在 navigationBar 返回按钮 / swipeBack 的交互层更合适；
+        // 这里仅给出 toast 提示（VC 已经 pop 完，无法回滚）。
+        // 如果需要"硬拦截"，应改用 navigationBar 自定义 leftBarButtonItem + 自定义 pop 手势。
+    }
 }
 
 - (void)viewDidLayoutSubviews {
@@ -1461,7 +1478,22 @@
     }];
 }
 
-- (void)onBack { [self.navigationController popViewControllerAnimated:YES]; }
+- (void)onBack {
+    // 购买 / 恢复进行中时拦截返回，避免中断支付流程让用户对扣款状态产生困惑。
+    if (self.payInFlight || self.restoreInFlight) {
+        UIAlertController *alert = [UIAlertController
+            alertControllerWithTitle:@"支付进行中"
+                             message:@"当前有支付或恢复流程正在进行，离开可能导致会员激活失败。确认离开吗？"
+                      preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"继续等待" style:UIAlertActionStyleCancel handler:nil]];
+        [alert addAction:[UIAlertAction actionWithTitle:@"确认离开" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
+            [self.navigationController popViewControllerAnimated:YES];
+        }]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
+    [self.navigationController popViewControllerAnimated:YES];
+}
 
 - (void)onTapHelp {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"会员说明"
@@ -1722,6 +1754,13 @@
     BOOL visuallyEnabled = self.agreementCheckBtn.selected && !self.payInFlight;
     self.payBtn.enabled = YES; // 始终可点击，让 onTapPay 能统一处理校验逻辑
     self.payBtn.alpha = visuallyEnabled ? 1.0 : 0.55;
+    // 同步禁用 / 启用系统侧滑返回手势，避免购买进行中用户从边缘滑动中断支付。
+    // 与 onBack 中的拦截一起构成完整的「支付保护」。
+    UIGestureRecognizer *popGesture = self.navigationController.interactivePopGestureRecognizer;
+    BOOL shouldBlockBack = self.payInFlight || self.restoreInFlight;
+    if (popGesture && popGesture.enabled == shouldBlockBack) {
+        popGesture.enabled = !shouldBlockBack;
+    }
 }
 
 - (void)onTapPay {
@@ -1933,10 +1972,7 @@
     // 验证失败时降级解析 signedTransaction。
     // 注意：此值是 base64 编码的整本收据（PKCS#7 container），不是 StoreKit 2 的 JWS。
     // 服务端若开启 JWS_FALLBACK 强校验，需要走 Server API 主路径（依赖 .p8 配置）。
-    NSURL *receiptURL = [[NSBundle mainBundle] appStoreReceiptURL];
-    NSData *receiptData = receiptURL ? [NSData dataWithContentsOfURL:receiptURL] : nil;
-    NSString *receiptBase64 = receiptData ? [receiptData base64EncodedStringWithOptions:0] : @"";
-    NSString *signedTransaction = receiptBase64;
+    NSString *signedTransaction = [self currentReceiptBase64];
 
     NSString *planId = self.pendingPlanId ?: @"";
     NSMutableDictionary *body = [@{
@@ -1964,9 +2000,15 @@
             // 刷新会员状态
             [weakSelf loadRemoteData];
             [weakSelf refreshRedeemBannerState];
-            // 弹出成功提示
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"开通成功"
-                                                                           message:@"会员权益已激活，尽情享受吧！"
+            // 弹出成功提示（沙箱环境加注说明，避免测试人员误以为真实扣款）
+            NSString *title = @"开通成功";
+            NSString *message = @"会员权益已激活，尽情享受吧！";
+            if ([weakSelf isAppStoreSandbox]) {
+                title = @"开通成功（测试环境）";
+                message = @"当前为 App Store 沙箱环境购买，不会真实扣款。会员权益已激活。";
+            }
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
+                                                                           message:message
                                                                     preferredStyle:UIAlertControllerStyleAlert];
             [alert addAction:[UIAlertAction actionWithTitle:@"好的" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
                 [weakSelf.navigationController popViewControllerAnimated:YES];
@@ -2003,22 +2045,35 @@
 /// 用户点击「恢复购买」：调用 SKPaymentQueue restoreCompletedTransactions，
 /// 系统会把该 Apple ID 已完成的非消耗型/订阅事务重新投递到 updatedTransactions。
 - (void)onTapRestore {
-    if (self.payInFlight) {
+    // 防连点：购买进行中 / restore 进行中均拦截
+    if (self.payInFlight || self.restoreInFlight) {
         return;
     }
+    self.restoreInFlight = YES;
+    self.restoreTotalCount = 0;
+    self.restoreProcessedCount = 0;
+    self.restoreSuccessCount = 0;
+    [self updatePayButtonState]; // 同步禁用侧滑返回
     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
     [[SKPaymentQueue defaultQueue] restoreCompletedTransactions];
 }
 
-/// SKPaymentQueueObserver — 恢复流程开始
+/// SKPaymentQueueObserver — 恢复流程完成。
+/// 注意：此回调触发时，所有 Restored 事务已通过 updatedTransactions 投递给
+/// handleRestoredTransaction:，但每笔的网络上报是异步的，不能在这里 hideHUD
+/// （否则后续上报还在进行中 UI 就没反馈了）。HUD 改为在最后一笔上报完成后隐藏。
 - (void)paymentQueueRestoreCompletedTransactionsFinished:(SKPaymentQueue *)queue {
     dispatch_async(dispatch_get_main_queue(), ^{
-        [MBProgressHUD hideHUDForView:self.view animated:YES];
-        // restore 完成后，handleRestoredTransaction: 会逐笔上报服务端；
-        // 这里根据是否有恢复到事务来提示用户。
-        if (queue.transactions.count == 0) {
+        // 0 笔事务：直接提示并收尾。
+        if (self.restoreTotalCount == 0) {
+            [MBProgressHUD hideHUDForView:self.view animated:YES];
+            self.restoreInFlight = NO;
+            [self updatePayButtonState];
             [[LoadingManager sharedManager] showError:@"暂无可恢复的购买记录" inView:self.view];
+            return;
         }
+        // 有事务：等 handleRestoredTransaction 的回调逐笔完成后再收尾（见 finishRestoreIfNeeded）
+        NSLog(@"[IAP] restore finished: %ld 笔事务等待上报完成", (long)self.restoreTotalCount);
     });
 }
 
@@ -2026,6 +2081,8 @@
 - (void)paymentQueue:(SKPaymentQueue *)queue restoreCompletedTransactionsFailedWithError:(NSError *)error {
     dispatch_async(dispatch_get_main_queue(), ^{
         [MBProgressHUD hideHUDForView:self.view animated:YES];
+        self.restoreInFlight = NO;
+        [self updatePayButtonState];
         NSString *msg = error.localizedDescription ?: @"恢复购买失败，请稍后重试";
         [[LoadingManager sharedManager] showError:msg inView:self.view];
     });
@@ -2039,9 +2096,10 @@
         [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
         return;
     }
-    NSURL *receiptURL = [[NSBundle mainBundle] appStoreReceiptURL];
-    NSData *receiptData = receiptURL ? [NSData dataWithContentsOfURL:receiptURL] : nil;
-    NSString *receiptBase64 = receiptData ? [receiptData base64EncodedStringWithOptions:0] : @"";
+    // 计入本次 restore 总数（用于在所有回调返回后统一收尾 HUD）
+    self.restoreTotalCount += 1;
+
+    NSString *receiptBase64 = [self currentReceiptBase64];
 
     __weak typeof(self) weakSelf = self;
     [[MembershipRequest shared] verifyPurchaseWithBody:@{
@@ -2054,22 +2112,78 @@
         // 服务端已识别并返回会员信息，可 finish 事务
         [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
         dispatch_async(dispatch_get_main_queue(), ^{
-            [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
-            [weakSelf loadRemoteData];
-            [[LoadingManager sharedManager] showError:@"恢复成功" inView:weakSelf.view];
+            weakSelf.restoreSuccessCount += 1;
+            [weakSelf finishOneRestore];
         });
     } failure:^(NSError * _Nonnull error) {
         // 服务端未识别（该用户没买过 / 沙箱账号未续费等），也 finish 避免事务堆积
         [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
         dispatch_async(dispatch_get_main_queue(), ^{
-            [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
-            NSString *msg = @"暂无可恢复的购买记录";
-            if ([error isKindOfClass:[APIError class]]) {
-                msg = [(APIError *)error displayMessageWithFallback:msg];
-            }
-            [[LoadingManager sharedManager] showError:msg inView:weakSelf.view];
+            [weakSelf finishOneRestore];
         });
     }];
+}
+
+/// 单笔 restore 事务处理完成的统一收尾逻辑：
+/// 当所有事务都处理完成时，刷新一次会员状态并提示用户。
+- (void)finishOneRestore {
+    self.restoreProcessedCount += 1;
+    if (self.restoreProcessedCount < self.restoreTotalCount) {
+        // 还有未完成的事务，HUD 保持
+        return;
+    }
+    // 全部完成
+    [MBProgressHUD hideHUDForView:self.view animated:YES];
+    self.restoreInFlight = NO;
+    [self updatePayButtonState]; // 恢复侧滑返回
+    // 仅在至少有一笔成功时刷新会员状态（避免无效请求）
+    if (self.restoreSuccessCount > 0) {
+        [self loadRemoteData];
+        [[LoadingManager sharedManager] showError:@"恢复成功" inView:self.view];
+    } else {
+        [[LoadingManager sharedManager] showError:@"暂无可恢复的购买记录" inView:self.view];
+    }
+    // 复位计数器
+    self.restoreTotalCount = 0;
+    self.restoreProcessedCount = 0;
+    self.restoreSuccessCount = 0;
+}
+
+#pragma mark - Receipt Helpers
+
+/// 获取本机 App Store 收据（base64 编码）。
+/// 若 appStoreReceiptURL 不存在（首次安装 / 重装后未购买过），返回空串并触发一次
+/// 异步收据刷新请求；下次购买流程再进来时即可拿到有效收据。
+- (NSString *)currentReceiptBase64 {
+    NSURL *receiptURL = [[NSBundle mainBundle] appStoreReceiptURL];
+    NSData *receiptData = receiptURL ? [NSData dataWithContentsOfURL:receiptURL] : nil;
+    if (receiptData.length == 0) {
+        // 触发异步刷新（不阻塞当前流程，下次调用就能拿到）
+        [self refreshAppStoreReceiptIfNeeded];
+        return @"";
+    }
+    return [receiptData base64EncodedStringWithOptions:0];
+}
+
+/// 通过 SKReceiptRefreshRequest 让 App Store 重新下发本机收据。
+/// 首次安装、重装后 appStoreReceiptURL 可能为 nil，此时直接发起购买会导致上报空收据。
+- (void)refreshAppStoreReceiptIfNeeded {
+    static dispatch_once_t onceToken;
+    // 每次 App 生命周期内只触发一次，避免无限循环（receipt 刷新失败时不要一直重试）
+    dispatch_once(&onceToken, ^{
+        SKReceiptRefreshRequest *req = [[SKReceiptRefreshRequest alloc] init];
+        [req start];
+        NSLog(@"[IAP] 触发收据刷新请求（appStoreReceiptURL 为空）");
+    });
+}
+
+/// 判断当前是否为 App Store 沙箱环境（TestFlight / Sandbox 测试账号）。
+/// 通过 appStoreReceiptURL 路径名区分：生产环境文件名为 receipt，沙箱为 sandboxReceipt。
+/// 用于在购买成功后给出"测试购买不会真实扣款"的明确提示，改善测试体验。
+- (BOOL)isAppStoreSandbox {
+    NSURL *receiptURL = [[NSBundle mainBundle] appStoreReceiptURL];
+    NSString *lastComponent = receiptURL.lastPathComponent ?: @"";
+    return [lastComponent isEqualToString:@"sandboxReceipt"];
 }
 
 - (void)onGiftCodeChanged {
