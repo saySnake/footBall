@@ -127,6 +127,9 @@
 @property (nonatomic, assign) NSInteger restoreTotalCount;     // 本次 restore 接收到的事务总数
 @property (nonatomic, assign) NSInteger restoreProcessedCount; // 已处理完成（success/failure）的事务数
 @property (nonatomic, assign) NSInteger restoreSuccessCount;   // 其中服务端识别为有效（success）的事务数
+/// 本 VC 生命周期内是否已触发过收据刷新（避免同一界面内重复刷新，
+/// 但允许下次重新进入会员中心再尝试一次，比 App 级 dispatch_once 更友好）
+@property (nonatomic, assign) BOOL receiptRefreshTriggered;
 @end
 
 @implementation MembershipCenterViewController
@@ -1938,6 +1941,10 @@
                 [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
                 dispatch_async(dispatch_get_main_queue(), ^{
                     [MBProgressHUD hideHUDForView:self.view animated:YES];
+                    // 支付失败必须重置 payInFlight，否则用户再次点击支付会被 onTapPay 的
+                    // 防连点拦截，导致本次会话永远无法再次发起购买（必须重启 App）。
+                    self.payInFlight = NO;
+                    [self updatePayButtonState]; // 同步恢复侧滑返回手势
                     if (transaction.error.code == SKErrorPaymentCancelled) {
                         [[LoadingManager sharedManager] showError:@"支付已取消，可重试" inView:self.view];
                     } else {
@@ -2099,6 +2106,7 @@
     // 计入本次 restore 总数（用于在所有回调返回后统一收尾 HUD）
     self.restoreTotalCount += 1;
 
+    // 复用统一的收据获取逻辑（含 nil 时触发 SKReceiptRefreshRequest 的能力）
     NSString *receiptBase64 = [self currentReceiptBase64];
 
     __weak typeof(self) weakSelf = self;
@@ -2167,14 +2175,14 @@
 
 /// 通过 SKReceiptRefreshRequest 让 App Store 重新下发本机收据。
 /// 首次安装、重装后 appStoreReceiptURL 可能为 nil，此时直接发起购买会导致上报空收据。
+/// 控制频率：每个 MembershipCenterViewController 实例最多触发一次（用户离开后再次进入会创建
+/// 新实例，相当于每次进入会员中心允许重试一次，比 App 级 dispatch_once 更宽容）。
 - (void)refreshAppStoreReceiptIfNeeded {
-    static dispatch_once_t onceToken;
-    // 每次 App 生命周期内只触发一次，避免无限循环（receipt 刷新失败时不要一直重试）
-    dispatch_once(&onceToken, ^{
-        SKReceiptRefreshRequest *req = [[SKReceiptRefreshRequest alloc] init];
-        [req start];
-        NSLog(@"[IAP] 触发收据刷新请求（appStoreReceiptURL 为空）");
-    });
+    if (self.receiptRefreshTriggered) return;
+    self.receiptRefreshTriggered = YES;
+    SKReceiptRefreshRequest *req = [[SKReceiptRefreshRequest alloc] init];
+    [req start];
+    NSLog(@"[IAP] 触发收据刷新请求（appStoreReceiptURL 为空）");
 }
 
 /// 判断当前是否为 App Store 沙箱环境（TestFlight / Sandbox 测试账号）。
