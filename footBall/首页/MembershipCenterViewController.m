@@ -160,15 +160,19 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 }
 
 - (void)viewDidLoad {
-    [super viewDidLoad];
-    self.hidesBottomBarWhenPushed = YES;
-    self.shouldShowNavigationBar = NO;
-    self.view.backgroundColor = kMCPageBg;
+    // QMBaseViewController.viewDidLoad 会调用 setupUI / updateTheme。
+    // 必须在 [super viewDidLoad] 之前准备好 plans，且此处不能再调 setupUI，
+    // 否则 banner / tab 会被创建两份叠在一起（文案看起来「出现两次」）。
     self.initialPlanIndex = MAX(0, MIN(self.initialPlanIndex, 3));
     self.currentIndex = self.initialPlanIndex;
     self.skProducts = [NSMutableDictionary dictionary];
     [self buildPlanData];
-    [self setupUI];
+
+    [super viewDidLoad];
+
+    self.hidesBottomBarWhenPushed = YES;
+    self.shouldShowNavigationBar = NO;
+    self.view.backgroundColor = kMCPageBg;
     [self refreshUserProfile];
     [self loadRemoteData];
     // 注册 StoreKit 支付队列观察者
@@ -180,6 +184,11 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     // 上次 App 被杀或断网导致服务端验证没回时，事务会停留在队列里，
     // 这里主动拉起后由 VC 走正常的 verifyPurchase 流程。
     [[PNIAPObserver shared] resumePendingTransactions];
+}
+
+- (void)updateTheme {
+    // 基类会把背景设成 ThemeManager 的浅色，会员中心必须保持稿面深色底
+    self.view.backgroundColor = kMCPageBg;
 }
 
 - (void)dealloc {
@@ -1287,10 +1296,9 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
         self.bannerSubLabel.text = nil;
         self.bannerSubLabel.textColor = [UIColor clearColor];
     } else {
-        // 非会员：复位，避免残留上一次会员态的文案
-        self.bannerTitleLabel.text = nil;
-        self.bannerSubLabel.text = nil;
-        self.bannerSubLabel.textColor = [UIColor clearColor];
+        // 非会员：恢复设计稿默认标题 + 兑换/折扣 banner 文案
+        self.bannerTitleLabel.text = @"会员中心";
+        [self refreshRedeemBannerState];
     }
 }
 
