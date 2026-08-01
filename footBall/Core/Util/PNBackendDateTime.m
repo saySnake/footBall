@@ -22,12 +22,13 @@
     }
     if (allDigits && s.length >= 10) {
         long long n = [s longLongValue];
-        // 14 位纯数字（如 20240115120000）是 yyyyMMddHHmmss 业务日期串，不是时间戳，
-        // 不能按毫秒/秒处理；只有 10 或 13 位的纯数字才视作时间戳
+        // 13 位纯数字视作毫秒时间戳（如 1700000000000）
         if (s.length == 13 && n > 1000000000000LL) {
             return [NSDate dateWithTimeIntervalSince1970:n / 1000.0];
         }
-        if (s.length == 10 && n > 1000000000LL) {
+        // 10/11/12 位纯数字视作秒时间戳（标准是 10 位，但留 11/12 位兜底防止后端返回非标准长度时漏解析）
+        // 注意：14 位（如 20240115120000）是 yyyyMMddHHmmss 业务日期串，不在此列，会落到后面格式化解析
+        if (s.length >= 10 && s.length <= 12 && n > 1000000000LL) {
             return [NSDate dateWithTimeIntervalSince1970:(NSTimeInterval)n];
         }
     }

@@ -1590,7 +1590,11 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
 - (BOOL)home_isMatchNotYetStartedForDisplay:(Match *)match {
     NSString *st = (match.matchStatus ?: @"").uppercaseString;
     if (st.length > 0) {
-        if ([st containsString:@"LIVE"] || [st containsString:@"IN_PLAY"] || [st containsString:@"1ST"] || [st isEqualToString:@"1H"] || [st isEqualToString:@"2H"] || [st containsString:@"2ND"] || [st isEqualToString:@"ET"] || [st isEqualToString:@"AET"] || [st isEqualToString:@"PEN"] || [st isEqualToString:@"FT_PEN"] || [st isEqualToString:@"PEN_LIVE"] || [st isEqualToString:@"HT"] || [st containsString:@"HALF"] || [st containsString:@"中场"] || [st isEqualToString:@"INT"] || [st containsString:@"PAUSE"]) {
+        // 注意：containsString 匹配面宽，但后端状态串格式不固定（可能带前缀如 MATCH_XX），
+        // 所以「进行中」判定保留 containsString 以提高兼容性。
+        // 唯一例外是 PEN：containsString:@"PEN" 会误伤 "PENDING"（待定），让待定比赛被误判为点球大战进行中，
+        // 所以 PEN 相关改用精确匹配 + 已知变体。
+        if ([st containsString:@"LIVE"] || [st containsString:@"IN_PLAY"] || [st containsString:@"1ST"] || [st isEqualToString:@"1H"] || [st isEqualToString:@"2H"] || [st containsString:@"2ND"] || [st containsString:@"ET"] || [st isEqualToString:@"PEN"] || [st isEqualToString:@"PEN_LIVE"] || [st isEqualToString:@"HT"] || [st containsString:@"HALF"] || [st containsString:@"中场"] || [st isEqualToString:@"INT"] || [st containsString:@"PAUSE"]) {
             return NO;
         }
         if ([st containsString:@"FINISH"] || [st containsString:@"COMPLETE"] || [st isEqualToString:@"FT"] || [st containsString:@"ENDED"] || [st containsString:@"AET"] || [st isEqualToString:@"FT_PEN"] || [st containsString:@"PEN_"] || [st containsString:@"已结束"] || [st containsString:@"完赛"] || [st isEqualToString:@"END"] || [st isEqualToString:@"CLOSED"] || [st isEqualToString:@"RESULT"] || [st isEqualToString:@"FIN"]) {

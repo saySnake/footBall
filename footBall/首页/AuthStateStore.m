@@ -6,10 +6,7 @@
 #import "AuthStateStore.h"
 
 static NSString * const kRealNameCompletedKey = @"auth_realname_completed";
-static NSString * const kRealNameFrontKey = @"auth_realname_front_data";
-static NSString * const kRealNameBackKey = @"auth_realname_back_data";
 static NSString * const kProfessionalCompletedKey = @"auth_professional_completed";
-static NSString * const kProfessionalImagesKey = @"auth_professional_images";
 
 @implementation AuthStateStore
 

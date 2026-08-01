@@ -257,8 +257,9 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
         return;
     }
 
-    // 节流：非主动刷新时，若距上次加载不足 30 秒则跳过，避免 tab 来回切换时重复打 5 个接口
-    static NSTimeInterval const kProfileLoadMinInterval = 30.0;
+    // 节流：非主动刷新时，若距上次加载不足 10 秒则跳过，避免 tab 来回切换时重复打 5 个接口。
+    // 取 10 秒（而非更长）：用户修改资料后回到本页希望在很短时间内就能刷新到新数据。
+    static NSTimeInterval const kProfileLoadMinInterval = 10.0;
     if (!forceRefresh) {
         NSTimeInterval now = [NSDate date].timeIntervalSince1970;
         if (self.lastProfileLoadTime > 0 && (now - self.lastProfileLoadTime) < kProfileLoadMinInterval) {

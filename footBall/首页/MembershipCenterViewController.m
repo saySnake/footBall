@@ -1685,6 +1685,11 @@
 }
 
 - (void)onTapPay {
+    // 支付进行中拦截：按钮现在始终 enabled（为了能弹「请先勾选协议」），
+    // 所以必须在入口显式拦截 payInFlight，避免连点触发重复购买
+    if (self.payInFlight) {
+        return;
+    }
     if (!self.agreementCheckBtn.selected) {
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"提示"
                                                                        message:@"请先勾选《会员服务协议》"
