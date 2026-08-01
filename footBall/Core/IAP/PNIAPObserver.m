@@ -98,11 +98,13 @@
     BOOL isRestore = (transaction.transactionState == SKPaymentTransactionStateRestored);
 
     // 兜底场景拿不到 planId/redeemCode，传 0 让服务端做幂等查询。
+    // agreementAccepted=false：兜底事务可能是 restore 也可能是应用启动时补单，
+    // 用户没有显式勾选协议，不能当作"已同意"处理（服务端在 restore=true 时会跳过校验）。
     NSDictionary *body = @{
         @"transactionId": transactionId,
         @"signedTransaction": receiptBase64,
         @"planId": @(0),
-        @"agreementAccepted": @YES,
+        @"agreementAccepted": @NO,
         @"restore": @(isRestore)
     };
 

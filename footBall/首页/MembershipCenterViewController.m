@@ -82,6 +82,8 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 @property (nonatomic, strong) UITextView *agreementLabel;
 /// 恢复购买按钮（Apple 审核要求：非消耗型/订阅类应用必须提供 Restore 入口）
 @property (nonatomic, strong) UIButton *restoreBtn;
+/// 订阅关键信息标签（Apple 审核指南 3.1.2 要求在购买按钮附近明示续期频率、价格周期、取消方式）
+@property (nonatomic, strong) UILabel *subscriptionInfoLabel;
 
 @property (nonatomic, strong) UIView *redeemOverlayView;
 @property (nonatomic, strong) UIView *redeemDialogView;
@@ -664,6 +666,23 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
         make.centerX.equalTo(self.view);
         make.bottom.equalTo(self.payBtn.mas_top).offset(-6);
         make.height.mas_equalTo(16);
+    }];
+
+    // 订阅关键信息标签（Apple 3.1.2 合规要求）：明示续期频率、价格周期、取消方式。
+    // 文案随当前选中方案切换，自动续期商品显示"¥X/月 按月续期..."，永久商品显示"一次性买断"。
+    self.subscriptionInfoLabel = [[UILabel alloc] init];
+    self.subscriptionInfoLabel.font = [UIFont systemFontOfSize:10];
+    self.subscriptionInfoLabel.textColor = [UIColor colorWithWhite:0.55 alpha:1.0];
+    self.subscriptionInfoLabel.textAlignment = NSTextAlignmentCenter;
+    self.subscriptionInfoLabel.numberOfLines = 0;
+    self.subscriptionInfoLabel.adjustsFontSizeToFitWidth = YES;
+    self.subscriptionInfoLabel.minimumScaleFactor = 0.85;
+    [self.view addSubview:self.subscriptionInfoLabel];
+    [self.subscriptionInfoLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(self.view);
+        make.bottom.equalTo(self.restoreBtn.mas_top).offset(-4);
+        make.leading.greaterThanOrEqualTo(self.view).offset(16);
+        make.trailing.lessThanOrEqualTo(self.view).offset(-16);
     }];
 
     self.agreementCheckBtn = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -1267,6 +1286,9 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 /// 根据会员状态更新 banner 文案
 - (void)applyMembershipStatusToUI:(PNMembershipStatus *)status {
     if (!status) return;
+    // isMember=true 且 expireTime 非空：有限期会员（月/季/年）。
+    // expireTime=null：永久会员（duration_days=0），banner 显示"永久有效"。
+    // Apple 3.1.2：永久会员不能显示具体到期日，否则审核会判定"伪造永久"。
     if (status.isMember && status.expireTime.length > 0) {
         self.bannerTitleLabel.text = [NSString stringWithFormat:@"会员有效期至 %@",
                                       [status.expireTime substringToIndex:MIN(10, status.expireTime.length)]];
@@ -1278,8 +1300,14 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
             self.bannerSubLabel.text = nil;
             self.bannerSubLabel.textColor = [UIColor clearColor];
         }
+    } else if (status.isMember) {
+        // 永久会员：expireTime=null（duration_days=0）。Apple 3.1.2：禁止显示具体到期日。
+        self.bannerTitleLabel.text = @"永久会员，永久有效";
+        self.bannerSubLabel.text = nil;
+        self.bannerSubLabel.textColor = [UIColor clearColor];
     } else {
-        // 非会员或无有效期：同样复位，避免残留上一次会员态的文案
+        // 非会员：复位，避免残留上一次会员态的文案
+        self.bannerTitleLabel.text = nil;
         self.bannerSubLabel.text = nil;
         self.bannerSubLabel.textColor = [UIColor clearColor];
     }
@@ -1320,7 +1348,15 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 
 - (NSAttributedString *)paymentButtonAttrTitleForPlan:(MCPlan *)plan {
     NSString *pay = plan.payPrice.length ? plan.payPrice : plan.price;
-    NSString *full = [NSString stringWithFormat:@"确认协议并支付¥%@", pay ?: @""];
+    // Apple 审核指南 3.1.2 要求：自动续期订阅的支付按钮文案必须明示价格 + 周期
+    // （如 "¥33/月"），不能只显示"¥33"。非续期商品（永久/创始人）不显示周期。
+    NSString *period = [self subscriptionPeriodTextForPlan:plan];
+    NSString *full;
+    if (period.length > 0) {
+        full = [NSString stringWithFormat:@"确认协议并支付 ¥%@/%@", pay ?: @"", period];
+    } else {
+        full = [NSString stringWithFormat:@"确认协议并支付 ¥%@", pay ?: @""];
+    }
     NSMutableAttributedString *attr = [[NSMutableAttributedString alloc] initWithString:full attributes:@{
         NSForegroundColorAttributeName: [UIColor whiteColor],
         NSFontAttributeName: [UIFont systemFontOfSize:12.57 weight:UIFontWeightSemibold]
@@ -1330,6 +1366,42 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
         [attr addAttribute:NSFontAttributeName value:[UIFont systemFontOfSize:8 weight:UIFontWeightSemibold] range:currencyRange];
     }
     return attr;
+}
+
+/// 返回方案的续期周期文案（用于按钮和订阅信息标签）。
+/// 按月续期 → "月"；按年续期 → "年"；永久/创始人 → ""（非续期商品）。
+/// Apple 3.1.2: 续期频率必须明示。
+- (NSString *)subscriptionPeriodTextForPlan:(MCPlan *)plan {
+    NSString *title = plan.title ?: @"";
+    if ([title containsString:@"月"]) return @"月";
+    if ([title containsString:@"年"]) return @"年";
+    if ([title containsString:@"季"]) return @"季";
+    // 永久 / 创始人 / 兑换码激活的方案：非自动续期，不显示周期
+    return @"";
+}
+
+/// 返回订阅关键信息文案（Apple 审核指南 3.1.2 要求在购买按钮附近明示）。
+/// 月/季/年订阅 → "¥33/月，按月自动续期，到期前 24 小时内扣费，可随时取消"
+/// 永久/创始人 → "¥748 一次性买断，永久有效"
+- (NSString *)subscriptionInfoTextForPlan:(MCPlan *)plan {
+    NSString *pay = plan.payPrice.length ? plan.payPrice : plan.price ?: @"";
+    NSString *period = [self subscriptionPeriodTextForPlan:plan];
+    if (period.length > 0) {
+        return [NSString stringWithFormat:@"¥%@/%@，按%@自动续期，到期前24小时内扣费，可随时取消",
+                pay, period, period];
+    }
+    // 永久 / 创始人：一次性买断，不续期
+    return [NSString stringWithFormat:@"¥%@ 一次性买断，永久有效，无需续费", pay];
+}
+
+/// 当前选中方案是否为永久/终身/创始人类型（非续期商品）。
+/// 用于购买成功文案适配（Apple 3.1.2：永久会员不能暗示自动续期）。
+- (BOOL)isCurrentPlanLifetime {
+    NSInteger idx = self.currentIndex;
+    if (idx < 0 || idx >= (NSInteger)self.plans.count) return NO;
+    MCPlan *plan = self.plans[idx];
+    NSString *title = plan.title ?: @"";
+    return [title containsString:@"永久"] || [title containsString:@"终身"] || [title containsString:@"创始"];
 }
 
 - (NSString *)cardHintTextForPlan:(MCPlan *)plan {
@@ -1384,7 +1456,10 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     NSString *privacyText   = @"《隐私政策》";
     NSString *autoRenewText = @"《自动续期条款》";
     NSString *suffix = @"\n付款：会员到期后 24 小时内自动续期，可随时在「设置-Apple ID-订阅」中取消。";
-    NSString *all = [NSString stringWithFormat:@"%@%@、%@、%@%@", prefix, agreementText, privacyText, autoRenewText, suffix];
+    // "管理订阅"链接：点击跳转系统订阅管理页（itms-apps://...）。Apple 3.1.2 推荐（非强制）。
+    NSString *manageLink = @"管理 Apple 订阅";
+    NSString *all = [NSString stringWithFormat:@"%@%@、%@、%@%@ %@",
+                     prefix, agreementText, privacyText, autoRenewText, suffix, manageLink];
 
     NSMutableAttributedString *m = [[NSMutableAttributedString alloc] initWithString:all attributes:@{
         NSForegroundColorAttributeName: [UIColor colorWithWhite:0.93 alpha:1.0],
@@ -1401,6 +1476,7 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     NSRange rAgreement = [all rangeOfString:agreementText];
     NSRange rPrivacy   = [all rangeOfString:privacyText];
     NSRange rAutoRenew = [all rangeOfString:autoRenewText];
+    NSRange rManage    = [all rangeOfString:manageLink];
     if (rAgreement.location != NSNotFound) {
         [m addAttributes:linkAttrs range:rAgreement];
         [m addAttribute:NSLinkAttributeName value:kMCMembershipAgreementURL range:rAgreement];
@@ -1412,6 +1488,11 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     if (rAutoRenew.location != NSNotFound) {
         [m addAttributes:linkAttrs range:rAutoRenew];
         [m addAttribute:NSLinkAttributeName value:kCAutoRenewTermsURL range:rAutoRenew];
+    }
+    if (rManage.location != NSNotFound) {
+        [m addAttributes:linkAttrs range:rManage];
+        // itms-apps:// scheme 触发系统跳转到 App Store 的账户订阅管理页
+        [m addAttribute:NSLinkAttributeName value:@"itms-apps://apps.apple.com/account/subscriptions" range:rManage];
     }
     return m;
 }
@@ -1505,6 +1586,8 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     self.planTitleLabel.text = [self displayTitleForPlan:plan];
     [self.payBtn setAttributedTitle:[self paymentButtonAttrTitleForPlan:plan] forState:UIControlStateNormal];
     [self.payBtn setAttributedTitle:[self paymentButtonAttrTitleForPlan:plan] forState:UIControlStateDisabled];
+    // 订阅关键信息标签同步刷新（Apple 3.1.2 合规：续期频率 + 价格周期 + 取消方式）
+    self.subscriptionInfoLabel.text = [self subscriptionInfoTextForPlan:plan];
     self.pageControl.currentPage = idx;
 }
 
@@ -2107,12 +2190,18 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
             // 刷新会员状态
             [weakSelf loadRemoteData];
             [weakSelf refreshRedeemBannerState];
-            // 弹出成功提示（沙箱环境加注说明，避免测试人员误以为真实扣款）
+            // 弹出成功提示（沙箱环境加注说明，避免测试人员误以为真实扣款）。
+            // 永久 / 创始人方案：一次性买断，文案不能暗示自动续期（Apple 3.1.2 合规）。
+            BOOL isLifetime = [self isCurrentPlanLifetime];
             NSString *title = @"开通成功";
-            NSString *message = @"会员权益已激活，尽情享受吧！";
+            NSString *message = isLifetime
+                ? @"永久会员已激活，感谢您的支持，尽情享受全部权益！"
+                : @"会员权益已激活，尽情享受吧！";
             if ([weakSelf isAppStoreSandbox]) {
                 title = @"开通成功（测试环境）";
-                message = @"当前为 App Store 沙箱环境购买，不会真实扣款。会员权益已激活。";
+                message = isLifetime
+                    ? @"当前为 App Store 沙箱环境购买，不会真实扣款。永久会员已激活。"
+                    : @"当前为 App Store 沙箱环境购买，不会真实扣款。会员权益已激活。";
             }
             UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
                                                                            message:message
@@ -2219,7 +2308,9 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
         @"transactionId": transactionId,
         @"signedTransaction": receiptBase64,
         @"planId": @(0),
-        @"agreementAccepted": @YES,
+        // restore 不要求用户勾选协议（Apple 也不要求），传 NO 保持数据真实，
+        // 服务端在 restore=true 时会跳过 agreementAccepted 校验。
+        @"agreementAccepted": @NO,
         @"restore": @YES
     } success:^(HTTPResponse * _Nullable responseObject) {
         // 服务端已识别并返回会员信息，可 finish 事务
