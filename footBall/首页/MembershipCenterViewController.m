@@ -45,7 +45,7 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 @end
 @implementation MCPlan @end
 
-@interface MembershipCenterViewController () <UIScrollViewDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver>
+@interface MembershipCenterViewController () <UIScrollViewDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, UITextViewDelegate>
 @property (nonatomic, strong) UIView *topGlowView;
 @property (nonatomic, strong) CAGradientLayer *topGlowLayer;
 @property (nonatomic, strong) UIView *navBar;
@@ -137,6 +137,10 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 /// 本 VC 生命周期内是否已触发过收据刷新（避免同一界面内重复刷新，
 /// 但允许下次重新进入会员中心再尝试一次，比 App 级 dispatch_once 更友好）
 @property (nonatomic, assign) BOOL receiptRefreshTriggered;
+/// loadRemoteData 防抖：购买成功 / restore 完成 / viewWillAppear 等多处都调用，
+/// 没有标志位会同时触发 2-3 次并发请求（plans + status），浪费网络 + UI 闪烁。
+/// 此处仅做"已有进行中则跳过"，完成后下次再调可正常触发。
+@property (nonatomic, assign) BOOL loadingRemoteData;
 @end
 
 @implementation MembershipCenterViewController
@@ -204,7 +208,7 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     // 中断会让用户对是否扣款产生困惑。这里弹窗确认，用户坚持才允许 pop。
     // 注意：此回调会触发多次（包括 present 别的 VC），仅在 isMovingFromParent=YES
     //（即真的要被 pop 出导航栈）时拦截。
-    if (self.isMovingFromParent && (self.payInFlight || self.restoreInFlight)) {
+    if (self.isMovingFromParentViewController && (self.payInFlight || self.restoreInFlight)) {
         NSLog(@"[IAP] 购买/恢复进行中，用户尝试离开");
         // 不在这里阻塞 super（已经调用过），通过提示告知用户当前状态。
         // 真正的拦截放在 navigationBar 返回按钮 / swipeBack 的交互层更合适；
@@ -1183,7 +1187,21 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 }
 
 - (void)loadRemoteData {
+    // 防抖：plans + status 两个并发请求，多次触发会浪费网络且让 UI 状态闪烁。
+    // 此处仅做"进行中则跳过"，请求完成后下次再调可正常触发。
+    if (self.loadingRemoteData) return;
+    self.loadingRemoteData = YES;
     __weak typeof(self) weakSelf = self;
+    __block NSInteger pendingCount = 2; // plans + status
+
+    void (^onOneDone)(void) = ^{
+        dispatch_async(dispatch_get_main_queue(), ^{
+            pendingCount -= 1;
+            if (pendingCount <= 0) {
+                weakSelf.loadingRemoteData = NO;
+            }
+        });
+    };
 
     // 加载会员方案列表，用价格和 appleProductId 更新本地 plans
     [[MembershipRequest shared] getMembershipPlansSuccess:^(HTTPResponse * _Nullable responseObject) {
@@ -1195,14 +1213,17 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
             id inner = ((NSDictionary *)raw)[@"list"] ?: ((NSDictionary *)raw)[@"data"];
             if ([inner isKindOfClass:NSArray.class]) list = inner;
         }
-        if (list.count == 0) return;
-        NSArray<PNMemberPlan *> *apiPlans = [NSArray yy_modelArrayWithClass:PNMemberPlan.class json:list];
-        weakSelf.apiPlans = apiPlans;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [weakSelf applyAPIPlansToUI:apiPlans];
-        });
+        if (list.count > 0) {
+            NSArray<PNMemberPlan *> *apiPlans = [NSArray yy_modelArrayWithClass:PNMemberPlan.class json:list];
+            weakSelf.apiPlans = apiPlans;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [weakSelf applyAPIPlansToUI:apiPlans];
+            });
+        }
+        onOneDone();
     } failure:^(NSError * _Nonnull error) {
         // 接口失败时保留本地写死数据，不影响展示
+        onOneDone();
     }];
 
     // 加载会员状态，更新 banner 标题
@@ -1213,7 +1234,9 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
         dispatch_async(dispatch_get_main_queue(), ^{
             [weakSelf applyMembershipStatusToUI:status];
         });
+        onOneDone();
     } failure:^(NSError * _Nonnull error) {
+        onOneDone();
     }];
 }
 
@@ -1399,6 +1422,18 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     SFSafariViewController *safari = [[SFSafariViewController alloc] initWithURL:url];
     safari.preferredControlTintColor = [UIColor colorWithRed:24/255.0 green:115/255.0 blue:1 alpha:1];
     [self presentViewController:safari animated:YES completion:nil];
+}
+
+#pragma mark - UITextViewDelegate
+
+/// 拦截 UITextView 中链接的默认打开行为（系统默认会调起 Safari 跳出 App），
+/// 改为应用内 SFSafariViewController 打开，体验更连贯，也便于审核员直接查看条款。
+- (BOOL)textView:(UITextView *)textView shouldInteractWithURL:(NSURL *)URL inRange:(NSRange)characterRange interaction:(UITextItemInteraction)interaction {
+    if ([URL.absoluteString hasPrefix:@"http"]) {
+        [self openAgreementURL:URL];
+        return NO; // 已自行处理，阻止系统默认行为
+    }
+    return YES;
 }
 
 - (void)buildPlanData {
