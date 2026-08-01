@@ -16,6 +16,7 @@
 #import "LoadingManager.h"
 #import "APIError.h"
 #import "PNIAPObserver.h"
+#import "PNIAPSK2Bridge.h"
 #import <MBProgressHUD/MBProgressHUD.h>
 
 #define kMCPageBg [UIColor colorWithRed:13/255.0 green:33/255.0 blue:34/255.0 alpha:1.0]
@@ -2173,31 +2174,47 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 - (void)handlePurchasedTransaction:(SKPaymentTransaction *)transaction {
     NSString *transactionId = transaction.transactionIdentifier ?: @"";
 
-    // 统一使用本机 appStoreReceiptURL 的 base64 收据作为 signedTransaction 上报。
-    // 服务端优先用 transactionId 调用 App Store Server API v2 验证，
-    // 验证失败时降级解析 signedTransaction。
-    // 注意：此值是 base64 编码的整本收据（PKCS#7 container），不是 StoreKit 2 的 JWS。
-    // 服务端若开启 JWS_FALLBACK 强校验，需要走 Server API 主路径（依赖 .p8 配置）。
-    //
-    // 超时设计：当前依赖 APIManager 全局 timeoutInterval，未为 verifyPurchase 单独设置更短超时。
-    // 原因：(1) APIManager 不支持 per-request timeout，临时切全局值会有并发安全问题；
-    //       (2) Apple Server API v2 在国内偶发慢响应，但通常 < 15s；
-    //       (3) 失败分支已 finish 事务并记详细日志（不会卡队列），用户等 30s 后看到提示可接受。
-    // 后续若优化可改 APIManager 支持 per-request timeout，或在失败分支走本地落库对账。
-    NSString *signedTransaction = [self currentReceiptBase64];
-
+    // 上报内容选择策略（修复 StoreKit 版本不匹配阻塞）：
+    // - iOS 15+: 优先从 StoreKit 2 Transaction.currentEntitlements 取 JWS（jsonRepresentation）。
+    //   JWS 是 header.payload.signature 三段式签名交易，服务端 verifyViaJws 可直接验签，
+    //   不依赖 .p8 私钥配置（关键：当前服务端 AuthKey.p8 缺失，Server API v2 路径不可用，
+    //   必须走 JWS 路径才能在沙箱联调通）。
+    // - iOS 13/14 或 SK2 未命中：退回本机 appStoreReceiptURL 的 base64 整本收据（StoreKit 1），
+    //   服务端 looksLikeJws 会跳过 JWS 分支，只能依赖 Server API v2（需 .p8 配置就绪）。
     NSString *planId = self.pendingPlanId ?: @"";
-    NSMutableDictionary *body = [@{
-        @"transactionId": transactionId,
-        @"signedTransaction": signedTransaction,
-        @"planId": planId,
-        @"agreementAccepted": @YES
-    } mutableCopy];
-    // 兑换码/付费邀请码：随 purchase 带上 redeemCode，服务端按码关联方案与追踪
-    if (self.pendingRedeemCode.length > 0) {
-        body[@"redeemCode"] = self.pendingRedeemCode;
-    }
+    __weak typeof(self) weakSelf = self;
 
+    void (^submitWithSignedTransaction)(NSString *) = ^(NSString *signedTransaction) {
+        NSMutableDictionary *body = [@{
+            @"transactionId": transactionId,
+            @"signedTransaction": signedTransaction ?: @"",
+            @"planId": planId,
+            @"agreementAccepted": @YES
+        } mutableCopy];
+        if (weakSelf.pendingRedeemCode.length > 0) {
+            body[@"redeemCode"] = weakSelf.pendingRedeemCode;
+        }
+        [weakSelf submitPurchaseVerification:body transaction:transaction];
+    };
+
+    if ([PNIAPSK2Bridge isAvailable]) {
+        [PNIAPSK2Bridge currentJWSForTransactionId:transactionId completion:^(PNIAPSK2Result * _Nullable result) {
+            if (result.jwsRepresentation.length > 0) {
+                NSLog(@"[IAP] 使用 SK2 JWS 上报（iOS 15+）: txnId=%@", transactionId);
+                submitWithSignedTransaction(result.jwsRepresentation);
+            } else {
+                NSLog(@"[IAP] SK2 JWS 未命中，回退到 SK1 收据: txnId=%@", transactionId);
+                submitWithSignedTransaction([weakSelf currentReceiptBase64]);
+            }
+        }];
+    } else {
+        submitWithSignedTransaction([self currentReceiptBase64]);
+    }
+}
+
+/// 实际上报 verifyPurchase 的统一入口（SK2 JWS 路径与 SK1 receipt 路径共用）
+- (void)submitPurchaseVerification:(NSDictionary *)body
+                       transaction:(SKPaymentTransaction *)transaction {
     __weak typeof(self) weakSelf = self;
     [[MembershipRequest shared] verifyPurchaseWithBody:body success:^(HTTPResponse * _Nullable responseObject) {
         // 服务端验证成功，结束事务

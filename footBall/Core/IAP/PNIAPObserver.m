@@ -6,11 +6,14 @@
 #import "PNIAPObserver.h"
 #import "MembershipRequest.h"
 #import "AuthManager.h"
+#import "PNIAPSK2Bridge.h"
 
 @interface PNIAPObserver ()
 @property (nonatomic, assign) BOOL started;
 /// 会员中心 VC 当前是否激活（激活时由 VC 处理，observer 不重复上报）
 @property (nonatomic, assign, getter=isMembershipCenterActive) BOOL membershipCenterActive;
+/// SK1 整本收据 base64（兜底路径用）
+- (NSString *)sk1ReceiptBase64;
 @end
 
 @implementation PNIAPObserver
@@ -93,32 +96,52 @@
 
 - (void)uploadTransaction:(SKPaymentTransaction *)transaction {
     NSString *transactionId = transaction.transactionIdentifier ?: @"";
-    NSURL *receiptURL = [[NSBundle mainBundle] appStoreReceiptURL];
-    NSData *receiptData = receiptURL ? [NSData dataWithContentsOfURL:receiptURL] : nil;
-    NSString *receiptBase64 = receiptData ? [receiptData base64EncodedStringWithOptions:0] : @"";
     BOOL isRestore = (transaction.transactionState == SKPaymentTransactionStateRestored);
 
     // 兜底场景拿不到 planId/redeemCode，传 0 让服务端做幂等查询。
     // agreementAccepted=false：兜底事务可能是 restore 也可能是应用启动时补单，
     // 用户没有显式勾选协议，不能当作"已同意"处理（服务端在 restore=true 时会跳过校验）。
-    NSDictionary *body = @{
+    NSDictionary *baseBody = @{
         @"transactionId": transactionId,
-        @"signedTransaction": receiptBase64,
         @"planId": @(0),
         @"agreementAccepted": @NO,
         @"restore": @(isRestore)
     };
 
-    [[MembershipRequest shared] verifyPurchaseWithBody:body success:^(HTTPResponse * _Nullable responseObject) {
-        [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
-        NSLog(@"[IAP] 兜底事务上报成功: txnId=%@", transactionId);
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"PNMembershipDidChangeNotification" object:nil];
-    } failure:^(NSError * _Nonnull error) {
-        // 上报失败：仍 finish 事务防止队列堆积（堆积超 Apple 阈值后 StoreKit 拒绝新支付）。
-        // 详细日志保留供客服对账兜底；用户下次进入会员中心可手动重试 restore。
-        [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
-        NSLog(@"[IAP][严重] 兜底事务上报失败已 finish，请人工对账: txnId=%@, err=%@", transactionId, error);
-    }];
+    void (^submitWithBody)(NSDictionary *) = ^(NSDictionary *extra) {
+        NSMutableDictionary *body = [baseBody mutableCopy];
+        if (extra) [body addEntriesFromDictionary:extra];
+        [[MembershipRequest shared] verifyPurchaseWithBody:body success:^(HTTPResponse * _Nullable responseObject) {
+            [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
+            NSLog(@"[IAP] 兜底事务上报成功: txnId=%@", transactionId);
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"PNMembershipDidChangeNotification" object:nil];
+        } failure:^(NSError * _Nonnull error) {
+            // 上报失败：仍 finish 事务防止队列堆积（堆积超 Apple 阈值后 StoreKit 拒绝新支付）。
+            // 详细日志保留供客服对账兜底；用户下次进入会员中心可手动重试 restore。
+            [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
+            NSLog(@"[IAP][严重] 兜底事务上报失败已 finish，请人工对账: txnId=%@, err=%@", transactionId, error);
+        }];
+    };
+
+    // iOS 15+: 优先用 SK2 JWS 上报（与服务端 verifyViaJws 路径匹配，不依赖 .p8 配置）。
+    // iOS 13/14 或 SK2 未命中：退回 SK1 整本收据 base64。
+    if ([PNIAPSK2Bridge isAvailable] && transactionId.length > 0) {
+        [PNIAPSK2Bridge currentJWSForTransactionId:transactionId completion:^(PNIAPSK2Result * _Nullable result) {
+            NSString *signed = result.jwsRepresentation.length > 0
+                ? result.jwsRepresentation
+                : [self sk1ReceiptBase64];
+            submitWithBody(@{ @"signedTransaction": signed ?: @"" });
+        }];
+    } else {
+        submitWithBody(@{ @"signedTransaction": [self sk1ReceiptBase64] });
+    }
+}
+
+/// SK1 整本收据 base64（兜底路径，iOS 13/14 或 SK2 未命中时使用）
+- (NSString *)sk1ReceiptBase64 {
+    NSURL *receiptURL = [[NSBundle mainBundle] appStoreReceiptURL];
+    NSData *receiptData = receiptURL ? [NSData dataWithContentsOfURL:receiptURL] : nil;
+    return receiptData ? [receiptData base64EncodedStringWithOptions:0] : @"";
 }
 
 @end
