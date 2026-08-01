@@ -562,6 +562,10 @@
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
         [MBProgressHUD hideHUDForView:self.view animated:YES];
+        // 首屏失败也要初始化 selectedTeams，否则后续若误访问 addObject 会崩
+        if (!self.selectedTeams) {
+            self.selectedTeams = [NSMutableArray array];
+        }
         [QMUITips showError:error.localizedDescription];
     }];
 }

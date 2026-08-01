@@ -1165,6 +1165,12 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
 }
 
 - (nullable NSDate *)pn_dateFromBackendDateTime:(NSString *)s {
+    if (s.length == 0) return nil;
+    // 语义：本页面存储的是"开球的绝对时刻"（语义 B）。
+    // - 新数据：上行带时区偏移（XXX），后端原样回传，PNBackendDateTime 能正确解析为绝对 NSDate
+    // - 老数据：上行不带偏移，后端按 Asia/Shanghai 解释存为绝对时刻，回传也不带偏移；
+    //   为了让老数据在跨时区下也能正确显示，这里把不带偏移的串按 Asia/Shanghai 解析
+    //   （与后端原存储语义一致），还原成绝对时刻后由 refreshDateTimeButtons 转本地时区展示。
     return [PNBackendDateTime dateFromBackendString:s];
 }
 
@@ -1192,9 +1198,17 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     NSDate *date = self.selectedDate ?: [NSDate date];
     NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
     fmt.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
-    fmt.locale = [NSLocale currentLocale];
+    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    // 语义：用户在 picker 选的"本地墙上钟时间"实际是一个绝对时刻。
+    // 上行必须用带时区偏移的 ISO8601 串（XXX），让后端能还原成绝对时刻：
+    //   - 中国用户选"今晚 8 点" → "2026-08-01T20:00:00+08:00"
+    //   - 后端按 UTC 存储
+    //   - 美国用户回读时，App 转成本地时区显示 → "凌晨 5 点"
+    // 这样跨时区用户各自看到本地的开球时间。
+    // 旧实现用不带偏移的 "yyyy-MM-dd'T'HH:mm:ss"，后端只能按 Asia/Shanghai 猜，
+    // 导致跨时区用户看到的时间错乱。
     fmt.timeZone = [NSTimeZone localTimeZone];
-    fmt.dateFormat = @"yyyy-MM-dd'T'HH:mm:ss";
+    fmt.dateFormat = @"yyyy-MM-dd'T'HH:mm:ssXXX";
     return [fmt stringFromDate:date];
 }
 

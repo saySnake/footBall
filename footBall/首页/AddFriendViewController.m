@@ -8,6 +8,7 @@
 #import <Masonry/Masonry.h>
 #import "ColorManager.h"
 #import "SocialRequest.h"
+#import "PNBackendDateTime.h"
 #import <SDWebImage/SDWebImage.h>
 #import <AVFoundation/AVFoundation.h>
 #import <PhotosUI/PhotosUI.h>
@@ -83,9 +84,18 @@ static NSString * const kCommunityPendingCountKey = @"community_pending_count";
 - (void)configureWithResult:(PNUser *)r {
     _nameLabel.text = r.nickname;
     _idLabel.text = [NSString stringWithFormat:NSLocalizedString(@"community_id_format", nil), r.userId];
-    _statusLabel.text = r.lastOnlineTime.length > 0 ? NSLocalizedString(@"community_online_15m", nil) : NSLocalizedString(@"community_online_5m_ago", nil);
-    _statusLabel.textColor = r.lastOnlineTime.length > 0 ? [UIColor colorWithRed:0.10 green:0.70 blue:0.30 alpha:1.0] : [UIColor grayColor];
-    BOOL online = (r.lastOnlineTime.length > 0);
+    // lastOnlineTime 是「最后在线时刻」，不是「是否在线」布尔值；
+    // 只有该时刻在最近 15 分钟内才视为「在线」显示绿色，否则显示离线灰色。
+    BOOL online = NO;
+    if (r.lastOnlineTime.length > 0) {
+        NSDate *last = [PNBackendDateTime dateFromBackendString:r.lastOnlineTime];
+        if (last) {
+            NSTimeInterval delta = [[NSDate date] timeIntervalSinceDate:last];
+            online = (delta >= 0 && delta <= 15 * 60);
+        }
+    }
+    _statusLabel.text = online ? NSLocalizedString(@"community_online_15m", nil) : NSLocalizedString(@"community_online_5m_ago", nil);
+    _statusLabel.textColor = online ? [UIColor colorWithRed:0.10 green:0.70 blue:0.30 alpha:1.0] : [UIColor grayColor];
     _statusDot.backgroundColor = online ? [UIColor colorWithRed:0.0 green:0.71 blue:0.12 alpha:1.0] : [UIColor colorWithWhite:0.65 alpha:1.0];
     NSURL *url = r.avatar.length > 0 ? [NSURL URLWithString:r.avatar] : nil;
     UIImage *placeholder = (@available(iOS 13.0, *)) ? [UIImage systemImageNamed:@"person.crop.circle.fill"] : nil;

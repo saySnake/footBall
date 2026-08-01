@@ -654,9 +654,11 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         [weakSelf.navigationController pushViewController:album animated:YES];
     };
     header.bottomGridView.onClickStamp = ^(NSInteger index, PassportStampGridItem *item) {
+        NSString *oldSid = item.stamp.stampId ?: @"";
+        if (oldSid.length == 0) return;
         StampAlbumCategoryViewController *album = StampAlbumCategoryViewController.alloc.init;
         album.didSelected = ^(PNStampAlbumItem * _Nonnull stamp) {
-            [StampRequest.shared replaceStamp:item.stamp.stampId newStampId:stamp.stampId success:^(HTTPResponse * _Nullable responseObject) {
+            [StampRequest.shared replaceStamp:oldSid newStampId:stamp.stampId success:^(HTTPResponse * _Nullable responseObject) {
                 [weakSelf loadStampCollection];
             } failure:^(NSError * _Nonnull error) {
                 [QMUITips showError:[weakSelf stampErrorMessage:error]];
@@ -669,7 +671,9 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
     };
     header.bottomGridView.onClickDelete = ^(NSInteger index, PassportStampGridItem *item) {
         // 隐藏（保留拥有关系）
-        [StampRequest.shared hideStamp:item.stamp.stampId success:^(HTTPResponse * _Nullable responseObject) {
+        NSString *sid = item.stamp.stampId ?: @"";
+        if (sid.length == 0) return;
+        [StampRequest.shared hideStamp:sid success:^(HTTPResponse * _Nullable responseObject) {
             [weakSelf loadStampCollection];
         } failure:^(NSError * _Nonnull error) {
             [QMUITips showError:[weakSelf stampErrorMessage:error]];

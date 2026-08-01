@@ -254,6 +254,8 @@ static UIColor *StampAlbumRarityColor(NSString *rarity) {
 
     self.filterApplied = NO;
     self.selectedFilterIndex = -1;
+    // 复位筛选按钮标题：否则上次选了某分类后标题仍是「XX分类 ▼」，与实际已重置的 filterApplied 状态不符
+    [self.filterButton setTitle:[NSString stringWithFormat:@"%@ ▼", self.filterBaseTitle ?: (NSLocalizedString(@"stamp_album_filter", nil) ?: @"筛选")] forState:UIControlStateNormal];
 }
 
 - (void)buildTopBar {

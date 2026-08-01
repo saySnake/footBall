@@ -1590,7 +1590,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
 - (BOOL)home_isMatchNotYetStartedForDisplay:(Match *)match {
     NSString *st = (match.matchStatus ?: @"").uppercaseString;
     if (st.length > 0) {
-        if ([st containsString:@"LIVE"] || [st containsString:@"IN_PLAY"] || [st containsString:@"1ST"] || [st isEqualToString:@"1H"] || [st isEqualToString:@"2H"] || [st containsString:@"2ND"] || [st containsString:@"ET"] || [st containsString:@"PEN"] || [st isEqualToString:@"HT"] || [st containsString:@"HALF"] || [st containsString:@"中场"] || [st containsString:@"INT"] || [st containsString:@"PAUSE"]) {
+        if ([st containsString:@"LIVE"] || [st containsString:@"IN_PLAY"] || [st containsString:@"1ST"] || [st isEqualToString:@"1H"] || [st isEqualToString:@"2H"] || [st containsString:@"2ND"] || [st isEqualToString:@"ET"] || [st isEqualToString:@"AET"] || [st isEqualToString:@"PEN"] || [st isEqualToString:@"FT_PEN"] || [st isEqualToString:@"PEN_LIVE"] || [st isEqualToString:@"HT"] || [st containsString:@"HALF"] || [st containsString:@"中场"] || [st isEqualToString:@"INT"] || [st containsString:@"PAUSE"]) {
             return NO;
         }
         if ([st containsString:@"FINISH"] || [st containsString:@"COMPLETE"] || [st isEqualToString:@"FT"] || [st containsString:@"ENDED"] || [st containsString:@"AET"] || [st isEqualToString:@"FT_PEN"] || [st containsString:@"PEN_"] || [st containsString:@"已结束"] || [st containsString:@"完赛"] || [st isEqualToString:@"END"] || [st isEqualToString:@"CLOSED"] || [st isEqualToString:@"RESULT"] || [st isEqualToString:@"FIN"]) {

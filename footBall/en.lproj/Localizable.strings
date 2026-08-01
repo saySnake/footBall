@@ -266,11 +266,13 @@
 "add_consume_error_price_invalid" = "Please enter a valid amount";
 "add_consume_upload_fail" = "Photo upload failed";
 "add_consume_image_fail" = "Could not process the image";
+"add_consume_photo_uploading" = "Photo is uploading, please wait before submitting";
 
 /* More Matches */
 "more_pick_time_title" = "Select Time";
 "consume_record_title" = "Consumption Record";
 "consume_record_empty" = "No records yet";
+"consume_item_placeholder" = "Expense";
 
 /* Community */
 "community_title" = "Community";
@@ -308,6 +310,7 @@
 "community_request_expired" = "Expired";
 "community_request_added" = "Added";
 "community_request_sent" = "Sent";
+"community_request_failed" = "Request failed";
 "community_rank_week" = "Weekly";
 "community_rank_month" = "Monthly";
 "community_rank_season" = "Season";
@@ -317,6 +320,7 @@
 "community_qrcode_save_success" = "Saved to Photos";
 "community_qrcode_save_fail" = "Save Failed";
 "team_select_required" = "Please select at least one team";
+"team_selected_title" = "Selected teams";
 
 
 /* Profile */
@@ -338,6 +342,8 @@
 "profile_identity" = "Identity";
 "profile_save" = "Save";
 "profile_save_success" = "Success";
+"profile_save_fail" = "Save failed";
+"profile_avatar_upload_fail" = "Avatar upload failed, please try again";
 "profile_stats_load_failed" = "Failed to load data";
 
 "profile_chip_ultras" = "ULTRAS";
@@ -367,9 +373,16 @@
 "profile_membership_promo" = "Limited-time code";
 "profile_membership_hint" = "Use a limited-time code to unlock member offers.";
 "profile_membership_coming_soon" = "Membership is coming soon.";
+"redeem_code_empty" = "Please enter a redemption code";
+"redeem_code_format_invalid" = "The redemption code format is invalid. Please check and try again.";
 
 /* Identity / Real-name / Professional Auth */
 "auth_identity_title" = "Identity Authentication";
+"auth_identity_professional_title" = "Professional Identity Certification";
+"auth_identity_professional_desc" = "For users with professional identity. E.g.: players, media, sports professionals, etc.";
+"auth_conditions" = "Certification Conditions";
+"auth_both_completed" = "All certifications completed";
+"auth_not_completed" = "Not certified yet";
 "auth_pro_identity_title" = "Professional Identity Certification";
 "auth_pro_identity_desc" = "For users with professional identity. E.g.: players, media, sports professionals, etc.";
 "auth_status_uncertified" = "Not certified";
@@ -380,9 +393,7 @@
 "force_update_title" = "Update required";
 "force_update_message" = "Please update to the latest version to continue.";
 "force_update_button" = "Update now";
-"force_update_title" = "Update required";
-"force_update_message" = "Please update to the latest version to continue.";
-"force_update_button" = "Update now";
+"force_update_no_store_url" = "No update link is configured. Please search for the app on the App Store to update.";
 "auth_conditions_title" = "Certification Conditions";
 "auth_professional_title" = "Professional Certification";
 "auth_professional_desc" = "Certification can increase exposure";
@@ -401,6 +412,10 @@
 "auth_id_back_display" = "Back image";
 "auth_please_upload_both" = "Please upload both front and back ID photos";
 "auth_realname_success" = "Real-name verification submitted";
+"auth_completed" = "Certification completed";
+"auth_realname_front" = "ID front";
+"auth_realname_back" = "ID back";
+"auth_submit" = "Start Certification";
 "auth_professional_nav_title" = "Professional Certification";
 "auth_professional_hint" = "Please complete your professional information";
 "auth_professional_subhint" = "Uploaded information will be saved for 15 days. You can upload certificates directly.";
@@ -449,3 +464,4 @@
 "passport_nav_title_friend" = "Their Passport";
 "passport_suffix" = "'s Passport";
 "stamp_album_suffix" = "'s Stamp Album";
+"stamp_album_friend_title" = "Their Stamp Album";

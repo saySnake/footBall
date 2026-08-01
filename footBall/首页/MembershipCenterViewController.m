@@ -1170,7 +1170,15 @@
         if (status.nearExpiry) {
             self.bannerSubLabel.text = @"即将到期，续费享优惠";
             self.bannerSubLabel.textColor = [UIColor colorWithRed:1.0 green:0.8 blue:0.2 alpha:1.0];
+        } else {
+            // 会员且非临期：必须复位，否则上次「即将到期」的黄色文案会残留
+            self.bannerSubLabel.text = nil;
+            self.bannerSubLabel.textColor = [UIColor clearColor];
         }
+    } else {
+        // 非会员或无有效期：同样复位，避免残留上一次会员态的文案
+        self.bannerSubLabel.text = nil;
+        self.bannerSubLabel.textColor = [UIColor clearColor];
     }
 }
 
@@ -1553,7 +1561,19 @@
 - (void)onTapRedeemDialogConfirm {
     NSString *code = [self normalizedRedeemInput:self.redeemInputField.text];
     self.redeemInputField.text = code;
-    if (![self isRedeemCodeReadyToSubmit:code]) return;
+    if (![self isRedeemCodeReadyToSubmit:code]) {
+        // 长度不符合（邀请码 12 位 / 历史兑换码 5 位）时给用户明确提示，
+        // 而不是静默 return 让用户以为按钮坏了
+        NSString *tip = code.length == 0
+            ? (NSLocalizedString(@"redeem_code_empty", nil) ?: @"请输入兑换码")
+            : (NSLocalizedString(@"redeem_code_format_invalid", nil) ?: @"兑换码格式不正确，请检查后重试");
+        MBProgressHUD *hud = [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+        hud.mode = MBProgressHUDModeText;
+        hud.label.text = tip;
+        hud.removeFromSuperViewOnHide = YES;
+        [hud hideAnimated:YES afterDelay:1.6];
+        return;
+    }
     [self.view endEditing:YES];
 
     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
@@ -1656,9 +1676,12 @@
 }
 
 - (void)updatePayButtonState {
-    BOOL enabled = self.agreementCheckBtn.selected && !self.payInFlight;
-    self.payBtn.enabled = enabled;
-    self.payBtn.alpha = enabled ? 1.0 : 0.55;
+    // 注意：不能把 payBtn.enabled 直接绑死在 agreementCheckBtn.selected 上，
+    // 否则未勾选协议时按钮禁用、收不到 TouchUpInside，onTapPay 开头的
+    // 「请先勾选协议」弹窗就永远走不到。这里只改透明度做视觉提示，点击拦截交给 onTapPay。
+    BOOL visuallyEnabled = self.agreementCheckBtn.selected && !self.payInFlight;
+    self.payBtn.enabled = YES; // 始终可点击，让 onTapPay 能统一处理校验逻辑
+    self.payBtn.alpha = visuallyEnabled ? 1.0 : 0.55;
 }
 
 - (void)onTapPay {

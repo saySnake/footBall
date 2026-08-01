@@ -13,6 +13,7 @@
 #import <math.h>
 #import "ColorManager.h"
 #import <SDWebImage/SDWebImage.h>
+#import <QMUIKit/QMUIKit.h>
 
 /// Figma「我关注的球队」1:9089 页面背景 #f7f7f7
 #define kMyTeamsPageBg     [UIColor colorWithRed:247/255.0 green:247/255.0 blue:247/255.0 alpha:1.0]
@@ -411,6 +412,9 @@ static CGFloat const kMyTeamsGridSideInset = 14.f;
             [weakSelf reloadFollowedTeamsFromAPI];
         } failure:^(NSError * _Nonnull error) {
             [weakSelf reloadFollowedTeamsFromAPI];
+            // 取消关注失败需要提示，否则用户以为已取消但下次进来发现还在
+            NSString *msg = error.localizedDescription.length ? error.localizedDescription : (NSLocalizedString(@"community_request_failed", nil) ?: @"操作失败");
+            [QMUITips showError:msg inView:weakSelf.view hideAfterDelay:2.0];
         }];
     };
     if (isAdd) {

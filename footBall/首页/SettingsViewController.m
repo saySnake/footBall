@@ -89,8 +89,13 @@ static UIColor * SettingsPageBackgroundColor(void) {
     UIView *row1 = [self addRowToCard:self.listCard top:nil icon:@"setting_noti" titleKey:@"settings_notice" showChevron:NO];
     self.noticeSwitch = [UISwitch new];
     self.noticeSwitch.onTintColor = [ColorManager sharedManager].primaryLightColor;
-    self.noticeSwitch.on = YES;
+    // 持久化通知开关状态：默认开启（首次安装），用户切换后记忆选择
+    BOOL noticeOn = [[NSUserDefaults standardUserDefaults] objectForKey:@"settings_notice_enabled"] == nil
+                    ? YES
+                    : [[NSUserDefaults standardUserDefaults] boolForKey:@"settings_notice_enabled"];
+    self.noticeSwitch.on = noticeOn;
     [row1 addSubview:self.noticeSwitch];
+    [self.noticeSwitch addTarget:self action:@selector(onNoticeSwitchChanged:) forControlEvents:UIControlEventValueChanged];
     [self.noticeSwitch mas_makeConstraints:^(MASConstraintMaker *make) {
         make.trailing.equalTo(row1).offset(-16);
         make.centerY.equalTo(row1);
@@ -220,6 +225,16 @@ static UIColor * SettingsPageBackgroundColor(void) {
     [self.navigationController pushViewController:vc animated:YES];
 }
 
+- (void)onNoticeSwitchChanged:(UISwitch *)sender {
+    // 持久化用户选择，下次进入页面恢复
+    [[NSUserDefaults standardUserDefaults] setBool:sender.on forKey:@"settings_notice_enabled"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    // 真正注册/注销远程通知需对接后端推送系统，这里先持久化状态；
+    // 后续接入 push 系统时，根据 sender.on 调用 UIApplication registerForRemoteNotifications / unregister
+    NSString *tip = sender.on ? @"通知已开启" : @"通知已关闭";
+    [QMUITips showInfo:tip inView:self.view hideAfterDelay:1.2];
+}
+
 #pragma mark - Cache
 
 - (void)refreshCacheSizeLabel {
@@ -234,15 +249,9 @@ static UIColor * SettingsPageBackgroundColor(void) {
 
 - (void)calculateTotalCacheSizeWithCompletion:(void(^)(NSUInteger totalBytes))completion {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        __block NSUInteger sdCacheSize = 0;
-        dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-        [[SDImageManager sharedManager] getCacheSizeWithCompletion:^(NSUInteger totalSize) {
-            sdCacheSize = totalSize;
-            dispatch_semaphore_signal(sema);
-        }];
-        dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC));
-
-        NSUInteger urlCacheSize = [[NSURLCache sharedURLCache] currentDiskUsage];
+        // 之前这里还单独算了 sdCacheSize / urlCacheSize，但下方 cachesDirSize 已经把
+        // Caches 目录整体遍历（SDWebImage 磁盘缓存、NSURLCache 磁盘缓存都在该目录下），
+        // 重复计算会让用户看到的缓存数字虚高，故移除。
 
         NSUInteger tmpSize = [self folderSizeAtPath:NSTemporaryDirectory()];
 
@@ -252,7 +261,6 @@ static UIColor * SettingsPageBackgroundColor(void) {
             cachesDirSize = [self folderSizeAtPath:cachePaths.firstObject];
         }
 
-        // cachesDirSize 已包含 SDWebImage 磁盘缓存，避免重复计算
         NSUInteger total = cachesDirSize + tmpSize;
         if (completion) completion(total);
     });

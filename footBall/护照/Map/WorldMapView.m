@@ -334,9 +334,8 @@ static BOOL WMStringLooksLikeISOAlpha2(NSString *s) {
     if (hitGone) {
         return self.goneFillColor;
     }
-    if (hitUngo) {
-        return self.ungoFillColor;
-    }
+    // hitUngo（用户标记「还没去」）和默认（三个清单都不在）目前用同一种浅绿色，
+    // 视觉上无差异；这里保留 hitUngo 判定是为了将来若要区分这两种语义时可单独着色。
     return self.ungoFillColor;
 }
 

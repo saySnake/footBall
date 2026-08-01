@@ -213,6 +213,9 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     if (![weekly isKindOfClass:[NSArray class]] || weekly.count != 7) {
         return nil;
     }
+    // maxV 初始为 1.0 作为下限：当所有值都为 0 或缺失时，避免后续除以 0；
+    // 若有更大值则取实际最大值。因此下方 maxV 必然 > 0，三元 maxV>0 永真，
+    // 直接用 maxV 做除数即可。
     double maxV = 1.0;
     for (NSNumber *n in weekly) {
         double v = fabs(n.doubleValue);
@@ -222,7 +225,7 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     }
     NSMutableArray<NSNumber *> *out = [NSMutableArray arrayWithCapacity:7];
     for (NSNumber *n in weekly) {
-        double ratio = maxV > 0 ? (n.doubleValue / maxV) : 0;
+        double ratio = n.doubleValue / maxV;
         NSInteger scaled = (NSInteger)llround(MAX(0, MIN(100, ratio * 100.0)));
         [out addObject:@(scaled)];
     }
@@ -503,9 +506,10 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
     m.positionForwardLabel = NSLocalizedString(@"passport_coverage_stadium", nil) ?: @"我去过的\n球场";
     m.positionMidfieldLabel = NSLocalizedString(@"passport_coverage_city", nil) ?: @"我去过的\n城市";
     m.positionDefenderLabel = NSLocalizedString(@"passport_coverage_country", nil) ?: @"我去过的\n国家";
-    m.positionForward = passport ? passport.yearStadiumCount : 0;
-    m.positionMidfield = passport ? passport.yearCityCount : 0;
-    m.positionDefender = passport ? passport.yearCountryCount : 0;
+    // 后端脏数据可能返回负数，展示时用 MAX(0, …) 兜底，避免 UI 出现 "-3 个球场"
+    m.positionForward = MAX(0, passport ? passport.yearStadiumCount : 0);
+    m.positionMidfield = MAX(0, passport ? passport.yearCityCount : 0);
+    m.positionDefender = MAX(0, passport ? passport.yearCountryCount : 0);
 
     //线下观赛数据 ability：看台类型分布 standDist → 柱状条目；平均层数 averageFloor
     m.abilitySectionTitle = NSLocalizedString(@"passport_ability_detail", nil) ?: @"线下观赛数据观";

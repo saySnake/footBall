@@ -302,7 +302,10 @@ static void kConsumeSetLabelLineHeight(UILabel *label, CGFloat lineHeight) {
 - (NSString *)displayAmountForExpense:(PNExpense *)e {
     id v = e.amount;
     if ([v isKindOfClass:[NSNumber class]]) {
-        return [NSString stringWithFormat:@"-%0.2f", [(NSNumber *)v doubleValue]];
+        double dv = [(NSNumber *)v doubleValue];
+        // 统一与字符串分支一致：已为负直接显示，否则补负号（消费记录语义为支出）
+        return dv < 0 ? [NSString stringWithFormat:@"%0.2f", dv]
+                      : [NSString stringWithFormat:@"-%0.2f", dv];
     }
     if ([v isKindOfClass:[NSString class]]) {
         NSString *s = [(NSString *)v stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];

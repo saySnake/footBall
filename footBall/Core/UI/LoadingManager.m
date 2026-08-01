@@ -12,7 +12,9 @@
 
 @interface LoadingManager ()
 
-@property (nonatomic, strong) NSMutableDictionary<NSValue *, MBProgressHUD *> *hudCache; // 缓存 HUD 实例
+// 用 NSMapTable 弱引用 view 作 key：view dealloc 时条目自动失效，避免 dangling 残留；
+// 同时也避免循环引用（HUD 强持有 view，cache 再强持有 view 会形成 cache↔view 环）。
+@property (nonatomic, strong) NSMapTable<UIView *, MBProgressHUD *> *hudCache;
 
 @end
 
@@ -30,39 +32,33 @@
 - (instancetype)init {
     self = [super init];
     if (self) {
-        _hudCache = [NSMutableDictionary dictionary];
+        // keyOptions 弱引用、valueOptions 强引用：HUD 由 cache 持有，view dealloc 后条目自动清理
+        _hudCache = [NSMapTable mapTableWithKeyOptions:NSPointerFunctionsWeakMemory valueOptions:NSPointerFunctionsStrongMemory];
     }
     return self;
 }
 
 #pragma mark - Private Methods
 
-/// 获取视图的 key（用于缓存）
-- (NSValue *)keyForView:(UIView *)view {
-    return [NSValue valueWithNonretainedObject:view];
-}
-
 /// 获取或创建 HUD
 - (MBProgressHUD *)hudForView:(UIView *)view {
-    NSValue *key = [self keyForView:view];
-    MBProgressHUD *hud = self.hudCache[key];
-    
+    MBProgressHUD *hud = [self.hudCache objectForKey:view];
+
     if (!hud) {
         hud = [MBProgressHUD showHUDAddedTo:view animated:YES];
-        self.hudCache[key] = hud;
+        [self.hudCache setObject:hud forKey:view];
     }
-    
+
     return hud;
 }
 
 /// 移除 HUD
 - (void)removeHudForView:(UIView *)view {
-    NSValue *key = [self keyForView:view];
-    MBProgressHUD *hud = self.hudCache[key];
-    
+    MBProgressHUD *hud = [self.hudCache objectForKey:view];
+
     if (hud) {
         [hud hideAnimated:YES];
-        [self.hudCache removeObjectForKey:key];
+        [self.hudCache removeObjectForKey:view];
     }
 }
 
@@ -117,9 +113,10 @@
 }
 
 - (void)hideAllLoading {
-    NSArray *keys = [self.hudCache.allKeys copy];
-    for (NSValue *key in keys) {
-        MBProgressHUD *hud = self.hudCache[key];
+    // NSMapTable 用 keyEnumerator 遍历所有 key（UIView *），逐个移除 HUD
+    NSEnumerator<UIView *> *keys = [self.hudCache keyEnumerator];
+    for (UIView *key in keys) {
+        MBProgressHUD *hud = [self.hudCache objectForKey:key];
         [hud hideAnimated:YES];
     }
     [self.hudCache removeAllObjects];

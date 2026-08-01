@@ -25,30 +25,21 @@ static NSString * const kProfessionalImagesKey = @"auth_professional_images";
 }
 
 + (void)saveRealNameFrontImage:(UIImage *)front backImage:(UIImage *)back {
-    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-    if (front) {
-        NSData *data = UIImageJPEGRepresentation(front, 0.7);
-        [ud setObject:data forKey:kRealNameFrontKey];
-    } else {
-        [ud removeObjectForKey:kRealNameFrontKey];
-    }
-    if (back) {
-        NSData *data = UIImageJPEGRepresentation(back, 0.7);
-        [ud setObject:data forKey:kRealNameBackKey];
-    } else {
-        [ud removeObjectForKey:kRealNameBackKey];
-    }
-    [ud synchronize];
+    // ⚠️ 安全：身份证正反面属于敏感个人信息，禁止写入 NSUserDefaults（会被 iTunes/iCloud 备份、无加密）。
+    // 当前全工程无任何调用方读取这两个方法（realNameFrontImage/realNameBackImage 也无调用），
+    // 因此这里直接 no-op，避免误用造成隐私泄露。如未来需要本地缓存身份证图片，
+    // 请改用 Keychain（少量）/ 加密文件（Library/Application Support，并设置 NSURLIsExcludedFromBackupKey）。
+    (void)front;
+    (void)back;
 }
 
 + (UIImage *)realNameFrontImage {
-    NSData *data = [[NSUserDefaults standardUserDefaults] objectForKey:kRealNameFrontKey];
-    return data && [data isKindOfClass:[NSData class]] ? [UIImage imageWithData:(NSData *)data] : nil;
+    // 见 saveRealNameFrontImage: 的说明：已停止持久化，恒返回 nil
+    return nil;
 }
 
 + (UIImage *)realNameBackImage {
-    NSData *data = [[NSUserDefaults standardUserDefaults] objectForKey:kRealNameBackKey];
-    return data && [data isKindOfClass:[NSData class]] ? [UIImage imageWithData:(NSData *)data] : nil;
+    return nil;
 }
 
 #pragma mark - 职业认证
@@ -63,31 +54,13 @@ static NSString * const kProfessionalImagesKey = @"auth_professional_images";
 }
 
 + (void)saveProfessionalImages:(NSArray<UIImage *> *)images {
-    if (!images.count) {
-        [[NSUserDefaults standardUserDefaults] removeObjectForKey:kProfessionalImagesKey];
-        [[NSUserDefaults standardUserDefaults] synchronize];
-        return;
-    }
-    NSMutableArray<NSData *> *arr = [NSMutableArray array];
-    for (UIImage *img in images) {
-        NSData *data = UIImageJPEGRepresentation(img, 0.7);
-        if (data) [arr addObject:data];
-    }
-    [[NSUserDefaults standardUserDefaults] setObject:arr forKey:kProfessionalImagesKey];
-    [[NSUserDefaults standardUserDefaults] synchronize];
+    // ⚠️ 安全：职业认证图片同样属于敏感信息，禁止写入 NSUserDefaults。
+    // 当前全工程无调用方读取（professionalImages 无调用），直接 no-op。
+    (void)images;
 }
 
 + (NSArray<UIImage *> *)professionalImages {
-    id obj = [[NSUserDefaults standardUserDefaults] objectForKey:kProfessionalImagesKey];
-    if (![obj isKindOfClass:[NSArray class]]) return @[];
-    NSMutableArray<UIImage *> *result = [NSMutableArray array];
-    for (id item in (NSArray *)obj) {
-        if ([item isKindOfClass:[NSData class]]) {
-            UIImage *img = [UIImage imageWithData:(NSData *)item];
-            if (img) [result addObject:img];
-        }
-    }
-    return [result copy];
+    return @[];
 }
 
 @end

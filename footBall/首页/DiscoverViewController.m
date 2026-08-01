@@ -780,9 +780,8 @@ typedef NS_ENUM(NSInteger, DiscoverVerifiedPillStyle) {
         NSString *norm = DiscoverNormalizedRecordStatus(@{ @"verificationStatus": m.verificationStatus ?: @"" });
         if ([norm isEqualToString:@"REJECTED"] || [norm isEqualToString:@"UNVERIFIED"]) {
             m.hasPendingVerification = NO;
-            if (![norm isEqualToString:@"VERIFIED"]) {
-                m.hasVerified = NO;
-            }
+            // 外层已限定 norm ∈ {REJECTED, UNVERIFIED}，这里必然不是 VERIFIED
+            m.hasVerified = NO;
             m.needsReverify = ([norm isEqualToString:@"REJECTED"] || (m.hasInputInfo && [norm isEqualToString:@"UNVERIFIED"]));
         } else if ([norm isEqualToString:@"PENDING"]) {
             m.hasPendingVerification = YES;
@@ -1721,7 +1720,6 @@ typedef NS_ENUM(NSInteger, DiscoverVerifiedPillStyle) {
 
     dispatch_group_t grp = dispatch_group_create();
     NSMutableSet<NSString *> *verifiedMatchIds = [NSMutableSet set];
-    NSMutableDictionary<NSString *, NSNumber *> *durationByMatchId = [NSMutableDictionary dictionary];
 
     void (^processRows)(NSArray<NSDictionary *> *) = ^(NSArray<NSDictionary *> *rows) {
         for (id item in rows) {
@@ -2149,9 +2147,9 @@ typedef NS_ENUM(NSInteger, DiscoverVerifiedPillStyle) {
         match.verifiedText = (NSLocalizedString(@"auth_cert_status_pending", nil) ?: @"待审核");
         [weakSelf.tableView reloadData];
         [weakSelf saveDiscoverOfflineCache];
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [weakSelf loadRemoteDataForceRefresh:YES];
-        });
+        // 不立即触发 loadRemoteDataForceRefresh：服务端此刻多半还没处理完提交，
+        // 立即回源会用 UNVERIFIED 状态覆盖刚设置的「待审核」乐观态，造成"红色重新认证"闪一下，
+        // 用户会误以为提交失败重复点击。下次 viewWillAppear / 下拉刷新自然会拉到最新状态。
     };
     [self presentViewController:vc animated:NO completion:nil];
 }

@@ -479,7 +479,11 @@ static CGSize kPAGridCellSizeForGridWidth(CGFloat gridWidth) {
     __block void (^uploadNext)(NSUInteger);
     uploadNext = ^(NSUInteger idx) {
         __strong typeof(weakSelf) self = weakSelf;
-        if (!self) return;
+        if (!self) {
+            // self 已释放，打断递归 block 的自循环引用，释放闭包
+            uploadNext = nil;
+            return;
+        }
         if (idx >= self.uploadedImages.count) {
             [[VerificationRequest shared] submitProfessionalWithImageUrls:[urls copy] success:^(HTTPResponse * _Nullable responseObject) {
                 __strong typeof(weakSelf) self2 = weakSelf;
@@ -502,32 +506,52 @@ static CGSize kPAGridCellSizeForGridWidth(CGFloat gridWidth) {
                 [self2 hideLoading];
                 [self2 showError:error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"profile_save_fail", nil)];
             }];
+            // 任务全部完成，打断递归 block 的自循环引用
+            uploadNext = nil;
             return;
         }
         UIImage *img = self.uploadedImages[idx];
-        NSData *jpeg = UIImageJPEGRepresentation(img, 0.85);
-        if (jpeg.length == 0) {
-            [self hideLoading];
-            [self showError:NSLocalizedString(@"auth_please_upload_work_cert", nil)];
-            return;
-        }
-        [[FileRequest shared] uploadImage:jpeg type:ImageObjectTypeProfessional success:^(HTTPResponse * _Nullable resp) {
-            NSString *url = [resp.dataObject isKindOfClass:[NSString class]] ? resp.dataObject : nil;
-            if (url.length == 0) {
-                __strong typeof(weakSelf) self2 = weakSelf;
-                if (!self2) return;
-                [self2 hideLoading];
-                [self2 showError:NSLocalizedString(@"auth_please_upload_work_cert", nil)];
+        // JPEG 编码是 CPU 密集型，放主线程会卡顿；派发到后台队列
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+            NSData *jpeg = UIImageJPEGRepresentation(img, 0.85);
+            __strong typeof(weakSelf) self2 = weakSelf;
+            if (!self2) {
                 return;
             }
-            [urls addObject:url];
-            uploadNext(idx + 1);
-        } failure:^(NSError * _Nonnull error) {
-            __strong typeof(weakSelf) self2 = weakSelf;
-            if (!self2) return;
-            [self2 hideLoading];
-            [self2 showError:error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"profile_save_fail", nil)];
-        }];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (jpeg.length == 0) {
+                    [self2 hideLoading];
+                    [self2 showError:NSLocalizedString(@"auth_please_upload_work_cert", nil)];
+                    uploadNext = nil;
+                    return;
+                }
+                [[FileRequest shared] uploadImage:jpeg type:ImageObjectTypeProfessional success:^(HTTPResponse * _Nullable resp) {
+                    NSString *url = [resp.dataObject isKindOfClass:[NSString class]] ? resp.dataObject : nil;
+                    if (url.length == 0) {
+                        __strong typeof(weakSelf) self3 = weakSelf;
+                        if (!self3) {
+                            uploadNext = nil;
+                            return;
+                        }
+                        [self3 hideLoading];
+                        [self3 showError:NSLocalizedString(@"auth_please_upload_work_cert", nil)];
+                        uploadNext = nil;
+                        return;
+                    }
+                    [urls addObject:url];
+                    uploadNext(idx + 1);
+                } failure:^(NSError * _Nonnull error) {
+                    __strong typeof(weakSelf) self3 = weakSelf;
+                    if (!self3) {
+                        uploadNext = nil;
+                        return;
+                    }
+                    [self3 hideLoading];
+                    [self3 showError:error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"profile_save_fail", nil)];
+                    uploadNext = nil;
+                }];
+            });
+        });
     };
     uploadNext(0);
 }

@@ -241,7 +241,9 @@
 }
 
 - (void)cacheMessage:(id)message {
-    if (self.cachedMessages.count >= self.maxCachedMessages) {
+    // maxCachedMessages 可被外部设为 0：此时直接丢弃所有消息（不缓存）
+    if (self.maxCachedMessages <= 0) return;
+    while (self.cachedMessages.count >= self.maxCachedMessages && self.cachedMessages.count > 0) {
         [self.cachedMessages removeObjectAtIndex:0];
     }
     [self.cachedMessages addObject:message];

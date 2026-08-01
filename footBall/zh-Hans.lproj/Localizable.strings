@@ -266,11 +266,13 @@
 "add_consume_error_price_invalid" = "请输入有效金额";
 "add_consume_upload_fail" = "图片上传失败";
 "add_consume_image_fail" = "图片处理失败";
+"add_consume_photo_uploading" = "图片上传中，请稍候再提交";
 
 /* More Matches */
 "more_pick_time_title" = "选择时间";
 "consume_record_title" = "消费记录";
 "consume_record_empty" = "暂无消费记录";
+"consume_item_placeholder" = "消费标题";
 
 /* Community */
 "community_title" = "社区";
@@ -308,6 +310,7 @@
 "community_request_expired" = "已过期";
 "community_request_added" = "已添加";
 "community_request_sent" = "已发送";
+"community_request_failed" = "操作失败";
 "community_rank_week" = "周榜";
 "community_rank_month" = "月榜";
 "community_rank_season" = "赛季榜";
@@ -317,6 +320,7 @@
 "community_qrcode_save_success" = "已保存到相册";
 "community_qrcode_save_fail" = "保存失败";
 "team_select_required" = "请至少选择一个喜欢的球队";
+"team_selected_title" = "已经选的球队";
 
 
 /* Profile */
@@ -338,6 +342,8 @@
 "profile_identity" = "身份";
 "profile_save" = "保存";
 "profile_save_success" = "成功";
+"profile_save_fail" = "保存失败";
+"profile_avatar_upload_fail" = "头像上传失败，请重试";
 "profile_stats_load_failed" = "数据加载失败";
 
 "profile_chip_ultras" = "ULTRAS球迷";
@@ -367,6 +373,8 @@
 "profile_membership_promo" = "限时兑换码";
 "profile_membership_hint" = "使用限时兑换码，解锁专属会员优惠";
 "profile_membership_coming_soon" = "会员功能即将开放，敬请期待";
+"redeem_code_empty" = "请输入兑换码";
+"redeem_code_format_invalid" = "兑换码格式不正确，请检查后重试";
 
 /* Identity / Real-name / Professional Auth */
 "auth_identity_title" = "认证身份";
@@ -385,6 +393,7 @@
 "force_update_title" = "版本更新";
 "force_update_message" = "当前版本过低，请更新到最新版本后继续使用。";
 "force_update_button" = "立即更新";
+"force_update_no_store_url" = "暂未配置更新地址，请前往 App Store 搜索更新";
 "auth_conditions_title" = "认证条件";
 "auth_professional_title" = "职业认证";
 "auth_professional_desc" = "认证可加速曝光度";
@@ -455,3 +464,4 @@
 "passport_nav_title_friend" = "TA的护照";
 "passport_suffix" = "的护照";
 "stamp_album_suffix" = "的邮票夹";
+"stamp_album_friend_title" = "TA的邮票夹";

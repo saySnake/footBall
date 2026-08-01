@@ -57,12 +57,12 @@ static NSString *const kCurrentUserKey = @"AuthManager_CurrentUser";
     }
     [[APIManager sharedManager] POST:APIPathValueSendCode parameters:@{@"phone":phone} headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            success(responseObject);
+            if (success) success(responseObject);
         } else {
-            failure([APIError errorWithResponse:responseObject]);
+            if (failure) failure([APIError errorWithResponse:responseObject]);
         }
     } failure:^(NSError * _Nonnull error) {
-        failure(error);
+        if (failure) failure(error);
     }];
     
 }

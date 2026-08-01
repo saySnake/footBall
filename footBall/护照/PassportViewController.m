@@ -546,11 +546,11 @@ static UIColor *PassportPageBg(void) {
     if (self.passportLoadFailed || !self.viewModel) {
         return 168;
     }
-    // DarkStatsCardCell 使用叠压布局（负间距），某些系统版本 AutomaticDimension 计算会偏小甚至为 0，直接给固定高度更稳
+    // GrowthBannerCell（row 1）固定高度；DarkStatsCardCell（row 0）走 AutomaticDimension
     if (indexPath.row == 1) {
         return 197;
     }
-    // BarChartCardCell 设计稿固定高度
+    // BarChartCardCell（row 2）设计稿固定高度
     if (indexPath.row == 2) {
         return 343;
     }

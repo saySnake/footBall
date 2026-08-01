@@ -128,7 +128,14 @@ static NSString * const kEndName = @"loading_1";
         self.isLoadingPagFiles = NO;
         return;
     }
-    
+
+    // 两个 PAG 都没加载成功时，不要标记 pagFilesLoaded=YES，
+    // 否则 loadPagFilesAsync 的早退守卫会永远阻止重试，刷新动画永久失效
+    if (!beginFile && !endFile) {
+        self.isLoadingPagFiles = NO;
+        return;
+    }
+
     self.beginPagFile = beginFile;
     self.endPagFile = endFile;
     self.pagFilesLoaded = YES;

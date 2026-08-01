@@ -273,6 +273,8 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
 @property (nonatomic, strong) NSArray<PNFriend *> *searchCandidates;
 @property (nonatomic, strong) NSArray<PNFriend *> *filteredSearchResults;
 @property (nonatomic, assign) BOOL isSearching;
+// 正在处理中的好友请求 requestId 集合，防止用户连点同一行触发重复同意/拒绝
+@property (nonatomic, strong) NSMutableSet<NSString *> *inFlightRequestIds;
 @end
 
 @implementation NewFriendRequestsViewController
@@ -307,6 +309,9 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     }
     self.recentRequests = recent;
     self.olderRequests = older;
+    if (!self.inFlightRequestIds) {
+        self.inFlightRequestIds = [NSMutableSet set];
+    }
 }
 
 - (NSDate *)dateFromFriendAPIString:(NSString *)s {
@@ -333,11 +338,12 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
 
 - (void)viewDidLoad {
     self.hidesBottomBarWhenPushed = YES;
-    [self loadRemoteData];
     [super viewDidLoad];
     self.view.backgroundColor = kRequestPageBg;
     self.shouldShowNavigationBar = NO;
     // 勿再次调用 setupUI / updateLocalizedStrings：QMBaseViewController.viewDidLoad 已调用，重复会导致头部与列表叠两层
+    // 数据加载放在 super viewDidLoad 之后：保证 UI 基础结构已就绪，回调里访问 self.view/子视图更安全
+    [self loadRemoteData];
 }
 
 - (void)loadRemoteData {
@@ -601,10 +607,16 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     if (row < 0 || row >= (NSInteger)arr.count) return;
     PNFriendRequest *request = arr[row];
     if ([self statusForFriendRequest:request] != FriendRequestStatusPending) return;
+    // 防连点：同一 requestId 正在处理中则忽略后续点击
+    NSString *rid = request.requestId ?: @"";
+    if (rid.length == 0) return;
+    if ([self.inFlightRequestIds containsObject:rid]) return;
+    [self.inFlightRequestIds addObject:rid];
     __weak typeof(self) weakSelf = self;
     [SocialRequest.shared processFriendRequest:request.requestId accept:accept success:^(HTTPResponse * _Nullable responseObject) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
+        [self.inFlightRequestIds removeObject:rid];
         if (accept) {
             [[NSNotificationCenter defaultCenter] postNotificationName:kCommunityFriendsDidChangeNotification object:nil];
         }
@@ -613,6 +625,7 @@ typedef NS_ENUM(NSInteger, FriendRequestStatus) {
     } failure:^(NSError * _Nonnull error) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
+        [self.inFlightRequestIds removeObject:rid];
         NSString *msg = error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"community_search_failed", nil);
         [self showError:msg];
     }];

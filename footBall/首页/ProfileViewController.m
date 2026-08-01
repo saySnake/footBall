@@ -9,7 +9,7 @@
 #import "SettingsViewController.h"
 #import "MyTeamsViewController.h"
 #import "MembershipCenterViewController.h"
-#import "ProfileTeamsStore.h"
+#import "ProfileTeamsStore.h"  // 提供 ProfileTeamItem 类型定义（cell configureWithTeam: 需要）
 #import "AuthManager.h"
 #import "User.h"
 #import "UserRequest.h"
@@ -170,6 +170,8 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
 @property (nonatomic, strong) NSArray<Team *> *apiFollowedTeams;
 
 @property (nonatomic, strong) NSArray<UIControl *> *menuControls;
+// 个人页远程数据加载节流：记录上次加载时间，避免 tab 切换时重复打接口
+@property (nonatomic, assign) NSTimeInterval lastProfileLoadTime;
 @end
 
 @implementation ProfileViewController
@@ -253,6 +255,18 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
         self.apiFollowedTeams = @[];
         [self updateTeamsCardUI];
         return;
+    }
+
+    // 节流：非主动刷新时，若距上次加载不足 30 秒则跳过，避免 tab 来回切换时重复打 5 个接口
+    static NSTimeInterval const kProfileLoadMinInterval = 30.0;
+    if (!forceRefresh) {
+        NSTimeInterval now = [NSDate date].timeIntervalSince1970;
+        if (self.lastProfileLoadTime > 0 && (now - self.lastProfileLoadTime) < kProfileLoadMinInterval) {
+            return;
+        }
+        self.lastProfileLoadTime = now;
+    } else {
+        self.lastProfileLoadTime = [NSDate date].timeIntervalSince1970;
     }
 
     __weak typeof(self) weakSelf = self;

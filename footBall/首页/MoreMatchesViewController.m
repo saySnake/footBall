@@ -549,7 +549,12 @@ static NSInteger const kMoreMatchesPageSize = 50;
         if (append) {
             [self.tableView.mj_footer endRefreshing];
         } else {
+            // 首屏失败：matches / footer / 分页游标都要复位到初始态，
+            // 否则下次下拉刷新时 currentPage 还是 1（虽然恰好对）、hasMore 还是 YES，
+            // 但 matches 已空却仍可能因为之前状态残留导致 footer 行为异常。
             [self.matches removeAllObjects];
+            self.currentPage = 1;
+            self.hasMore = YES;
             [self.tableView reloadData];
             self.tableView.mj_footer.hidden = YES;
         }
