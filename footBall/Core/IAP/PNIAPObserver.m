@@ -111,8 +111,10 @@
         NSLog(@"[IAP] 兜底事务上报成功: txnId=%@", transactionId);
         [[NSNotificationCenter defaultCenter] postNotificationName:@"PNMembershipDidChangeNotification" object:nil];
     } failure:^(NSError * _Nonnull error) {
-        // 上报失败：保留事务不 finish，下次 App 启动 / 进入会员中心会再次尝试。
-        NSLog(@"[IAP] 兜底事务上报失败（保留待重试）: txnId=%@ err=%@", transactionId, error);
+        // 上报失败：仍 finish 事务防止队列堆积（堆积超 Apple 阈值后 StoreKit 拒绝新支付）。
+        // 详细日志保留供客服对账兜底；用户下次进入会员中心可手动重试 restore。
+        [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
+        NSLog(@"[IAP][严重] 兜底事务上报失败已 finish，请人工对账: txnId=%@, err=%@", transactionId, error);
     }];
 }
 

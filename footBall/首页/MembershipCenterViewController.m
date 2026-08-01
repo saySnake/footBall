@@ -8,6 +8,7 @@
 #import <SDWebImage/SDWebImage.h>
 #import <math.h>
 #import <StoreKit/StoreKit.h>
+#import <SafariServices/SafariServices.h>
 #import "AuthManager.h"
 #import "FontManager.h"
 #import "MembershipRequest.h"
@@ -22,6 +23,12 @@
 #define kMCMintBorder [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:0.90]
 #define kMCDiscountMint [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0]
 #define kMCDiscountHintGray [UIColor colorWithRed:203/255.0 green:203/255.0 blue:203/255.0 alpha:1.0]
+
+/// 订阅 / 隐私政策跳转 URL（App Store 审核要求自动续期订阅必须在购买页面提供可点击的条款链接）。
+/// TODO: 上架前替换为公司正式 URL（建议 OSS 静态页或官网聚合页）。
+static NSString *const kMCMembershipAgreementURL = @"https://passnomad.oss-cn-beijing.aliyuncs.com/agreement/membership.html";
+static NSString *const kMCPrivacyPolicyURL      = @"https://passnomad.oss-cn-beijing.aliyuncs.com/agreement/privacy.html";
+static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-beijing.aliyuncs.com/agreement/auto-renew.html";
 
 @interface MCPlan : NSObject
 @property (nonatomic, copy) NSString *title;
@@ -72,7 +79,7 @@
 
 @property (nonatomic, strong) UIButton *payBtn;
 @property (nonatomic, strong) UIButton *agreementCheckBtn;
-@property (nonatomic, strong) UILabel *agreementLabel;
+@property (nonatomic, strong) UITextView *agreementLabel;
 /// 恢复购买按钮（Apple 审核要求：非消耗型/订阅类应用必须提供 Restore 入口）
 @property (nonatomic, strong) UIButton *restoreBtn;
 
@@ -667,14 +674,28 @@
         make.size.mas_equalTo(CGSizeMake(14, 14));
     }];
 
-    self.agreementLabel = [UILabel new];
+    self.agreementLabel = [[UITextView alloc] init];
+    self.agreementLabel.editable = NO;
+    self.agreementLabel.selectable = YES;            // 链接可点必须 selectable
+    self.agreementLabel.scrollEnabled = NO;          // 自适应高度
+    self.agreementLabel.userInteractionEnabled = YES;
+    self.agreementLabel.backgroundColor = [UIColor clearColor];
+    self.agreementLabel.textContainerInset = UIEdgeInsetsZero;
+    self.agreementLabel.textContainer.lineFragmentPadding = 0;
     self.agreementLabel.font = [UIFont systemFontOfSize:10];
     self.agreementLabel.textColor = [UIColor colorWithWhite:0.93 alpha:1.0];
     self.agreementLabel.attributedText = [self agreementAttrText];
+    self.agreementLabel.linkTextAttributes = @{
+        NSForegroundColorAttributeName: [UIColor colorWithRed:24/255.0 green:115/255.0 blue:1 alpha:1],
+        NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle)
+    };
+    // 拦截 UITextView 默认用外链浏览器打开的行为，改为应用内 SFSafariViewController 打开
+    self.agreementLabel.delegate = self;
     [self.view addSubview:self.agreementLabel];
     [self.agreementLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(self.agreementCheckBtn.mas_trailing).offset(6);
         make.centerY.equalTo(self.agreementCheckBtn);
+        make.trailing.equalTo(self.view).offset(-16);
     }];
 
     self.agreementCheckBtn.selected = NO;
@@ -1335,16 +1356,49 @@
 }
 
 - (NSAttributedString *)agreementAttrText {
-    NSString *all = @"开通前阅读并同意《会员服务协议》";
+    NSString *prefix = @"开通前阅读并同意 ";
+    NSString *agreementText = @"《会员服务协议》";
+    NSString *privacyText   = @"《隐私政策》";
+    NSString *autoRenewText = @"《自动续期条款》";
+    NSString *suffix = @"\n付款：会员到期后 24 小时内自动续期，可随时在「设置-Apple ID-订阅」中取消。";
+    NSString *all = [NSString stringWithFormat:@"%@%@、%@、%@%@", prefix, agreementText, privacyText, autoRenewText, suffix];
+
     NSMutableAttributedString *m = [[NSMutableAttributedString alloc] initWithString:all attributes:@{
         NSForegroundColorAttributeName: [UIColor colorWithWhite:0.93 alpha:1.0],
         NSFontAttributeName: [UIFont systemFontOfSize:10 weight:UIFontWeightMedium]
     }];
-    NSRange r = [all rangeOfString:@"《会员服务协议》"];
-    if (r.location != NSNotFound) {
-        [m addAttribute:NSForegroundColorAttributeName value:[UIColor colorWithRed:24/255.0 green:115/255.0 blue:1 alpha:1] range:r];
+
+    // 三个链接统一高亮色 + 下划线，并打上 NSLinkAttributeName 标记。
+    // UITextView 原生识别 NSLinkAttributeName，点击即可跳转，不需要手动算命中。
+    NSDictionary *linkAttrs = @{
+        NSForegroundColorAttributeName: [UIColor colorWithRed:24/255.0 green:115/255.0 blue:1 alpha:1],
+        NSFontAttributeName: [UIFont systemFontOfSize:10 weight:UIFontWeightMedium],
+        NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle)
+    };
+    NSRange rAgreement = [all rangeOfString:agreementText];
+    NSRange rPrivacy   = [all rangeOfString:privacyText];
+    NSRange rAutoRenew = [all rangeOfString:autoRenewText];
+    if (rAgreement.location != NSNotFound) {
+        [m addAttributes:linkAttrs range:rAgreement];
+        [m addAttribute:NSLinkAttributeName value:kMCMembershipAgreementURL range:rAgreement];
+    }
+    if (rPrivacy.location != NSNotFound) {
+        [m addAttributes:linkAttrs range:rPrivacy];
+        [m addAttribute:NSLinkAttributeName value:kMCPrivacyPolicyURL range:rPrivacy];
+    }
+    if (rAutoRenew.location != NSNotFound) {
+        [m addAttributes:linkAttrs range:rAutoRenew];
+        [m addAttribute:NSLinkAttributeName value:kCAutoRenewTermsURL range:rAutoRenew];
     }
     return m;
+}
+
+/// 统一的应用内网页打开入口（SFSafariViewController）
+- (void)openAgreementURL:(NSURL *)url {
+    if (![url isKindOfClass:[NSURL class]] || !url.absoluteString.length) return;
+    SFSafariViewController *safari = [[SFSafariViewController alloc] initWithURL:url];
+    safari.preferredControlTintColor = [UIColor colorWithRed:24/255.0 green:115/255.0 blue:1 alpha:1];
+    [self presentViewController:safari animated:YES completion:nil];
 }
 
 - (void)buildPlanData {
@@ -1944,6 +1998,11 @@
                     // 支付失败必须重置 payInFlight，否则用户再次点击支付会被 onTapPay 的
                     // 防连点拦截，导致本次会话永远无法再次发起购买（必须重启 App）。
                     self.payInFlight = NO;
+                    // 清理本次购买上下文（兑换码 / 折扣商品 ID），避免下次普通购买时
+                    // 误带 redeemCode 导致服务端走兑换码激活分支，用错的兑换码激活会员。
+                    self.pendingPlanId = nil;
+                    self.pendingRedeemCode = nil;
+                    self.hasAppliedRedeemDiscount = NO;
                     [self updatePayButtonState]; // 同步恢复侧滑返回手势
                     if (transaction.error.code == SKErrorPaymentCancelled) {
                         [[LoadingManager sharedManager] showError:@"支付已取消，可重试" inView:self.view];
@@ -1979,6 +2038,12 @@
     // 验证失败时降级解析 signedTransaction。
     // 注意：此值是 base64 编码的整本收据（PKCS#7 container），不是 StoreKit 2 的 JWS。
     // 服务端若开启 JWS_FALLBACK 强校验，需要走 Server API 主路径（依赖 .p8 配置）。
+    //
+    // 超时设计：当前依赖 APIManager 全局 timeoutInterval，未为 verifyPurchase 单独设置更短超时。
+    // 原因：(1) APIManager 不支持 per-request timeout，临时切全局值会有并发安全问题；
+    //       (2) Apple Server API v2 在国内偶发慢响应，但通常 < 15s；
+    //       (3) 失败分支已 finish 事务并记详细日志（不会卡队列），用户等 30s 后看到提示可接受。
+    // 后续若优化可改 APIManager 支持 per-request timeout，或在失败分支走本地落库对账。
     NSString *signedTransaction = [self currentReceiptBase64];
 
     NSString *planId = self.pendingPlanId ?: @"";
@@ -2023,8 +2088,13 @@
             [weakSelf presentViewController:alert animated:YES completion:nil];
         });
     } failure:^(NSError * _Nonnull error) {
-        // 服务端验证失败：不 finish 事务，保留收据，下次启动可重试。
-        // 这里清理本地支付状态（payInFlight），否则用户再点支付会被拦截。
+        // 服务端验证失败处理策略：
+        // - 仍要 finish 事务：保留事务不 finish 会让 StoreKit 队列堆积（Apple 阈值约 50 笔），
+        //   一旦超限所有新支付都会被 StoreKit 拒绝。改为 finish + 详细日志，由客服对账兜底。
+        // - 清理本地支付状态（payInFlight），否则用户再点支付会被拦截。
+        [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
+        NSLog(@"[IAP][严重] 购买验证失败已 finish，请人工对账: txnId=%@, planId=%@, err=%@",
+              transaction.transactionIdentifier ?: @"", weakSelf.pendingPlanId ?: @"", error);
         dispatch_async(dispatch_get_main_queue(), ^{
             [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
             weakSelf.payInFlight = NO;
