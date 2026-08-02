@@ -127,10 +127,10 @@
     // iOS 13/14 或 SK2 未命中：退回 SK1 整本收据 base64。
     if ([PNIAPSK2Bridge isAvailable] && transactionId.length > 0) {
         [PNIAPSK2Bridge currentJWSForTransactionId:transactionId completion:^(PNIAPSK2Result * _Nullable result) {
-            NSString *signed = result.jwsRepresentation.length > 0
+            NSString *signedTxn = result.jwsRepresentation.length > 0
                 ? result.jwsRepresentation
                 : [self sk1ReceiptBase64];
-            submitWithBody(@{ @"signedTransaction": signed ?: @"" });
+            submitWithBody(@{ @"signedTransaction": signedTxn ?: @"" });
         }];
     } else {
         submitWithBody(@{ @"signedTransaction": [self sk1ReceiptBase64] });
