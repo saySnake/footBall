@@ -54,6 +54,16 @@ LEFT = Alignment(horizontal="left", vertical="center", wrap_text=True)
 THIN = Side(border_style="thin", color="DDDDDD")
 BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 
+# Excel 展示用的「测试方式」中英文映射（内部代码仍用英文 key 保持稳定）
+METHOD_LABEL_CN = {
+    "AUTO_PASS": "自动化已测",
+    "AUTO_PARTIAL": "部分自动化",
+    "MANUAL_REQUIRED": "真机手测",
+    "CONFIG_REQUIRED": "需后台配置",
+    "SCOPE_OUT": "V1 范围外",
+    "CHECKLIST": "提交清单",
+}
+
 
 # =====================================================================
 # 场景分类表 — 根据本次 26 个服务端 mock 测试实际通过情况标注
@@ -219,8 +229,8 @@ def main():
         c8.alignment = CENTER
         c8.fill = RESULT_FILL.get(result, RESULT_FILL["待手测"])
 
-        # 测试方式（第 9 列）
-        c9 = ws.cell(row=row_idx, column=9, value=method)
+        # 测试方式（第 9 列）— Excel 展示中文
+        c9 = ws.cell(row=row_idx, column=9, value=METHOD_LABEL_CN.get(method, method))
         c9.font = BODY_FONT
         c9.border = BORDER
         c9.alignment = CENTER
@@ -267,6 +277,9 @@ def main():
     for extra in extra_rows:
         row_idx = ws.max_row + 1
         for col_idx, value in enumerate(extra, 1):
+            # 第 9 列（测试方式）展示中文
+            if col_idx == 9:
+                value = METHOD_LABEL_CN.get(value, value)
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
             cell.font = BODY_FONT
             cell.border = BORDER
@@ -287,24 +300,23 @@ def main():
     ws2 = wb.create_sheet("测试统计")
     stats = [
         ("测试方式", "数量", "说明"),
-        ("AUTO_PASS（自动化已测通过）", 0, "49 个服务端 mock 测试已验证（含 IAP 19 + 兑换码 9 + 集成等）"),
-        ("AUTO_PARTIAL（部分自动化）", 0, "服务端已测，客户端 UI 需真机确认"),
-        ("MANUAL_REQUIRED（必须真机手测）", 0, "依赖 StoreKit / Apple 沙箱 / UI 渲染"),
-        ("CONFIG_REQUIRED（需配置才能测）", 0, "依赖 App Store Connect 后台配置"),
-        ("SCOPE_OUT（V1 范围外）", 0, "本版本不做：多语言切换；后续版本再测"),
-        ("CHECKLIST（N/A 提交清单）", 0, "非测试范畴"),
+        ("自动化已测", 0, "49 个服务端 mock 测试已验证（含 IAP 19 + 兑换码 9 + 集成等）"),
+        ("部分自动化", 0, "服务端已测，客户端 UI 需真机确认"),
+        ("真机手测", 0, "依赖 StoreKit / Apple 沙箱 / UI 渲染"),
+        ("需后台配置", 0, "依赖 App Store Connect 后台配置"),
+        ("V1 范围外", 0, "本版本不做：多语言切换；后续版本再测"),
+        ("提交清单", 0, "非测试范畴"),
     ]
-    # 统计
-    counts = {"AUTO_PASS": 0, "AUTO_PARTIAL": 0, "MANUAL_REQUIRED": 0,
-              "CONFIG_REQUIRED": 0, "SCOPE_OUT": 0, "CHECKLIST": 0}
+    # 统计：Excel 第 9 列已是中文 label，直接按中文累加
+    cn_labels = [s[0] for s in stats[1:]]  # ["自动化已测", "部分自动化", ...]
+    counts_cn = {label: 0 for label in cn_labels}
     for r in range(2, ws.max_row + 1):
         m = ws.cell(row=r, column=9).value
-        if m in counts:
-            counts[m] += 1
-    for i, key in enumerate(["AUTO_PASS", "AUTO_PARTIAL", "MANUAL_REQUIRED",
-                              "CONFIG_REQUIRED", "SCOPE_OUT", "CHECKLIST"], 1):
+        if m in counts_cn:
+            counts_cn[m] += 1
+    for i, label in enumerate(cn_labels, 1):
         # stats 索引 0 是表头，1~6 是 6 个分类
-        stats[i] = (stats[i][0], counts[key], stats[i][2])
+        stats[i] = (stats[i][0], counts_cn[label], stats[i][2])
 
     for row_idx, row in enumerate(stats, 1):
         for col_idx, val in enumerate(row, 1):
@@ -324,7 +336,7 @@ def main():
     print(f"✅ 已生成：{XLSX_PATH}")
     print(f"   主表共 {ws.max_row - 1} 行（{rows.__len__() - 1} 个原场景 + {len(extra_rows)} 个附加场景）")
     print(f"   统计：")
-    for k, v in counts.items():
+    for k, v in counts_cn.items():
         print(f"     - {k}: {v}")
 
 
