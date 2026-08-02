@@ -72,17 +72,17 @@ SCENE_STATUS = {
     "1.9": ("待手测", "MANUAL_REQUIRED", "续期条款文案需真机 UI 确认"),
     "1.10": ("待手测", "MANUAL_REQUIRED", "同 1.1，订阅条款 tap 手势暂 pass"),
 
-    # ===== 第二章 沙箱配置 — 全部需在 App Store Connect 后台配置 =====
-    "2.1": ("待配置", "CONFIG_REQUIRED", "App Store Connect 后台创建 4 个 IAP 产品"),
+    # ===== 第二章 沙箱配置 — .p8 / KEY_ID / ISSUER_ID 已就位，剩 ASC 后台产品配置 =====
+    "2.1": ("待配置", "CONFIG_REQUIRED", "App Store Connect 后台已创建 4 个 IAP（nomad.iap.month/year/forever.vip/forever.svip）；待审核通过"),
     "2.2": ("待配置", "CONFIG_REQUIRED", "提审时勾选「将 IAP 加入审核」"),
     "2.3": ("待配置", "CONFIG_REQUIRED", "付费 App 协议需 Active"),
-    "2.4": ("待配置", "CONFIG_REQUIRED", "Sandbox Tester 中国+美国各一个"),
+    "2.4": ("待配置", "CONFIG_REQUIRED", "Sandbox Tester 中国+美国各一个；KEY_ID=LGB4Z64FR5、ISSUER_ID=ed6c272c-... 已配、AuthKey.p8 已上传"),
 
     # ===== 第三章 正常购买 =====
-    "3.1.1": ("通过", "AUTO_PARTIAL", "服务端 verifyAndActivate 月卡流程已测（IAPVerifyFlowTest.testNormalPurchaseMonthly）；真机支付需 Sandbox Tester"),
-    "3.1.2": ("通过", "AUTO_PARTIAL", "服务端逻辑同 3.1.1；真机年卡支付需手测"),
-    "3.1.3": ("通过", "AUTO_PARTIAL", "服务端永久方案 expireTime=null 已测（testPurchaseLifetime）"),
-    "3.1.4": ("通过", "AUTO_PARTIAL", "服务端逻辑同 3.1.1；真机创始人 planId=4 需手测"),
+    "3.1.1": ("通过", "AUTO_PARTIAL", "服务端 verifyAndActivate 月卡流程已测（IAPVerifyFlowTest.testNormalPurchaseMonthly）+ 全产品矩阵覆盖；真机支付需 Sandbox Tester"),
+    "3.1.2": ("通过", "AUTO_PARTIAL", "服务端逻辑同 3.1.1；全产品矩阵已验证 nomad.iap.year；真机年卡支付需手测"),
+    "3.1.3": ("通过", "AUTO_PARTIAL", "服务端永久方案 expireTime=null 已测（testPurchaseLifetime）+ 全产品矩阵覆盖 nomad.iap.forever.vip"),
+    "3.1.4": ("通过", "AUTO_PARTIAL", "全产品矩阵已验证 nomad.iap.forever.svip（planId=4）；真机创始人 planId=4 需手测"),
     "3.1.5": ("待手测", "MANUAL_REQUIRED", "已是会员再次购买：当前无拦截（直接叠加时长），用例建议补拦截"),
     "3.2.1": ("待手测", "MANUAL_REQUIRED", "SKProductsRequest 客户端流程，需真机"),
     "3.2.2": ("待手测", "MANUAL_REQUIRED", "skProducts 缓存命中，需真机"),
@@ -171,7 +171,9 @@ SCENE_STATUS = {
     "ENV.4": ("通过", "AUTO_PASS", "bundleId 占位符 → fail-fast 拒绝（防上线配置遗漏）"),
     "ENV.5": ("通过", "AUTO_PASS", "transactionId 为空 → 拒绝"),
     "FRAUD.1": ("通过", "AUTO_PASS", "低价商品冒充高价方案 → 拒绝 + 落对账（testFraudProductMismatch）"),
+    "FRAUD.2": ("通过", "AUTO_PASS", "跨 planId 套用 productId（月卡 productId 买年卡）→ 拒绝 + 落 PENDING_VERIFY（testFraudCrossProductId）本轮新增"),
     "IDEMPOTENT.1": ("通过", "AUTO_PASS", "同一 appleTransactionId 重复提交 → 不重复激活（testIdempotentPurchase）"),
+    "MATRIX.1": ("通过", "AUTO_PASS", "全产品矩阵：4 个 productId（nomad.iap.month/year/forever.vip/forever.svip）全部能正确激活 + durationDays 落库正确 + 永久产品 expireTime=null（testAllProductsMatrix）本轮新增"),
 }
 
 
@@ -234,7 +236,7 @@ def main():
         if prio in PRIORITY_FILL:
             ws.cell(row=row_idx, column=6).fill = PRIORITY_FILL[prio]
 
-    # 在末尾追加 ENV/FRAUD/IDEMPOTENT 附加测试场景
+    # 在末尾追加 ENV/FRAUD/IDEMPOTENT/MATRIX 附加测试场景
     extra_rows = [
         ("ENV.1", "环境校验", "production+Sandbox 放行", "服务端：config=production + txn.env=Sandbox",
          "放行（不拒，审计日志）", "P0", "AppleIAPProxyImpl.java:isTransactionValid", "通过", "AUTO_PASS",
@@ -249,9 +251,18 @@ def main():
         ("FRAUD.1", "支付安全", "低价商品冒充高价方案", "客户端传 planId=monthly，Apple 返回 cheap",
          "拒绝激活 + 落 PENDING_VERIFY", "P0", "MembershipServiceImpl.java:200", "通过", "AUTO_PASS",
          "支付欺诈核心校验"),
+        ("FRAUD.2", "支付安全", "跨 planId 套用 productId",
+         "客户端传 planId=year，Apple 返回 productId=nomad.iap.month",
+         "拒绝激活 + 落 PENDING_VERIFY", "P0", "MembershipServiceImpl.java", "通过", "AUTO_PASS",
+         "本轮新增：跨产品套用拦截（testFraudCrossProductId）"),
         ("IDEMPOTENT.1", "幂等", "同一 transactionId 重复提交", "第二次提交相同 appleTransactionId",
          "不重复激活，返回已有信息", "P0", "MembershipServiceImpl.java:216", "通过", "AUTO_PASS",
          "uk_apple_txn 唯一索引兜底"),
+        ("MATRIX.1", "全产品矩阵", "4 个 ASC productId 全部能正确激活",
+         "循环测 nomad.iap.month / nomad.iap.year / nomad.iap.forever.vip / nomad.iap.forever.svip",
+         "4 个产品全部激活成功 + durationDays 落库正确 + 永久产品 expireTime=null", "P0",
+         "MembershipServiceImpl.java", "通过", "AUTO_PASS",
+         "本轮新增：4 产品矩阵（testAllProductsMatrix），防 SQL 改坏无人发现"),
     ]
     for extra in extra_rows:
         row_idx = ws.max_row + 1
@@ -276,7 +287,7 @@ def main():
     ws2 = wb.create_sheet("测试统计")
     stats = [
         ("测试方式", "数量", "说明"),
-        ("AUTO_PASS（自动化已测通过）", 0, "26 个服务端 mock 测试已验证"),
+        ("AUTO_PASS（自动化已测通过）", 0, "49 个服务端 mock 测试已验证（含 IAP 19 + 兑换码 9 + 集成等）"),
         ("AUTO_PARTIAL（部分自动化）", 0, "服务端已测，客户端 UI 需真机确认"),
         ("MANUAL_REQUIRED（必须真机手测）", 0, "依赖 StoreKit / Apple 沙箱 / UI 渲染"),
         ("CONFIG_REQUIRED（需配置才能测）", 0, "依赖 App Store Connect 后台配置"),
