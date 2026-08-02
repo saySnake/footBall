@@ -72,7 +72,7 @@ METHOD_LABEL_CN = {
 SCENE_STATUS = {
     # ===== 第一章 合规自检 — 全部需 UI/配置，部分需手测 =====
     "1.1": ("待手测", "MANUAL_REQUIRED", "订阅条款 tap 手势未补，阻塞 5；按用户要求暂 pass"),
-    "1.2": ("通过", "AUTO_PARTIAL", "服务端 price 走 SKProduct.price（locale 化），未硬编码；美区 Sandbox Tester 真机确认 $ 符号"),
+    "1.2": ("通过", "AUTO_PARTIAL", "代码已确认价格走 SKProduct.price，未硬编码；Sandbox 购买真机确认显示正确。仅中国上架不涉跨区，保留为防改坏硬编码"),
     "1.3": ("通过", "AUTO_PARTIAL", "服务端 getPlans 已测；UI 入口需真机确认"),
     "1.4": ("通过", "AUTO_PARTIAL", "isAppStoreSandbox 逻辑已在客户端代码；沙箱成功提示需真机确认"),
     "1.5": ("通过", "MANUAL_REQUIRED", "代码静态检查：无外部支付入口"),

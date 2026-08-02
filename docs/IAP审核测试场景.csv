@@ -1,6 +1,6 @@
 编号,章节,场景,操作步骤,预期结果,优先级,代码位置,测试结果,备注
 1.1,合规自检,订阅条款/隐私政策链接,点击购买页《会员服务协议》《隐私政策》《自动续期条款》,应用内 SFSafariViewController 打开对应 URL,P0,MembershipCenterViewController.m:1370,,,自动续期订阅硬性要求；缺会被拒 3.1.2
-1.2,合规自检,价格由 SKProduct 提供,用中国/美国 Sandbox Tester 账号查看商品价格,价格数字与货币符号跟随 App Store 账号地区（不可硬编码 ¥33）,P0,buildPlanData,,,V1 仅简体中文文案，但价格必须由 SKProduct 提供；美区账号应显示 $
+1.2,合规自检,价格由 SKProduct 提供（防硬编码）,代码检查 buildPlanData 价格源；Sandbox 购买看实际显示,价格必须来自 SKProduct.price，不可在代码里硬编码 ¥33/¥268 等,P0,buildPlanData,,,仅中国上架，不涉跨区；保留是为防未来改坏硬编码（Apple 审核 P0）
 1.3,合规自检,恢复购买入口,查看会员中心底部,「恢复购买」按钮与支付按钮同屏可见,P0,MembershipCenterViewController.m:643,,,
 1.4,合规自检,沙箱购买不真实扣款,SandboxTester 购买完成,弹「开通成功（测试环境）不会真实扣款」,P0,MembershipCenterViewController.m:2191,,,
 1.5,合规自检,无外部支付诱导,扫一遍购买页,无「官网」「支付宝」「微信支付」入口,P0,-,,,
