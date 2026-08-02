@@ -9,13 +9,14 @@
 - AUTO_PARTIAL    ：服务端逻辑已自动化测，客户端 UI 交互仍需真机手测
 - MANUAL_REQUIRED ：必须真机 + Sandbox Tester 手测（涉及 StoreKit / Apple 沙箱 / UI）
 - CONFIG_REQUIRED ：依赖 Apple 后台配置（.p8 / Issuer ID / Sandbox Tester）
+- SCOPE_OUT       ：V1 范围外（如多语言切换），后续版本再测
 - CHECKLIST       ：非测试范畴，是提交 Checklist 配置项
 
 测试结果：
 - 通过（绿色）   ：AUTO_PASS
 - 待手测（黄色） ：AUTO_PARTIAL / MANUAL_REQUIRED
 - 待配置（灰色） ：CONFIG_REQUIRED
-- N/A（白色）    ：CHECKLIST
+- N/A（白色）    ：CHECKLIST / SCOPE_OUT
 """
 
 import csv
@@ -45,7 +46,6 @@ RESULT_FILL = {
     "待配置": PatternFill("solid", fgColor="E7E6E6"),     # 灰
     "N/A": PatternFill("solid", fgColor="FFFFFF"),        # 白
 }
-
 HEADER_FILL = PatternFill("solid", fgColor="1A5B47")
 HEADER_FONT = Font(name="PingFang SC", size=11, bold=True, color="FFFFFF")
 BODY_FONT = Font(name="PingFang SC", size=10)
@@ -66,7 +66,7 @@ SCENE_STATUS = {
     "1.3": ("通过", "AUTO_PARTIAL", "服务端 getPlans 已测；UI 入口需真机确认"),
     "1.4": ("通过", "AUTO_PARTIAL", "isAppStoreSandbox 逻辑已在客户端代码；沙箱成功提示需真机确认"),
     "1.5": ("通过", "MANUAL_REQUIRED", "代码静态检查：无外部支付入口"),
-    "1.6": ("待手测", "MANUAL_REQUIRED", "需结合实际业务在真机确认"),
+    "1.6": ("待手测", "MANUAL_REQUIRED", "V1 决策：必须登录才能购买。预期：未登录点购买 → 跳登录页；登录后回到购买流程。需真机确认跳转链路"),
     "1.7": ("通过", "MANUAL_REQUIRED", "代码静态检查：仅会员订阅"),
     "1.8": ("待配置", "CONFIG_REQUIRED", "App Store Connect 配置项：商品名需含「连续包月/年」"),
     "1.9": ("待手测", "MANUAL_REQUIRED", "续期条款文案需真机 UI 确认"),
@@ -139,12 +139,12 @@ SCENE_STATUS = {
     "8.7": ("通过", "MANUAL_REQUIRED", "代码静态检查：所有失败路径均有 toast/alert"),
     "8.8": ("待手测", "MANUAL_REQUIRED", "切换方案不抖动，需真机"),
 
-    # ===== 第九章 多语言 =====
-    "9.1": ("待手测", "MANUAL_REQUIRED", "简体中文，需真机切语言"),
-    "9.2": ("待手测", "MANUAL_REQUIRED", "繁体中文，需真机"),
-    "9.3": ("待手测", "MANUAL_REQUIRED", "英文，需真机"),
-    "9.4": ("待手测", "MANUAL_REQUIRED", "美国 App Store 账号，需美区 Sandbox Tester"),
-    "9.5": ("待手测", "MANUAL_REQUIRED", "货币格式，需多地区真机"),
+    # ===== 第九章 多语言（V1 范围外，本版本不切语言，文案默认简体中文） =====
+    "9.1": ("N/A", "SCOPE_OUT", "V1 不做多语言切换，文案默认简体中文"),
+    "9.2": ("N/A", "SCOPE_OUT", "V1 不做多语言切换"),
+    "9.3": ("N/A", "SCOPE_OUT", "V1 不做多语言切换"),
+    "9.4": ("N/A", "SCOPE_OUT", "V1 不做多语言切换；如需美区测试可单独用美区 Sandbox Tester"),
+    "9.5": ("N/A", "SCOPE_OUT", "V1 不做多语言切换；价格 locale 跟随 SKProduct.price 由系统保证"),
 
     # ===== 第十章 崩溃边界 =====
     "10.1": ("待手测", "MANUAL_REQUIRED", "网络全断进页面，需真机飞行模式"),
@@ -160,7 +160,7 @@ SCENE_STATUS = {
     "11.1": ("N/A", "CHECKLIST", "提交前在 App Store Connect 检查"),
     "11.2": ("N/A", "CHECKLIST", "提交前合规检查（依赖 1.1/1.10 修复）"),
     "11.3": ("N/A", "CHECKLIST", "提交前用 Sandbox Tester 跑完整流程"),
-    "11.4": ("N/A", "CHECKLIST", "提交前确认场景 3.1/4.1-4.4/5.1-5.2/6.1-6.2/7.1-7.9/9.1-9.3 全通过"),
+    "11.4": ("N/A", "CHECKLIST", "提交前确认场景 3.1/4.1-4.4/5.1-5.2/6.1-6.2/7.1-7.9 全通过（第九章多语言 V1 范围外）"),
     "11.5": ("N/A", "CHECKLIST", "提交前删除/脱敏敏感日志"),
     "11.6": ("N/A", "CHECKLIST", "TestFlight 验证"),
 
@@ -291,18 +291,19 @@ def main():
         ("AUTO_PARTIAL（部分自动化）", 0, "服务端已测，客户端 UI 需真机确认"),
         ("MANUAL_REQUIRED（必须真机手测）", 0, "依赖 StoreKit / Apple 沙箱 / UI 渲染"),
         ("CONFIG_REQUIRED（需配置才能测）", 0, "依赖 App Store Connect 后台配置"),
+        ("SCOPE_OUT（V1 范围外）", 0, "本版本不做：多语言切换；后续版本再测"),
         ("CHECKLIST（N/A 提交清单）", 0, "非测试范畴"),
     ]
     # 统计
     counts = {"AUTO_PASS": 0, "AUTO_PARTIAL": 0, "MANUAL_REQUIRED": 0,
-              "CONFIG_REQUIRED": 0, "CHECKLIST": 0}
+              "CONFIG_REQUIRED": 0, "SCOPE_OUT": 0, "CHECKLIST": 0}
     for r in range(2, ws.max_row + 1):
         m = ws.cell(row=r, column=9).value
         if m in counts:
             counts[m] += 1
     for i, key in enumerate(["AUTO_PASS", "AUTO_PARTIAL", "MANUAL_REQUIRED",
-                              "CONFIG_REQUIRED", "CHECKLIST"], 1):
-        # stats 索引 0 是表头，1~5 是 5 个分类
+                              "CONFIG_REQUIRED", "SCOPE_OUT", "CHECKLIST"], 1):
+        # stats 索引 0 是表头，1~6 是 6 个分类
         stats[i] = (stats[i][0], counts[key], stats[i][2])
 
     for row_idx, row in enumerate(stats, 1):
