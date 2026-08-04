@@ -19,7 +19,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) NSString *price;
 /// 每日均价文案
 @property (nonatomic, copy, nullable) NSString *dailyPriceDesc;
-/// Apple IAP 产品 ID
+/// 商品 ID（服务端字段，客户端暂不使用）
 @property (nonatomic, copy, nullable) NSString *appleProductId;
 /// 状态：ACTIVE / INACTIVE
 @property (nonatomic, copy, nullable) NSString *status;
@@ -82,7 +82,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) NSString *appleProductId;
 @property (nonatomic, copy, nullable) NSString *planId;
 @property (nonatomic, assign) NSInteger durationDays;
-/// YES：需 Apple IAP；NO：已直接激活会员
+/// YES：需付费激活（当前版本暂未开放付费）；NO：已直接激活会员
 @property (nonatomic, assign) BOOL needPayment;
 @end
 

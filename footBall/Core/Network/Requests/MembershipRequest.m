@@ -2,8 +2,6 @@
 //  MembershipRequest.m
 //  footBall
 //
-//  购买验证 verifyPurchaseWithBody: 的字段需与 IAP 流程、后端 DTO 一致。
-//
 
 #import "MembershipRequest.h"
 #import "APIManager.h"
@@ -23,23 +21,6 @@
 
 - (void)getMembershipPlansSuccess:(APISuccessBlock)success failure:(APIFailureBlock)failure {
     [[APIManager sharedManager] GET:APIPathValueMembershipPlans parameters:nil headers:nil success:^(HTTPResponse * _Nullable responseObject) {
-        if (responseObject.success) {
-            responseObject.dataObject = responseObject.data;
-            if (success) success(responseObject);
-        } else {
-            if (failure) failure([APIError errorWithResponse:responseObject]);
-        }
-    } failure:^(NSError * _Nonnull error) {
-        if (failure) failure(error);
-    }];
-}
-
-- (void)verifyPurchaseWithBody:(NSDictionary *)body success:(APISuccessBlock)success failure:(APIFailureBlock)failure {
-    if (![body isKindOfClass:NSDictionary.class] || body.count == 0) {
-        if (failure) failure([NSError errorWithDomain:@"MembershipRequestErrorDomain" code:-1 userInfo:@{ NSLocalizedDescriptionKey: @"请求体不能为空" }]);
-        return;
-    }
-    [[APIManager sharedManager] POST:APIPathValueMembershipPurchase parameters:body headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
             responseObject.dataObject = responseObject.data;
             if (success) success(responseObject);

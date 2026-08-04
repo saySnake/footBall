@@ -83,8 +83,6 @@
             
             [[DoraemonManager shareInstance] addPluginWithTitle:@"内存检测弹窗" icon:@"doraemon_default" desc:@"检查内存泄露,循环引用" pluginName:@"BVDebugMemoryLeakPlugin" atModule:@"业务专区"];
 
-            [[DoraemonManager shareInstance] addPluginWithTitle:@"IAP 调试面板" icon:@"doraemon_default" desc:@"App Store 内购审核测试场景" pluginName:@"BVIAPDebugPlugin" atModule:@"业务专区"];
-
             [BVAPPDebugTool setupCustomLogoStyle];
         });
     });

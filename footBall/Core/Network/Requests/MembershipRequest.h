@@ -2,8 +2,7 @@
 //  MembershipRequest.h
 //  footBall
 //
-//  会员：方案、购买验证、状态、权益、订阅记录（/api/v1/membership/*）。
-//  说明：Apple S2S 回调为服务端接口，路径为 APIPathValueMembershipAppleCallback，客户端不应调用。
+//  会员：方案、状态、权益、订阅记录、兑换（/api/v1/membership/*）。
 //
 
 #import <Foundation/Foundation.h>
@@ -17,11 +16,6 @@ NS_ASSUME_NONNULL_BEGIN
 /// GET `/api/v1/membership/plans` — 会员方案列表
 - (void)getMembershipPlansSuccess:(nullable APISuccessBlock)success
                           failure:(nullable APIFailureBlock)failure;
-
-/// POST `/api/v1/membership/purchase` — IAP 收据验证等；body 字段以后端为准（如 receipt、productId）
-- (void)verifyPurchaseWithBody:(NSDictionary *)body
-                       success:(nullable APISuccessBlock)success
-                       failure:(nullable APIFailureBlock)failure;
 
 /// GET `/api/v1/membership/status` — 当前用户会员状态
 - (void)getMembershipStatusSuccess:(nullable APISuccessBlock)success

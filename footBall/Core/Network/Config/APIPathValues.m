@@ -220,12 +220,10 @@ NSString * const APIPathValueCommunityFriendData(NSString *friendId) {
 
 #pragma mark - 会员模块
 NSString * const APIPathValueMembershipPlans = @"/api/v1/membership/plans";
-NSString * const APIPathValueMembershipPurchase = @"/api/v1/membership/purchase";
 NSString * const APIPathValueMembershipRedeem = @"/api/v1/membership/redeem";
 NSString * const APIPathValueMembershipStatus = @"/api/v1/membership/status";
 NSString * const APIPathValueMembershipBenefits = @"/api/v1/membership/benefits";
 NSString * const APIPathValueMembershipRecords = @"/api/v1/membership/records";
-NSString * const APIPathValueMembershipAppleCallback = @"/api/v1/membership/apple/callback";
 
 #pragma mark - 数据统计模块
 NSString * const APIPathValueStatisticsMe = @"/api/v1/statistics/me";

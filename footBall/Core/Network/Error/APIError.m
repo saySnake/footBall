@@ -188,10 +188,9 @@ static char kRetryCountKey;
     static NSDictionary<NSString *, NSString *> *kInviteCodeMessages;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        // IAP / 会员相关错误码（前缀 06xxxx，与 fc-mono ErrorCode 一致）
-        // 关键性：审核员测试购买时会看到这些文案，必须给出准确中文提示而不是"请求失败"
+        // 会员 / 兑换相关错误码（前缀 06xxxx，与 fc-mono ErrorCode 一致）
         kInviteCodeMessages = @{
-            // ===== IAP / 会员错误（06xxxx）=====
+            // ===== 会员 / 兑换错误（06xxxx）=====
             @"060001": @"购买验证失败，请稍后重试或联系客服",
             @"060002": @"该交易已处理，请勿重复提交",
             @"060003": @"会员方案不存在或已下架",

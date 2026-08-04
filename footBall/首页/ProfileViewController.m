@@ -634,7 +634,7 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
     self.membershipPromoLabel = [UILabel new];
     self.membershipPromoLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
     self.membershipPromoLabel.textColor = kProfileMembershipPromoText;
-    self.membershipPromoLabel.text = NSLocalizedString(@"profile_membership_promo", nil);
+//    self.membershipPromoLabel.text = NSLocalizedString(@"profile_membership_promo", nil);
     [self.membershipCard addSubview:self.membershipPromoLabel];
     [self.membershipPromoLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(self.membershipTitleLabel);
@@ -646,7 +646,8 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
     self.membershipHintLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightRegular];
     self.membershipHintLabel.textColor = [UIColor colorWithWhite:1.0 alpha:0.72];
     self.membershipHintLabel.numberOfLines = 2;
-    self.membershipHintLabel.text = NSLocalizedString(@"profile_membership_hint", nil);
+//    self.membershipHintLabel.text = NSLocalizedString(@"profile_membership_hint", nil);
+    self.membershipHintLabel.text = @"功能开发中，敬请期待";
     [self.membershipCard addSubview:self.membershipHintLabel];
     [self.membershipHintLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(self.membershipTitleLabel);
@@ -880,8 +881,8 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
     [super updateLocalizedStrings];
     [self refreshIDLabel];
     self.membershipTitleLabel.text = NSLocalizedString(@"profile_membership_center", nil);
-    self.membershipPromoLabel.text = NSLocalizedString(@"profile_membership_promo", nil);
-    self.membershipHintLabel.text = NSLocalizedString(@"profile_membership_hint", nil);
+//    self.membershipPromoLabel.text = NSLocalizedString(@"profile_membership_promo", nil);
+//    self.membershipHintLabel.text = NSLocalizedString(@"profile_membership_hint", nil);
     self.stat1Title.text = NSLocalizedString(@"profile_stat_friends", nil);
     self.stat2Title.text = NSLocalizedString(@"profile_stat_follow", nil);
     self.stat3Title.text = NSLocalizedString(@"profile_stat_stamps", nil);
@@ -990,13 +991,13 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
 }
 
 - (void)openMembershipCenter {
-    NSLog(@"[Profile][Diag] openMembershipCenter 触发，准备 push");
-    MembershipCenterViewController *vc = [MembershipCenterViewController new];
-    vc.initialPlanIndex = 0;
-    vc.hidesBottomBarWhenPushed = YES;
-    [self.navigationController pushViewController:vc animated:YES];
-    NSLog(@"[Profile][Diag] openMembershipCenter navigationController=%@, push 后 topVC=%@",
-          self.navigationController, self.navigationController.topViewController);
+//    NSLog(@"[Profile][Diag] openMembershipCenter 触发，准备 push");
+//    MembershipCenterViewController *vc = [MembershipCenterViewController new];
+//    vc.initialPlanIndex = 0;
+//    vc.hidesBottomBarWhenPushed = YES;
+//    [self.navigationController pushViewController:vc animated:YES];
+//    NSLog(@"[Profile][Diag] openMembershipCenter navigationController=%@, push 后 topVC=%@",
+//          self.navigationController, self.navigationController.topViewController);
 }
 
 @end

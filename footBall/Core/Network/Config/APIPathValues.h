@@ -204,8 +204,6 @@ FOUNDATION_EXPORT NSString * const APIPathValueCommunityFriendData(NSString *fri
 #pragma mark - 会员模块
 /// 获取会员方案列表
 FOUNDATION_EXPORT NSString * const APIPathValueMembershipPlans;
-/// Apple IAP收据验证并激活会员
-FOUNDATION_EXPORT NSString * const APIPathValueMembershipPurchase;
 /// 兑换码/礼包码/邀请码兑换
 FOUNDATION_EXPORT NSString * const APIPathValueMembershipRedeem;
 /// 获取当前用户会员状态
@@ -214,8 +212,6 @@ FOUNDATION_EXPORT NSString * const APIPathValueMembershipStatus;
 FOUNDATION_EXPORT NSString * const APIPathValueMembershipBenefits;
 /// 获取订阅记录
 FOUNDATION_EXPORT NSString * const APIPathValueMembershipRecords;
-/// Apple S2S 回调
-FOUNDATION_EXPORT NSString * const APIPathValueMembershipAppleCallback;
 #pragma mark - 数据统计模块
 /// 获取当前用户数据统计
 FOUNDATION_EXPORT NSString * const APIPathValueStatisticsMe;

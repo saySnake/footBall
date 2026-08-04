@@ -18,7 +18,6 @@
 #import "TeamSelectionViewController.h"
 #import "PNAppVersionManager.h"
 #import "PNAppVersionInfo.h"
-#import "PNIAPObserver.h"
 
 @interface SceneDelegate ()
 
@@ -70,10 +69,6 @@
     self.didInstallRootAfterVersionCheck = YES;
     if ([AuthManager sharedManager].isLoggedIn) {
         self.window.rootViewController = [[MainTabBarController alloc] init];
-        // 已登录：启动 IAP 全局观察者，处理上次被杀进程时遗留的未 finish 事务（掉单恢复）
-        [[PNIAPObserver shared] start];
-        // 主动扫描队列中残留事务，触发 verifyPurchase 兜底上报
-        [[PNIAPObserver shared] resumePendingTransactions];
     } else {
         LoginChoiceViewController *loginVC = [LoginChoiceViewController new];
         UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
@@ -95,9 +90,6 @@
     LoginChoiceViewController *rootVC = [LoginChoiceViewController new];
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:rootVC];
     self.window.rootViewController = nav;
-    // Token 过期强制退出登录：与 SettingsViewController.routeToLoginAfterLogout 一致，
-    // 停止 IAP 观察者避免换账号后跨账号激活会员。
-    [[PNIAPObserver shared] stop];
 }
 
 - (void)sceneDidDisconnect:(UIScene *)scene {

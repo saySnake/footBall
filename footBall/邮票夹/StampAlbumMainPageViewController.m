@@ -464,17 +464,18 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 @implementation StampAlbumMainPageViewController
 
 - (void)presentStampUnlockDialog {
-    __weak typeof(self) weakSelf = self;
-    StampUnlockPopupViewController *vc = [[StampUnlockPopupViewController alloc] init];
-    vc.onConfirm = ^(NSInteger initialPlanIndex) {
-        __strong typeof(weakSelf) self = weakSelf;
-        if (!self) return;
-        MembershipCenterViewController *member = [[MembershipCenterViewController alloc] init];
-        member.initialPlanIndex = initialPlanIndex;
-        member.hidesBottomBarWhenPushed = YES;
-        [self.navigationController pushViewController:member animated:YES];
-    };
-    [self presentViewController:vc animated:NO completion:nil];
+    [QMUITips showInfo:@"功能开发中，敬请期待"];
+//    __weak typeof(self) weakSelf = self;
+//    StampUnlockPopupViewController *vc = [[StampUnlockPopupViewController alloc] init];
+//    vc.onConfirm = ^(NSInteger initialPlanIndex) {
+//        __strong typeof(weakSelf) self = weakSelf;
+//        if (!self) return;
+//        MembershipCenterViewController *member = [[MembershipCenterViewController alloc] init];
+//        member.initialPlanIndex = initialPlanIndex;
+//        member.hidesBottomBarWhenPushed = YES;
+//        [self.navigationController pushViewController:member animated:YES];
+//    };
+//    [self presentViewController:vc animated:NO completion:nil];
 }
 - (instancetype)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil {
     if (self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil]) {
