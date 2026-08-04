@@ -125,23 +125,28 @@
 #pragma mark - 文本提示（Toast）
 
 - (void)showSuccess:(NSString *)message inView:(UIView *)view {
-    [self showText:message inView:view mode:MBProgressHUDModeCustomView iconName:@"success" duration:1.5];
+//    [self showText:message inView:view mode:MBProgressHUDModeCustomView iconName:@"success" duration:1.5];
+    [QMUITips showSucceed:message];
 }
 
 - (void)showError:(NSString *)message inView:(UIView *)view {
-    [self showText:message inView:view mode:MBProgressHUDModeCustomView iconName:@"error" duration:2.0];
+//    [self showText:message inView:view mode:MBProgressHUDModeCustomView iconName:@"error" duration:2.0];
+    [QMUITips showError:message inView:view];
 }
 
 - (void)showInfo:(NSString *)message inView:(UIView *)view {
-    [self showText:message inView:view mode:MBProgressHUDModeCustomView iconName:@"info" duration:2.0];
+//    [self showText:message inView:view mode:MBProgressHUDModeCustomView iconName:@"info" duration:2.0];
+    [QMUITips showInfo:message inView:view];
 }
 
 - (void)showText:(NSString *)message inView:(UIView *)view {
-    [self showText:message inView:view duration:2.0];
+//    [self showText:message inView:view duration:2.0];
+    [QMUITips showWithText:message inView:view];
 }
 
 - (void)showText:(NSString *)message inView:(UIView *)view duration:(NSTimeInterval)duration {
-    [self showText:message inView:view mode:MBProgressHUDModeText duration:duration];
+//    [self showText:message inView:view mode:MBProgressHUDModeText duration:duration];
+    [QMUITips showWithText:message inView:view hideAfterDelay:duration];
 }
 
 - (void)showCenteredText:(NSString *)message inView:(UIView *)view {
