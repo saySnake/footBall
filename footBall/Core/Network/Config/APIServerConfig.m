@@ -77,9 +77,9 @@
 - (void)loadDefaultServerConfigs {
     // 默认HTTP服务器地址配置
     // 注意：这些是示例地址，需要根据实际项目修改
-    _serverURLs[@(APIEnvironmentTest)] = @"https://nomadfootball.cn";
-    _serverURLs[@(APIEnvironmentUAT)] = @"https://nomadfootball.cn";
-    _serverURLs[@(APIEnvironmentAppStore)] = @"https://nomadfootball.cn";
+    _serverURLs[@(APIEnvironmentTest)] = @"https://api.nomadfootball.cn";
+    _serverURLs[@(APIEnvironmentUAT)] = @"https://api.nomadfootball.cn";
+    _serverURLs[@(APIEnvironmentAppStore)] = @"https://api.nomadfootball.cn";
     
     // WebSocket地址默认从HTTP地址自动转换，也可以单独配置
     // 如果需要独立的WebSocket地址，可以在这里设置：
