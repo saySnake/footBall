@@ -10,9 +10,11 @@
 #import "AuthManager.h"
 #import "SDImageManager.h"
 #import <Masonry/Masonry.h>
+#import <SafariServices/SafariServices.h>
 #import "ColorManager.h"
-#import "PrivacyAgreementViewController.h"
 #import "PNIAPObserver.h"
+
+static NSString *const kSettingsPrivacyPolicyURL = @"https://nomadfootball.cn/privacy/";
 
 static UIColor * SettingsPageBackgroundColor(void) {
     return [UIColor colorWithRed:0.969 green:0.969 blue:0.969 alpha:1.0];
@@ -222,8 +224,11 @@ static UIColor * SettingsPageBackgroundColor(void) {
 - (void)onBack { [self.navigationController popViewControllerAnimated:YES]; }
 
 - (void)onPrivacy {
-    PrivacyAgreementViewController *vc = [PrivacyAgreementViewController new];
-    [self.navigationController pushViewController:vc animated:YES];
+    NSURL *url = [NSURL URLWithString:kSettingsPrivacyPolicyURL];
+    if (!url) return;
+    SFSafariViewController *safari = [[SFSafariViewController alloc] initWithURL:url];
+    safari.preferredControlTintColor = [ColorManager colorWithHexString:@"#285d4b"];
+    [self presentViewController:safari animated:YES completion:nil];
 }
 
 - (void)onNoticeSwitchChanged:(UISwitch *)sender {
