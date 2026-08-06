@@ -55,9 +55,12 @@
 "phone_get_code_button" = "Get verification code";
 "phone_toast_invalid_phone" = "Please enter a valid phone number";
 "phone_toast_agree_required" = "Please agree to the Terms and Privacy Policy first";
-"phone_agreement_text" = "Agree to Terms and Privacy Policy";
+"phone_agreement_text" = "Agree to Terms of Service and Privacy Policy";
 "phone_agreement_prefix" = "Agree to ";
-"phone_agreement_link" = "Terms and Privacy Policy";
+"phone_agreement_link" = "Terms of Service and Privacy Policy";
+"phone_agreement_terms_link" = "Terms of Service";
+"phone_agreement_and" = " and ";
+"phone_agreement_privacy_link" = "Privacy Policy";
 
 /* Login - Other Methods */
 "login_other_methods_title" = "Other login methods";
