@@ -55,9 +55,12 @@
 "phone_get_code_button" = "取得驗證碼";
 "phone_toast_invalid_phone" = "請輸入正確的手機號";
 "phone_toast_agree_required" = "請先勾選並同意法律條款和隱私協議";
-"phone_agreement_text" = "同意《法律條款和隱私協議》";
+"phone_agreement_text" = "同意《服務條款》和《隱私協議》";
 "phone_agreement_prefix" = "同意";
-"phone_agreement_link" = "《法律條款和隱私協議》";
+"phone_agreement_link" = "《服務條款》和《隱私協議》";
+"phone_agreement_terms_link" = "《服務條款》";
+"phone_agreement_and" = "和";
+"phone_agreement_privacy_link" = "《隱私協議》";
 
 /* Login - Other Methods */
 "login_other_methods_title" = "其他登入方式";

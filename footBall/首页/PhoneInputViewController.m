@@ -7,8 +7,12 @@
 
 #import "PhoneInputViewController.h"
 #import <Masonry/Masonry.h>
+#import <SafariServices/SafariServices.h>
 #import "ColorManager.h"
 #import "VerifyCodeViewController.h"
+
+static NSString *const kPhoneTermsOfServiceURL = @"https://nomadfootball.cn/terms/";
+static NSString *const kPhonePrivacyPolicyURL = @"https://nomadfootball.cn/privacy/";
 
 /// Figma 稿：主按钮 / 勾选 #285d4b；手机号输入条：浅底 #F5F5F5、圆角 12；次级字 #656565；说明 #a1a1a1；链接 #3021ff
 static UIColor *PNFigmaGreen(void) {
@@ -45,7 +49,9 @@ static UIColor *PNFigmaSocialCircleBG(void) {
 @property (nonatomic, strong) UIStackView *agreementStack;
 @property (nonatomic, strong) UIButton *agreeCheckButton;
 @property (nonatomic, strong) UILabel *agreementPrefixLabel;
-@property (nonatomic, strong) UIButton *agreementLinkButton;
+@property (nonatomic, strong) UIButton *termsLinkButton;
+@property (nonatomic, strong) UILabel *agreementAndLabel;
+@property (nonatomic, strong) UIButton *privacyLinkButton;
 @property (nonatomic, strong) UILabel *otherLoginLabel;
 @property (nonatomic, strong) UIView *otherLoginLeftLine;
 @property (nonatomic, strong) UIView *otherLoginRightLine;
@@ -201,16 +207,31 @@ static UIColor *PNFigmaSocialCircleBG(void) {
     self.agreementPrefixLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
     self.agreementPrefixLabel.textColor = [UIColor blackColor];
     
-    self.agreementLinkButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    [self.agreementLinkButton setTitle:NSLocalizedString(@"phone_agreement_link", nil) forState:UIControlStateNormal];
-    [self.agreementLinkButton setTitleColor:PNFigmaLinkBlue() forState:UIControlStateNormal];
-    self.agreementLinkButton.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-    self.agreementLinkButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
+    self.termsLinkButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    [self.termsLinkButton setTitle:NSLocalizedString(@"phone_agreement_terms_link", nil) forState:UIControlStateNormal];
+    [self.termsLinkButton setTitleColor:PNFigmaLinkBlue() forState:UIControlStateNormal];
+    self.termsLinkButton.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    self.termsLinkButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
+    [self.termsLinkButton addTarget:self action:@selector(openTermsOfService) forControlEvents:UIControlEventTouchUpInside];
+    
+    self.agreementAndLabel = [[UILabel alloc] init];
+    self.agreementAndLabel.text = NSLocalizedString(@"phone_agreement_and", nil);
+    self.agreementAndLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    self.agreementAndLabel.textColor = [UIColor blackColor];
+    
+    self.privacyLinkButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    [self.privacyLinkButton setTitle:NSLocalizedString(@"phone_agreement_privacy_link", nil) forState:UIControlStateNormal];
+    [self.privacyLinkButton setTitleColor:PNFigmaLinkBlue() forState:UIControlStateNormal];
+    self.privacyLinkButton.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    self.privacyLinkButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
+    [self.privacyLinkButton addTarget:self action:@selector(openPrivacyAgreement) forControlEvents:UIControlEventTouchUpInside];
     
     self.agreementStack = [[UIStackView alloc] initWithArrangedSubviews:@[
         self.agreeCheckButton,
         self.agreementPrefixLabel,
-        self.agreementLinkButton,
+        self.termsLinkButton,
+        self.agreementAndLabel,
+        self.privacyLinkButton,
     ]];
     self.agreementStack.axis = UILayoutConstraintAxisHorizontal;
     self.agreementStack.alignment = UIStackViewAlignmentCenter;
@@ -359,6 +380,22 @@ static UIColor *PNFigmaSocialCircleBG(void) {
 
 - (void)toggleAgree {
     self.agreeCheckButton.selected = !self.agreeCheckButton.selected;
+}
+
+- (void)openTermsOfService {
+    [self openAgreementURLString:kPhoneTermsOfServiceURL];
+}
+
+- (void)openPrivacyAgreement {
+    [self openAgreementURLString:kPhonePrivacyPolicyURL];
+}
+
+- (void)openAgreementURLString:(NSString *)urlString {
+    NSURL *url = [NSURL URLWithString:urlString ?: @""];
+    if (!url) return;
+    SFSafariViewController *safari = [[SFSafariViewController alloc] initWithURL:url];
+    safari.preferredControlTintColor = PNFigmaGreen();
+    [self presentViewController:safari animated:YES completion:nil];
 }
 
 - (void)updateButtonState {
