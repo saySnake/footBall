@@ -104,18 +104,18 @@ static UIColor * SettingsPageBackgroundColor(void) {
     UIControl *privacyTap = (UIControl *)row2;
     [privacyTap addTarget:self action:@selector(onPrivacy) forControlEvents:UIControlEventTouchUpInside];
 
-    UIControl *row3 = (UIControl *)[self addRowToCard:self.listCard top:row2 icon:@"setting_version" titleKey:@"settings_test_version" showChevron:NO];
-    self.versionValueLabel = [UILabel new];
-    self.versionValueLabel.font = [UIFont systemFontOfSize:13];
-    self.versionValueLabel.textColor = [UIColor grayColor];
-    self.versionValueLabel.textAlignment = NSTextAlignmentRight;
-    [row3 addSubview:self.versionValueLabel];
-    [self.versionValueLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(row3).offset(-16);
-        make.centerY.equalTo(row3);
-    }];
+//    UIControl *row3 = (UIControl *)[self addRowToCard:self.listCard top:row2 icon:@"setting_version" titleKey:@"settings_test_version" showChevron:NO];
+//    self.versionValueLabel = [UILabel new];
+//    self.versionValueLabel.font = [UIFont systemFontOfSize:13];
+//    self.versionValueLabel.textColor = [UIColor grayColor];
+//    self.versionValueLabel.textAlignment = NSTextAlignmentRight;
+//    [row3 addSubview:self.versionValueLabel];
+//    [self.versionValueLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+//        make.trailing.equalTo(row3).offset(-16);
+//        make.centerY.equalTo(row3);
+//    }];
 
-    UIControl *row4 = (UIControl *)[self addRowToCard:self.listCard top:row3 icon:@"setting_clean" titleKey:@"settings_clear_data" showChevron:NO];
+    UIControl *row4 = (UIControl *)[self addRowToCard:self.listCard top:row2 icon:@"setting_clean" titleKey:@"settings_clear_data" showChevron:NO];
     [row4 addTarget:self action:@selector(onClearData) forControlEvents:UIControlEventTouchUpInside];
     self.cacheValueLabel = [UILabel new];
     self.cacheValueLabel.font = [UIFont systemFontOfSize:13];
@@ -151,7 +151,7 @@ static UIColor * SettingsPageBackgroundColor(void) {
     [super updateLocalizedStrings];
     self.navTitle.text = NSLocalizedString(@"settings_title", nil);
     [self.logoutBtn setTitle:NSLocalizedString(@"settings_logout", nil) forState:UIControlStateNormal];
-    self.versionValueLabel.text = NSLocalizedString(@"settings_test_version_value", nil);
+//    self.versionValueLabel.text = NSLocalizedString(@"settings_test_version_value", nil);
     [self refreshCacheSizeLabel];
 }
 
