@@ -900,46 +900,56 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
 }
 
 - (void)uploadAvatarImage:(UIImage *)image {
-    NSData *jpeg = UIImageJPEGRepresentation(image, 0.85);
-    if (jpeg.length == 0) {
-        NSData *png = UIImagePNGRepresentation(image);
-        if (png.length > 0) {
-            jpeg = UIImageJPEGRepresentation([UIImage imageWithData:png], 0.85);
-        }
-    }
-    if (jpeg.length == 0) {
-        NSLog(@"[AvatarDebug] uploadAvatarImage: jpeg data empty, skip");
-        return;
-    }
-    NSLog(@"[AvatarDebug] uploadAvatarImage: start upload, jpegLength=%lu", (unsigned long)jpeg.length);
     self.avatarUploadInProgress = YES;
-    // 显示上传中提示
+    // 显示上传中提示（在主线程立即显示，与后台 JPEG 编码并行）
     [[LoadingManager sharedManager] showLoadingInView:self.view];
     __weak typeof(self) weakSelf = self;
-    [[FileRequest shared] uploadImage:jpeg type:ImageObjectTypeProfile success:^(HTTPResponse * _Nullable responseObject) {
-        __strong typeof(weakSelf) self = weakSelf;
-        if (!self) return;
-        NSString *key = [responseObject.dataObject isKindOfClass:[NSString class]] ? responseObject.dataObject : nil;
-        NSLog(@"[AvatarDebug] uploadAvatarImage: success, key=%@", key ?: @"nil");
-        [[LoadingManager sharedManager] hideLoadingInView:self.view];
-        self.avatarUploadInProgress = NO;
-        if (key.length > 0) {
-            self.uploadedAvatarKey = key;
-            self.avatarNeedsUpload = NO;
-            // 立即把头像 key 更新到服务端，不等用户点保存
-            [self syncAvatarKeyToServer:key];
-        } else {
-            [[LoadingManager sharedManager] showError:@"头像上传失败，请重试" inView:self.view];
+    // JPEG 编码是 CPU 密集型，必须放到后台队列，否则主线程冻结会触发 watchdog (0x8badf00d)
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSData *jpeg = UIImageJPEGRepresentation(image, 0.85);
+        if (jpeg.length == 0) {
+            NSData *png = UIImagePNGRepresentation(image);
+            if (png.length > 0) {
+                jpeg = UIImageJPEGRepresentation([UIImage imageWithData:png], 0.85);
+            }
         }
-    } failure:^(NSError * _Nonnull error) {
-        __strong typeof(weakSelf) self = weakSelf;
-        if (!self) return;
-        NSLog(@"[AvatarDebug] uploadAvatarImage: failed, error=%@", error);
-        [[LoadingManager sharedManager] hideLoadingInView:self.view];
-        self.avatarUploadInProgress = NO;
-        [[LoadingManager sharedManager] showError:@"头像上传失败，请重试" inView:self.view];
-        // 上传失败，保留 avatarNeedsUpload=YES，onSave 时重试
-    }];
+        NSData *jpegToUpload = jpeg;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) return;
+            if (jpegToUpload.length == 0) {
+                NSLog(@"[AvatarDebug] uploadAvatarImage: jpeg data empty, skip");
+                [[LoadingManager sharedManager] hideLoadingInView:self.view];
+                self.avatarUploadInProgress = NO;
+                return;
+            }
+            NSLog(@"[AvatarDebug] uploadAvatarImage: start upload, jpegLength=%lu", (unsigned long)jpegToUpload.length);
+            [[FileRequest shared] uploadImage:jpegToUpload type:ImageObjectTypeProfile success:^(HTTPResponse * _Nullable responseObject) {
+                __strong typeof(weakSelf) self = weakSelf;
+                if (!self) return;
+                NSString *key = [responseObject.dataObject isKindOfClass:[NSString class]] ? responseObject.dataObject : nil;
+                NSLog(@"[AvatarDebug] uploadAvatarImage: success, key=%@", key ?: @"nil");
+                [[LoadingManager sharedManager] hideLoadingInView:self.view];
+                self.avatarUploadInProgress = NO;
+                if (key.length > 0) {
+                    self.uploadedAvatarKey = key;
+                    self.avatarNeedsUpload = NO;
+                    // 立即把头像 key 更新到服务端，不等用户点保存
+                    [self syncAvatarKeyToServer:key];
+                } else {
+                    [[LoadingManager sharedManager] showError:@"头像上传失败，请重试" inView:self.view];
+                }
+            } failure:^(NSError * _Nonnull error) {
+                __strong typeof(weakSelf) self = weakSelf;
+                if (!self) return;
+                NSLog(@"[AvatarDebug] uploadAvatarImage: failed, error=%@", error);
+                [[LoadingManager sharedManager] hideLoadingInView:self.view];
+                self.avatarUploadInProgress = NO;
+                [[LoadingManager sharedManager] showError:@"头像上传失败，请重试" inView:self.view];
+                // 上传失败，保留 avatarNeedsUpload=YES，onSave 时重试
+            }];
+        });
+    });
 }
 
 - (void)syncAvatarKeyToServer:(NSString *)key {
@@ -1030,45 +1040,50 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
     if (self.avatarNeedsUpload) {
         // 有待上传的新图时优先上传，不能被旧的 uploadedAvatarKey 抢先
         UIImage *avatarImage = self.avatarView.image;
-        NSData *jpeg = UIImageJPEGRepresentation(avatarImage, 0.85);
-        NSLog(@"[AvatarDebug] onSave: avatarNeedsUpload=YES, image=%@, jpegLength=%lu",
-              avatarImage ? [NSString stringWithFormat:@"%.0fx%.0f", avatarImage.size.width, avatarImage.size.height] : @"nil",
-              (unsigned long)jpeg.length);
-        // 如果 JPEG 转换失败，尝试 PNG 再转 JPEG
-        if (jpeg.length == 0 && avatarImage) {
-            NSData *png = UIImagePNGRepresentation(avatarImage);
-            if (png.length > 0) {
-                UIImage *fromPNG = [UIImage imageWithData:png];
-                jpeg = UIImageJPEGRepresentation(fromPNG, 0.85);
-            }
-            NSLog(@"[AvatarDebug] PNG fallback jpegLength=%lu", (unsigned long)jpeg.length);
-        }
-        if (jpeg.length > 0) {
-            NSLog(@"[AvatarDebug] starting OSS upload, jpegLength=%lu", (unsigned long)jpeg.length);
-            [[FileRequest shared] uploadImage:jpeg type:ImageObjectTypeProfile success:^(HTTPResponse * _Nullable responseObject) {
-                NSString *url = [responseObject.dataObject isKindOfClass:[NSString class]] ? responseObject.dataObject : nil;
-                NSLog(@"[AvatarDebug] OSS upload success, url=%@", url ?: @"nil");
-                if (url.length == 0) {
-                    [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
-                    [[LoadingManager sharedManager] showError:NSLocalizedString(@"profile_avatar_upload_fail", nil) ?: @"头像上传失败，请重试" inView:weakSelf.view];
-                    return;
+        // JPEG 编码是 CPU 密集型，必须放到后台队列，否则主线程冻结会触发 watchdog (0x8badf00d)
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+            NSData *jpeg = UIImageJPEGRepresentation(avatarImage, 0.85);
+            NSLog(@"[AvatarDebug] onSave: avatarNeedsUpload=YES, image=%@, jpegLength=%lu",
+                  avatarImage ? [NSString stringWithFormat:@"%.0fx%.0f", avatarImage.size.width, avatarImage.size.height] : @"nil",
+                  (unsigned long)jpeg.length);
+            // 如果 JPEG 转换失败，尝试 PNG 再转 JPEG
+            if (jpeg.length == 0 && avatarImage) {
+                NSData *png = UIImagePNGRepresentation(avatarImage);
+                if (png.length > 0) {
+                    UIImage *fromPNG = [UIImage imageWithData:png];
+                    jpeg = UIImageJPEGRepresentation(fromPNG, 0.85);
                 }
-                weakSelf.uploadedAvatarKey = url;
-                p.avatar = url;
-                putProfile();
-            } failure:^(NSError * _Nonnull error) {
-                NSLog(@"[AvatarDebug] OSS upload failed: %@", error);
-                [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
-                NSString *msg = error.localizedDescription.length ? error.localizedDescription : (NSLocalizedString(@"profile_avatar_upload_fail", nil) ?: @"头像上传失败，请重试");
-                [[LoadingManager sharedManager] showError:msg inView:weakSelf.view];
-            }];
-            return;
-        } else {
-            // 图片数据为空，提示用户重新选择
-            [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
-            [[LoadingManager sharedManager] showError:@"头像图片无效，请重新选择" inView:weakSelf.view];
-            return;
-        }
+                NSLog(@"[AvatarDebug] PNG fallback jpegLength=%lu", (unsigned long)jpeg.length);
+            }
+            NSData *jpegToUpload = jpeg;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (jpegToUpload.length > 0) {
+                    NSLog(@"[AvatarDebug] starting OSS upload, jpegLength=%lu", (unsigned long)jpegToUpload.length);
+                    [[FileRequest shared] uploadImage:jpegToUpload type:ImageObjectTypeProfile success:^(HTTPResponse * _Nullable responseObject) {
+                        NSString *url = [responseObject.dataObject isKindOfClass:[NSString class]] ? responseObject.dataObject : nil;
+                        NSLog(@"[AvatarDebug] OSS upload success, url=%@", url ?: @"nil");
+                        if (url.length == 0) {
+                            [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+                            [[LoadingManager sharedManager] showError:NSLocalizedString(@"profile_avatar_upload_fail", nil) ?: @"头像上传失败，请重试" inView:weakSelf.view];
+                            return;
+                        }
+                        weakSelf.uploadedAvatarKey = url;
+                        p.avatar = url;
+                        putProfile();
+                    } failure:^(NSError * _Nonnull error) {
+                        NSLog(@"[AvatarDebug] OSS upload failed: %@", error);
+                        [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+                        NSString *msg = error.localizedDescription.length ? error.localizedDescription : (NSLocalizedString(@"profile_avatar_upload_fail", nil) ?: @"头像上传失败，请重试");
+                        [[LoadingManager sharedManager] showError:msg inView:weakSelf.view];
+                    }];
+                } else {
+                    // 图片数据为空，提示用户重新选择
+                    [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+                    [[LoadingManager sharedManager] showError:@"头像图片无效，请重新选择" inView:weakSelf.view];
+                }
+            });
+        });
+        return;
     }
 
     if (self.uploadedAvatarKey.length > 0) {

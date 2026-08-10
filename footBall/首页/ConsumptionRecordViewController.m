@@ -215,7 +215,9 @@ static void kConsumeSetLabelLineHeight(UILabel *label, CGFloat lineHeight) {
         if (d) return d;
     }
     NSDateFormatter *f = [[NSDateFormatter alloc] init];
-    f.locale = [NSLocale currentLocale];
+    // 固定格式串必须用 en_US_POSIX 解析（QA1480），用 currentLocale 会在
+    // ar/th 等区域下解析失败，所有时间显示 --:--，按日筛选全空
+    f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
     f.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
     NSArray<NSString *> *fmts = @[
         @"yyyy-MM-dd'T'HH:mm:ssZ",
@@ -241,7 +243,8 @@ static void kConsumeSetLabelLineHeight(UILabel *label, CGFloat lineHeight) {
     if (e.expenseDate.length >= 10) {
         NSString *s = [e.expenseDate substringToIndex:10];
         NSDateFormatter *f = [[NSDateFormatter alloc] init];
-        f.locale = [NSLocale currentLocale];
+        // 固定格式串必须用 en_US_POSIX（QA1480），避免 ar/th 等区域解析失败
+        f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
         f.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
         f.timeZone = [NSTimeZone localTimeZone];
         f.dateFormat = @"yyyy-MM-dd";
@@ -597,13 +600,14 @@ static void kConsumeSetLabelLineHeight(UILabel *label, CGFloat lineHeight) {
 - (void)reloadRecordsForSelectedDate {
     NSDate *day = self.selectedDate ?: [NSDate date];
     NSDateFormatter *ym = [[NSDateFormatter alloc] init];
-    ym.locale = [NSLocale currentLocale];
+    // 上送给后端的固定格式串必须用 en_US_POSIX（QA1480），避免 ar/th 等区域输出非阿拉伯数字
+    ym.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
     ym.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
     ym.timeZone = [NSTimeZone localTimeZone];
     ym.dateFormat = @"yyyy-MM";
     NSString *monthStr = [ym stringFromDate:day];
     NSDateFormatter *ymd = [[NSDateFormatter alloc] init];
-    ymd.locale = [NSLocale currentLocale];
+    ymd.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
     ymd.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
     ymd.timeZone = [NSTimeZone localTimeZone];
     ymd.dateFormat = @"yyyy-MM-dd";

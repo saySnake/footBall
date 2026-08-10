@@ -166,8 +166,14 @@ static BOOL APIShouldDeferFailureForTokenRefresh(id<APIRequestInterceptor> inter
         
         // 初始化AFHTTPSessionManager
         _sessionManager = [[AFHTTPSessionManager alloc] init];
+        // 仅 Debug 构建下（联调自签证书服务器）放宽 ATS，Release 必须强制证书+域名校验
+#if DEBUG
         _sessionManager.securityPolicy.allowInvalidCertificates = YES;
         _sessionManager.securityPolicy.validatesDomainName = NO;
+#else
+        _sessionManager.securityPolicy.allowInvalidCertificates = NO;
+        _sessionManager.securityPolicy.validatesDomainName = YES;
+#endif
         _sessionManager.requestSerializer = [AFJSONRequestSerializer serializer];
         AFJSONResponseSerializer *responseSerializer = [AFJSONResponseSerializer serializer];
         responseSerializer.removesKeysWithNullValues = YES;

@@ -1375,7 +1375,13 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
 }
 - (void)refreshUserProfile {
     NSString *avatar = AuthManager.sharedManager.user.profile.avatar ?: AuthManager.sharedManager.user.avatar;
-    [_avatarView sd_setImageWithURL:[NSURL URLWithString:avatar]];
+    // avatar 可能为 nil/空：URLWithString:nil 会抛 NSInvalidArgumentException
+    if (avatar.length > 0) {
+        [_avatarView sd_setImageWithURL:[NSURL URLWithString:avatar] placeholderImage:[UIImage imageNamed:kLogoPlaceholder]];
+    } else {
+        [_avatarView sd_cancelCurrentImageLoad];
+        _avatarView.image = [UIImage imageNamed:kLogoPlaceholder];
+    }
     NSString *nickname = AuthManager.sharedManager.user.profile.nickname;
     _challengerLabel.text = nickname.length > 0 ? nickname : @"--";
     NSDateFormatter *df = [[NSDateFormatter alloc] init];
@@ -1426,14 +1432,22 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     Team *item = _teamItems[indexPath.item];
     cell.nameLabel.text = item.name;
     __weak HomeTeamCell *weakCell = cell;
-    [cell.logoView sd_setImageWithURL:[NSURL URLWithString:item.logo]
-                     placeholderImage:[UIImage imageNamed:kLogoPlaceholder]
-                            completed:^(UIImage * _Nullable image, NSError * _Nullable error, SDImageCacheType cacheType, NSURL * _Nullable imageURL) {
-        __strong HomeTeamCell *c = weakCell;
-        if (!c) return;
-        c.logoView.backgroundColor = (image && !error) ? [UIColor clearColor] : [UIColor colorWithWhite:0.6 alpha:1.0];
-        [c applyHomeTeamSelectionAppearance];
-    }];
+    UIImage *teamPlaceholder = [UIImage imageNamed:kLogoPlaceholder];
+    // item.logo 可能为 nil/空：URLWithString:nil 会抛 NSInvalidArgumentException
+    if (item.logo.length > 0) {
+        [cell.logoView sd_setImageWithURL:[NSURL URLWithString:item.logo]
+                         placeholderImage:teamPlaceholder
+                                completed:^(UIImage * _Nullable image, NSError * _Nullable error, SDImageCacheType cacheType, NSURL * _Nullable imageURL) {
+            __strong HomeTeamCell *c = weakCell;
+            if (!c) return;
+            c.logoView.backgroundColor = (image && !error) ? [UIColor clearColor] : [UIColor colorWithWhite:0.6 alpha:1.0];
+            [c applyHomeTeamSelectionAppearance];
+        }];
+    } else {
+        [cell.logoView sd_cancelCurrentImageLoad];
+        cell.logoView.image = teamPlaceholder;
+        cell.logoView.backgroundColor = [UIColor colorWithWhite:0.6 alpha:1.0];
+    }
     if (!cell.logoView.image) {
         cell.logoView.backgroundColor = [UIColor colorWithWhite:0.6 alpha:1.0];
     } else {
@@ -1528,9 +1542,21 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     [cell.timePill setTitle:[self timeTextFromRaw:m.matchDate] forState:UIControlStateNormal];
     BOOL showScore = (![self home_isMatchNotYetStartedForDisplay:m]) || (m.homeScore > 0 || m.awayScore > 0);
     cell.centerLabel.text = showScore ? [NSString stringWithFormat:@"%ld : %ld", (long)m.homeScore, (long)m.awayScore] : @"VS";
-    [cell.homeLogo sd_setImageWithURL:[NSURL URLWithString:m.homeTeamLogo] placeholderImage:[UIImage imageNamed:kLogoPlaceholder]];
-    [cell.awayLogo sd_setImageWithURL:[NSURL URLWithString:m.awayTeamLogo] placeholderImage:[UIImage imageNamed:kLogoPlaceholder]];
-    UIImage *ph = [UIImage imageNamed:kLogoPlaceholder];
+    // 队徽 URL 必须判空：URLWithString:nil 会抛 NSInvalidArgumentException 导致崩溃
+    UIImage *homePlaceholder = [UIImage imageNamed:kLogoPlaceholder];
+    if (m.homeTeamLogo.length > 0) {
+        [cell.homeLogo sd_setImageWithURL:[NSURL URLWithString:m.homeTeamLogo] placeholderImage:homePlaceholder];
+    } else {
+        [cell.homeLogo sd_cancelCurrentImageLoad];
+        cell.homeLogo.image = homePlaceholder;
+    }
+    if (m.awayTeamLogo.length > 0) {
+        [cell.awayLogo sd_setImageWithURL:[NSURL URLWithString:m.awayTeamLogo] placeholderImage:homePlaceholder];
+    } else {
+        [cell.awayLogo sd_cancelCurrentImageLoad];
+        cell.awayLogo.image = homePlaceholder;
+    }
+    UIImage *ph = homePlaceholder;
     if (!ph) {
         cell.homeLogo.backgroundColor = [UIColor colorWithWhite:0.85 alpha:1.0];
         cell.awayLogo.backgroundColor = [UIColor colorWithWhite:0.85 alpha:1.0];

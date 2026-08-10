@@ -87,7 +87,13 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         self.lockView.hidden = YES;
         if (item.stamp) {
             self.backgroundColor = [UIColor colorWithHexString:@"#9C9C9C"];
-            [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
+            // image 字段可能为空：URLWithString:nil 会抛 NSInvalidArgumentException 导致崩溃
+            if (item.stamp.image.length > 0) {
+                [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
+            } else {
+                [self sd_cancelImageLoadForState:UIControlStateNormal];
+                [self setImage:nil forState:UIControlStateNormal];
+            }
         } else {
             self.backgroundColor = [UIColor colorWithHexString:@"#E9E9E9"];
             [self sd_cancelImageLoadForState:UIControlStateNormal];
@@ -102,7 +108,13 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         if (item.stamp) {
             self.stampState = PassportStampGridItemViewStateUpdate;
             self.lockView.hidden = YES;
-            [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
+            // image 字段可能为空：URLWithString:nil 会抛 NSInvalidArgumentException
+            if (item.stamp.image.length > 0) {
+                [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
+            } else {
+                [self sd_cancelImageLoadForState:UIControlStateNormal];
+                [self setImage:nil forState:UIControlStateNormal];
+            }
         } else {
             self.stampState = PassportStampGridItemViewStateAdd;
             self.lockView.hidden = NO;
@@ -115,7 +127,13 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         self.lockView.image = [UIImage imageNamed:@"lock_icon"];
         self.lockView.hidden = NO;
         if (item.stamp) {
-            [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
+            // image 字段可能为空：URLWithString:nil 会抛 NSInvalidArgumentException
+            if (item.stamp.image.length > 0) {
+                [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
+            } else {
+                [self sd_cancelImageLoadForState:UIControlStateNormal];
+                [self setImage:nil forState:UIControlStateNormal];
+            }
         } else {
             [self sd_cancelImageLoadForState:UIControlStateNormal];
             [self setImage:nil forState:UIControlStateNormal];
