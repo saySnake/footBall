@@ -229,9 +229,11 @@ static const CGFloat kPillCircleSize = 44.f;
 - (void)tabBarController:(UITabBarController *)tabBarController didSelectViewController:(UIViewController *)viewController {
     [self updatePillSelection];
     [self updateBottomBarHiddenForController:viewController];
-    if (tabBarController.selectedIndex == 2) {
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"community_friends_did_change" object:nil];
-    }
+    // 注意：不再向社区 tab 发送 community_friends_did_change 通知。
+    // 切 tab 不是"好友数据已变更"事件，原本发送会让 LocationViewController.onFriendsChanged
+    // 以 forced:YES 绕过 kFriendsRefreshMinInterval 节流；紧接着 viewWillAppear 又会再触发
+    // 一次刷新，导致每次点 tab 至少 2 次冗余请求、节流被完全架空。
+    // 实际数据刷新交给 LocationViewController.viewWillAppear 的节流路径处理。
 }
 
 #pragma mark - UINavigationControllerDelegate

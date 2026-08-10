@@ -526,46 +526,66 @@ static CGFloat const kRAVerifiedBackImageToCaption = 8.f;   // 稿 643−638 约
         [self showError:NSLocalizedString(@"auth_please_upload_both", nil)];
         return;
     }
-    NSData *frontJPEG = UIImageJPEGRepresentation(self.frontImage, 0.85);
-    NSData *backJPEG = UIImageJPEGRepresentation(self.backImage, 0.85);
-    if (frontJPEG.length == 0 || backJPEG.length == 0) {
-        [self showError:NSLocalizedString(@"auth_please_upload_both", nil)];
-        return;
-    }
     [self showLoading];
     __weak typeof(self) weakSelf = self;
-    [[FileRequest shared] uploadImage:frontJPEG type:ImageObjectTypeIDCard success:^(HTTPResponse * _Nullable r1) {
-        NSString *frontUrl = [r1.dataObject isKindOfClass:[NSString class]] ? r1.dataObject : nil;
-        if (frontUrl.length == 0) {
+    UIImage *frontImage = self.frontImage;
+    UIImage *backImage = self.backImage;
+    // JPEG 编码是 CPU 密集型操作，必须放到后台队列，否则主线程冻结会触发 watchdog (0x8badf00d)
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSData *frontJPEG = UIImageJPEGRepresentation(frontImage, 0.85);
+        NSData *backJPEG = UIImageJPEGRepresentation(backImage, 0.85);
+        dispatch_async(dispatch_get_main_queue(), ^{
             __strong typeof(weakSelf) self = weakSelf;
             if (!self) return;
-            [self hideLoading];
-            [self showError:NSLocalizedString(@"auth_please_upload_both", nil)];
-            return;
-        }
-        [[FileRequest shared] uploadImage:backJPEG type:ImageObjectTypeIDCard success:^(HTTPResponse * _Nullable r2) {
-            NSString *backUrl = [r2.dataObject isKindOfClass:[NSString class]] ? r2.dataObject : nil;
-            if (backUrl.length == 0) {
-                __strong typeof(weakSelf) self = weakSelf;
-                if (!self) return;
+            if (frontJPEG.length == 0 || backJPEG.length == 0) {
                 [self hideLoading];
                 [self showError:NSLocalizedString(@"auth_please_upload_both", nil)];
                 return;
             }
-            [[VerificationRequest shared] submitRealnameWithFrontUrl:frontUrl backUrl:backUrl success:^(HTTPResponse * _Nullable responseObject) {
-                __strong typeof(weakSelf) self = weakSelf;
-                if (!self) return;
-                void (^finishFlow)(void) = ^{
+            [[FileRequest shared] uploadImage:frontJPEG type:ImageObjectTypeIDCard success:^(HTTPResponse * _Nullable r1) {
+                NSString *frontUrl = [r1.dataObject isKindOfClass:[NSString class]] ? r1.dataObject : nil;
+                if (frontUrl.length == 0) {
+                    __strong typeof(weakSelf) self = weakSelf;
+                    if (!self) return;
                     [self hideLoading];
-                    [self showSuccess:NSLocalizedString(@"auth_realname_success", nil)];
-                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                        [self.navigationController popViewControllerAnimated:YES];
-                    });
-                };
-                [[VerificationRequest shared] fetchStatusSuccess:^(HTTPResponse * _Nullable responseObject) {
-                    finishFlow();
+                    [self showError:NSLocalizedString(@"auth_please_upload_both", nil)];
+                    return;
+                }
+                [[FileRequest shared] uploadImage:backJPEG type:ImageObjectTypeIDCard success:^(HTTPResponse * _Nullable r2) {
+                    NSString *backUrl = [r2.dataObject isKindOfClass:[NSString class]] ? r2.dataObject : nil;
+                    if (backUrl.length == 0) {
+                        __strong typeof(weakSelf) self = weakSelf;
+                        if (!self) return;
+                        [self hideLoading];
+                        [self showError:NSLocalizedString(@"auth_please_upload_both", nil)];
+                        return;
+                    }
+                    [[VerificationRequest shared] submitRealnameWithFrontUrl:frontUrl backUrl:backUrl success:^(HTTPResponse * _Nullable responseObject) {
+                        __strong typeof(weakSelf) self = weakSelf;
+                        if (!self) return;
+                        void (^finishFlow)(void) = ^{
+                            [self hideLoading];
+                            [self showSuccess:NSLocalizedString(@"auth_realname_success", nil)];
+                            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                                [self.navigationController popViewControllerAnimated:YES];
+                            });
+                        };
+                        [[VerificationRequest shared] fetchStatusSuccess:^(HTTPResponse * _Nullable responseObject) {
+                            finishFlow();
+                        } failure:^(NSError * _Nonnull error) {
+                            finishFlow();
+                        }];
+                    } failure:^(NSError * _Nonnull error) {
+                        __strong typeof(weakSelf) self = weakSelf;
+                        if (!self) return;
+                        [self hideLoading];
+                        [self showError:error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"profile_save_fail", nil)];
+                    }];
                 } failure:^(NSError * _Nonnull error) {
-                    finishFlow();
+                    __strong typeof(weakSelf) self = weakSelf;
+                    if (!self) return;
+                    [self hideLoading];
+                    [self showError:error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"profile_save_fail", nil)];
                 }];
             } failure:^(NSError * _Nonnull error) {
                 __strong typeof(weakSelf) self = weakSelf;
@@ -573,18 +593,8 @@ static CGFloat const kRAVerifiedBackImageToCaption = 8.f;   // 稿 643−638 约
                 [self hideLoading];
                 [self showError:error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"profile_save_fail", nil)];
             }];
-        } failure:^(NSError * _Nonnull error) {
-            __strong typeof(weakSelf) self = weakSelf;
-            if (!self) return;
-            [self hideLoading];
-            [self showError:error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"profile_save_fail", nil)];
-        }];
-    } failure:^(NSError * _Nonnull error) {
-        __strong typeof(weakSelf) self = weakSelf;
-        if (!self) return;
-        [self hideLoading];
-        [self showError:error.localizedDescription.length ? error.localizedDescription : NSLocalizedString(@"profile_save_fail", nil)];
-    }];
+        });
+    });
 }
 
 - (void)updateLocalizedStrings {

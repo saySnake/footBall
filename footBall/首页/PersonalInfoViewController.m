@@ -900,46 +900,56 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
 }
 
 - (void)uploadAvatarImage:(UIImage *)image {
-    NSData *jpeg = UIImageJPEGRepresentation(image, 0.85);
-    if (jpeg.length == 0) {
-        NSData *png = UIImagePNGRepresentation(image);
-        if (png.length > 0) {
-            jpeg = UIImageJPEGRepresentation([UIImage imageWithData:png], 0.85);
-        }
-    }
-    if (jpeg.length == 0) {
-        NSLog(@"[AvatarDebug] uploadAvatarImage: jpeg data empty, skip");
-        return;
-    }
-    NSLog(@"[AvatarDebug] uploadAvatarImage: start upload, jpegLength=%lu", (unsigned long)jpeg.length);
     self.avatarUploadInProgress = YES;
-    // 显示上传中提示
+    // 显示上传中提示（在主线程立即显示，与后台 JPEG 编码并行）
     [[LoadingManager sharedManager] showLoadingInView:self.view];
     __weak typeof(self) weakSelf = self;
-    [[FileRequest shared] uploadImage:jpeg type:ImageObjectTypeProfile success:^(HTTPResponse * _Nullable responseObject) {
-        __strong typeof(weakSelf) self = weakSelf;
-        if (!self) return;
-        NSString *key = [responseObject.dataObject isKindOfClass:[NSString class]] ? responseObject.dataObject : nil;
-        NSLog(@"[AvatarDebug] uploadAvatarImage: success, key=%@", key ?: @"nil");
-        [[LoadingManager sharedManager] hideLoadingInView:self.view];
-        self.avatarUploadInProgress = NO;
-        if (key.length > 0) {
-            self.uploadedAvatarKey = key;
-            self.avatarNeedsUpload = NO;
-            // 立即把头像 key 更新到服务端，不等用户点保存
-            [self syncAvatarKeyToServer:key];
-        } else {
-            [[LoadingManager sharedManager] showError:@"头像上传失败，请重试" inView:self.view];
+    // JPEG 编码是 CPU 密集型，必须放到后台队列，否则主线程冻结会触发 watchdog (0x8badf00d)
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSData *jpeg = UIImageJPEGRepresentation(image, 0.85);
+        if (jpeg.length == 0) {
+            NSData *png = UIImagePNGRepresentation(image);
+            if (png.length > 0) {
+                jpeg = UIImageJPEGRepresentation([UIImage imageWithData:png], 0.85);
+            }
         }
-    } failure:^(NSError * _Nonnull error) {
-        __strong typeof(weakSelf) self = weakSelf;
-        if (!self) return;
-        NSLog(@"[AvatarDebug] uploadAvatarImage: failed, error=%@", error);
-        [[LoadingManager sharedManager] hideLoadingInView:self.view];
-        self.avatarUploadInProgress = NO;
-        [[LoadingManager sharedManager] showError:@"头像上传失败，请重试" inView:self.view];
-        // 上传失败，保留 avatarNeedsUpload=YES，onSave 时重试
-    }];
+        NSData *jpegToUpload = jpeg;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) return;
+            if (jpegToUpload.length == 0) {
+                NSLog(@"[AvatarDebug] uploadAvatarImage: jpeg data empty, skip");
+                [[LoadingManager sharedManager] hideLoadingInView:self.view];
+                self.avatarUploadInProgress = NO;
+                return;
+            }
+            NSLog(@"[AvatarDebug] uploadAvatarImage: start upload, jpegLength=%lu", (unsigned long)jpegToUpload.length);
+            [[FileRequest shared] uploadImage:jpegToUpload type:ImageObjectTypeProfile success:^(HTTPResponse * _Nullable responseObject) {
+                __strong typeof(weakSelf) self = weakSelf;
+                if (!self) return;
+                NSString *key = [responseObject.dataObject isKindOfClass:[NSString class]] ? responseObject.dataObject : nil;
+                NSLog(@"[AvatarDebug] uploadAvatarImage: success, key=%@", key ?: @"nil");
+                [[LoadingManager sharedManager] hideLoadingInView:self.view];
+                self.avatarUploadInProgress = NO;
+                if (key.length > 0) {
+                    self.uploadedAvatarKey = key;
+                    self.avatarNeedsUpload = NO;
+                    // 立即把头像 key 更新到服务端，不等用户点保存
+                    [self syncAvatarKeyToServer:key];
+                } else {
+                    [[LoadingManager sharedManager] showError:@"头像上传失败，请重试" inView:self.view];
+                }
+            } failure:^(NSError * _Nonnull error) {
+                __strong typeof(weakSelf) self = weakSelf;
+                if (!self) return;
+                NSLog(@"[AvatarDebug] uploadAvatarImage: failed, error=%@", error);
+                [[LoadingManager sharedManager] hideLoadingInView:self.view];
+                self.avatarUploadInProgress = NO;
+                [[LoadingManager sharedManager] showError:@"头像上传失败，请重试" inView:self.view];
+                // 上传失败，保留 avatarNeedsUpload=YES，onSave 时重试
+            }];
+        });
+    });
 }
 
 - (void)syncAvatarKeyToServer:(NSString *)key {

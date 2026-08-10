@@ -730,46 +730,56 @@ static CGFloat PNMatchVerifyDimBaseAlpha(void) {
     NSMutableArray *urls = [NSMutableArray arrayWithCapacity:_photos.count];
     __block NSInteger uploadFailures = 0;
     dispatch_group_t group = dispatch_group_create();
-    for (int i = 0; i < _photos.count; i++) {
-        NSData *data = UIImageJPEGRepresentation(_photos[i], 0.5);
-        if (!data) {
-            uploadFailures++;
-            continue;
-        }
-        dispatch_group_enter(group);
-        [FileRequest.shared uploadImage:data type:ImageObjectTypeMatch success:^(HTTPResponse * _Nullable responseObject) {
-            id objectKey = responseObject.dataObject;
-            if ([objectKey isKindOfClass:[NSString class]] && [(NSString *)objectKey length] > 0) {
-                [urls addObject:objectKey];
-            } else {
+    // JPEG 编码是 CPU 密集型操作，必须放到后台队列，否则主线程冻结会触发 watchdog (0x8badf00d)
+    NSArray<UIImage *> *photos = [_photos copy];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        for (int i = 0; i < photos.count; i++) {
+            NSData *data = UIImageJPEGRepresentation(photos[i], 0.5);
+            if (!data) {
                 uploadFailures++;
+                continue;
             }
-            dispatch_group_leave(group);
-        } failure:^(NSError * _Nonnull error) {
-            uploadFailures++;
-            dispatch_group_leave(group);
-        }];
-    }
-    dispatch_group_notify(group, dispatch_get_main_queue(), ^{
-        if (uploadFailures > 0 || urls.count < 2) {
-            self.confirmInFlight = NO;
-            [self updateConfirmButtonState];
-            [QMUITips showError:@"照片上传失败，请重试"];
-            return;
+            dispatch_group_enter(group);
+            [FileRequest.shared uploadImage:data type:ImageObjectTypeMatch success:^(HTTPResponse * _Nullable responseObject) {
+                id objectKey = responseObject.dataObject;
+                if ([objectKey isKindOfClass:[NSString class]] && [(NSString *)objectKey length] > 0) {
+                    @synchronized(urls) {
+                        [urls addObject:objectKey];
+                    }
+                } else {
+                    @synchronized(urls) {
+                        uploadFailures++;
+                    }
+                }
+                dispatch_group_leave(group);
+            } failure:^(NSError * _Nonnull error) {
+                @synchronized(urls) {
+                    uploadFailures++;
+                }
+                dispatch_group_leave(group);
+            }];
         }
-        NSString *verifyId = self.matchId.length > 0 ? self.matchId : self.recordId;
-        [MatchRequest.shared verifyMatchRecord:verifyId body:@{@"photoUrls": urls, @"latitude": @(self.coordinate.latitude), @"longitude": @(self.coordinate.longitude), @"address": self.currentAddress ?: @""} success:^(HTTPResponse * _Nullable responseObject) {
-            self.confirmInFlight = NO;
-            [[NSNotificationCenter defaultCenter] postNotificationName:PNMatchRecordDidUpdateNotification object:nil];
-            if (self.completion) {
-                self.completion();
+        dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+            if (uploadFailures > 0 || urls.count < 2) {
+                self.confirmInFlight = NO;
+                [self updateConfirmButtonState];
+                [QMUITips showError:@"照片上传失败，请重试"];
+                return;
             }
-            [self dismissWithCardAnimation];
-        } failure:^(NSError * _Nonnull error) {
-            self.confirmInFlight = NO;
-            [self updateConfirmButtonState];
-            [QMUITips showError:error.localizedDescription];
-        }];
+            NSString *verifyId = self.matchId.length > 0 ? self.matchId : self.recordId;
+            [MatchRequest.shared verifyMatchRecord:verifyId body:@{@"photoUrls": urls, @"latitude": @(self.coordinate.latitude), @"longitude": @(self.coordinate.longitude), @"address": self.currentAddress ?: @""} success:^(HTTPResponse * _Nullable responseObject) {
+                self.confirmInFlight = NO;
+                [[NSNotificationCenter defaultCenter] postNotificationName:PNMatchRecordDidUpdateNotification object:nil];
+                if (self.completion) {
+                    self.completion();
+                }
+                [self dismissWithCardAnimation];
+            } failure:^(NSError * _Nonnull error) {
+                self.confirmInFlight = NO;
+                [self updateConfirmButtonState];
+                [QMUITips showError:error.localizedDescription];
+            }];
+        });
     });
 }
 

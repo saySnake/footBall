@@ -377,7 +377,10 @@
     for (NSInteger idx = 0; idx < self.mutableSelectedTeams.count; idx++) {
         Team *team = self.mutableSelectedTeams[idx];
         SelectedTeamBadgeView *badge = [[SelectedTeamBadgeView alloc] initWithFrame:CGRectZero];
-        [badge.logoView sd_setImageWithURL:[NSURL URLWithString:team.logo]];
+        // team.logo 可能为 nil/空：URLWithString:nil 会抛 NSInvalidArgumentException 导致首启崩溃
+        if (team.logo.length > 0) {
+            [badge.logoView sd_setImageWithURL:[NSURL URLWithString:team.logo]];
+        }
         badge.removeButton.tag = idx;
         [badge.removeButton addTarget:self action:@selector(removeTeamTapped:) forControlEvents:UIControlEventTouchUpInside];
         [self.teamsStackView addArrangedSubview:badge];
@@ -687,7 +690,13 @@
     }
     Team *m = self.filteredTeams[indexPath.item];
     cell.nameLabel.text = m.name;
-    [cell.logoView sd_setImageWithURL:[NSURL URLWithString:m.logo]];
+    // m.logo 可能为 nil/空：URLWithString:nil 会抛 NSInvalidArgumentException 导致首启崩溃
+    if (m.logo.length > 0) {
+        [cell.logoView sd_setImageWithURL:[NSURL URLWithString:m.logo]];
+    } else {
+        [cell.logoView sd_cancelCurrentImageLoad];
+        cell.logoView.image = nil;
+    }
     BOOL selected = [self.selectedTeams containsObject:m];
     cell.checkmarkView.hidden = !selected;
     // 按设计图：选中 = 圆形加粗绿色描边；未选中 = 圆形细浅灰描边（描边在圆形容器上）
