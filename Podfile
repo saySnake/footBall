@@ -50,15 +50,58 @@ post_install do |installer|
     end
   end
 
-  afn_dir = File.join(installer.sandbox.root.to_s, 'AFNetworking', 'AFNetworking')
+  afn_dir = File.join(installer.sandbox.root.to_s, 'AFNetworking')
   if Dir.exist?(afn_dir)
-    Dir.glob(File.join(afn_dir, '*.{h,m}')).each do |path|
+    Dir.glob(File.join(afn_dir, '**', '*.{h,m}')).each do |path|
       next unless File.file?(path)
       system('chmod', 'u+w', path)
       contents = File.read(path)
       patched = contents.gsub(/^#import <netinet6\/in6\.h>\s*\n/, '')
       File.write(path, patched) if patched != contents
     end
+  end
+
+  # ITMS-91061: AFNetworking / MBProgressHUD 必须在各自 framework 内带 PrivacyInfo.xcprivacy
+  privacy_manifest = <<~'PLIST'
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+    	<key>NSPrivacyTracking</key>
+    	<false/>
+    	<key>NSPrivacyTrackingDomains</key>
+    	<array/>
+    	<key>NSPrivacyCollectedDataTypes</key>
+    	<array/>
+    	<key>NSPrivacyAccessedAPITypes</key>
+    	<array/>
+    </dict>
+    </plist>
+  PLIST
+
+  %w[AFNetworking MBProgressHUD].each do |pod_name|
+    pod_root = File.join(installer.sandbox.root.to_s, pod_name)
+    next unless Dir.exist?(pod_root)
+
+    privacy_path = File.join(pod_root, 'PrivacyInfo.xcprivacy')
+    system('chmod', 'u+w', pod_root)
+    File.write(privacy_path, privacy_manifest)
+
+    target = installer.pods_project.targets.find { |t| t.name == pod_name }
+    next unless target
+
+    # Avoid duplicate file refs across repeated pod install
+    existing = target.resources_build_phase.files.find do |bf|
+      bf.file_ref && bf.file_ref.path && bf.file_ref.path.end_with?('PrivacyInfo.xcprivacy')
+    end
+    if existing
+      puts "[post_install] PrivacyInfo already linked for #{pod_name}"
+      next
+    end
+
+    file_ref = installer.pods_project.main_group.find_subpath("Pods/#{pod_name}", true).new_file(privacy_path)
+    target.resources_build_phase.add_file_reference(file_ref, true)
+    puts "[post_install] Added PrivacyInfo.xcprivacy to #{pod_name}"
   end
 
   # UIWebView: Apple 不再接受使用 UIWebView 的 App，移除所有引用
