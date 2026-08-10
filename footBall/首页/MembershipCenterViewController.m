@@ -1960,12 +1960,29 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     }
 }
 
+/// 临时调试用：屏幕中央弹一个 1.5 秒可见的 toast，用于定位"点击无反应"问题。
+/// 诊断完会移除。
+- (void)showDebugToast:(NSString *)msg {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        MBProgressHUD *hud = [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+        hud.mode = MBProgressHUDModeText;
+        hud.label.text = msg;
+        hud.removeFromSuperViewOnHide = YES;
+        hud.userInteractionEnabled = NO;
+        [hud hideAnimated:YES afterDelay:1.5];
+    });
+}
+
 - (void)onTapPay {
+    // === 临时调试：屏幕可见反馈，定位"点击无反应"问题 ===
+    [self showDebugToast:[NSString stringWithFormat:@"onTapPay 进入 (payInFlight=%d restoreInFlight=%d)",
+                          self.payInFlight, self.restoreInFlight]];
     // IAP 支付硬约束：购买必须登录态。
     // 入口已拦截（Profile/StampAlbum），这里做兜底：用户进入会员中心后 logout、token 过期等场景。
     // 服务端 verifyAndActivate 会校验 JWT，未登录返回 401，但 Apple 支付已经发起无法回滚，
     // 用户付了款却拿不到会员，所以必须在 addPayment 之前拦截。
     if (![AuthManager sharedManager].isLoggedIn) {
+        [self showDebugToast:@"分支: 未登录拦截"];
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"请先登录"
                                                                        message:@"开通会员需要先登录，登录后可继续完成支付"
                                                                 preferredStyle:UIAlertControllerStyleAlert];
@@ -1986,9 +2003,11 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     // 同时拦截 restoreInFlight：restore 进行中再发起购买会让 SKPaymentQueue 状态混乱
     //（同时有 restore 和 payment 在跑），Apple 行为未定义。
     if (self.payInFlight || self.restoreInFlight) {
+        [self showDebugToast:@"分支: payInFlight/restoreInFlight 静默拦截"];
         return;
     }
     if (!self.agreementCheckBtn.selected) {
+        [self showDebugToast:@"分支: 协议未勾选"];
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"提示"
                                                                        message:@"请先勾选《会员服务协议》"
                                                                 preferredStyle:UIAlertControllerStyleAlert];
@@ -2044,18 +2063,24 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 
     appleProductId = [appleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (appleProductId.length == 0) {
+        [self showDebugToast:[NSString stringWithFormat:@"分支: appleProductId 为空 (apiPlans=%lu, idx=%ld)",
+                              (unsigned long)self.apiPlans.count, (long)self.currentIndex]];
         [[LoadingManager sharedManager] showError:@"该方案暂不支持购买" inView:self.view];
         return;
     }
 
     if (![SKPaymentQueue canMakePayments]) {
+        [self showDebugToast:@"分支: canMakePayments=NO"];
         [[LoadingManager sharedManager] showError:@"当前设备不支持应用内购买，请检查家长控制设置" inView:self.view];
         return;
     }
 
     if (self.payInFlight) {
+        [self showDebugToast:@"分支: payInFlight 二次拦截"];
         return;
     }
+
+    [self showDebugToast:[NSString stringWithFormat:@"分支: 即将发起支付 appleProductId=%@ planId=%@", appleProductId, planId]];
 
     self.pendingPlanId = planId;
     // 关键：payInFlight 必须在 startPaymentWithProduct / fetchProductAndPay 调用前就置 YES，
@@ -2082,10 +2107,10 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
         [[LoadingManager sharedManager] showError:@"商品标识无效，请稍后重试" inView:self.view];
         return;
     }
-    if (self.payInFlight) {
-        return;
-    }
-    self.payInFlight = YES;
+    // 注意：不能在此处再检查/设置 payInFlight。
+    // onTapPay 在调用本方法之前就已经把 payInFlight 置为 YES（见 onTapPay 注释），
+    // 这里再检查 payInFlight 会立即 return，导致首次进入（skProducts 无缓存）的购买流程
+    // 永远走不通——SKProductsRequest 根本不会被 start，回调当然不会来。
     self.payBtn.enabled = NO;
     // cancel 不会走 didFail，先清掉可能残留的 HUD，避免叠层卡死
     [self.productsRequest cancel];
@@ -2094,6 +2119,8 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     self.productsRequest = [[SKProductsRequest alloc] initWithProductIdentifiers:[NSSet setWithObject:productId]];
     self.productsRequest.delegate = self;
     [self.productsRequest start];
+    // === 临时调试：确认 SKProductsRequest 已 start ===
+    [self showDebugToast:[NSString stringWithFormat:@"已 start SKProductsRequest\nproductId=%@", productId]];
 }
 
 /// 拿到 SKProduct 后发起支付
@@ -2120,6 +2147,12 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
         NSLog(@"[IAP] products=%@, invalidProductIdentifiers=%@",
               [response.products valueForKey:@"productIdentifier"],
               response.invalidProductIdentifiers);
+        // === 临时调试：把 products/invalid 数量显示出来，定位沙箱面板不弹的根因 ===
+        NSUInteger validCount = response.products.count;
+        NSUInteger invalidCount = response.invalidProductIdentifiers.count;
+        NSString *firstInvalid = invalidCount > 0 ? response.invalidProductIdentifiers.firstObject : @"(无)";
+        [self showDebugToast:[NSString stringWithFormat:@"products=%lu invalid=%lu\n首条invalid=%@",
+                              (unsigned long)validCount, (unsigned long)invalidCount, firstInvalid]];
         if (response.products.count == 0) {
             // 商品无效：才算真正的流程结束，清 payInFlight 让用户可以重试
             self.payInFlight = NO;
@@ -2136,6 +2169,9 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
         [MBProgressHUD hideHUDForView:self.view animated:YES];
         self.payInFlight = NO;
         [self updatePayButtonState];
+        // === 临时调试：SKProductsRequest 失败时把错误显示出来 ===
+        [self showDebugToast:[NSString stringWithFormat:@"拉商品失败: code=%ld\n%@",
+                              (long)error.code, error.localizedDescription ?: @"(无描述)"]];
         NSString *msg = error.localizedDescription ?: @"获取商品信息失败，请稍后重试";
         [[LoadingManager sharedManager] showError:msg inView:self.view];
     });
