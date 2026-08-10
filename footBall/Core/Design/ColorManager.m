@@ -92,8 +92,7 @@
 #pragma mark - Helper Methods
 
 - (BOOL)isDarkMode {
-    ThemeManager *themeManager = [ThemeManager sharedManager];
-    return [themeManager actualTheme] == AppThemeDark;
+    return [ThemeManager sharedManager].isNightMode;
 }
 
 #pragma mark - 主色调
@@ -175,57 +174,49 @@
 #pragma mark - 中性色
 
 - (UIColor *)backgroundColor {
-    if (@available(iOS 13.0, *)) {
-        return [UIColor systemBackgroundColor];
-    } else {
-        return [UIColor whiteColor];
-    }
+    // 由 ThemeManager.nightMode 决定，避免系统动态颜色造成“第二套”主题
+    return [ThemeManager sharedManager].backgroundColor;
 }
 
 - (UIColor *)secondaryBackgroundColor {
-    if (@available(iOS 13.0, *)) {
-        return [UIColor secondarySystemBackgroundColor];
-    } else {
-        return [UIColor colorWithRed:0.95 green:0.95 blue:0.97 alpha:1.0];
-    }
+    BOOL isDark = [self isDarkMode];
+    return isDark
+        ? [UIColor colorWithRed:0.10 green:0.10 blue:0.10 alpha:1.0]
+        : [UIColor colorWithRed:0.95 green:0.95 blue:0.97 alpha:1.0];
 }
 
 - (UIColor *)tertiaryBackgroundColor {
-    if (@available(iOS 13.0, *)) {
-        return [UIColor tertiarySystemBackgroundColor];
-    } else {
-        return [UIColor colorWithRed:0.9 green:0.9 blue:0.92 alpha:1.0];
-    }
+    BOOL isDark = [self isDarkMode];
+    return isDark
+        ? [UIColor colorWithRed:0.15 green:0.15 blue:0.15 alpha:1.0]
+        : [UIColor colorWithRed:0.9 green:0.9 blue:0.92 alpha:1.0];
 }
 
 #pragma mark - 文本颜色
 
 - (UIColor *)textColor {
-    return [UIColor blackColor];
+    return [ThemeManager sharedManager].textColor;
 }
 
 - (UIColor *)secondaryTextColor {
-    if (@available(iOS 13.0, *)) {
-        return [UIColor secondaryLabelColor];
-    } else {
-        return [UIColor colorWithRed:0.6 green:0.6 blue:0.6 alpha:1.0];
-    }
+    BOOL isDark = [self isDarkMode];
+    return isDark
+        ? [UIColor colorWithRed:0.6 green:0.6 blue:0.6 alpha:1.0]
+        : [UIColor colorWithRed:0.4 green:0.4 blue:0.4 alpha:1.0];
 }
 
 - (UIColor *)tertiaryTextColor {
-    if (@available(iOS 13.0, *)) {
-        return [UIColor tertiaryLabelColor];
-    } else {
-        return [UIColor colorWithRed:0.4 green:0.4 blue:0.4 alpha:1.0];
-    }
+    BOOL isDark = [self isDarkMode];
+    return isDark
+        ? [UIColor colorWithRed:0.45 green:0.45 blue:0.45 alpha:1.0]
+        : [UIColor colorWithRed:0.55 green:0.55 blue:0.55 alpha:1.0];
 }
 
 - (UIColor *)placeholderTextColor {
-    if (@available(iOS 13.0, *)) {
-        return [UIColor placeholderTextColor];
-    } else {
-        return [UIColor colorWithRed:0.7 green:0.7 blue:0.7 alpha:1.0];
-    }
+    BOOL isDark = [self isDarkMode];
+    return isDark
+        ? [UIColor colorWithRed:0.5 green:0.5 blue:0.5 alpha:1.0]
+        : [UIColor colorWithRed:0.7 green:0.7 blue:0.7 alpha:1.0];
 }
 
 - (UIColor *)disabledTextColor {
@@ -235,19 +226,11 @@
 #pragma mark - 边框和分割线
 
 - (UIColor *)separatorColor {
-    if (@available(iOS 13.0, *)) {
-        return [UIColor separatorColor];
-    } else {
-        return [UIColor colorWithRed:0.78 green:0.78 blue:0.8 alpha:1.0];
-    }
+    return [ThemeManager sharedManager].separatorColor;
 }
 
 - (UIColor *)borderColor {
-    if (@available(iOS 13.0, *)) {
-        return [UIColor separatorColor];
-    } else {
-        return [UIColor colorWithRed:0.78 green:0.78 blue:0.8 alpha:1.0];
-    }
+    return [ThemeManager sharedManager].separatorColor;
 }
 
 #pragma mark - 遮罩和覆盖层

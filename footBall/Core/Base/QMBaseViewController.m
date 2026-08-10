@@ -201,20 +201,9 @@
 
 - (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
     [super traitCollectionDidChange:previousTraitCollection];
-    
-    // 检测系统主题变化（iOS 13+）
-    // 注意：ThemeObserverView 已经全局监听了，这里作为备用检测
-    if (@available(iOS 13.0, *)) {
-        if (previousTraitCollection && 
-            [previousTraitCollection hasDifferentColorAppearanceComparedToTraitCollection:self.traitCollection]) {
-            // 系统主题发生了变化
-            ThemeManager *themeManager = [ThemeManager sharedManager];
-            if (themeManager.currentTheme == AppThemeAuto) {
-                // 如果当前主题是跟随系统，触发主题更新通知
-                [themeManager handleSystemThemeChange];
-            }
-        }
-    }
+
+    // 主题由 ThemeManager.nightMode 单一开关控制，且 window.overrideUserInterfaceStyle
+    // 已被锁定，系统主题变化不会影响 App 内部主题，因此这里不需要任何处理。
 }
 
 #pragma mark - Override Methods
