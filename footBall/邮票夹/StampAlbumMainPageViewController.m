@@ -483,6 +483,21 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 
 - (void)presentStampUnlockDialog {
     __weak typeof(self) weakSelf = self;
+    // IAP 支付硬约束：解锁邮票需开通会员，会员购买必须登录态。
+    // 未登录拦截：弹提示并跳登录页，避免进入会员中心后 getPlans 401 / 支付无法激活。
+    if (![AuthManager sharedManager].isLoggedIn) {
+        [QMUITips showError:(NSLocalizedString(@"membership_login_required", nil) ?: @"请先登录后再开通会员")
+                  inView:weakSelf.view hideAfterDelay:1.6];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            Class loginClass = NSClassFromString(@"LoginChoiceViewController");
+            if (!loginClass) return;
+            UIViewController *loginVC = [loginClass new];
+            UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
+            nav.modalPresentationStyle = UIModalPresentationFullScreen;
+            [weakSelf presentViewController:nav animated:YES completion:nil];
+        });
+        return;
+    }
     StampUnlockPopupViewController *vc = [[StampUnlockPopupViewController alloc] init];
     vc.onConfirm = ^(NSInteger initialPlanIndex) {
         __strong typeof(weakSelf) self = weakSelf;
