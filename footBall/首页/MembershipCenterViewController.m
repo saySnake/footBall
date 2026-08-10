@@ -1962,14 +1962,41 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 
 /// 临时调试用：屏幕中央弹一个 1.5 秒可见的 toast，用于定位"点击无反应"问题。
 /// 诊断完会移除。
+/// 关键：用独立的 UILabel 而非 MBProgressHUD，避免与支付流程的 loading HUD 共用
+/// MBProgressHUD 栈导致"支付取消后菊花一直转"（多个 HUD 叠加，hideHUD 只隐藏最上面一个）。
 - (void)showDebugToast:(NSString *)msg {
     dispatch_async(dispatch_get_main_queue(), ^{
-        MBProgressHUD *hud = [MBProgressHUD showHUDAddedTo:self.view animated:YES];
-        hud.mode = MBProgressHUDModeText;
-        hud.label.text = msg;
-        hud.removeFromSuperViewOnHide = YES;
-        hud.userInteractionEnabled = NO;
-        [hud hideAnimated:YES afterDelay:1.5];
+        // 移除上一次未消失的 toast，避免叠加
+        for (UIView *sub in self.view.subviews) {
+            if (sub.tag == 9527) [sub removeFromSuperview];
+        }
+
+        UILabel *toast = [[UILabel alloc] init];
+        toast.text = msg;
+        toast.numberOfLines = 0;
+        toast.textAlignment = NSTextAlignmentCenter;
+        toast.font = [UIFont systemFontOfSize:12];
+        toast.textColor = [UIColor whiteColor];
+        toast.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.85];
+        toast.layer.cornerRadius = 8;
+        toast.layer.masksToBounds = YES;
+        toast.tag = 9527;
+
+        // 用 maxWidth 计算 intrinsic size，防止超长文案被截断
+        CGFloat maxWidth = [UIScreen mainScreen].bounds.size.width * 0.8;
+        CGRect rect = [msg boundingRectWithSize:CGSizeMake(maxWidth, CGFLOAT_MAX)
+                                        options:NSStringDrawingUsesLineFragmentOrigin
+                                     attributes:@{NSFontAttributeName: [UIFont systemFontOfSize:12]}
+                                        context:nil];
+        toast.frame = CGRectMake(0, 0, CGRectGetWidth(rect) + 24, CGRectGetHeight(rect) + 16);
+        toast.center = self.view.center;
+
+        [self.view addSubview:toast];
+        [self.view bringSubviewToFront:toast];
+
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [toast removeFromSuperview];
+        });
     });
 }
 
