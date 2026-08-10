@@ -87,7 +87,13 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         self.lockView.hidden = YES;
         if (item.stamp) {
             self.backgroundColor = [UIColor colorWithHexString:@"#9C9C9C"];
-            [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
+            // image 字段可能为空：URLWithString:nil 会抛 NSInvalidArgumentException 导致崩溃
+            if (item.stamp.image.length > 0) {
+                [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
+            } else {
+                [self sd_cancelImageLoadForState:UIControlStateNormal];
+                [self setImage:nil forState:UIControlStateNormal];
+            }
         } else {
             self.backgroundColor = [UIColor colorWithHexString:@"#E9E9E9"];
             [self sd_cancelImageLoadForState:UIControlStateNormal];
@@ -102,7 +108,13 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         if (item.stamp) {
             self.stampState = PassportStampGridItemViewStateUpdate;
             self.lockView.hidden = YES;
-            [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
+            // image 字段可能为空：URLWithString:nil 会抛 NSInvalidArgumentException
+            if (item.stamp.image.length > 0) {
+                [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
+            } else {
+                [self sd_cancelImageLoadForState:UIControlStateNormal];
+                [self setImage:nil forState:UIControlStateNormal];
+            }
         } else {
             self.stampState = PassportStampGridItemViewStateAdd;
             self.lockView.hidden = NO;
@@ -115,7 +127,13 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
         self.lockView.image = [UIImage imageNamed:@"lock_icon"];
         self.lockView.hidden = NO;
         if (item.stamp) {
-            [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
+            // image 字段可能为空：URLWithString:nil 会抛 NSInvalidArgumentException
+            if (item.stamp.image.length > 0) {
+                [self sd_setImageWithURL:[NSURL URLWithString:item.stamp.image] forState:UIControlStateNormal];
+            } else {
+                [self sd_cancelImageLoadForState:UIControlStateNormal];
+                [self setImage:nil forState:UIControlStateNormal];
+            }
         } else {
             [self sd_cancelImageLoadForState:UIControlStateNormal];
             [self setImage:nil forState:UIControlStateNormal];
@@ -465,6 +483,21 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 
 - (void)presentStampUnlockDialog {
     __weak typeof(self) weakSelf = self;
+    // IAP 支付硬约束：解锁邮票需开通会员，会员购买必须登录态。
+    // 未登录拦截：弹提示并跳登录页，避免进入会员中心后 getPlans 401 / 支付无法激活。
+    if (![AuthManager sharedManager].isLoggedIn) {
+        [QMUITips showError:(NSLocalizedString(@"membership_login_required", nil) ?: @"请先登录后再开通会员")
+                  inView:weakSelf.view hideAfterDelay:1.6];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            Class loginClass = NSClassFromString(@"LoginChoiceViewController");
+            if (!loginClass) return;
+            UIViewController *loginVC = [loginClass new];
+            UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
+            nav.modalPresentationStyle = UIModalPresentationFullScreen;
+            [weakSelf presentViewController:nav animated:YES completion:nil];
+        });
+        return;
+    }
     StampUnlockPopupViewController *vc = [[StampUnlockPopupViewController alloc] init];
     vc.onConfirm = ^(NSInteger initialPlanIndex) {
         __strong typeof(weakSelf) self = weakSelf;

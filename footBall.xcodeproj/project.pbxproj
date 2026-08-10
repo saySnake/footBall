@@ -186,13 +186,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-footBall/Pods-footBall-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-footBall/Pods-footBall-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -259,7 +255,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				// 发布必须使用 "Apple Distribution"，否则 Archive 后无法上传到 App Store Connect。
+				// PROFILE 字段留空 + Automatic 由 Xcode 自动匹配 App Store 类型的 profile；
+				// 若团队改用手动签名，请在 Xcode 界面选择对应的 Provisioning Profile 后再 Archive。
+				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 8;
 				DEVELOPMENT_TEAM = F649U4M8PK;

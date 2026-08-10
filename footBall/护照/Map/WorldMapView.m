@@ -215,39 +215,58 @@ static BOOL WMStringLooksLikeISOAlpha2(NSString *s) {
     [self.countryISOs removeAllObjects];
     [self.countryZhNames removeAllObjects];
 
-    [self buildLayersFromGeoJSON:self.geoJSONData];
-    [self applyTransformClamped:YES];
+    // 几何构建（数万点 project + addLineToPoint）是 CPU 密集型，搬到后台队列执行；
+    // CGPathRef 是不可变值类型且线程安全构造，回到主线程再装配 CAShapeLayer 并加到 layer 树
+    NSDictionary *geo = self.geoJSONData;
+    CGRect boundsRect = self.bounds;
+    NSInteger generation = self.geoJSONLoadGeneration;
+    __weak typeof(self) weakSelf = self;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSArray *built = [weakSelf buildCountryPathsFromGeoJSON:geo inRect:boundsRect];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            if (!strongSelf) return;
+            // 期间若 GeoJSON 已重新加载，丢弃本次结果
+            if (strongSelf.geoJSONLoadGeneration != generation) return;
+            // 期间若 bounds 已变化，等下一次 layout 触发的重建
+            CGFloat cw = CGRectGetWidth(strongSelf.bounds);
+            CGFloat ch = CGRectGetHeight(strongSelf.bounds);
+            if (fabs(cw - boundsRect.size.width) > 0.5 || fabs(ch - boundsRect.size.height) > 0.5) return;
+
+            for (NSDictionary *entry in built) {
+                id pathObj = entry[@"path"];
+                if (!pathObj || pathObj == [NSNull null]) continue;
+                CGPathRef path = (__bridge CGPathRef)pathObj;
+                NSString *isoCode = entry[@"iso"] ?: @"";
+                NSString *zhName = entry[@"zh"] ?: @"";
+
+                CAShapeLayer *layer = [CAShapeLayer layer];
+                layer.frame = strongSelf.bounds;
+                layer.path = path;
+                layer.contentsScale = [UIScreen mainScreen].scale;
+
+                layer.strokeColor = strongSelf.strokeColor.CGColor;
+                layer.lineWidth = strongSelf.lineWidth;
+                layer.fillColor = [strongSelf fillColorForISO:isoCode chineseName:zhName].CGColor;
+                layer.lineJoin = kCALineJoinRound;
+                layer.lineCap = kCALineCapRound;
+
+                [strongSelf.contentLayer addSublayer:layer];
+                [strongSelf.countryLayers addObject:layer];
+                [strongSelf.countryISOs addObject:isoCode];
+                [strongSelf.countryZhNames addObject:zhName];
+            }
+            [strongSelf applyTransformClamped:YES];
+        });
+    });
 }
 
-- (void)reload {
-    if (![NSThread isMainThread]) {
-        dispatch_async(dispatch_get_main_queue(), ^{ [self reload]; });
-        return;
-    }
-    [self applyFillColorsToCountryLayers];
-}
-
-/// 仅更新已有 shapeLayer 的 fillColor，不重建路径
-- (void)applyFillColorsToCountryLayers {
-    NSUInteger n = self.countryLayers.count;
-    if (n == 0 || n != self.countryISOs.count || n != self.countryZhNames.count) {
-        return;
-    }
-    for (NSUInteger i = 0; i < n; i++) {
-        CAShapeLayer *layer = self.countryLayers[i];
-        NSString *iso = self.countryISOs[i];
-        NSString *zh = self.countryZhNames[i];
-        layer.fillColor = [self fillColorForISO:iso chineseName:zh].CGColor;
-    }
-}
-
-#pragma mark - Build layers
-
-- (void)buildLayersFromGeoJSON:(NSDictionary *)geojson {
+/// 后台线程执行：解析 GeoJSON 并构建每个国家的 CGPath，返回不可变结果数组。
+/// 不接触 UIView / CALayer，所有几何计算（projectLon、addLineToPoint）都是纯函数操作。
+- (NSArray<NSDictionary *> *)buildCountryPathsFromGeoJSON:(NSDictionary *)geojson inRect:(CGRect)rect {
+    NSMutableArray *out = [NSMutableArray array];
     NSArray *features = geojson[@"features"];
-    if (![features isKindOfClass:[NSArray class]]) return;
-
-    CGRect rect = self.bounds;
+    if (![features isKindOfClass:[NSArray class]]) return out;
 
     for (NSDictionary *feat in features) {
         if (![feat isKindOfClass:[NSDictionary class]]) continue;
@@ -276,23 +295,43 @@ static BOOL WMStringLooksLikeISOAlpha2(NSString *s) {
         NSString *isoCode = [self isoCodeFromFeature:feat];
         NSString *zhName = [self chineseNameFromFeature:feat];
 
-        CAShapeLayer *layer = [CAShapeLayer layer];
-        layer.frame = rect;
-        layer.path = countryPath.CGPath;
-        layer.contentsScale = [UIScreen mainScreen].scale;
+        CGPathRef p = countryPath.CGPath;
+        if (!p) continue;
+        // 拷贝一份独立 CGPath，原 UIBezierPath 出作用域后仍可用
+        CGPathRef retained = CGPathCreateCopy(p);
+        [out addObject:@{
+            @"path": CFBridgingRelease(retained),
+            @"iso": isoCode ?: @"",
+            @"zh": zhName ?: @"",
+        }];
+    }
+    return out;
+}
+}
 
-        layer.strokeColor = self.strokeColor.CGColor;
-        layer.lineWidth = self.lineWidth;
-        layer.fillColor = [self fillColorForISO:isoCode chineseName:zhName].CGColor;
-        layer.lineJoin = kCALineJoinRound;
-        layer.lineCap = kCALineCapRound;
+- (void)reload {
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{ [self reload]; });
+        return;
+    }
+    [self applyFillColorsToCountryLayers];
+}
 
-        [self.contentLayer addSublayer:layer];
-        [self.countryLayers addObject:layer];
-        [self.countryISOs addObject:isoCode ?: @""];
-        [self.countryZhNames addObject:zhName ?: @""];
+/// 仅更新已有 shapeLayer 的 fillColor，不重建路径
+- (void)applyFillColorsToCountryLayers {
+    NSUInteger n = self.countryLayers.count;
+    if (n == 0 || n != self.countryISOs.count || n != self.countryZhNames.count) {
+        return;
+    }
+    for (NSUInteger i = 0; i < n; i++) {
+        CAShapeLayer *layer = self.countryLayers[i];
+        NSString *iso = self.countryISOs[i];
+        NSString *zh = self.countryZhNames[i];
+        layer.fillColor = [self fillColorForISO:iso chineseName:zh].CGColor;
     }
 }
+
+#pragma mark - Build layers
 
 - (NSString *)chineseNameFromFeature:(NSDictionary *)feature {
     NSDictionary *props = feature[@"properties"];

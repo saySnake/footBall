@@ -517,7 +517,9 @@ static NSDecimalNumber *PNAddConsumeDecimalFromInput(NSString *raw) {
 - (NSString *)expenseDateStringForAPI {
     NSDate *d = self.selectedDate ?: [NSDate date];
     NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
-    fmt.locale = [NSLocale currentLocale];
+    // 上送后端的固定格式串必须用 en_US_POSIX（QA1480），用 currentLocale 会在
+    // ar/th 等区域下输出非阿拉伯数字，后端解析失败
+    fmt.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
     fmt.calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
     fmt.timeZone = [NSTimeZone localTimeZone];
     // 服务端 expenseDate 是 LocalDate，只接受 yyyy-MM-dd 格式

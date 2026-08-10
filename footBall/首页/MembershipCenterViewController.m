@@ -1810,6 +1810,23 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 }
 
 - (void)onTapRedeemDialogConfirm {
+    // IAP 硬约束：兑换码激活/折扣购买都需登录态（服务端用 userId 关联会员/兑换码使用记录）
+    if (![AuthManager sharedManager].isLoggedIn) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"请先登录"
+                                                                       message:@"兑换会员需要先登录"
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"去登录" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+            Class loginClass = NSClassFromString(@"LoginChoiceViewController");
+            if (!loginClass) return;
+            UIViewController *loginVC = [loginClass new];
+            UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
+            nav.modalPresentationStyle = UIModalPresentationFullScreen;
+            [self presentViewController:nav animated:YES completion:nil];
+        }]];
+        [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
     NSString *code = [self normalizedRedeemInput:self.redeemInputField.text];
     self.redeemInputField.text = code;
     if (![self isRedeemCodeReadyToSubmit:code]) {
@@ -1944,6 +1961,26 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 }
 
 - (void)onTapPay {
+    // IAP 支付硬约束：购买必须登录态。
+    // 入口已拦截（Profile/StampAlbum），这里做兜底：用户进入会员中心后 logout、token 过期等场景。
+    // 服务端 verifyAndActivate 会校验 JWT，未登录返回 401，但 Apple 支付已经发起无法回滚，
+    // 用户付了款却拿不到会员，所以必须在 addPayment 之前拦截。
+    if (![AuthManager sharedManager].isLoggedIn) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"请先登录"
+                                                                       message:@"开通会员需要先登录，登录后可继续完成支付"
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"去登录" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+            Class loginClass = NSClassFromString(@"LoginChoiceViewController");
+            if (!loginClass) return;
+            UIViewController *loginVC = [loginClass new];
+            UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
+            nav.modalPresentationStyle = UIModalPresentationFullScreen;
+            [self presentViewController:nav animated:YES completion:nil];
+        }]];
+        [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
     // 支付进行中拦截：按钮现在始终 enabled（为了能弹「请先勾选协议」），
     // 所以必须在入口显式拦截 payInFlight，避免连点触发重复购买。
     // 同时拦截 restoreInFlight：restore 进行中再发起购买会让 SKPaymentQueue 状态混乱
@@ -2288,6 +2325,23 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 /// 用户点击「恢复购买」：调用 SKPaymentQueue restoreCompletedTransactions，
 /// 系统会把该 Apple ID 已完成的非消耗型/订阅事务重新投递到 updatedTransactions。
 - (void)onTapRestore {
+    // IAP 硬约束：恢复购买同样需登录态（服务端按 userId + transactionId 反查本地会员记录）
+    if (![AuthManager sharedManager].isLoggedIn) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"请先登录"
+                                                                       message:@"恢复购买需要先登录"
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"去登录" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+            Class loginClass = NSClassFromString(@"LoginChoiceViewController");
+            if (!loginClass) return;
+            UIViewController *loginVC = [loginClass new];
+            UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
+            nav.modalPresentationStyle = UIModalPresentationFullScreen;
+            [self presentViewController:nav animated:YES completion:nil];
+        }]];
+        [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
     // 防连点：购买进行中 / restore 进行中均拦截
     if (self.payInFlight || self.restoreInFlight) {
         return;
@@ -2467,6 +2521,23 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 }
 
 - (void)onRedeemGiftCode {
+    // IAP 硬约束：礼包码激活会员同样需登录态
+    if (![AuthManager sharedManager].isLoggedIn) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"请先登录"
+                                                                       message:@"兑换会员需要先登录"
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"去登录" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+            Class loginClass = NSClassFromString(@"LoginChoiceViewController");
+            if (!loginClass) return;
+            UIViewController *loginVC = [loginClass new];
+            UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
+            nav.modalPresentationStyle = UIModalPresentationFullScreen;
+            [self presentViewController:nav animated:YES completion:nil];
+        }]];
+        [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
     NSString *code = self.giftHiddenInput.text ?: @"";
     if (code.length < 5) return;
     [self.view endEditing:YES];

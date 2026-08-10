@@ -49,8 +49,8 @@
     
     // 获取当前主题
     ThemeManager *themeManager = [ThemeManager sharedManager];
-    BOOL isDarkMode = [themeManager actualTheme] == AppThemeDark;
-    
+    BOOL isDarkMode = themeManager.isNightMode;
+
     return [self imageNamed:imageName darkMode:isDarkMode];
 }
 
@@ -116,8 +116,8 @@
     }
     
     ThemeManager *themeManager = [ThemeManager sharedManager];
-    BOOL isDarkMode = [themeManager actualTheme] == AppThemeDark;
-    
+    BOOL isDarkMode = themeManager.isNightMode;
+
     return [self imageExists:imageName darkMode:isDarkMode];
 }
 

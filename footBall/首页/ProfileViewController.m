@@ -991,12 +991,34 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
 
 - (void)openMembershipCenter {
     NSLog(@"[Profile][Diag] openMembershipCenter 触发，准备 push");
+    // IAP 支付硬约束：会员中心的所有功能（浏览方案 / 支付 / 恢复 / 兑换）都强依赖登录态，
+    // 未登录时连 getPlans/getStatus 都会 401，且购买后无法激活会员。
+    // 这里在入口拦截，避免用户进入无意义的空页面、点支付后才报错。
+    if (![AuthManager sharedManager].isLoggedIn) {
+        [self promptLoginAndRoute];
+        return;
+    }
     MembershipCenterViewController *vc = [MembershipCenterViewController new];
     vc.initialPlanIndex = 0;
     vc.hidesBottomBarWhenPushed = YES;
     [self.navigationController pushViewController:vc animated:YES];
     NSLog(@"[Profile][Diag] openMembershipCenter navigationController=%@, push 后 topVC=%@",
           self.navigationController, self.navigationController.topViewController);
+}
+
+/// 未登录访问会员中心入口的统一提示 + 登录跳转。
+/// 与 SplashViewController/SettingsViewController 的登录页跳转保持一致：用 LoginChoiceViewController。
+- (void)promptLoginAndRoute {
+    [QMUITips showError:(NSLocalizedString(@"membership_login_required", nil) ?: @"请先登录后再开通会员")
+              inView:self.view hideAfterDelay:1.6];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        Class loginClass = NSClassFromString(@"LoginChoiceViewController");
+        if (!loginClass) return;
+        UIViewController *loginVC = [loginClass new];
+        UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
+        nav.modalPresentationStyle = UIModalPresentationFullScreen;
+        [self presentViewController:nav animated:YES completion:nil];
+    });
 }
 
 @end

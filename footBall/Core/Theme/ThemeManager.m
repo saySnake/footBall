@@ -9,11 +9,9 @@
 
 NSString *const AppThemeDidChangeNotification = @"AppThemeDidChangeNotification";
 
-static NSString *const kUserDefaultsThemeKey = @"AppCurrentTheme";
+static NSString *const kUserDefaultsNightModeKey = @"AppNightMode";
 
 @interface ThemeManager ()
-
-// 注意：currentTheme 和 followSystem 已在主接口中声明，这里不需要重复声明
 
 @end
 
@@ -31,159 +29,102 @@ static NSString *const kUserDefaultsThemeKey = @"AppCurrentTheme";
 - (instancetype)init {
     self = [super init];
     if (self) {
-        // 从UserDefaults读取保存的主题设置（integerForKey 缺失时返回 0，与 AppThemeLight 冲突）
-        id savedObj = [[NSUserDefaults standardUserDefaults] objectForKey:kUserDefaultsThemeKey];
-        if (savedObj != nil) {
-            NSInteger savedTheme = [savedObj integerValue];
-            if (savedTheme >= AppThemeLight && savedTheme <= AppThemeAuto) {
-                _currentTheme = (AppTheme)savedTheme;
-            } else {
-                _currentTheme = AppThemeAuto;
-            }
-        } else {
-            _currentTheme = AppThemeAuto;
-        }
-        
-        _followSystem = YES;
-        
-        // 监听系统主题变化
-        [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(handleSystemThemeChange:)
-                                                     name:UIApplicationDidBecomeActiveNotification
-                                                   object:nil];
+        // 读取持久化的夜间模式开关（首次安装默认为 NO）
+        _nightMode = [[NSUserDefaults standardUserDefaults] boolForKey:kUserDefaultsNightModeKey];
     }
     return self;
 }
 
-- (void)dealloc {
-    [[NSNotificationCenter defaultCenter] removeObserver:self];
+#pragma mark - Night Mode
+
+- (void)setNightMode:(BOOL)nightMode {
+    [self setNightMode:nightMode notify:YES];
 }
 
-- (void)setCurrentTheme:(AppTheme)currentTheme {
-    [self setTheme:currentTheme];
-}
-
-- (void)setTheme:(AppTheme)theme {
-    if (_currentTheme == theme) {
+- (void)setNightMode:(BOOL)nightMode notify:(BOOL)notify {
+    if (_nightMode == nightMode) {
         return;
     }
-    
-    _currentTheme = theme;
-    
-    // 保存到UserDefaults
-    [[NSUserDefaults standardUserDefaults] setInteger:theme forKey:kUserDefaultsThemeKey];
+
+    _nightMode = nightMode;
+
+    // 持久化
+    [[NSUserDefaults standardUserDefaults] setBool:nightMode forKey:kUserDefaultsNightModeKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
-    
-    // 更新主题配置
-    [self updateThemeConfiguration];
-    
-    // 发送通知
-    [[NSNotificationCenter defaultCenter] postNotificationName:AppThemeDidChangeNotification object:nil];
-}
 
-- (AppTheme)actualTheme {
-    if (self.currentTheme == AppThemeAuto) {
-        // 跟随系统
-        if (@available(iOS 13.0, *)) {
-            // 优先使用 keyWindow 的 traitCollection，这样能获取到最新的主题状态
-            UIWindow *keyWindow = nil;
-            for (UIWindow *window in [UIApplication sharedApplication].windows) {
-                if (window.isKeyWindow) {
-                    keyWindow = window;
-                    break;
-                }
-            }
-            // 如果没有 keyWindow，使用第一个 window
-            if (!keyWindow && [UIApplication sharedApplication].windows.count > 0) {
-                keyWindow = [UIApplication sharedApplication].windows.firstObject;
-            }
-            
-            UITraitCollection *traitCollection = keyWindow ? keyWindow.traitCollection : [UITraitCollection currentTraitCollection];
-            UIUserInterfaceStyle style = traitCollection.userInterfaceStyle;
-            return (style == UIUserInterfaceStyleDark) ? AppThemeDark : AppThemeLight;
-        } else {
-            return AppThemeLight;
-        }
-    }
-    return self.currentTheme;
-}
+    if (notify) {
+        // 把当前 window 的 overrideUserInterfaceStyle 同步到新的主题状态
+        [self applyAppearanceToActiveWindow];
 
-- (UIColor *)primaryColor {
-    return [UIColor systemBlueColor];
-}
-
-- (UIColor *)backgroundColor {
-    AppTheme actualTheme = [self actualTheme];
-    if (actualTheme == AppThemeDark) {
-        return [UIColor colorWithRed:0.0 green:0.0 blue:0.0 alpha:1.0];
-    } else {
-        return [UIColor systemBackgroundColor];
-    }
-}
-
-- (UIColor *)textColor {
-    AppTheme actualTheme = [self actualTheme];
-    if (actualTheme == AppThemeDark) {
-        return [UIColor whiteColor];
-    } else {
-        return [UIColor redColor];
-    }
-}
-
-- (UIColor *)secondaryTextColor {
-    AppTheme actualTheme = [self actualTheme];
-    if (actualTheme == AppThemeDark) {
-        return [UIColor colorWithRed:0.6 green:0.6 blue:0.6 alpha:1.0];
-    } else {
-        return [UIColor secondaryLabelColor];
-    }
-}
-
-- (UIColor *)separatorColor {
-    AppTheme actualTheme = [self actualTheme];
-    if (actualTheme == AppThemeDark) {
-        return [UIColor colorWithRed:0.2 green:0.2 blue:0.2 alpha:1.0];
-    } else {
-        return [UIColor separatorColor];
-    }
-}
-
-- (void)setupThemeConfiguration {
-    [self updateThemeConfiguration];
-}
-
-- (void)updateThemeConfiguration {
-    // 使用原生方式配置主题
-    // 主要通过通知机制让各个视图控制器自行更新
-    AppTheme actualTheme = [self actualTheme];
-    
-    // 配置导航栏和状态栏样式
-    if (@available(iOS 13.0, *)) {
-        if (actualTheme == AppThemeDark) {
-            // 深色主题
-            [UIApplication sharedApplication].statusBarStyle = UIStatusBarStyleLightContent;
-        } else {
-            // 浅色主题
-            [UIApplication sharedApplication].statusBarStyle = UIStatusBarStyleDarkContent;
-        }
-    }
-}
-
-- (void)handleSystemThemeChange {
-    if (self.currentTheme == AppThemeAuto) {
-        // 直接更新主题配置并发送通知
-        // 因为 traitCollectionDidChange 只有在主题真正变化时才会被调用
-        [self updateThemeConfiguration];
-        
-        // 发送主题变化通知
+        // 发送通知，让各视图控制器/视图刷新
         dispatch_async(dispatch_get_main_queue(), ^{
-            [[NSNotificationCenter defaultCenter] postNotificationName:AppThemeDidChangeNotification object:nil];
+            [[NSNotificationCenter defaultCenter] postNotificationName:AppThemeDidChangeNotification
+                                                                object:nil
+                                                              userInfo:@{@"nightMode": @(nightMode)}];
         });
     }
 }
 
-- (void)handleSystemThemeChange:(NSNotification *)notification {
-    [self handleSystemThemeChange];
+#pragma mark - Setup
+
+- (void)setupThemeConfiguration {
+    [self applyAppearanceToActiveWindow];
+}
+
+#pragma mark - Appearance
+
+- (void)applyAppearanceToWindow:(UIWindow *)window {
+    if (!window) {
+        return;
+    }
+    if (@available(iOS 13.0, *)) {
+        // 锁定系统的动态颜色路径：把 window 固定成 Light/Dark，
+        // systemBackgroundColor 这类动态色就不会再跟着系统主题跑了。
+        window.overrideUserInterfaceStyle = self.nightMode
+            ? UIUserInterfaceStyleDark
+            : UIUserInterfaceStyleLight;
+    }
+}
+
+- (void)applyAppearanceToActiveWindow {
+    for (UIWindow *window in [UIApplication sharedApplication].windows) {
+        [self applyAppearanceToWindow:window];
+    }
+
+    // 状态栏样式
+    if (@available(iOS 13.0, *)) {
+        [UIApplication sharedApplication].statusBarStyle =
+            self.nightMode ? UIStatusBarStyleLightContent : UIStatusBarStyleDarkContent;
+    }
+}
+
+#pragma mark - Colors
+
+- (UIColor *)primaryColor {
+    // 主品牌色 #1A5B47
+    return [UIColor colorWithRed:0x1A/255.0 green:0x5B/255.0 blue:0x47/255.0 alpha:1.0];
+}
+
+- (UIColor *)backgroundColor {
+    return self.nightMode
+        ? [UIColor colorWithRed:0.0 green:0.0 blue:0.0 alpha:1.0]
+        : [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0];
+}
+
+- (UIColor *)textColor {
+    return self.nightMode ? [UIColor whiteColor] : [UIColor blackColor];
+}
+
+- (UIColor *)secondaryTextColor {
+    return self.nightMode
+        ? [UIColor colorWithRed:0.6 green:0.6 blue:0.6 alpha:1.0]
+        : [UIColor colorWithRed:0.4 green:0.4 blue:0.4 alpha:1.0];
+}
+
+- (UIColor *)separatorColor {
+    return self.nightMode
+        ? [UIColor colorWithRed:0.2 green:0.2 blue:0.2 alpha:1.0]
+        : [UIColor colorWithRed:0.78 green:0.78 blue:0.8 alpha:1.0];
 }
 
 @end

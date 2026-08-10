@@ -381,10 +381,9 @@ static void PNPostMatchFavoriteDidUpdateNotification(NSString *matchId) {
     NSDictionary *params = @{ @"pageNum": @(MAX(page, 1)), @"pageSize": @(MAX(pageSize, 1)) };
     [[APIManager sharedManager] GET:APIPathValueMatchGetFavorites parameters:params headers:nil success:^(HTTPResponse * _Nullable responseObject) {
         if (responseObject.success) {
-            NSArray *list = responseObject.data[@"list"];
-            if (![list isKindOfClass:NSArray.class]) {
-                list = [responseObject.data isKindOfClass:NSArray.class] ? responseObject.data : @[];
-            }
+            // 必须先判类型再用：data 可能是 { list } 或直接数组，
+            // 用工程已有的安全工具，避免 data 是数组时下标取值触发 unrecognized selector
+            NSArray *list = PNMatchJSONArrayFromPageData(responseObject.data);
             NSArray *matches = [NSArray yy_modelArrayWithClass:Match.class json:list];
             responseObject.dataObject = matches;
             if (success) success(responseObject);
