@@ -307,7 +307,6 @@ static BOOL WMStringLooksLikeISOAlpha2(NSString *s) {
     }
     return out;
 }
-}
 
 - (void)reload {
     if (![NSThread isMainThread]) {
