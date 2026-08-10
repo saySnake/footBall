@@ -8,6 +8,7 @@
 #import "SceneDelegate.h"
 #import "MainTabBarController.h"
 #import "AuthManager.h"
+#import "ThemeManager.h"
 #import "ThemeObserverView.h"
 #ifdef DEBUG
 #import <DoraemonKit/DoraemonManager.h>
@@ -37,6 +38,8 @@
     self.window = [[UIWindow alloc] initWithWindowScene:windowScene];
     self.window.rootViewController = [[UIViewController alloc] init];
     self.window.rootViewController.view.backgroundColor = [UIColor colorWithRed:0.051 green:0.129 blue:0.133 alpha:1.0];
+    // 锁定系统动态颜色路径，让 App 只走 ThemeManager 这一套主题
+    [[ThemeManager sharedManager] applyAppearanceToWindow:self.window];
     [self.window makeKeyAndVisible];
 
     [self setupThemeObserver];
