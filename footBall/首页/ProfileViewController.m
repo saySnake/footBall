@@ -562,13 +562,13 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
     /// 缺口圆一半在券外，必须关闭裁剪才能与 Figma 票券一致
     self.membershipCard.clipsToBounds = NO;
     [self.membershipCard addTarget:self action:@selector(openMembershipCenter) forControlEvents:UIControlEventTouchUpInside];
-    [self.contentWrap addSubview:self.membershipCard];
-    [self.membershipCard mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.headerView.mas_bottom).offset(12);
-        make.leading.equalTo(self.contentWrap).offset(kProfileMembershipHorizontalInset);
-        make.trailing.equalTo(self.contentWrap).offset(-kProfileMembershipHorizontalInset);
-        make.height.equalTo(self.membershipCard.mas_width).multipliedBy(kProfileMembershipAspectH / kProfileMembershipAspectW);
-    }];
+//    [self.contentWrap addSubview:self.membershipCard];
+//    [self.membershipCard mas_makeConstraints:^(MASConstraintMaker *make) {
+//        make.top.equalTo(self.headerView.mas_bottom).offset(12);
+//        make.leading.equalTo(self.contentWrap).offset(kProfileMembershipHorizontalInset);
+//        make.trailing.equalTo(self.contentWrap).offset(-kProfileMembershipHorizontalInset);
+//        make.height.equalTo(self.membershipCard.mas_width).multipliedBy(kProfileMembershipAspectH / kProfileMembershipAspectW);
+//    }];
 
     UIView *decorContainer = [UIView new];
     decorContainer.backgroundColor = [UIColor clearColor];
@@ -634,7 +634,7 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
     self.membershipPromoLabel = [UILabel new];
     self.membershipPromoLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
     self.membershipPromoLabel.textColor = kProfileMembershipPromoText;
-//    self.membershipPromoLabel.text = NSLocalizedString(@"profile_membership_promo", nil);
+    self.membershipPromoLabel.text = NSLocalizedString(@"profile_membership_promo", nil);
     [self.membershipCard addSubview:self.membershipPromoLabel];
     [self.membershipPromoLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(self.membershipTitleLabel);
@@ -646,8 +646,7 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
     self.membershipHintLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightRegular];
     self.membershipHintLabel.textColor = [UIColor colorWithWhite:1.0 alpha:0.72];
     self.membershipHintLabel.numberOfLines = 2;
-//    self.membershipHintLabel.text = NSLocalizedString(@"profile_membership_hint", nil);
-    self.membershipHintLabel.text = @"功能开发中，敬请期待";
+    self.membershipHintLabel.text = NSLocalizedString(@"profile_membership_hint", nil);
     [self.membershipCard addSubview:self.membershipHintLabel];
     [self.membershipHintLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(self.membershipTitleLabel);
@@ -662,7 +661,7 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
     [self.teamsCard addTarget:self action:@selector(onTeamsTapped) forControlEvents:UIControlEventTouchUpInside];
     [self.contentWrap addSubview:self.teamsCard];
     [self.teamsCard mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.membershipCard.mas_bottom).offset(12);
+        make.top.equalTo(self.headerView.mas_bottom).offset(12);
         make.leading.equalTo(self.contentWrap).offset(kProfileTeamsCardInset);
         make.trailing.equalTo(self.contentWrap).offset(-kProfileTeamsCardInset);
     }];
@@ -807,7 +806,7 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
 
     // 无数据：单行卡片 52pt，与「个人资料」等一致；有数据：标题行 + 球队图标区 90pt，可横向滑动
     [self.teamsCard mas_remakeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.membershipCard.mas_bottom).offset(12);
+        make.top.equalTo(self.headerView.mas_bottom).offset(12);
         make.leading.equalTo(self.contentWrap).offset(kProfileTeamsCardInset);
         make.trailing.equalTo(self.contentWrap).offset(-kProfileTeamsCardInset);
         if (hasData) {
@@ -881,8 +880,8 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
     [super updateLocalizedStrings];
     [self refreshIDLabel];
     self.membershipTitleLabel.text = NSLocalizedString(@"profile_membership_center", nil);
-//    self.membershipPromoLabel.text = NSLocalizedString(@"profile_membership_promo", nil);
-//    self.membershipHintLabel.text = NSLocalizedString(@"profile_membership_hint", nil);
+    self.membershipPromoLabel.text = NSLocalizedString(@"profile_membership_promo", nil);
+    self.membershipHintLabel.text = NSLocalizedString(@"profile_membership_hint", nil);
     self.stat1Title.text = NSLocalizedString(@"profile_stat_friends", nil);
     self.stat2Title.text = NSLocalizedString(@"profile_stat_follow", nil);
     self.stat3Title.text = NSLocalizedString(@"profile_stat_stamps", nil);

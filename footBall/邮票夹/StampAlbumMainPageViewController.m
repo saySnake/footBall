@@ -22,8 +22,8 @@
 #import "CommunityRequest.h"
 #import "PNMatchInfoInputViewController.h"
 #import "TeamsRequest.h"
-#define STAMP_SECTION_COUNT  1000
-#define STAMP_SECTION_ITEMS  15
+#define STAMP_SECTION_COUNT  0
+#define STAMP_SECTION_ITEMS  5
 #define STAMP_ITEAM_FREE  5
 
 static UIColor *PassportSheetsNavBg(void) {
@@ -482,7 +482,7 @@ typedef NS_ENUM(NSUInteger, PassportStampGridItemViewState) {
 @implementation StampAlbumMainPageViewController
 
 - (void)presentStampUnlockDialog {
-    [QMUITips showInfo:@"功能开发中，敬请期待"];
+//    [QMUITips showInfo:@"功能开发中，敬请期待"];
 //    __weak typeof(self) weakSelf = self;
 //    StampUnlockPopupViewController *vc = [[StampUnlockPopupViewController alloc] init];
 //    vc.onConfirm = ^(NSInteger initialPlanIndex) {
