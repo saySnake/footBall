@@ -186,6 +186,8 @@ static NSArray<NSDictionary *> *DiscoverRecordArrayFromData(id data) {
 /// 比赛时间（HH:mm），用于中间时间胶囊
 @property (nonatomic, copy) NSString *timeText;
 @property (nonatomic, copy) NSString *dateText;
+/// 后端原始开球时间串（YYYY-MM-dd'T'HH:mm:ss，东八区），进入「输入信息」时作为比赛日期默认值
+@property (nonatomic, copy) NSString *matchDateRaw;
 @property (nonatomic, copy) NSString *scoreText;
 @property (nonatomic, copy) NSString *verifiedText;
 /// 是否已经完成“输入信息”
@@ -746,6 +748,7 @@ typedef NS_ENUM(NSInteger, DiscoverVerifiedPillStyle) {
         @"awayName": m.awayName ?: @"",
         @"timeText": m.timeText ?: @"",
         @"dateText": m.dateText ?: @"",
+        @"matchDateRaw": m.matchDateRaw ?: @"",
         @"scoreText": m.scoreText ?: @"",
         @"verifiedText": m.verifiedText ?: @"",
         @"hasInputInfo": @(m.hasInputInfo),
@@ -768,6 +771,7 @@ typedef NS_ENUM(NSInteger, DiscoverVerifiedPillStyle) {
     m.awayName = DiscoverStringFromAny(dict[@"awayName"]) ?: @"-";
     m.timeText = DiscoverStringFromAny(dict[@"timeText"]) ?: @"";
     m.dateText = DiscoverStringFromAny(dict[@"dateText"]) ?: @"";
+    m.matchDateRaw = DiscoverStringFromAny(dict[@"matchDateRaw"]) ?: @"";
     m.scoreText = DiscoverStringFromAny(dict[@"scoreText"]) ?: @"";
     m.verifiedText = DiscoverStringFromAny(dict[@"verifiedText"]) ?: @"";
     m.hasInputInfo = [dict[@"hasInputInfo"] respondsToSelector:@selector(boolValue)] ? [dict[@"hasInputInfo"] boolValue] : NO;
@@ -1807,6 +1811,7 @@ typedef NS_ENUM(NSInteger, DiscoverVerifiedPillStyle) {
         m.awayLogoURL = match.awayTeamLogo ?: @"";
         m.timeText = [self shortTimeText:match.matchDate];
         m.dateText = [self shortDateText:match.matchDate];
+        m.matchDateRaw = match.matchDate ?: @"";
         if (type == DiscoverMatchTypeUpcoming) {
             m.scoreText = m.timeText;
             m.hasInputInfo = match.infoCompleted;
@@ -2123,6 +2128,8 @@ typedef NS_ENUM(NSInteger, DiscoverVerifiedPillStyle) {
     vc.matchId = match.matchId;
     vc.homeName = match.homeName;
     vc.awayName = match.awayName;
+    // 比赛日期由比赛开球时间决定，作为默认值传入（页面内与比赛名称一样锁定不可改）
+    vc.kickoffDate = [self dateFromRaw:match.matchDateRaw];
     __weak typeof(self) weakSelf = self;
     vc.completion = ^(NSString * _Nullable recordId) {
         // 仅完成“输入信息”，暂不允许看详情，还需“认证比赛”

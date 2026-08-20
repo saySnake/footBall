@@ -419,6 +419,9 @@ static UIColor *PNFigmaSocialCircleBG(void) {
         return;
     }
     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
+    // 先收起手机号键盘：push 后验证码页要立刻拉起自己的键盘，
+    // 若旧键盘仍挂着，first responder 切换容易在转场中被 UIKit 忽略（键盘不弹）
+    [self.view endEditing:YES];
     __weak typeof(self) weakSelf = self;
     [AuthManager.sharedManager sendVerifyCode:phone success:^(HTTPResponse *response) {
         __strong typeof(weakSelf) strongSelf = weakSelf;

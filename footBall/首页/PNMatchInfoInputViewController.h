@@ -15,6 +15,8 @@ FOUNDATION_EXPORT NSString * const PNMatchRecordDidUpdateNotification;
 @property (nonatomic, copy) NSString *homeName;
 /// 客队名称
 @property (nonatomic, copy) NSString *awayName;
+/// 比赛开球时间；非空时作为比赛日期默认值（比赛日期/时间由比赛决定，不允许修改）
+@property (nonatomic, strong, nullable) NSDate *kickoffDate;
 
 /// 观赛记录 ID；非空时走 `PUT /match-records/{id}` 并先拉详情填充表单
 @property (nonatomic, copy, nullable) NSString *recordId;
