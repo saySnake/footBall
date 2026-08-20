@@ -120,6 +120,26 @@
 
 @implementation APIErrorHandlingInterceptor
 
+/// 判断 refresh 失败是否为「服务端明确判定 token 失效」。
+/// 只有确定失效才登出；网络超时/断网/取消等临时错误返回 NO，保持登录态等下次重试。
++ (BOOL)isTokenDefinitelyInvalidError:(NSError *)error {
+    if (![error isKindOfClass:APIError.class]) {
+        // 非 APIError 视为网络层错误，保守起见不登出
+        return NO;
+    }
+    APIError *apiError = (APIError *)error;
+    // 网络类临时错误（断网/超时/取消）：不是 token 失效
+    if ([apiError isNetworkError]) {
+        return NO;
+    }
+    // 服务端 5xx：token 状态未知，不登出（等恢复后重试）
+    if ([apiError isServerError]) {
+        return NO;
+    }
+    // 明确的 401/认证错误，或服务端返回了业务错误码（如 token 无效/过期）：确定失效
+    return [apiError isAuthenticationError] || apiError.businessCode.length > 0;
+}
+
 - (instancetype)init {
     return [self initWithErrorHandler:nil];
 }
@@ -147,18 +167,27 @@
                     NSLog(@"✅ [API Request] token刷新成功，开始重启%ld个请求",self.callbacks.count);
                     [self _callback:YES];
                 } else {
-                    NSLog(@"✅ [API Request] token刷新失败，退出重新登录");
+                    NSLog(@"✅ [API Request] token刷新失败（业务错误），退出重新登录");
                     [self _callback:NO];
                     [APIManager.sharedManager clearAuthorizationHeader];
                     [NSNotificationCenter.defaultCenter postNotificationName:TokenExpiredNotification object:nil];
                 }
                 self.refreshingToken = NO;
             } failure:^(NSError * _Nonnull error) {
-                [APIManager.sharedManager clearAuthorizationHeader];
+                // 只有服务端明确判定 token 失效才登出。
+                // 网络超时/断网/请求取消等临时错误一律保持登录态，
+                // 否则弱网下刷新失败会把用户强制登出（表现为「隔几小时自动登出」）。
+                BOOL tokenReallyInvalid = [APIErrorHandlingInterceptor isTokenDefinitelyInvalidError:error];
+                self.refreshingToken = NO;
+                if (!tokenReallyInvalid) {
+                    NSLog(@"⚠️ [API Request] token刷新遇到网络错误，保持登录态，等待下次请求重试");
+                    [self _callback:NO];
+                    return;
+                }
                 NSLog(@"✅ [API Request] token刷新失败，退出重新登录");
                 [self _callback:NO];
+                [APIManager.sharedManager clearAuthorizationHeader];
                 [NSNotificationCenter.defaultCenter postNotificationName:TokenExpiredNotification object:nil];
-                self.refreshingToken = NO;                
                 // 调用错误处理回调
                 if (self.errorHandler) {
                     self.errorHandler(error);
