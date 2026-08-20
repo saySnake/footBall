@@ -97,6 +97,17 @@ static const NSInteger kVCResendCountdownSeconds = 60;
     [super viewDidAppear:animated];
     [self.codeTextField becomeFirstResponder];
     [self startCaretBlink];
+    // 转场竞态兜底：从手机号页 push 进来时，旧键盘正在收起，
+    // 此时 becomeFirstResponder 可能被 UIKit 静默忽略（键盘不再弹出）。
+    // 转场结束后检查一次，若仍未获得焦点则重试拉起。
+    __weak typeof(self) weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        if (![self.codeTextField isFirstResponder]) {
+            [self.codeTextField becomeFirstResponder];
+        }
+    });
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -367,6 +378,19 @@ static const NSInteger kVCResendCountdownSeconds = 60;
         make.leading.trailing.equalTo(self.view).inset(24);
         make.height.mas_equalTo(54);
     }];
+
+    // 6 个格子是纯 UILabel，真实输入藏在 1x1 的 codeTextField 里；
+    // 键盘一旦收起（转场竞态没弹起 / 用户主动收起），必须给用户点击格子唤起键盘的入口
+    self.codeStackView.userInteractionEnabled = YES;
+    UITapGestureRecognizer *codeTap = [[UITapGestureRecognizer alloc] initWithTarget:self
+                                                                               action:@selector(codeBoxTapped)];
+    [self.codeStackView addGestureRecognizer:codeTap];
+}
+
+- (void)codeBoxTapped {
+    if (![self.codeTextField isFirstResponder]) {
+        [self.codeTextField becomeFirstResponder];
+    }
 }
 
 - (void)startCaretBlink {

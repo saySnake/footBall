@@ -635,7 +635,9 @@ static NSArray<NSString *> *PassportOnlineMethodHexPalette(void) {
         if (pSum > 1e-6) {
             centerShare = (CGFloat)(maxP / pSum);
         } else {
-            centerShare = (CGFloat)(1.0 / (double)onlineList.count);
+            // 所有方式均为 0 次且后端占比全 0：真实空态，中心显示 0%。
+            // 此前 1/count 的均分兜底会让 4 项全 0 时中心错显 25%
+            centerShare = 0;
         }
     }
     m.outcomeCenterPercent = MIN(1, MAX(0, centerShare));

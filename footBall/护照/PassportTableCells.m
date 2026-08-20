@@ -1543,12 +1543,21 @@ static UIView *PCOutcomeLegendItemView(NSString *title, NSString *numStr, UIColo
         double v = [vals[i] doubleValue];
         double r = 0;
         if (allZeroWeights) {
-            r = 1.0 / (double)legs.count;
+            // 全 0 空态：不画均分扇区（否则中心 0% 与四份彩色圆环自相矛盾），
+            // 由下方统一替换为灰色空环
+            r = 0;
         } else {
             r = sum > 0 ? v / sum : 0;
         }
         [ratios addObject:@(r)];
         [segColors addObject:PCHex([NSString stringWithFormat:@"%@", leg[@"h"] ?: @"000000"])];
+    }
+    if (allZeroWeights) {
+        // 空数据：灰色空环 + 中心 0%
+        [ratios removeAllObjects];
+        [segColors removeAllObjects];
+        [ratios addObject:@(1.0)];
+        [segColors addObject:[UIColor colorWithWhite:0.88 alpha:1.0]];
     }
     if (ratios.count == 0) {
         [ratios addObjectsFromArray:@[ @(p), @(1 - p) ]];

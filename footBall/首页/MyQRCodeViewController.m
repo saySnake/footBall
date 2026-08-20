@@ -343,10 +343,43 @@ static CGFloat kQRNotchPathRadius(void) {
         return;
     }
 
-    UIGraphicsBeginImageContextWithOptions(cardBounds.size, NO, [UIScreen mainScreen].scale);
-    [self.cardView drawViewHierarchyInRect:cardBounds afterScreenUpdates:YES];
-    UIImage *snapshot = UIGraphicsGetImageFromCurrentImageContext();
+    // 卡片是 CAShapeLayer 画的「圆角 + 头像凹口」形状且透明背景，直接截 cardView
+    // 会让圆角/凹口外是透明像素，保存到相册后渲染成白色（四周圆角发白）。
+    // 改为截取整屏后裁剪：圆角外露出页面真实的深绿渐变背景，与屏幕所见一致。
+    // 头像一半在卡片上方（卡片顶边穿过头像中心），裁剪区域需向上扩展到包含完整头像，
+    // 否则分享图只剩半圆凹口没有头像。
+    CGFloat scale = [UIScreen mainScreen].scale;
+    UIGraphicsBeginImageContextWithOptions(self.view.bounds.size, NO, scale);
+    [self.view drawViewHierarchyInRect:self.view.bounds afterScreenUpdates:NO];
+    UIImage *full = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
+    if (!full || !full.CGImage) {
+        [self showToast:NSLocalizedString(@"community_qrcode_save_fail", nil)];
+        return;
+    }
+
+    CGRect cardFrame = [self.cardView convertRect:cardBounds toView:self.view];
+    CGRect avatarFrame = [self.avatarView convertRect:self.avatarView.bounds toView:self.view];
+    CGRect cropFrame = cardFrame;
+    // 向上扩到头像顶部（含白边），四周再加少量呼吸留白更美观
+    cropFrame.origin.y = MIN(cropFrame.origin.y, avatarFrame.origin.y) - 12;
+    cropFrame.size.height = CGRectGetMaxY(cardFrame) - cropFrame.origin.y + 12;
+    cropFrame.origin.x -= 12;
+    cropFrame.size.width += 24;
+
+    CGRect pixelRect = CGRectMake(cropFrame.origin.x * scale,
+                                  cropFrame.origin.y * scale,
+                                  cropFrame.size.width * scale,
+                                  cropFrame.size.height * scale);
+    CGRect pixelBounds = CGRectMake(0, 0, CGImageGetWidth(full.CGImage), CGImageGetHeight(full.CGImage));
+    pixelRect = CGRectIntersection(pixelRect, pixelBounds);
+    if (CGRectIsEmpty(pixelRect)) {
+        [self showToast:NSLocalizedString(@"community_qrcode_save_fail", nil)];
+        return;
+    }
+    CGImageRef croppedCG = CGImageCreateWithImageInRect(full.CGImage, pixelRect);
+    UIImage *snapshot = [UIImage imageWithCGImage:croppedCG scale:scale orientation:UIImageOrientationUp];
+    if (croppedCG) CGImageRelease(croppedCG);
     if (!snapshot) {
         [self showToast:NSLocalizedString(@"community_qrcode_save_fail", nil)];
         return;
@@ -357,12 +390,22 @@ static CGFloat kQRNotchPathRadius(void) {
         avc.popoverPresentationController.sourceView = self.saveBtn;
         avc.popoverPresentationController.sourceRect = self.saveBtn.bounds;
     }
+    // UIActivityViewController 里选「保存图片」不会触发 UIImageWriteToSavedPhotosAlbum 的回调，
+    // 需用 completionWithItemsHandler 才能拿到保存成功/失败的结果并给出提示
+    __weak typeof(self) weakSelf = self;
+    avc.completionWithItemsHandler = ^(NSString *activityType, BOOL completed, NSArray *errorItems, NSError *activityError) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        if (!completed) return; // 用户主动取消，不提示
+        NSString *msg = NSLocalizedString(@"community_qrcode_save_success", nil);
+        if ([activityType isEqualToString:UIActivityTypeSaveToCameraRoll]) {
+            // 保存到相册：成功/失败提示
+            msg = activityError ? NSLocalizedString(@"community_qrcode_save_fail", nil)
+                                : NSLocalizedString(@"community_qrcode_save_success", nil);
+        }
+        [strongSelf showToast:msg];
+    };
     [self presentViewController:avc animated:YES completion:nil];
-}
-
-- (void)image:(UIImage *)image didFinishSavingWithError:(NSError *)error contextInfo:(void *)contextInfo {
-    NSString *msg = error ? NSLocalizedString(@"community_qrcode_save_fail", nil) : NSLocalizedString(@"community_qrcode_save_success", nil);
-    [self showToast:msg];
 }
 
 - (void)showToast:(NSString *)message {

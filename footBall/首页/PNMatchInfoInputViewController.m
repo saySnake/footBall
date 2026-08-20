@@ -1002,7 +1002,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     [self pn_applyEmotionOption:[[self pn_emotionOptionsData] firstObject]];
     
     self.priceField.text = @"";
-    self.selectedDate = [NSDate date];
+    self.selectedDate = self.kickoffDate ?: [NSDate date];
     [self refreshDateTimeButtons];
     self.commentView.text = @"";
 
@@ -1143,7 +1143,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     if (!kick) {
         kick = [self pn_dateFromBackendDateTime:detail.matchDate];
     }
-    self.selectedDate = kick ?: [NSDate date];
+    self.selectedDate = kick ?: self.kickoffDate ?: [NSDate date];
     [self refreshDateTimeButtons];
 
     NSDictionary<NSString *, NSString *> *emotionOpt = [self pn_emotionOptionForValue:detail.postMatchEmotion];
@@ -1425,6 +1425,20 @@ shouldChangeTextInRange:(NSRange)range
     [self.commentView resignFirstResponder];
 }
 
+- (BOOL)pn_isDateTimeLocked {
+    // 与「比赛名称不可修改」同语义：记录绑定具体比赛（matchId 非空）时，
+    // 比赛日期/时间由比赛本身决定，不允许用户修改
+    return self.matchId.length > 0;
+}
+
+- (void)pn_updateDateTimeAvailability {
+    BOOL locked = [self pn_isDateTimeLocked];
+    self.dateBtn.enabled = !locked;
+    self.timeBtn.enabled = !locked;
+    self.dateBtn.userInteractionEnabled = !locked;
+    self.timeBtn.userInteractionEnabled = !locked;
+}
+
 - (void)refreshDateTimeButtons {
     NSDate *date = self.selectedDate ?: [NSDate date];
     NSCalendar *cal = [[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian];
@@ -1434,9 +1448,11 @@ shouldChangeTextInRange:(NSRange)range
     NSString *timeStr = [NSString stringWithFormat:@"%02ld:%02ld", (long)c.hour, (long)c.minute];
     [self.dateBtn setTitle:dateStr forState:UIControlStateNormal];
     [self.timeBtn setTitle:timeStr forState:UIControlStateNormal];
+    [self pn_updateDateTimeAvailability];
 }
 
 - (void)onPickDate {
+    if ([self pn_isDateTimeLocked]) return; // 比赛日期由比赛决定，不可修改
     [self.view endEditing:YES];
     PNPickerSheetViewController *sheet = [PNPickerSheetViewController new];
     sheet.mode = PNPickerSheetModeDate;
@@ -1451,6 +1467,7 @@ shouldChangeTextInRange:(NSRange)range
 }
 
 - (void)onPickTime {
+    if ([self pn_isDateTimeLocked]) return; // 比赛时间由比赛决定，不可修改
     [self.view endEditing:YES];
     PNPickerSheetViewController *sheet = [PNPickerSheetViewController new];
     sheet.mode = PNPickerSheetModeTime;
