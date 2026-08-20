@@ -896,10 +896,18 @@ typedef NS_ENUM(NSInteger, DiscoverVerifiedPillStyle) {
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
-    // 底部预留 tab bar 高度，避免内容滑到 tab bar 下方导致无法点击
-    CGFloat tabBarH = self.tabBarController.tabBar.bounds.size.height;
-    if (tabBarH > 0 && _scrollView.contentInset.bottom != tabBarH) {
-        _scrollView.contentInset = UIEdgeInsetsMake(0, 0, tabBarH, 0);
+    // 底部预留自定义 pill tab bar：系统 tabBar 已被 MainTabBarController 压成 0 高度，
+    // 真实遮挡物是锚定 safeAreaLayoutGuide 底部、总高 72 的自定义栏，
+    // 所以留白 = 72 + 安全区高度（全面屏 34pt），否则最后一行被 pill bar 压住
+    CGFloat safeBottom = 0;
+    if (@available(iOS 11.0, *)) {
+        safeBottom = self.view.safeAreaInsets.bottom;
+    }
+    CGFloat bottomBarH = 72.f + safeBottom;
+    UIEdgeInsets insets = _scrollView.contentInset;
+    if (insets.bottom < bottomBarH) {
+        insets.bottom = bottomBarH;
+        _scrollView.contentInset = insets;
     }
 }
 
