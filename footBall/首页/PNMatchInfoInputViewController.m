@@ -53,7 +53,8 @@ static NSSet<NSString *> *PNSeatAllowedWatchLocations(void) {
     static NSSet<NSString *> *set;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        set = [NSSet setWithObjects:@"在聚会", @"在球场", nil];
+        // 需求：只有观赛信息为「在球场」时座位才可选，其余地点（含「在聚会」）不可选
+        set = [NSSet setWithObjects:@"在球场", nil];
     });
     return set;
 }
@@ -438,6 +439,8 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     // 去掉高亮时的系统效果
     emotionBtn.adjustsImageWhenHighlighted = NO;
     emotionBtn.showsTouchWhenHighlighted = NO;
+    // 宽度按内容自适应，避免固定 84pt 放不下「选择情绪」四个字而截断出省略号
+    emotionBtn.titleLabel.adjustsFontSizeToFitWidth = NO;
     [emotionBtn addTarget:self action:@selector(onEmotionButtonTapped) forControlEvents:UIControlEventTouchUpInside];
     [card addSubview:emotionBtn];
     self.emotionButton = emotionBtn;
@@ -467,9 +470,10 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
         make.centerY.equalTo(title);
         make.trailing.equalTo(card).offset(-16);
         make.height.mas_equalTo(32);
-        make.width.mas_equalTo(84);
+        // 不固定宽度：按钮宽度 = 图标左距 38 + 标题 + 右距 20 自适应，
+        // 固定 84pt 时「选择情绪」四字放不下会被截断成省略号
+        make.leading.greaterThanOrEqualTo(title.mas_trailing).offset(12);
     }];
-    
     // 情绪面板先添加（在底层），scroll 后添加（在上层），保证默认时 scroll 可正常滑动
     UIView *emotionPanel = [[UIView alloc] init];
     emotionPanel.backgroundColor = [UIColor whiteColor];
@@ -631,10 +635,9 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     matchField.layer.cornerRadius = 8;
     matchField.leftView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 16, 1)];
     matchField.leftViewMode = UITextFieldViewModeAlways;
-    // 键盘为默认文字键盘，Return 为「完成」，方便收起键盘
-    matchField.keyboardType = UIKeyboardTypeDefault;
-    matchField.returnKeyType = UIReturnKeyDone;
-    matchField.delegate = self;
+    // 需求：比赛名称由当前对阵自动生成，不允许用户修改
+    matchField.enabled = NO;
+    matchField.textColor = [UIColor blackColor];
     // 去掉键盘上方的 3 个快捷按钮（上一项/下一项/完成 等）
     if (@available(iOS 9.0, *)) {
         UITextInputAssistantItem *item = matchField.inputAssistantItem;
@@ -666,7 +669,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
                                                 toParent:content
                                               topAnchor:watchTitle.mas_bottom];
     
-    // 座位（仅观赛地点为「在聚会」「在球场」时可选）
+    // 座位（仅观赛地点为「在球场」时可选，其余地点置灰不可点）
     UILabel *seatTitle = [[UILabel alloc] init];
     seatTitle.text = @"座位";
     seatTitle.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
@@ -995,7 +998,8 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherG
     self.selectedSeat = @"";
     self.selectedReason = @"";
     [self.selectedIdentities removeAllObjects];
-    [self pn_applyEmotionOption:nil];
+    // 需求：默认选中「兴奋」（首个情绪项）；编辑模式由 applyFromDetail 按服务端数据回填覆盖
+    [self pn_applyEmotionOption:[[self pn_emotionOptionsData] firstObject]];
     
     self.priceField.text = @"";
     self.selectedDate = [NSDate date];

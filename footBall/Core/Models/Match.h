@@ -50,6 +50,10 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL liked;
 /// 观赛记录主键；`MatchVO` / `MatchScheduleVO` 在有记录时由后端下发
 @property (nonatomic, copy) NSString *recordId;
+/// 展示层缓存：matchDate 解析出的开球时间（供列表滚动复用，非后端字段）
+@property (nonatomic, strong, nullable) NSDate *parsedKickoffDate;
+/// 展示层缓存：parsedKickoffDate 是否已尝试解析（区分「未解析」与「解析失败」）
+@property (nonatomic, assign) BOOL kickoffDateParsed;
 @end
 
 @interface MatchDetail : Match

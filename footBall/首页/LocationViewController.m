@@ -507,9 +507,17 @@ typedef NS_ENUM(NSInteger, CommunityRankType) {
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
-    CGFloat tabBarH = self.tabBarController.tabBar.bounds.size.height;
-    if (tabBarH > 0 && self.tableView.contentInset.bottom != tabBarH) {
-        self.tableView.contentInset = UIEdgeInsetsMake(0, 0, tabBarH + 6, 0);
+    // 底部预留自定义 pill tab bar：系统 tabBar 已被压成 0 高度，取 tabBar.bounds 拿不到真实遮挡高度，
+    // 实际遮挡物是锚定 safeAreaLayoutGuide 底部、总高 72 的自定义栏
+    CGFloat safeBottom = 0;
+    if (@available(iOS 11.0, *)) {
+        safeBottom = self.view.safeAreaInsets.bottom;
+    }
+    CGFloat tabBarH = 72.f + safeBottom;
+    UIEdgeInsets insets = self.tableView.contentInset;
+    if (insets.bottom < tabBarH + 6) {
+        insets.bottom = tabBarH + 6;
+        self.tableView.contentInset = insets;
     }
 }
 

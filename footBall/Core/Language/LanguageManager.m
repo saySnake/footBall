@@ -6,6 +6,12 @@
 //
 
 #import "LanguageManager.h"
+#import <objc/runtime.h>
+
+// 下方 LanguageManager (ForceChineseTemp) category 提供的临时方法，前向声明供 NSBundle category 使用
+@interface LanguageManager (ForceChineseTemp)
++ (NSBundle *)fc_temp_zhHansBundle;
+@end
 
 NSString *const AppLanguageDidChangeNotification = @"AppLanguageDidChangeNotification";
 
@@ -199,6 +205,65 @@ static NSString *const kUserDefaultsLanguageKey = @"AppCurrentLanguage";
         default:
             return @"English";
     }
+}
+
+@end
+
+// ============================================================================
+// ⚠️ 临时：强制所有 NSLocalizedString 走 zh-Hans 语言包（当次启动立即生效）。
+// 原因：全 App 约五百处 NSLocalizedString 直接跟随系统语言，英文/繁中系统下
+// 整个界面显示英文（英文语言文件尚未校对完成）。LanguageManager 的 L() 宏
+// 已强制中文，但覆盖不到这些调用点；main.m 写 AppleLanguages 对当次启动无效。
+// 原理：方法交换后，任何 NSBundle 的本地化查询都转发到 zh-Hans.lproj 对应包。
+// 待语言文件校对完成后，删除下面两个 category 即可恢复"跟随系统语言"。
+// ============================================================================
+@implementation NSBundle (ForceChinese)
+
++ (void)load {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        Method original = class_getInstanceMethod(self, @selector(localizedStringForKey:value:table:));
+        Method swizzled = class_getInstanceMethod(self, @selector(fc_temp_localizedStringForKey:value:table:));
+        if (original && swizzled) {
+            method_exchangeImplementations(original, swizzled);
+        }
+    });
+}
+
+- (NSString *)fc_temp_localizedStringForKey:(NSString *)key value:(NSString *)value table:(NSString *)tableName {
+    NSBundle *zh = [LanguageManager fc_temp_zhHansBundle];
+    // 已是 zh-Hans 包时按原逻辑走（方法已交换，此调用即原始实现），避免死循环
+    if (self == zh) {
+        return [self fc_temp_localizedStringForKey:key value:value table:tableName];
+    }
+
+    // 其余包（主包/en/zh-Hant/Base 等）一律改查 zh-Hans 包；
+    // 注意主包本身在英文系统下也会返回英文，所以主包同样要重定向
+    NSString *result = [zh fc_temp_localizedStringForKey:key value:value table:tableName];
+    if (result.length > 0 && ![result isEqualToString:key]) {
+        return result;
+    }
+    // zh-Hans 包里也找不到（key 只存在于其他语言文件），回退查原包
+    result = [self fc_temp_localizedStringForKey:key value:value table:tableName];
+    if (result.length > 0 && ![result isEqualToString:key]) {
+        return result;
+    }
+    return value ?: key;
+}
+
+@end
+
+@implementation LanguageManager (ForceChineseTemp)
+
++ (NSBundle *)fc_temp_zhHansBundle {
+    static NSBundle *bundle = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSString *path = [[NSBundle mainBundle] pathForResource:@"zh-Hans" ofType:@"lproj"];
+        bundle = path ? [NSBundle bundleWithPath:path] : [NSBundle mainBundle];
+    });
+    bundle = bundle ?: [NSBundle mainBundle];
+    return bundle;
 }
 
 @end

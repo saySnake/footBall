@@ -350,16 +350,21 @@ static NSString *kHomeTeamIdString(id raw) {
 @property (nonatomic, strong) Match *highlightFinished;
 @property (nonatomic, strong) Match *highlightUpcoming;
 
-@property (nonatomic, strong) UIScrollView *scrollView;
-@property (nonatomic, strong) UIView *contentView;
 @property (nonatomic, strong) UIView *bodyBgView;
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UIButton *moreBtn;
 @property (nonatomic, strong) UIView *twoCardsContainer;
 @property (nonatomic, strong) UITableView *tableView;
-@property (nonatomic, strong) MASConstraint *tableHeightConstraint;
 @property (nonatomic, strong) UIView *scheduleEmptyBackgroundView;
 @property (nonatomic, strong) UILabel *scheduleEmptyTitleLabel;
+/// 表头容器：头像/球队栏 + 白色内容区（标题/更多/精选双卡），高度布局后量出
+@property (nonatomic, strong) UIView *homeTableHeaderView;
+/// 头像距表头顶部的约束（= 安全区顶部 + 12，tableHeaderView 内不能用 safeAreaLayoutGuide）
+@property (nonatomic, strong) MASConstraint *avatarTopConstraint;
+/// 空态插图距空态视图顶部的约束（UITableView 会把 backgroundView 铺满 bounds，只能靠内部偏移避让表头）
+@property (nonatomic, strong) MASConstraint *scheduleEmptyTopConstraint;
+/// 下拉回弹时填充头部上方区域的深绿背景（tableView 自身背景保持白色，不影响底部）
+@property (nonatomic, strong) UIView *topStretchGreenView;
 /// 防止切 tab 时反复触发全量请求，记录上次加载时间
 @property (nonatomic, assign) NSTimeInterval lastLoadTime;
 /// 是否正在加载中，防止并发请求
@@ -614,10 +619,21 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
 }
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
-    // 底部预留 tab bar 高度，避免内容滑到 tab bar 下方导致无法点击
-    CGFloat tabBarH = self.tabBarController.tabBar.bounds.size.height;
-    if (tabBarH > 0 && _scrollView.contentInset.bottom != tabBarH) {
-        _scrollView.contentInset = UIEdgeInsetsMake(0, 0, tabBarH, 0);
+    [self home_syncTableHeaderLayoutIfNeeded];
+    // 底部预留自定义 pill tab bar：其锚定在 safeAreaLayoutGuide 底部、总高 72（pill 56 + 上下 8 间距），
+    // 所以留白 = 72 + 安全区高度（全面屏 34pt，无 Home 指示条机型为 0），否则最后一行被 pill bar 压住。
+    // 注意不能用 tabBarController.tabBar.bounds——系统 tabBar 已被 MainTabBarController 压成 0 高度。
+    CGFloat safeBottom = 0;
+    if (@available(iOS 11.0, *)) {
+        safeBottom = self.view.safeAreaInsets.bottom;
+    }
+    CGFloat bottomBarH = 72.f + safeBottom;
+    UIEdgeInsets insets = _tableView.contentInset;
+    // MJRefresh footer 显示时会给 inset.bottom 加 footer 高度（隐藏时对称减回），
+    // 只在数值不足时补足，避免覆盖其增量、也不与 footer 的加减逻辑打架
+    if (insets.bottom < bottomBarH) {
+        insets.bottom = bottomBarH;
+        _tableView.contentInset = insets;
     }
 }
 
@@ -661,18 +677,67 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     // 预计算分组缓存，避免 tableView 回调里反复遍历
     [self rebuildGroupCache];
     [_tableView reloadData];
-    // 用 performSelector 防抖，避免短时间内多次触发布局计算
-    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(updateTableHeight) object:nil];
-    [self performSelector:@selector(updateTableHeight) withObject:nil afterDelay:0.05];
     NSLog(@"[HomeDebug] filterData done data=%ld filtered=%ld sections=%ld cost=%.3f",
           (long)self.dataSource.count, (long)self.filteredData.count, (long)self.sortedDateKeys.count, CACurrentMediaTime() - t0);
+}
+
+/// 上拉加载更多专用：只插入新增的分组/行，不整表 reloadData。
+/// 依赖新旧分组快照对比（分页按时间升序追加，前面分组只增不变），避免每翻一页全表刷新——
+/// 旧实现刷新成本随行数线性上涨，正是「加载到最后一页卡死」的根因。
+- (void)filterDataAppendingFromOldKeys:(NSArray<NSString *> *)oldKeys
+                          oldGrouped:(NSDictionary<NSString *, NSArray<Match *> *> *)oldGrouped {
+    CFTimeInterval t0 = CACurrentMediaTime();
+    [self ensureDefaultSelectedTeamIfNeeded];
+    _filteredData = [_dataSource mutableCopy];
+    [self rebuildGroupCache];
+
+    NSArray<NSString *> *newKeys = self.sortedDateKeys ?: @[];
+    NSDictionary<NSString *, NSArray<Match *> *> *newGrouped = self.groupedMatches ?: @{};
+    NSInteger commonSections = MIN(oldKeys.count, newKeys.count);
+
+    NSMutableArray<NSIndexPath *> *insertPaths = [NSMutableArray array];
+    NSMutableArray<NSNumber *> *insertSections = [NSMutableArray array];
+    for (NSInteger s = 0; s < commonSections; s++) {
+        NSString *ok = oldKeys[s];
+        NSString *nk = newKeys[s];
+        if (![ok isEqualToString:nk]) {
+            // 分组键发生位移说明数据源整体变化（异常场景），退回全量刷新保证正确性
+            [self filterData];
+            return;
+        }
+        NSUInteger oldRows = [oldGrouped[ok] count];
+        NSArray<Match *> *newList = newGrouped[nk] ?: @[];
+        if (newList.count > oldRows) {
+            for (NSUInteger r = oldRows; r < newList.count; r++) {
+                [insertPaths addObject:[NSIndexPath indexPathForRow:r inSection:s]];
+            }
+        }
+    }
+    for (NSInteger s = commonSections; s < (NSInteger)newKeys.count; s++) {
+        [insertSections addObject:@(s)];
+    }
+
+    if (insertSections.count == 0 && insertPaths.count == 0) {
+        return;
+    }
+    [_tableView beginUpdates];
+    if (insertSections.count > 0) {
+        NSIndexSet *idx = [NSIndexSet indexSetWithIndexesInRange:NSMakeRange(insertSections.firstObject.integerValue, insertSections.count)];
+        [_tableView insertSections:idx withRowAnimation:UITableViewRowAnimationNone];
+    }
+    if (insertPaths.count > 0) {
+        [_tableView insertRowsAtIndexPaths:insertPaths withRowAnimation:UITableViewRowAnimationNone];
+    }
+    [_tableView endUpdates];
+    NSLog(@"[HomeDebug] append incremental sections=%lu rows=%lu cost=%.3f",
+          (unsigned long)insertSections.count, (unsigned long)insertPaths.count, CACurrentMediaTime() - t0);
 }
 
 - (void)rebuildGroupCache {
     NSMutableDictionary<NSString *, NSMutableArray<Match *> *> *dict = [NSMutableDictionary dictionary];
     NSMutableArray<NSString *> *keys = [NSMutableArray array];
     for (Match *m in _filteredData) {
-        NSString *key = [self monthTextFromRaw:m.matchDate];
+        NSString *key = [self monthTextFromMatch:m];
         if (!dict[key]) {
             dict[key] = [NSMutableArray array];
             [keys addObject:key];
@@ -692,7 +757,6 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
 }
 
 - (void)setupUI {
-    [self setupHeader];
     [self setupScrollContent];
 }
 
@@ -702,10 +766,33 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     [self.navigationController pushViewController:vc animated:YES];
 }
 
-- (void)setupHeader {
+- (void)setupScrollContent {
+    // 单 tableView 自滚动架构：顶部区域做成 tableHeaderView，
+    // 消灭「tableView 高度=全部内容、所有行同时实例化」导致的每加载一页全量 reloadData 卡死。
+    _tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleGrouped];
+    _tableView.delegate = self;
+    _tableView.dataSource = self;
+    _tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    _tableView.backgroundColor = kHomeContentBg;
+    _tableView.sectionHeaderHeight = 44;
+    _tableView.sectionFooterHeight = 0.01;
+    _tableView.showsVerticalScrollIndicator = NO;
+    if (@available(iOS 11.0, *)) {
+        _tableView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+    }
+    [_tableView registerClass:[MatchCell class] forCellReuseIdentifier:@"MatchCell"];
+    [self.view addSubview:_tableView];
+    [_tableView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.view);
+    }];
+
+    // —— 表头：深绿头部（头像/日期/球队栏）+ 白色内容区（标题/更多/精选双卡） ——
+    _homeTableHeaderView = [[UIView alloc] init];
+    _homeTableHeaderView.backgroundColor = [UIColor clearColor];
+
     _headerView = [[UIView alloc] init];
     _headerView.backgroundColor = kHeaderGreen;
-    [self.view addSubview:_headerView];
+    [_homeTableHeaderView addSubview:_headerView];
 
     _avatarView = [[UIImageView alloc] init];
     _avatarView.backgroundColor = [UIColor colorWithRed:0.4 green:0.3 blue:0.5 alpha:1.0];
@@ -747,12 +834,40 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     [_teamCollectionView registerClass:[HomeTeamCell class] forCellWithReuseIdentifier:@"TeamCell"];
     [_headerView addSubview:_teamCollectionView];
 
+    // 白色内容区（顶部双圆弧，按原型“查看赛事/更多”所在区域）
+    self.bodyBgView = [[UIView alloc] init];
+    self.bodyBgView.backgroundColor = kHomeContentBg;
+    self.bodyBgView.layer.cornerRadius = 24;
+    self.bodyBgView.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+    if (@available(iOS 13.0, *)) {
+        self.bodyBgView.layer.cornerCurve = kCACornerCurveContinuous;
+    }
+    self.bodyBgView.clipsToBounds = YES;
+    [_homeTableHeaderView addSubview:self.bodyBgView];
+
+    _titleLabel = [[UILabel alloc] init];
+    _titleLabel.text = NSLocalizedString(@"home_view_matches", nil);
+    _titleLabel.font = [UIFont boldSystemFontOfSize:16];
+    _titleLabel.textColor = [UIColor blackColor];
+    _moreBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    [_moreBtn setTitle:NSLocalizedString(@"home_more", nil) forState:UIControlStateNormal];
+    [_moreBtn setTitleColor:[UIColor colorWithWhite:0.47 alpha:1.0] forState:UIControlStateNormal];
+    _moreBtn.titleLabel.font = [UIFont systemFontOfSize:12];
+    [_moreBtn addTarget:self action:@selector(onMoreTapped) forControlEvents:UIControlEventTouchUpInside];
+    [self.bodyBgView addSubview:_titleLabel];
+    [self.bodyBgView addSubview:_moreBtn];
+
+    _twoCardsContainer = [[UIView alloc] init];
+    [self.bodyBgView addSubview:_twoCardsContainer];
+    [self buildTwoCards];
+
+    // 表头内部布局（与旧版锚定一致）：深绿头部顶到表头顶，白区顶部相对球队栏定位
     [_headerView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.leading.trailing.equalTo(self.view);
-        make.height.mas_equalTo(257);
+        make.top.leading.trailing.equalTo(_homeTableHeaderView);
     }];
     [_avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_headerView.mas_safeAreaLayoutGuideTop).offset(12);
+        // tableHeaderView 位于滚动内容区，safeAreaLayoutGuide 会随滚动变化，改为手动同步安全区高度
+        self.avatarTopConstraint = make.top.equalTo(_headerView).offset(12);
         make.leading.equalTo(_headerView).offset(16);
         make.width.height.mas_equalTo(40);
     }];
@@ -769,96 +884,78 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
         make.leading.trailing.equalTo(_headerView);
         make.height.mas_equalTo(96);
     }];
-}
-
-- (void)setupScrollContent {
-    // 白色内容区（顶部双圆弧，按原型“查看赛事/更多”所在区域）
-    self.bodyBgView = [[UIView alloc] init];
-    self.bodyBgView.backgroundColor = kHomeContentBg;
-    self.bodyBgView.layer.cornerRadius = 24;
-    self.bodyBgView.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
-    if (@available(iOS 13.0, *)) {
-        self.bodyBgView.layer.cornerCurve = kCACornerCurveContinuous;
-    }
-    self.bodyBgView.clipsToBounds = YES;
-    [self.view addSubview:self.bodyBgView];
-
-    _scrollView = [[UIScrollView alloc] init];
-    _scrollView.backgroundColor = [UIColor clearColor];
-    _scrollView.showsVerticalScrollIndicator = NO;
-    if (@available(iOS 11.0, *)) _scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
-    [self.bodyBgView addSubview:_scrollView];
-    _contentView = [[UIView alloc] init];
-    _contentView.backgroundColor = kHomeContentBg;
-    [_scrollView addSubview:_contentView];
-
-    _titleLabel = [[UILabel alloc] init];
-    _titleLabel.text = NSLocalizedString(@"home_view_matches", nil);
-    _titleLabel.font = [UIFont boldSystemFontOfSize:16];
-    _titleLabel.textColor = [UIColor blackColor];
-    _moreBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [_moreBtn setTitle:NSLocalizedString(@"home_more", nil) forState:UIControlStateNormal];
-    [_moreBtn setTitleColor:[UIColor colorWithWhite:0.47 alpha:1.0] forState:UIControlStateNormal];
-    _moreBtn.titleLabel.font = [UIFont systemFontOfSize:12];
-    [_moreBtn addTarget:self action:@selector(onMoreTapped) forControlEvents:UIControlEventTouchUpInside];
-    [_contentView addSubview:_titleLabel];
-    [_contentView addSubview:_moreBtn];
-
-    _twoCardsContainer = [[UIView alloc] init];
-    [_contentView addSubview:_twoCardsContainer];
-    [self buildTwoCards];
-
-    _tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleGrouped];
-    _tableView.delegate = self;
-    _tableView.dataSource = self;
-    _tableView.scrollEnabled = NO; // 让整页由外层 scrollView 滚动
-    _tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
-    _tableView.backgroundColor = kHomeContentBg;
-    _tableView.sectionHeaderHeight = 44;
-    _tableView.sectionFooterHeight = 0.01;
-    [_tableView registerClass:[MatchCell class] forCellReuseIdentifier:@"MatchCell"];
-    [_contentView addSubview:_tableView];
-
+    // 白色内容区顶=球队栏顶 +（队名底 74 + 间距 18），与旧版完全一致
     [self.bodyBgView mas_makeConstraints:^(MASConstraintMaker *make) {
-        // 相对球队列表定位，保证队名与白色内容区间距恒为 18pt（不随安全区变化）
         make.top.equalTo(_teamCollectionView.mas_top).offset(kHomeTeamNameBottomFromCollectionTop + kHomeTeamNameToBodyGap);
-        make.leading.trailing.bottom.equalTo(self.view);
+        make.leading.trailing.bottom.equalTo(_homeTableHeaderView);
     }];
-    [_scrollView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.edges.equalTo(self.bodyBgView);
-    }];
-    [_contentView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.edges.equalTo(_scrollView);
-        make.width.equalTo(_scrollView);
+    // 深绿头部只需延伸到白区顶部圆弧之下（圆角 24pt，垫 30pt 足够盖住缺口），
+    // 否则圆弧两侧会露出 tableView 的白色背景。
+    // 注意锚点是 bodyBgView.mas_top：若错锚到 bodyBgView 底部，绿头会穿透白区
+    // 向下多伸出 30pt 到表头 frame 外——平时被首个 section header 盖住，
+    // 切球队清空数据（0 个 section）时就会露出一条深绿横杠。
+    [_headerView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.bottom.equalTo(self.bodyBgView.mas_top).offset(30);
     }];
     [_titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_contentView).offset(20);
-        make.leading.equalTo(_contentView).offset(16);
+        make.top.equalTo(self.bodyBgView).offset(20);
+        make.leading.equalTo(self.bodyBgView).offset(16);
     }];
     [_moreBtn mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerY.equalTo(_titleLabel);
-        make.trailing.equalTo(_contentView).offset(-16);
+        make.trailing.equalTo(self.bodyBgView).offset(-16);
     }];
     [_twoCardsContainer mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(_titleLabel.mas_bottom).offset(16);
-        make.leading.equalTo(_contentView).offset(16);
-        make.trailing.equalTo(_contentView).offset(-16);
+        make.leading.equalTo(self.bodyBgView).offset(16);
+        make.trailing.equalTo(self.bodyBgView).offset(-16);
         make.height.mas_equalTo(kHomeFeaturedCardH);
-    }];
-    [_tableView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_twoCardsContainer.mas_bottom).offset(10);
-        make.leading.trailing.equalTo(_contentView);
-        self.tableHeightConstraint = make.height.mas_equalTo(0); // 实际高度后面根据 contentSize 更新
-        make.bottom.equalTo(_contentView).offset(-12);
+        make.bottom.equalTo(self.bodyBgView).offset(-12);
     }];
 
-    // 初次布局根据当前数据刷新列表高度
-    [_tableView reloadData];
-    [self updateTableHeight];
+    _tableView.tableHeaderView = _homeTableHeaderView;
+    [self home_syncTableHeaderLayoutIfNeeded];
+    [self setupTopStretchGreenView];
+}
+
+/// 下拉回弹时头部上方露出的区域：在 tableView 内垫一块与头部同色的深绿背景，
+/// 静止时位于 tableHeaderView 上方的屏幕外（y=-屏幕高），下拉时自然跟随露出，避免露出白色突兀。
+/// frame 固定不跟随滚动，这与 MJRefresh header 的悬浮机制一致。
+- (void)setupTopStretchGreenView {
+    if (_topStretchGreenView.superview) return;
+    CGFloat screenH = [UIScreen mainScreen].bounds.size.height;
+    _topStretchGreenView = [[UIView alloc] initWithFrame:CGRectMake(0, -screenH, _tableView.bounds.size.width, screenH)];
+    _topStretchGreenView.backgroundColor = kHeaderGreen;
+    _topStretchGreenView.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    [_tableView addSubview:_topStretchGreenView];
+    // 垫在内容之下，避免盖住表头/行
+    [_tableView sendSubviewToBack:_topStretchGreenView];
+}
+
+/// 表头用 Masonry 自适应高度后，需要手动 systemLayoutSizeFitting 量高写回 tableHeaderView，
+/// 否则 UITableView 仍按初始 frame 高度布局（这是 tableHeaderView 的系统特性）。
+- (void)home_syncTableHeaderLayoutIfNeeded {
+    if (!_homeTableHeaderView || !_tableView) return;
+    if (self.avatarTopConstraint) {
+        CGFloat safeTop = 0;
+        if (@available(iOS 11.0, *)) {
+            safeTop = self.view.safeAreaInsets.top;
+        }
+        self.avatarTopConstraint.inset = 12.f + safeTop;
+    }
+    CGFloat width = _tableView.bounds.size.width;
+    if (width <= 0) return;
+    CGSize fit = [_homeTableHeaderView systemLayoutSizeFittingSize:CGSizeMake(width, UILayoutFittingCompressedSize.height)
+                                   withHorizontalFittingPriority:UILayoutPriorityRequired
+                                         verticalFittingPriority:UILayoutPriorityFittingSizeLevel];
+    CGRect frame = _homeTableHeaderView.frame;
+    if (fabs(frame.size.height - fit.height) < 0.5 && fabs(frame.size.width - width) < 0.5) return;
+    frame.size = CGSizeMake(width, fit.height);
+    _homeTableHeaderView.frame = frame;
+    _tableView.tableHeaderView = _homeTableHeaderView;
 }
 
 - (void)updateTableHeight {
-    CFTimeInterval t0 = CACurrentMediaTime();
     if (!_tableView) return;
     CGFloat headerH = 40.f, footerH = 0.01f, rowH = 103.f;
     CGFloat total = 0;
@@ -870,15 +967,8 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     // 仅在首屏请求完成后才展示「暂无比赛」，切队加载中保持空白不闪空态
     BOOL showEmpty = noRows && self.scheduleListSettled;
     [self updateHomeScheduleEmptyState:showEmpty];
-    if (showEmpty) {
-        total = 220.f;
-    } else if (noRows) {
-        total = 0.f;
-    }
-    self.tableHeightConstraint.offset = total;
-    [self.view setNeedsLayout];
-    NSLog(@"[HomeDebug] updateTableHeight total=%.1f sections=%ld showEmpty=%d settled=%d cost=%.3f",
-          total, (long)self.sortedDateKeys.count, showEmpty, self.scheduleListSettled, CACurrentMediaTime() - t0);
+    NSLog(@"[HomeDebug] updateTableHeight total=%.1f sections=%ld showEmpty=%d settled=%d",
+          total, (long)self.sortedDateKeys.count, showEmpty, self.scheduleListSettled);
 }
 
 - (void)ensureScheduleEmptyBackgroundView {
@@ -896,7 +986,9 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     [bg addSubview:title];
     [iv mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(bg);
-        make.centerY.equalTo(bg).offset(-24);
+        // UITableView 会把 backgroundView 铺满 bounds，列表为空时上方是 tableHeaderView，
+        // 用内部顶部偏移让空态内容落在表头之下
+        self.scheduleEmptyTopConstraint = make.top.equalTo(bg).offset(24);
         make.width.height.mas_equalTo(120);
     }];
     [title mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -919,23 +1011,31 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
         title = NSLocalizedString(@"discover_list_empty", nil) ?: @"暂无比赛";
     }
     self.scheduleEmptyTitleLabel.text = title;
+    if (self.scheduleEmptyTopConstraint) {
+        CGFloat top = self.tableView.tableHeaderView.frame.size.height + 24;
+        self.scheduleEmptyTopConstraint.inset = top;
+    }
     self.tableView.backgroundView = self.scheduleEmptyBackgroundView;
+    [self.scheduleEmptyBackgroundView setNeedsLayout];
 }
 
-/// 无赛程时隐藏上拉 footer，避免空态下方再露出「没有更多数据」
+/// 上拉 footer 显隐：无数据、以及「已经全部加载完毕」时直接隐藏，
+/// 不再展示 MJRefresh 的 NoMoreData 文案，避免底部多出一行提示。
 - (void)updateScheduleFooterVisibility {
     BOOL hasData = self.dataSource.count > 0;
     if (!hasData) {
-        [self.scrollView.mj_footer endRefreshing];
-        self.scrollView.mj_footer.hidden = YES;
+        [self.tableView.mj_footer endRefreshing];
+        self.tableView.mj_footer.hidden = YES;
         return;
     }
-    self.scrollView.mj_footer.hidden = NO;
-    if (self.scheduleHasMore) {
-        [self.scrollView.mj_footer resetNoMoreData];
-    } else {
-        [self.scrollView.mj_footer endRefreshingWithNoMoreData];
+    if (!self.scheduleHasMore) {
+        // 没有更多数据：结束刷新并整体隐藏 footer（隐藏时 MJRefresh 会对称减回 inset 增量）
+        [self.tableView.mj_footer resetNoMoreData];
+        self.tableView.mj_footer.hidden = YES;
+        return;
     }
+    self.tableView.mj_footer.hidden = NO;
+    [self.tableView.mj_footer resetNoMoreData];
 }
 
 - (void)updateLocalizedStrings {
@@ -1117,16 +1217,16 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
 - (void)setupRefresh {
     RefreshPagHeader *header = [RefreshPagHeader headerWithRefreshingTarget:self refreshingAction:@selector(refreshData)];
     [header prepare];
-    _scrollView.mj_header = header;
+    _tableView.mj_header = header;
     __weak typeof(self) weakSelf = self;
     MJRefreshAutoNormalFooter *footer = [MJRefreshAutoNormalFooter footerWithRefreshingBlock:^{
         [weakSelf loadMoreScheduleMatches];
     }];
-    // 显式由 updateScheduleFooterVisibility 控制显隐；无数据时必须隐藏
+    // 显式由 updateScheduleFooterVisibility 控制显隐；无数据/无更多时隐藏
     footer.automaticallyHidden = NO;
     footer.hidden = YES;
     footer.stateLabel.font = [UIFont systemFontOfSize:12];
-    _scrollView.mj_footer = footer;
+    _tableView.mj_footer = footer;
 }
 
 - (void)refreshData {
@@ -1150,7 +1250,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
         [self fetchFeatureMatchs];
         [self fetchScheduleMatchesReset:YES];
         if (endRefreshing) {
-            [self.scrollView.mj_header endRefreshing];
+            [self.tableView.mj_header endRefreshing];
         }
     }
 }
@@ -1175,7 +1275,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
         [self fetchFeatureMatchs];
         [self fetchScheduleMatchesReset:YES];
         if (endRefreshing) {
-            [self.scrollView.mj_header endRefreshing];
+            [self.tableView.mj_header endRefreshing];
         }
         [self saveHomeOfflineCache];
     } failure:^(NSError * _Nonnull error) {
@@ -1184,7 +1284,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
         [self fetchFeatureMatchs];
         [self fetchScheduleMatchesReset:YES];
         if (endRefreshing) {
-            [self.scrollView.mj_header endRefreshing];
+            [self.tableView.mj_header endRefreshing];
         }
     }];
 }
@@ -1284,14 +1384,14 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
 - (void)fetchScheduleMatchesReset:(BOOL)reset {
     if (self.isLoadingSchedule) {
         if (!reset) {
-            [self.scrollView.mj_footer endRefreshing];
+            [self.tableView.mj_footer endRefreshing];
             return;
         }
         // 切队/下拉刷新允许覆盖进行中的请求；旧回调靠 scheduleRequestSeq 丢弃
         self.isLoadingSchedule = NO;
     }
     if (!reset && !self.scheduleHasMore) {
-        [self.scrollView.mj_footer endRefreshingWithNoMoreData];
+        [self.tableView.mj_footer endRefreshing];
         return;
     }
     self.isLoadingSchedule = YES;
@@ -1306,6 +1406,9 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     BOOL myTeamOnly = (teamId.length == 0 && AuthManager.sharedManager.isLoggedIn);
     NSInteger pageNum = reset ? 1 : MAX(self.scheduleCurrentPage + 1, 1);
     NSArray<Match *> *previous = [self.dataSource copy];
+    // 增量插入用的旧分组快照
+    NSArray<NSString *> *oldKeys = [self.sortedDateKeys copy];
+    NSDictionary<NSString *, NSArray<Match *> *> *oldGrouped = [self.groupedMatches copy];
 #if DEBUG
     NSLog(@"[HomeDebug] schedule page=%ld teamId=%@ myTeamOnly=%d pageSize=%ld seq=%ld",
           (long)pageNum, teamId ?: @"(nil)", myTeamOnly, (long)kHomeScheduleFetchPageSize, (long)reqSeq);
@@ -1341,10 +1444,16 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
         NSLog(@"[HomeDebug] schedule page done page=%ld count=%ld batch=%ld hasMore=%d elapsed=%.3f",
               (long)pageNum, (long)self.dataSource.count, (long)list.count, self.scheduleHasMore,
               CACurrentMediaTime() - self.homeDebugLoadStartAt);
-        [self filterData];
+        if (reset) {
+            [self filterData];
+        } else {
+            // 加载更多只插入新增行，不整表 reloadData（防卡死的关键路径）
+            [self filterDataAppendingFromOldKeys:oldKeys oldGrouped:oldGrouped];
+        }
         [self updateTableHeight];
         [self saveHomeOfflineCache];
-        [self.scrollView.mj_header endRefreshing];
+        [self.tableView.mj_header endRefreshing];
+        [self.tableView.mj_footer endRefreshing];
         [self updateScheduleFooterVisibility];
     } failure:^(NSError * _Nonnull error) {
         __strong typeof(weakSelf) self = weakSelf;
@@ -1361,8 +1470,8 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
         }
         [self filterData];
         [self updateTableHeight];
-        [self.scrollView.mj_header endRefreshing];
-        [self.scrollView.mj_footer endRefreshing];
+        [self.tableView.mj_header endRefreshing];
+        [self.tableView.mj_footer endRefreshing];
         [self updateScheduleFooterVisibility];
     }];
 }
@@ -1397,8 +1506,18 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     return [PNBackendDateTime dateFromBackendString:raw];
 }
 
-- (NSString *)monthTextFromRaw:(NSString *)raw {
-    NSDate *date = [self dateFromRaw:raw];
+/// 带缓存的解析：同一场比赛的 matchDate 在分组/日期/时间处要解析 3 次，
+/// 结果缓存在 Match 模型上，滚动复用时不再反复尝试 15 种候选格式。
+- (NSDate *)dateFromMatch:(Match *)match {
+    if (!match) return nil;
+    if (match.kickoffDateParsed) return match.parsedKickoffDate;
+    match.parsedKickoffDate = [PNBackendDateTime dateFromBackendString:match.matchDate];
+    match.kickoffDateParsed = YES;
+    return match.parsedKickoffDate;
+}
+
+- (NSString *)monthTextFromMatch:(Match *)match {
+    NSDate *date = [self dateFromMatch:match];
     if (!date) return @"-";
     NSDateFormatter *fmt = [PNBackendDateTime displayFormatter];
     fmt.locale = [NSLocale currentLocale];
@@ -1406,8 +1525,8 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     return [fmt stringFromDate:date];
 }
 
-- (NSString *)timeTextFromRaw:(NSString *)raw {
-    NSDate *date = [self dateFromRaw:raw];
+- (NSString *)timeTextForMatch:(Match *)match {
+    NSDate *date = [self dateFromMatch:match];
     if (!date) return @"--:--";
     NSDateFormatter *fmt = [PNBackendDateTime displayFormatter];
     fmt.locale = [NSLocale currentLocale];
@@ -1415,8 +1534,8 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     return [fmt stringFromDate:date];
 }
 
-- (NSString *)dateDetailFromRaw:(NSString *)raw {
-    NSDate *date = [self dateFromRaw:raw];
+- (NSString *)dateTextForMatch:(Match *)match {
+    NSDate *date = [self dateFromMatch:match];
     if (!date) return @"--";
     NSDateFormatter *fmt = [PNBackendDateTime displayFormatter];
     fmt.dateFormat = @"yyyy年MM月dd日";
@@ -1538,8 +1657,8 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
     Match *m = [self modelAtIndexPath:indexPath];
     cell.homeLabel.text = m.homeTeamName ?: @"";
     cell.awayLabel.text = m.awayTeamName ?: @"";
-    cell.dateLabel.text = [self dateDetailFromRaw:m.matchDate];
-    [cell.timePill setTitle:[self timeTextFromRaw:m.matchDate] forState:UIControlStateNormal];
+    cell.dateLabel.text = [self dateTextForMatch:m];
+    [cell.timePill setTitle:[self timeTextForMatch:m] forState:UIControlStateNormal];
     BOOL showScore = (![self home_isMatchNotYetStartedForDisplay:m]) || (m.homeScore > 0 || m.awayScore > 0);
     cell.centerLabel.text = showScore ? [NSString stringWithFormat:@"%ld : %ld", (long)m.homeScore, (long)m.awayScore] : @"VS";
     // 队徽 URL 必须判空：URLWithString:nil 会抛 NSInvalidArgumentException 导致崩溃
@@ -1605,7 +1724,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
             return NO;
         }
     }
-    NSDate *kickoff = [self dateFromRaw:match.matchDate];
+    NSDate *kickoff = [self dateFromMatch:match];
     if (!kickoff) {
         return NO;
     }
@@ -1630,7 +1749,7 @@ static const NSInteger kHomeScheduleFetchPageSize = 20;
             return YES;
         }
     }
-    NSDate *kick = [self dateFromRaw:match.matchDate];
+    NSDate *kick = [self dateFromMatch:match];
     if (!kick) {
         return YES;
     }

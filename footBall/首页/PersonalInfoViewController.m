@@ -151,7 +151,6 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
 
 @property (nonatomic, strong) UIView *identityCard;
 @property (nonatomic, strong) UILabel *identityLeft;
-@property (nonatomic, strong) UIImageView *identityArrow;
 
 @property (nonatomic, strong) UIView *chipsContainer;
 @property (nonatomic, strong)MASConstraint *chipsHeightConstraint;
@@ -446,7 +445,7 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
     self.firstYearArrow = [self addDownArrowToCard:self.firstCard];
     prev = self.firstCard;
 
-    // 身份卡片（右侧箭头 + 标签多选交互）
+    // 身份卡片（标签多选交互）
     self.identityCard = [self makeCard];
     [self.content addSubview:self.identityCard];
     [self.identityCard mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -460,12 +459,6 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
     [self.identityLeft mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(self.identityCard).offset(16);
         make.top.equalTo(self.identityCard).offset(16);
-    }];
-    self.identityArrow = [self addRightArrowToCard:self.identityCard];
-    [self.identityArrow mas_remakeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(self.identityCard).offset(-14);
-        make.centerY.equalTo(self.identityLeft);
-        make.size.mas_equalTo(CGSizeMake(14, 14));
     }];
 
     self.chipsContainer = [UIView new];
@@ -610,19 +603,6 @@ static NSString *PNAvatarAbsoluteURLString(NSString *raw) {
     UIImageView *img = [UIImageView new];
     img.contentMode = UIViewContentModeScaleAspectFit;
     img.image = [UIImage imageNamed:@"setting_down"];
-    [card addSubview:img];
-    [img mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(card).offset(-14);
-        make.centerY.equalTo(card);
-        make.size.mas_equalTo(CGSizeMake(14, 14));
-    }];
-    return img;
-}
-
-- (UIImageView *)addRightArrowToCard:(UIView *)card {
-    UIImageView *img = [UIImageView new];
-    img.contentMode = UIViewContentModeScaleAspectFit;
-    img.image = [UIImage imageNamed:@"setting_right"];
     [card addSubview:img];
     [img mas_makeConstraints:^(MASConstraintMaker *make) {
         make.trailing.equalTo(card).offset(-14);

@@ -227,6 +227,18 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
     [super viewDidLayoutSubviews];
     [self.view bringSubviewToFront:self.settingsBtn];
     self.headerGradientLayer.frame = self.headerView.bounds;
+    // 底部预留自定义 pill tab bar（锚定 safeAreaLayoutGuide 底部、总高 72），
+    // 否则滚到最底时最后一张卡片被 pill bar 压住
+    CGFloat safeBottom = 0;
+    if (@available(iOS 11.0, *)) {
+        safeBottom = self.view.safeAreaInsets.bottom;
+    }
+    CGFloat bottomBarH = 72.f + safeBottom;
+    UIEdgeInsets insets = self.scrollView.contentInset;
+    if (insets.bottom < bottomBarH) {
+        insets.bottom = bottomBarH;
+        self.scrollView.contentInset = insets;
+    }
 }
 
 - (void)viewWillAppear:(BOOL)animated {
