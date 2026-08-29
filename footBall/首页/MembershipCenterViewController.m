@@ -2368,8 +2368,9 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
                     self.redeemPlanId = nil;
                     [self updatePayButtonState]; // 同步恢复侧滑返回手势
                     // 礼包码页不打扰用户（可能是后台残留事务失败）
+                    // 此处在 dispatch_async block 内，不能用 break（不在 loop/switch 中），用 return 提前结束 block。
                     if (self.showingGiftCode) {
-                        break;
+                        return;
                     }
                     if (transaction.error.code == SKErrorPaymentCancelled) {
                         [[LoadingManager sharedManager] showError:@"支付已取消，可重试" inView:self.view];
