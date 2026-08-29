@@ -33,6 +33,47 @@
 @end
 
 @implementation PNMembershipStatus
++ (NSDictionary<NSString *, id> *)modelCustomPropertyMapper {
+    // YYModel 对 BOOL isXxx 默认按「去掉 is」去 JSON 里找 key（找 member），
+    // 会导致服务端的 isMember 永远解成 NO，会员中心 banner 一直显示兑换码文案。
+    return @{
+        @"isMember": @[ @"isMember", @"member", @"active" ],
+        @"nearExpiry": @[ @"nearExpiry", @"near_expiry" ],
+        @"levelName": @[ @"levelName", @"level_name" ],
+        @"expireTime": @[ @"expireTime", @"expire_time" ],
+    };
+}
+
+- (BOOL)modelCustomTransformFromDictionary:(NSDictionary *)dic {
+    id rawMember = dic[@"isMember"] ?: dic[@"member"] ?: dic[@"active"];
+    if ([rawMember isKindOfClass:NSNumber.class]) {
+        self.isMember = [(NSNumber *)rawMember boolValue];
+    } else if ([rawMember isKindOfClass:NSString.class]) {
+        NSString *s = [(NSString *)rawMember lowercaseString];
+        self.isMember = ([s isEqualToString:@"1"] || [s isEqualToString:@"true"] || [s isEqualToString:@"yes"]);
+    }
+
+    id rawNear = dic[@"nearExpiry"] ?: dic[@"near_expiry"];
+    if ([rawNear isKindOfClass:NSNumber.class]) {
+        self.nearExpiry = [(NSNumber *)rawNear boolValue];
+    } else if ([rawNear isKindOfClass:NSString.class]) {
+        NSString *s = [(NSString *)rawNear lowercaseString];
+        self.nearExpiry = ([s isEqualToString:@"1"] || [s isEqualToString:@"true"] || [s isEqualToString:@"yes"]);
+    }
+
+    // LocalDateTime 可能是 ISO 字符串，也可能被序列成数组 [y,m,d,h,m,s]
+    id rawExpire = dic[@"expireTime"] ?: dic[@"expire_time"];
+    if ([rawExpire isKindOfClass:NSString.class]) {
+        NSString *s = [(NSString *)rawExpire stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        // "2026-09-28T20:54:14" → 展示用前 10 位即可，保留完整串给模型
+        self.expireTime = s;
+    } else if ([rawExpire isKindOfClass:NSArray.class] && [(NSArray *)rawExpire count] >= 3) {
+        NSArray *a = (NSArray *)rawExpire;
+        self.expireTime = [NSString stringWithFormat:@"%04ld-%02ld-%02ld",
+                           (long)[a[0] integerValue], (long)[a[1] integerValue], (long)[a[2] integerValue]];
+    }
+    return YES;
+}
 @end
 
 @implementation PNMemberBenefit

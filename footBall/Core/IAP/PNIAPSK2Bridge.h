@@ -26,6 +26,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, readonly) NSString *transactionId;
 @property (nonatomic, copy, readonly) NSString *jwsRepresentation;
 @property (nonatomic, assign, readonly) BOOL isRestore;
+/// StoreKit 2 productId（用于客户端反查 planId）
+@property (nonatomic, copy, readonly) NSString *productId;
 @end
 
 @interface PNIAPSK2Bridge : NSObject
@@ -41,6 +43,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// @param completion 主线程回调，result 为 nil 表示匹配失败（应回退到 SK1 收据路径）
 + (void)currentJWSForTransactionId:(NSString *)transactionId
                         completion:(void (^)(PNIAPSK2Result * _Nullable result))completion;
+
+/// 枚举当前有效权益（订阅/非消耗型），每笔带真正的 JWS。
+/// 用于「已订阅但 SK1 restore 0 笔」时的补激活（验证失败后 finish 过的场景）。
++ (void)enumerateCurrentEntitlements:(void (^)(NSArray<PNIAPSK2Result *> *results))completion;
 
 /// 主动 finish 当前 SK2 事务（与 SK1 finishTransaction 等价）。
 /// 注意：SK1 和 SK2 共享同一个 payment queue，SK1 已经 finish 的事务无需再调用此方法。

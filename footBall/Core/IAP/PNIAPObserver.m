@@ -96,16 +96,15 @@
 
 - (void)uploadTransaction:(SKPaymentTransaction *)transaction {
     NSString *transactionId = transaction.transactionIdentifier ?: @"";
-    BOOL isRestore = (transaction.transactionState == SKPaymentTransactionStateRestored);
 
-    // 兜底场景拿不到 planId/redeemCode，传 0 让服务端做幂等查询。
-    // agreementAccepted=false：兜底事务可能是 restore 也可能是应用启动时补单，
-    // 用户没有显式勾选协议，不能当作"已同意"处理（服务端在 restore=true 时会跳过校验）。
+    // 兜底场景拿不到 planId/redeemCode：必须 restore=true + planId=0，
+    // 让服务端按 Apple productId 幂等查询/补激活。
+    // 若 restore=false 且 planId=0，会走「普通购买」分支查方案失败。
     NSDictionary *baseBody = @{
         @"transactionId": transactionId,
         @"planId": @(0),
         @"agreementAccepted": @NO,
-        @"restore": @(isRestore)
+        @"restore": @YES
     };
 
     void (^submitWithBody)(NSDictionary *) = ^(NSDictionary *extra) {

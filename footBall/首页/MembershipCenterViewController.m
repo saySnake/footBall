@@ -137,6 +137,8 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 @property (nonatomic, assign) NSInteger restoreTotalCount;     // 本次 restore 接收到的事务总数
 @property (nonatomic, assign) NSInteger restoreProcessedCount; // 已处理完成（success/failure）的事务数
 @property (nonatomic, assign) NSInteger restoreSuccessCount;   // 其中服务端识别为有效（success）的事务数
+/// 最近一次 restore 上报失败的文案（用于替代笼统的「暂无可恢复」）
+@property (nonatomic, copy) NSString *lastRestoreErrorMessage;
 /// 本 VC 生命周期内是否已触发过收据刷新（避免同一界面内重复刷新，
 /// 但允许下次重新进入会员中心再尝试一次，比 App 级 dispatch_once 更友好）
 @property (nonatomic, assign) BOOL receiptRefreshTriggered;
@@ -208,6 +210,8 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     [[PNIAPObserver shared] setMembershipCenterActive:YES];
     // 每次返回会员中心都扫描一次残留事务（应对被 pop 后回来、断网重连等场景）
     [[PNIAPObserver shared] resumePendingTransactions];
+    // 重新进入时强制拉一次状态，确保头部到期日与支付按钮状态最新
+    [self loadRemoteData];
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
@@ -630,93 +634,107 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
         make.centerX.equalTo(self.view);
     }];
 
+    // 底部操作区（自下而上锚到安全区，避免小屏/全面屏贴底、协议挤在一起）
+    CGFloat kMCBottomHInset = 24.0;
+
+    self.agreementCheckBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.agreementCheckBtn.layer.borderColor = [UIColor colorWithWhite:0.75 alpha:1.0].CGColor;
+    self.agreementCheckBtn.layer.borderWidth = 1.2;
+    self.agreementCheckBtn.layer.cornerRadius = 3;
+    [self.agreementCheckBtn addTarget:self action:@selector(onToggleAgreement) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.agreementCheckBtn];
+
+    self.agreementLabel = [[UITextView alloc] init];
+    self.agreementLabel.editable = NO;
+    self.agreementLabel.selectable = YES;
+    self.agreementLabel.scrollEnabled = NO;
+    self.agreementLabel.userInteractionEnabled = YES;
+    self.agreementLabel.backgroundColor = [UIColor clearColor];
+    self.agreementLabel.textContainerInset = UIEdgeInsetsZero;
+    self.agreementLabel.textContainer.lineFragmentPadding = 0;
+    self.agreementLabel.font = [UIFont systemFontOfSize:11];
+    self.agreementLabel.textColor = [UIColor colorWithWhite:0.72 alpha:1.0];
+    self.agreementLabel.attributedText = [self agreementAttrText];
+    self.agreementLabel.linkTextAttributes = @{
+        NSForegroundColorAttributeName: kMCMint,
+        NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle)
+    };
+    self.agreementLabel.delegate = self;
+    [self.view addSubview:self.agreementLabel];
+
+    // 协议区贴底：文案多行自适应，勾选框与首行顶对齐
+    [self.agreementLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.view).offset(kMCBottomHInset + 22);
+        make.trailing.equalTo(self.view).offset(-kMCBottomHInset);
+        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-10);
+    }];
+    [self.agreementCheckBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.equalTo(self.view).offset(kMCBottomHInset);
+        make.top.equalTo(self.agreementLabel.mas_top).offset(1);
+        make.size.mas_equalTo(CGSizeMake(18, 18));
+    }];
+
+    self.agreementCheckBtn.selected = NO;
+    [self.agreementCheckBtn setTitle:@"" forState:UIControlStateNormal];
+
+    self.restoreBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.restoreBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    NSDictionary *restoreAttrs = @{
+        NSForegroundColorAttributeName: kMCMint,
+        NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle),
+        NSFontAttributeName: [UIFont systemFontOfSize:12 weight:UIFontWeightMedium]
+    };
+    [self.restoreBtn setAttributedTitle:[[NSAttributedString alloc] initWithString:@"恢复购买" attributes:restoreAttrs]
+                              forState:UIControlStateNormal];
+    UIColor *restoreHighlight = [kMCMint colorWithAlphaComponent:0.55];
+    NSDictionary *restoreHighlightAttrs = @{
+        NSForegroundColorAttributeName: restoreHighlight,
+        NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle),
+        NSFontAttributeName: [UIFont systemFontOfSize:12 weight:UIFontWeightMedium]
+    };
+    [self.restoreBtn setAttributedTitle:[[NSAttributedString alloc] initWithString:@"恢复购买" attributes:restoreHighlightAttrs]
+                              forState:UIControlStateHighlighted];
+    self.restoreBtn.contentEdgeInsets = UIEdgeInsetsMake(8, 16, 8, 16);
+    [self.restoreBtn addTarget:self action:@selector(onTapRestore) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.restoreBtn];
+    [self.restoreBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(self.view);
+        make.bottom.equalTo(self.agreementLabel.mas_top).offset(-10);
+        make.height.mas_equalTo(32);
+    }];
+
     self.payBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     self.payBtn.backgroundColor = kMCMint;
-    self.payBtn.layer.cornerRadius = 17.5;
-    /// Figma 571:2659：约 12.6pt semibold
-    self.payBtn.titleLabel.font = [UIFont systemFontOfSize:12.6 weight:UIFontWeightSemibold];
+    self.payBtn.layer.cornerRadius = 20;
+    self.payBtn.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
     self.payBtn.titleLabel.adjustsFontSizeToFitWidth = YES;
     self.payBtn.titleLabel.minimumScaleFactor = 0.85;
     [self.payBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     [self.payBtn addTarget:self action:@selector(onTapPay) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.payBtn];
     [self.payBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.view).offset(47);
-        make.trailing.equalTo(self.view).offset(-47);
-        make.height.mas_equalTo(35);
-        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-62);
+        make.leading.equalTo(self.view).offset(40);
+        make.trailing.equalTo(self.view).offset(-40);
+        make.height.mas_equalTo(40);
+        make.bottom.equalTo(self.restoreBtn.mas_top).offset(-6);
     }];
 
-    self.restoreBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    self.restoreBtn.titleLabel.font = [UIFont systemFontOfSize:10];
-    [self.restoreBtn setTitle:@"恢复购买" forState:UIControlStateNormal];
-    [self.restoreBtn setTitleColor:[UIColor colorWithWhite:0.6 alpha:1.0] forState:UIControlStateNormal];
-    [self.restoreBtn setTitleColor:[UIColor colorWithWhite:0.4 alpha:1.0] forState:UIControlStateHighlighted];
-    self.restoreBtn.titleLabel.adjustsFontSizeToFitWidth = YES;
-    self.restoreBtn.titleLabel.minimumScaleFactor = 0.85;
-    [self.restoreBtn addTarget:self action:@selector(onTapRestore) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:self.restoreBtn];
-    [self.restoreBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self.view);
-        make.bottom.equalTo(self.payBtn.mas_top).offset(-6);
-        make.height.mas_equalTo(16);
-    }];
-
-    // 订阅关键信息标签（Apple 3.1.2 合规要求）：明示续期频率、价格周期、取消方式。
-    // 文案随当前选中方案切换，自动续期商品显示"¥X/月 按月续期..."，永久商品显示"一次性买断"。
+    // 订阅关键信息（Apple 3.1.2）：续期频率 / 买断说明，放在支付按钮上方
     self.subscriptionInfoLabel = [[UILabel alloc] init];
-    self.subscriptionInfoLabel.font = [UIFont systemFontOfSize:10];
+    self.subscriptionInfoLabel.font = [UIFont systemFontOfSize:11];
     self.subscriptionInfoLabel.textColor = [UIColor colorWithWhite:0.55 alpha:1.0];
     self.subscriptionInfoLabel.textAlignment = NSTextAlignmentCenter;
-    self.subscriptionInfoLabel.numberOfLines = 0;
+    self.subscriptionInfoLabel.numberOfLines = 2;
     self.subscriptionInfoLabel.adjustsFontSizeToFitWidth = YES;
     self.subscriptionInfoLabel.minimumScaleFactor = 0.85;
     [self.view addSubview:self.subscriptionInfoLabel];
     [self.subscriptionInfoLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self.view);
-        make.bottom.equalTo(self.restoreBtn.mas_top).offset(-4);
-        make.leading.greaterThanOrEqualTo(self.view).offset(16);
-        make.trailing.lessThanOrEqualTo(self.view).offset(-16);
+        make.bottom.equalTo(self.payBtn.mas_top).offset(-8);
+        make.leading.equalTo(self.view).offset(kMCBottomHInset);
+        make.trailing.equalTo(self.view).offset(-kMCBottomHInset);
     }];
 
-    self.agreementCheckBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    self.agreementCheckBtn.layer.borderColor = [UIColor colorWithWhite:0.93 alpha:1.0].CGColor;
-    self.agreementCheckBtn.layer.borderWidth = 1;
-    self.agreementCheckBtn.layer.cornerRadius = 2;
-    [self.agreementCheckBtn addTarget:self action:@selector(onToggleAgreement) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:self.agreementCheckBtn];
-    [self.agreementCheckBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.view).offset(99);
-        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-20);
-        make.size.mas_equalTo(CGSizeMake(14, 14));
-    }];
-
-    self.agreementLabel = [[UITextView alloc] init];
-    self.agreementLabel.editable = NO;
-    self.agreementLabel.selectable = YES;            // 链接可点必须 selectable
-    self.agreementLabel.scrollEnabled = NO;          // 自适应高度
-    self.agreementLabel.userInteractionEnabled = YES;
-    self.agreementLabel.backgroundColor = [UIColor clearColor];
-    self.agreementLabel.textContainerInset = UIEdgeInsetsZero;
-    self.agreementLabel.textContainer.lineFragmentPadding = 0;
-    self.agreementLabel.font = [UIFont systemFontOfSize:10];
-    self.agreementLabel.textColor = [UIColor colorWithWhite:0.93 alpha:1.0];
-    self.agreementLabel.attributedText = [self agreementAttrText];
-    self.agreementLabel.linkTextAttributes = @{
-        NSForegroundColorAttributeName: [UIColor colorWithRed:24/255.0 green:115/255.0 blue:1 alpha:1],
-        NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle)
-    };
-    // 拦截 UITextView 默认用外链浏览器打开的行为，改为应用内 SFSafariViewController 打开
-    self.agreementLabel.delegate = self;
-    [self.view addSubview:self.agreementLabel];
-    [self.agreementLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.agreementCheckBtn.mas_trailing).offset(6);
-        make.centerY.equalTo(self.agreementCheckBtn);
-        make.trailing.equalTo(self.view).offset(-16);
-    }];
-
-    self.agreementCheckBtn.selected = NO;
-    [self.agreementCheckBtn setTitle:@"" forState:UIControlStateNormal];
     [self refreshRedeemBannerState];
     [self applyPlanAtIndex:self.currentIndex animated:NO];
     [self updatePayButtonState];
@@ -727,10 +745,11 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     [self.view bringSubviewToFront:self.planTitleLabel];
     [self.view bringSubviewToFront:self.cardScrollView];
     [self.view bringSubviewToFront:self.pageControl];
+    [self.view bringSubviewToFront:self.subscriptionInfoLabel];
     [self.view bringSubviewToFront:self.payBtn];
+    [self.view bringSubviewToFront:self.restoreBtn];
     [self.view bringSubviewToFront:self.agreementCheckBtn];
     [self.view bringSubviewToFront:self.agreementLabel];
-    [self.view bringSubviewToFront:self.restoreBtn];
 }
 
 - (void)setupRedeemDialog {
@@ -1368,16 +1387,22 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
         if (status.nearExpiry) {
             self.bannerSubLabel.text = @"即将到期，续费享优惠";
             self.bannerSubLabel.textColor = [UIColor colorWithRed:1.0 green:0.8 blue:0.2 alpha:1.0];
+            self.bannerHintLabel.text = @"使用限时兑换码，解锁专属会员优惠";
+            self.bannerHintLabel.textColor = kMCDiscountHintGray;
         } else {
-            // 会员且非临期：必须复位，否则上次「即将到期」的黄色文案会残留
+            // 会员且非临期：清掉兑换码副标题，避免仍显示「限时兑换码」
             self.bannerSubLabel.text = nil;
             self.bannerSubLabel.textColor = [UIColor clearColor];
+            self.bannerHintLabel.text = @"尊享全部会员权益";
+            self.bannerHintLabel.textColor = kMCDiscountHintGray;
         }
     } else if (status.isMember) {
         // 永久会员：expireTime=null（duration_days=0）。Apple 3.1.2：禁止显示具体到期日。
         self.bannerTitleLabel.text = @"永久会员，永久有效";
         self.bannerSubLabel.text = nil;
         self.bannerSubLabel.textColor = [UIColor clearColor];
+        self.bannerHintLabel.text = @"尊享全部会员权益";
+        self.bannerHintLabel.textColor = kMCDiscountHintGray;
     } else {
         // 非会员：恢复设计稿默认标题 + 兑换/折扣 banner 文案
         self.bannerTitleLabel.text = @"会员中心";
@@ -1477,10 +1502,8 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 }
 
 /// 本次实际购买的方案是否为永久/终身/创始人类型（非续期商品）。
-/// 通过 pendingPlanId 查 apiPlans（服务端方案），用 durationDays==0 精准判断永久，
-/// 避免异步购买期间用户滑卡片导致 currentIndex 错位、成功文案与实际购买不符。
-- (BOOL)isPurchasedPlanLifetime {
-    NSString *pid = self.pendingPlanId;
+/// 传入本次购买捕获的 planId（勿在清掉 pendingPlanId 后再读属性）。
+- (BOOL)isPurchasedPlanLifetimeWithPlanId:(NSString *)pid {
     if (pid.length == 0) return [self isCurrentPlanLifetime]; // 兜底
     for (PNMemberPlan *plan in self.apiPlans) {
         if ([plan.planId isEqualToString:pid]) {
@@ -1538,26 +1561,44 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 }
 
 - (NSAttributedString *)agreementAttrText {
-    NSString *prefix = @"开通前阅读并同意 ";
+    // 结构：第 1 行同意条款；第 2 行弱化取消说明 + 管理订阅（续期细节已在按钮上方 subscriptionInfoLabel）
+    NSString *prefix = @"开通前请阅读并同意";
     NSString *agreementText = @"《会员服务协议》";
     NSString *privacyText   = @"《隐私政策》";
     NSString *autoRenewText = @"《自动续期条款》";
-    NSString *suffix = @"\n付款：会员到期后 24 小时内自动续期，可随时在「设置-Apple ID-订阅」中取消。";
-    // "管理订阅"链接：点击跳转系统订阅管理页（itms-apps://...）。Apple 3.1.2 推荐（非强制）。
+    NSString *line2Prefix = @"可随时在系统设置中取消自动续期  ";
     NSString *manageLink = @"管理 Apple 订阅";
-    NSString *all = [NSString stringWithFormat:@"%@%@、%@、%@%@ %@",
-                     prefix, agreementText, privacyText, autoRenewText, suffix, manageLink];
+    NSString *all = [NSString stringWithFormat:@"%@%@、%@、%@\n%@%@",
+                     prefix, agreementText, privacyText, autoRenewText, line2Prefix, manageLink];
+
+    UIFont *bodyFont = [UIFont systemFontOfSize:11 weight:UIFontWeightRegular];
+    UIFont *linkFont = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
+    UIColor *bodyColor = [UIColor colorWithWhite:0.68 alpha:1.0];
+    UIColor *mutedColor = [UIColor colorWithWhite:0.48 alpha:1.0];
+
+    NSMutableParagraphStyle *style = [[NSMutableParagraphStyle alloc] init];
+    style.lineSpacing = 4;
+    style.paragraphSpacing = 2;
+    style.alignment = NSTextAlignmentLeft;
 
     NSMutableAttributedString *m = [[NSMutableAttributedString alloc] initWithString:all attributes:@{
-        NSForegroundColorAttributeName: [UIColor colorWithWhite:0.93 alpha:1.0],
-        NSFontAttributeName: [UIFont systemFontOfSize:10 weight:UIFontWeightMedium]
+        NSForegroundColorAttributeName: bodyColor,
+        NSFontAttributeName: bodyFont,
+        NSParagraphStyleAttributeName: style
     }];
 
-    // 三个链接统一高亮色 + 下划线，并打上 NSLinkAttributeName 标记。
-    // UITextView 原生识别 NSLinkAttributeName，点击即可跳转，不需要手动算命中。
+    // 第二行弱化
+    NSRange rLine2 = [all rangeOfString:line2Prefix];
+    if (rLine2.location != NSNotFound) {
+        [m addAttributes:@{
+            NSForegroundColorAttributeName: mutedColor,
+            NSFontAttributeName: [UIFont systemFontOfSize:10 weight:UIFontWeightRegular]
+        } range:NSMakeRange(rLine2.location, all.length - rLine2.location)];
+    }
+
     NSDictionary *linkAttrs = @{
-        NSForegroundColorAttributeName: [UIColor colorWithRed:24/255.0 green:115/255.0 blue:1 alpha:1],
-        NSFontAttributeName: [UIFont systemFontOfSize:10 weight:UIFontWeightMedium],
+        NSForegroundColorAttributeName: kMCMint,
+        NSFontAttributeName: linkFont,
         NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle)
     };
     NSRange rAgreement = [all rangeOfString:agreementText];
@@ -1577,8 +1618,11 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
         [m addAttribute:NSLinkAttributeName value:kCAutoRenewTermsURL range:rAutoRenew];
     }
     if (rManage.location != NSNotFound) {
-        [m addAttributes:linkAttrs range:rManage];
-        // itms-apps:// scheme 触发系统跳转到 App Store 的账户订阅管理页
+        [m addAttributes:@{
+            NSForegroundColorAttributeName: kMCMint,
+            NSFontAttributeName: [UIFont systemFontOfSize:10 weight:UIFontWeightMedium],
+            NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle)
+        } range:rManage];
         [m addAttribute:NSLinkAttributeName value:@"itms-apps://apps.apple.com/account/subscriptions" range:rManage];
     }
     return m;
@@ -2022,8 +2066,17 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     self.agreementCheckBtn.hidden = giftMode;
     self.agreementLabel.hidden = giftMode;
     self.restoreBtn.hidden = giftMode;
+    self.subscriptionInfoLabel.hidden = giftMode;
     self.giftContainerView.hidden = !giftMode;
     if (giftMode) {
+        // 切到礼包码时收掉 IAP「开通成功」（延迟回调可能已 present，避免盖在礼包页上）
+        UIViewController *presented = self.presentedViewController;
+        if ([presented isKindOfClass:[UIAlertController class]]) {
+            NSString *title = [(UIAlertController *)presented title] ?: @"";
+            if ([title containsString:@"开通成功"]) {
+                [presented dismissViewControllerAnimated:NO completion:nil];
+            }
+        }
         if (!wasGiftMode) {
             [self resetGiftCodeUI];
         }
@@ -2278,8 +2331,9 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     for (SKPaymentTransaction *transaction in transactions) {
         switch (transaction.transactionState) {
             case SKPaymentTransactionStatePurchasing: {
-                // 购买中，展示 loading
+                // 礼包码页不展示购买 loading（多为队列残留，非本页发起）
                 dispatch_async(dispatch_get_main_queue(), ^{
+                    if (self.showingGiftCode) { return; }
                     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
                 });
                 break;
@@ -2313,6 +2367,10 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
                     self.redeemAppleProductId = nil;
                     self.redeemPlanId = nil;
                     [self updatePayButtonState]; // 同步恢复侧滑返回手势
+                    // 礼包码页不打扰用户（可能是后台残留事务失败）
+                    if (self.showingGiftCode) {
+                        break;
+                    }
                     if (transaction.error.code == SKErrorPaymentCancelled) {
                         [[LoadingManager sharedManager] showError:@"支付已取消，可重试" inView:self.view];
                     } else {
@@ -2338,31 +2396,74 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     }
 }
 
+/// 本会话已提交过 verify 的 Apple transactionId（进程级，防 StoreKit 重复回调 / 重进页面二次上报）
+static NSMutableSet<NSString *> *PNSubmittedVerifyTxnIds(void) {
+    static NSMutableSet<NSString *> *set;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        set = [NSMutableSet set];
+    });
+    return set;
+}
+
 /// 购买成功后，将 transactionId 和 signedTransaction 上报服务端验证
 - (void)handlePurchasedTransaction:(SKPaymentTransaction *)transaction {
     NSString *transactionId = transaction.transactionIdentifier ?: @"";
+    if (transactionId.length == 0) {
+        return;
+    }
+    // StoreKit 会在 finish 前多次回调同一笔 Purchased；首笔成功后 pendingPlanId 已清空，
+    // 若再次走「购买」路径会传空 planId → 服务端 @NotNull「planId不能为空」。
+    if ([PNSubmittedVerifyTxnIds() containsObject:transactionId]) {
+        NSLog(@"[IAP] 跳过重复 Purchased 回调: txnId=%@", transactionId);
+        return;
+    }
+    [PNSubmittedVerifyTxnIds() addObject:transactionId];
 
     // 上报内容选择策略（修复 StoreKit 版本不匹配阻塞）：
-    // - iOS 15+: 优先从 StoreKit 2 Transaction.currentEntitlements 取 JWS（jsonRepresentation）。
-    //   JWS 是 header.payload.signature 三段式签名交易，服务端 verifyViaJws 可直接验签，
-    //   不依赖 .p8 私钥配置（关键：当前服务端 AuthKey.p8 缺失，Server API v2 路径不可用，
-    //   必须走 JWS 路径才能在沙箱联调通）。
-    // - iOS 13/14 或 SK2 未命中：退回本机 appStoreReceiptURL 的 base64 整本收据（StoreKit 1），
-    //   服务端 looksLikeJws 会跳过 JWS 分支，只能依赖 Server API v2（需 .p8 配置就绪）。
-    NSString *planId = self.pendingPlanId ?: @"";
+    // - iOS 15+: 优先取 VerificationResult.jwsRepresentation（真正 JWS）
+    // - 未命中：退回 SK1 appStoreReceiptURL base64
+    // 本地立刻捕获 planId / redeemCode，避免异步回调时 pending 已被成功分支清空。
+    //
+    // 关键：只有「本页点过支付」留下的 pendingPlanId 才算用户主动购买，才弹「开通成功」。
+    // 队列残留 / 重放事务即使能从 productId 反查出 planId，也一律走 restore 补单且不弹窗，
+    // 否则用户只停在礼包码 Tab 也会被延迟回调打断。
+    NSString *pendingPlanId = [self.pendingPlanId copy] ?: @"";
+    NSString *redeemCode = [self.pendingRedeemCode copy] ?: @"";
+    // 仅「点过支付留下的 pending」算主动购买；礼包页即使还有 pending 也不弹开通成功
+    BOOL userInitiatedPurchase = (pendingPlanId.length > 0);
+    NSString *planId = pendingPlanId;
+    if (planId.length == 0) {
+        NSString *productId = transaction.payment.productIdentifier ?: @"";
+        planId = [self planIdForAppleProductId:productId] ?: @"";
+    }
+    // 队列残留（无 pending）：restore 补单。主动购买仍走购买分支。
+    BOOL asRestore = !userInitiatedPurchase || (planId.length == 0);
+    BOOL allowSuccessUI = userInitiatedPurchase && !asRestore && !self.showingGiftCode;
     __weak typeof(self) weakSelf = self;
 
     void (^submitWithSignedTransaction)(NSString *) = ^(NSString *signedTransaction) {
         NSMutableDictionary *body = [@{
             @"transactionId": transactionId,
             @"signedTransaction": signedTransaction ?: @"",
-            @"planId": planId,
-            @"agreementAccepted": @YES
+            @"planId": asRestore ? @(0) : @([planId longLongValue]),
+            @"agreementAccepted": asRestore ? @NO : @YES,
+            @"restore": @(asRestore)
         } mutableCopy];
-        if (weakSelf.pendingRedeemCode.length > 0) {
-            body[@"redeemCode"] = weakSelf.pendingRedeemCode;
+        if (!asRestore && redeemCode.length > 0) {
+            body[@"redeemCode"] = redeemCode;
         }
-        [weakSelf submitPurchaseVerification:body transaction:transaction];
+        if (asRestore || !allowSuccessUI) {
+            NSLog(@"[IAP] Purchased 静默补单/不弹窗: txnId=%@ product=%@ gift=%d pending=%@ restore=%d",
+                  transactionId,
+                  transaction.payment.productIdentifier ?: @"",
+                  (int)weakSelf.showingGiftCode,
+                  pendingPlanId,
+                  (int)asRestore);
+        }
+        [weakSelf submitPurchaseVerification:body
+                                 transaction:transaction
+                              purchasedPlanId:(allowSuccessUI ? planId : nil)];
     };
 
     if ([PNIAPSK2Bridge isAvailable]) {
@@ -2384,29 +2485,65 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     }
 }
 
+/// 本会话已弹出过「开通成功」的 transactionId（进程级，防延迟回调重复弹窗）
+static NSMutableSet<NSString *> *PNShownPurchaseSuccessTxnIds(void) {
+    static NSMutableSet<NSString *> *set;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        set = [NSMutableSet set];
+    });
+    return set;
+}
+
 /// 实际上报 verifyPurchase 的统一入口（SK2 JWS 路径与 SK1 receipt 路径共用）
+/// @param purchasedPlanId 本次用户主动购买的方案（restore 补单传 nil，不弹「开通成功」）
 - (void)submitPurchaseVerification:(NSDictionary *)body
-                       transaction:(SKPaymentTransaction *)transaction {
+                       transaction:(SKPaymentTransaction *)transaction
+                    purchasedPlanId:(NSString *)purchasedPlanId {
     __weak typeof(self) weakSelf = self;
+    BOOL showPurchaseSuccessUI = (purchasedPlanId.length > 0);
+    NSString *txnId = transaction.transactionIdentifier ?: (body[@"transactionId"] ?: @"");
     [[MembershipRequest shared] verifyPurchaseWithBody:body success:^(HTTPResponse * _Nullable responseObject) {
         // 服务端验证成功，结束事务
         [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
         dispatch_async(dispatch_get_main_queue(), ^{
+            if (!weakSelf) { return; }
             [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+            weakSelf.payInFlight = NO;
+            [weakSelf updatePayButtonState];
+            // 先刷新会员状态（到期日 banner）；不要紧接着调 refreshRedeemBannerState，
+            // 否则会把「会员有效期至 xxx」盖回「限时兑换码」。
+            [weakSelf loadRemoteData];
+            // 无论是否弹窗，成功后都清购买上下文，避免礼包页静默成功后 pending 残留再弹窗
             weakSelf.pendingPlanId = nil;
             weakSelf.pendingRedeemCode = nil;
             weakSelf.hasAppliedRedeemDiscount = NO;
             weakSelf.redeemAppleProductId = nil;
             weakSelf.redeemPlanId = nil;
-            // 刷新会员状态
-            [weakSelf loadRemoteData];
-            [weakSelf refreshRedeemBannerState];
-            // 弹出成功提示（沙箱环境加注说明，避免测试人员误以为真实扣款）。
-            // 永久 / 创始人方案：一次性买断，文案不能暗示自动续期（Apple 3.1.2 合规）。
-            // 关键：必须用 pendingPlanId（本次购买的方案）判断，不能用 currentIndex。
-            // 购买是异步流程，用户在等待 Apple 弹窗期间可能滑到其他卡片，
-            // currentIndex 会变成另一个方案，导致成功文案与实际购买不符。
-            BOOL isLifetime = [weakSelf isPurchasedPlanLifetime];
+            if (!showPurchaseSuccessUI) {
+                return;
+            }
+
+            // 同一笔 txn 只弹一次成功；延迟重复回调 / 并发 verify 不再弹窗
+            if (txnId.length > 0 && [PNShownPurchaseSuccessTxnIds() containsObject:txnId]) {
+                NSLog(@"[IAP] 跳过重复开通成功弹窗: txnId=%@", txnId);
+                return;
+            }
+            if (txnId.length > 0) {
+                [PNShownPurchaseSuccessTxnIds() addObject:txnId];
+            }
+            // 礼包码 Tab / 页面不可见 / 已有弹窗：只静默刷新，不弹「开通成功」
+            // （用户切到礼包码后，延迟的 IAP 回调不应再打断当前页）
+            if (weakSelf.showingGiftCode || weakSelf.view.window == nil || weakSelf.presentedViewController != nil) {
+                NSLog(@"[IAP] 跳过开通成功 UI: gift=%d window=%d presented=%d txnId=%@",
+                      (int)weakSelf.showingGiftCode,
+                      (int)(weakSelf.view.window != nil),
+                      (int)(weakSelf.presentedViewController != nil),
+                      txnId);
+                return;
+            }
+
+            BOOL isLifetime = [weakSelf isPurchasedPlanLifetimeWithPlanId:purchasedPlanId];
             NSString *title = @"开通成功";
             NSString *message = isLifetime
                 ? @"永久会员已激活，感谢您的支持，尽情享受全部权益！"
@@ -2432,11 +2569,16 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
         // - 清理本地支付状态（payInFlight），否则用户再点支付会被拦截。
         [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
         NSLog(@"[IAP][严重] 购买验证失败已 finish，请人工对账: txnId=%@, planId=%@, err=%@",
-              transaction.transactionIdentifier ?: @"", weakSelf.pendingPlanId ?: @"", error);
+              transaction.transactionIdentifier ?: @"", purchasedPlanId ?: body[@"planId"], error);
         dispatch_async(dispatch_get_main_queue(), ^{
             [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
             weakSelf.payInFlight = NO;
             [weakSelf updatePayButtonState];
+            // 补单失败 / 礼包码页：不弹「验证失败」
+            if (!showPurchaseSuccessUI || weakSelf.showingGiftCode) {
+                NSLog(@"[IAP] verify 失败（不弹窗）gift=%d: %@", (int)weakSelf.showingGiftCode, error);
+                return;
+            }
             NSString *msg = @"购买成功，但服务器验证失败，请联系客服处理";
             if ([error isKindOfClass:[APIError class]]) {
                 msg = [(APIError *)error displayMessageWithFallback:msg];
@@ -2457,10 +2599,10 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 
 #pragma mark - Restore Purchases
 
-/// 用户点击「恢复购买」：调用 SKPaymentQueue restoreCompletedTransactions，
-/// 系统会把该 Apple ID 已完成的非消耗型/订阅事务重新投递到 updatedTransactions。
+/// 用户点击「恢复购买」。
+/// 优先走 StoreKit 2 currentEntitlements（已 finish 的订阅仍在权益里），
+/// 再回退 SK1 restoreCompletedTransactions。
 - (void)onTapRestore {
-    // IAP 硬约束：恢复购买同样需登录态（服务端按 userId + transactionId 反查本地会员记录）
     if (![AuthManager sharedManager].isLoggedIn) {
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"请先登录"
                                                                        message:@"恢复购买需要先登录"
@@ -2477,7 +2619,6 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
         [self presentViewController:alert animated:YES completion:nil];
         return;
     }
-    // 防连点：购买进行中 / restore 进行中均拦截
     if (self.payInFlight || self.restoreInFlight) {
         return;
     }
@@ -2485,29 +2626,129 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     self.restoreTotalCount = 0;
     self.restoreProcessedCount = 0;
     self.restoreSuccessCount = 0;
-    [self updatePayButtonState]; // 同步禁用侧滑返回
+    self.lastRestoreErrorMessage = nil;
+    [self updatePayButtonState];
     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
-    [[SKPaymentQueue defaultQueue] restoreCompletedTransactions];
+
+    __weak typeof(self) weakSelf = self;
+    if ([PNIAPSK2Bridge isAvailable]) {
+        [PNIAPSK2Bridge enumerateCurrentEntitlements:^(NSArray<PNIAPSK2Result *> *results) {
+            if (results.count > 0) {
+                NSLog(@"[IAP] restore 走 SK2 entitlements: %lu 笔", (unsigned long)results.count);
+                for (PNIAPSK2Result *item in results) {
+                    [weakSelf submitRestoredEntitlement:item];
+                }
+                return;
+            }
+            NSLog(@"[IAP] SK2 entitlements 为空，回退 SK1 restoreCompletedTransactions");
+            [[SKPaymentQueue defaultQueue] restoreCompletedTransactions];
+        }];
+    } else {
+        [[SKPaymentQueue defaultQueue] restoreCompletedTransactions];
+    }
+}
+
+/// 将 SK2 当前权益上报服务端（restore 优先；失败且能映射 planId 时再以购买路径补激活）
+- (void)submitRestoredEntitlement:(PNIAPSK2Result *)item {
+    NSString *transactionId = item.transactionId ?: @"";
+    NSString *jws = item.jwsRepresentation ?: @"";
+    if (transactionId.length == 0 || jws.length == 0) {
+        return;
+    }
+    self.restoreTotalCount += 1;
+
+    NSString *planId = [self planIdForAppleProductId:item.productId];
+    __weak typeof(self) weakSelf = self;
+
+    void (^finishFail)(NSError *) = ^(NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSString *msg = error.localizedDescription;
+            if (msg.length > 0) {
+                weakSelf.lastRestoreErrorMessage = msg;
+            }
+            [weakSelf finishOneRestore];
+        });
+    };
+
+    void (^finishOK)(void) = ^{
+        dispatch_async(dispatch_get_main_queue(), ^{
+            weakSelf.restoreSuccessCount += 1;
+            [weakSelf finishOneRestore];
+        });
+    };
+
+    // 1) 先按 restore 上报（新服务端可补激活）
+    [[MembershipRequest shared] verifyPurchaseWithBody:@{
+        @"transactionId": transactionId,
+        @"signedTransaction": jws,
+        @"planId": @(0),
+        @"agreementAccepted": @NO,
+        @"restore": @YES
+    } success:^(HTTPResponse * _Nullable responseObject) {
+        finishOK();
+    } failure:^(NSError * _Nonnull error) {
+        // 2) 旧服务端 / PENDING_VERIFY：改走「正式购买」路径（需能映射 planId）
+        if (planId.length == 0) {
+            NSLog(@"[IAP] restore 失败且无法映射 planId productId=%@ err=%@", item.productId, error);
+            finishFail(error);
+            return;
+        }
+        NSLog(@"[IAP] restore 失败，改以 purchase 补报 planId=%@ productId=%@", planId, item.productId);
+        [[MembershipRequest shared] verifyPurchaseWithBody:@{
+            @"transactionId": transactionId,
+            @"signedTransaction": jws,
+            @"planId": planId,
+            @"agreementAccepted": @YES,
+            @"restore": @NO
+        } success:^(HTTPResponse * _Nullable responseObject) {
+            finishOK();
+        } failure:^(NSError * _Nonnull error2) {
+            NSLog(@"[IAP] purchase 补报仍失败: %@", error2);
+            finishFail(error2);
+        }];
+    }];
+}
+
+/// 用 apiPlans 把 Apple productId 反查为服务端 planId
+- (NSString *)planIdForAppleProductId:(NSString *)productId {
+    productId = [productId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (productId.length == 0) return nil;
+    for (PNMemberPlan *p in self.apiPlans) {
+        NSString *pid = [p.appleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if ([pid isEqualToString:productId] && p.planId.length > 0) {
+            return p.planId;
+        }
+    }
+    return nil;
 }
 
 /// SKPaymentQueueObserver — 恢复流程完成。
-/// 注意：此回调触发时，所有 Restored 事务已通过 updatedTransactions 投递给
-/// handleRestoredTransaction:，但每笔的网络上报是异步的，不能在这里 hideHUD
-/// （否则后续上报还在进行中 UI 就没反馈了）。HUD 改为在最后一笔上报完成后隐藏。
 - (void)paymentQueueRestoreCompletedTransactionsFinished:(SKPaymentQueue *)queue {
     dispatch_async(dispatch_get_main_queue(), ^{
-        // 0 笔事务：直接提示并收尾。
-        // 注意：必须同时检查 !restoreInFlight，避免与 finishOneRestore 的复位竞态：
-        // 网络快时所有 verifyPurchase 可能在本回调之前完成并触发 finishOneRestore 复位
-        // restoreTotalCount=0，此时进入此分支会重复弹"暂无可恢复"提示。
         if (self.restoreTotalCount == 0 && self.restoreInFlight) {
+            // SK1 也是 0 笔：再尝试一次 SK2 entitlements（防时序）
+            if ([PNIAPSK2Bridge isAvailable]) {
+                __weak typeof(self) weakSelf = self;
+                [PNIAPSK2Bridge enumerateCurrentEntitlements:^(NSArray<PNIAPSK2Result *> *results) {
+                    if (results.count > 0) {
+                        for (PNIAPSK2Result *item in results) {
+                            [weakSelf submitRestoredEntitlement:item];
+                        }
+                        return;
+                    }
+                    [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
+                    weakSelf.restoreInFlight = NO;
+                    [weakSelf updatePayButtonState];
+                    [[LoadingManager sharedManager] showError:@"暂无可恢复的购买记录" inView:weakSelf.view];
+                }];
+                return;
+            }
             [MBProgressHUD hideHUDForView:self.view animated:YES];
             self.restoreInFlight = NO;
             [self updatePayButtonState];
             [[LoadingManager sharedManager] showError:@"暂无可恢复的购买记录" inView:self.view];
             return;
         }
-        // 有事务：等 handleRestoredTransaction 的回调逐笔完成后再收尾（见 finishOneRestore）
         NSLog(@"[IAP] restore finished: %ld 笔事务等待上报完成", (long)self.restoreTotalCount);
     });
 }
@@ -2523,8 +2764,8 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     });
 }
 
-/// 恢复购买拿到一笔事务：把 transactionId 上报服务端做幂等查询，
-/// 服务端按 appleTransactionId 命中已有会员记录，返回 activateTime/expireTime。
+/// 恢复购买拿到一笔事务：把 transactionId + JWS 上报服务端。
+/// 服务端按 appleTransactionId 命中已有会员记录，或验证通过后按 productId 补激活。
 - (void)handleRestoredTransaction:(SKPaymentTransaction *)transaction {
     NSString *transactionId = transaction.transactionIdentifier ?: @"";
     if (transactionId.length == 0) {
@@ -2534,32 +2775,51 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     // 计入本次 restore 总数（用于在所有回调返回后统一收尾 HUD）
     self.restoreTotalCount += 1;
 
-    // 复用统一的收据获取逻辑（含 nil 时触发 SKReceiptRefreshRequest 的能力）
-    NSString *receiptBase64 = [self currentReceiptBase64];
-
     __weak typeof(self) weakSelf = self;
-    [[MembershipRequest shared] verifyPurchaseWithBody:@{
-        @"transactionId": transactionId,
-        @"signedTransaction": receiptBase64,
-        @"planId": @(0),
-        // restore 不要求用户勾选协议（Apple 也不要求），传 NO 保持数据真实，
-        // 服务端在 restore=true 时会跳过 agreementAccepted 校验。
-        @"agreementAccepted": @NO,
-        @"restore": @YES
-    } success:^(HTTPResponse * _Nullable responseObject) {
-        // 服务端已识别并返回会员信息，可 finish 事务
-        [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            weakSelf.restoreSuccessCount += 1;
-            [weakSelf finishOneRestore];
-        });
-    } failure:^(NSError * _Nonnull error) {
-        // 服务端未识别（该用户没买过 / 沙箱账号未续费等），也 finish 避免事务堆积
-        [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [weakSelf finishOneRestore];
-        });
-    }];
+    void (^submitRestore)(NSString *) = ^(NSString *signedTransaction) {
+        [[MembershipRequest shared] verifyPurchaseWithBody:@{
+            @"transactionId": transactionId,
+            @"signedTransaction": signedTransaction ?: @"",
+            @"planId": @(0),
+            // restore 不要求用户勾选协议（Apple 也不要求），传 NO 保持数据真实，
+            // 服务端在 restore=true 时会跳过 agreementAccepted 校验。
+            @"agreementAccepted": @NO,
+            @"restore": @YES
+        } success:^(HTTPResponse * _Nullable responseObject) {
+            // 服务端已识别并返回会员信息，可 finish 事务
+            [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                weakSelf.restoreSuccessCount += 1;
+                [weakSelf finishOneRestore];
+            });
+        } failure:^(NSError * _Nonnull error) {
+            // 服务端未识别也 finish 避免堆积；保留错误文案供收尾展示
+            [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (error.localizedDescription.length > 0) {
+                    weakSelf.lastRestoreErrorMessage = error.localizedDescription;
+                }
+                [weakSelf finishOneRestore];
+            });
+        }];
+    };
+
+    // 与购买路径一致：优先 SK2 JWS，避免 SK1 收据在服务端 .p8 未配齐时验不过
+    if ([PNIAPSK2Bridge isAvailable]) {
+        [PNIAPSK2Bridge currentJWSForTransactionId:transactionId completion:^(PNIAPSK2Result * _Nullable result) {
+            NSString *jws = result.jwsRepresentation ?: @"";
+            NSUInteger dotCount = [[jws componentsSeparatedByString:@"."] count];
+            if (jws.length > 0 && dotCount >= 3) {
+                NSLog(@"[IAP] restore 使用 SK2 JWS: txnId=%@", transactionId);
+                submitRestore(jws);
+            } else {
+                NSLog(@"[IAP] restore JWS 未命中，回退 SK1 收据: txnId=%@", transactionId);
+                submitRestore([weakSelf currentReceiptBase64]);
+            }
+        }];
+    } else {
+        submitRestore([self currentReceiptBase64]);
+    }
 }
 
 /// 单笔 restore 事务处理完成的统一收尾逻辑：
@@ -2577,10 +2837,17 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     // 仅在至少有一笔成功时刷新会员状态（避免无效请求）
     if (self.restoreSuccessCount > 0) {
         [self loadRemoteData];
-        [[LoadingManager sharedManager] showError:@"恢复成功" inView:self.view];
-    } else {
-        [[LoadingManager sharedManager] showError:@"暂无可恢复的购买记录" inView:self.view];
+        // 礼包码页不弹「恢复成功」，避免误以为是礼包兑换结果
+        if (!self.showingGiftCode) {
+            [[LoadingManager sharedManager] showError:@"恢复成功" inView:self.view];
+        }
+    } else if (!self.showingGiftCode) {
+        NSString *msg = self.lastRestoreErrorMessage.length > 0
+            ? self.lastRestoreErrorMessage
+            : @"暂无可恢复的购买记录";
+        [[LoadingManager sharedManager] showError:msg inView:self.view];
     }
+    self.lastRestoreErrorMessage = nil;
     // 复位计数器
     self.restoreTotalCount = 0;
     self.restoreProcessedCount = 0;
@@ -2747,10 +3014,10 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
 
 - (void)onToggleAgreement {
     self.agreementCheckBtn.selected = !self.agreementCheckBtn.selected;
-    self.agreementCheckBtn.layer.borderColor = [UIColor colorWithWhite:0.93 alpha:1.0].CGColor;
+    self.agreementCheckBtn.layer.borderColor = (self.agreementCheckBtn.selected ? kMCMint : [UIColor colorWithWhite:0.75 alpha:1.0]).CGColor;
     [self.agreementCheckBtn setTitle:(self.agreementCheckBtn.selected ? @"✓" : @"") forState:UIControlStateNormal];
     [self.agreementCheckBtn setTitleColor:kMCMint forState:UIControlStateNormal];
-    self.agreementCheckBtn.titleLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightBold];
+    self.agreementCheckBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightBold];
     [self updatePayButtonState];
 }
 
