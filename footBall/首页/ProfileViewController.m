@@ -948,17 +948,27 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
 }
 
 - (void)onDeleteAccount {
-    PNCommonAlertViewController *alert = [PNCommonAlertViewController new];
-    // 设计稿：标题「提示」、确认钮绿色「确认」，正文分行警示
-    alert.alertTitle = NSLocalizedString(@"settings_alert_title", @"提示");
-    alert.message = NSLocalizedString(@"settings_delete_account_alert_message", nil);
-    alert.cancelTitle = NSLocalizedString(@"cancel", nil);
-    alert.confirmTitle = NSLocalizedString(@"confirm", @"确认");
-    alert.confirmDestructive = NO;
+    NSString *message = NSLocalizedString(@"settings_delete_account_alert_message", nil);
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:NSLocalizedString(@"settings_alert_title", @"提示")
+                                                                   message:message
+                                                            preferredStyle:UIAlertControllerStyleAlert];
     __weak typeof(self) weakSelf = self;
-    alert.onConfirm = ^{
+    [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"settings_manage_apple_subscription", @"管理 Apple 订阅")
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction * _Nonnull action) {
+        NSURL *url = [NSURL URLWithString:@"itms-apps://apps.apple.com/account/subscriptions"];
+        if (url) {
+            [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
+        }
+    }]];
+    [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"settings_delete_account_confirm", @"确认")
+                                              style:UIAlertActionStyleDestructive
+                                            handler:^(UIAlertAction * _Nonnull action) {
         [weakSelf beginDeactivateAccountFlow];
-    };
+    }]];
+    [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"cancel", nil)
+                                              style:UIAlertActionStyleCancel
+                                            handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
 }
 

@@ -444,7 +444,8 @@
 "settings_logout_confirm" = "Confirm log out";
 "settings_delete_account" = "Delete Account";
 "settings_delete_account_alert_title" = "Notice";
-"settings_delete_account_alert_message" = "Deleting will immediately erase\nall your data and account\nand cannot be undone";
+"settings_delete_account_alert_message" = "Deleting will immediately erase all your data and account and cannot be undone.\n\nDeleting your account does not cancel Apple subscriptions. If you have auto-renewing plans, tap \"Manage Apple Subscription\" below before deleting.";
+"settings_manage_apple_subscription" = "Manage Apple Subscription";
 "settings_delete_account_confirm" = "Confirm";
 "settings_delete_account_no_phone" = "Unable to get your phone number. Please try again later.";
 "verify_deactivate_title" = "Verify Phone";

@@ -38,6 +38,10 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 @property (nonatomic, copy) NSString *price;
 /// 底部按钮展示价（稿内常与卡片价不同，如首屏 ¥22）
 @property (nonatomic, copy) NSString *payPrice;
+/// SKProduct 本地化完整价格（含货币符号，审核要求展示价=Apple 扣款价）
+@property (nonatomic, copy) NSString *localizedPrice;
+/// 折扣前 SKProduct 本地化价格
+@property (nonatomic, copy) NSString *localizedOriginalPrice;
 /// 折扣前展示价（如 33/268/748）
 @property (nonatomic, copy) NSString *originalPrice;
 @property (nonatomic, copy) NSString *hint;
@@ -1203,19 +1207,25 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     }];
 }
 
+- (NSString *)displayPriceTextForPlan:(MCPlan *)plan {
+    if (plan.localizedPrice.length > 0) return plan.localizedPrice;
+    NSString *pay = plan.payPrice.length ? plan.payPrice : plan.price;
+    return pay.length > 0 ? pay : @"—";
+}
+
+- (NSString *)displayOriginalPriceTextForPlan:(MCPlan *)plan {
+    if (plan.localizedOriginalPrice.length > 0) return plan.localizedOriginalPrice;
+    return plan.originalPrice.length > 0 ? plan.originalPrice : @"";
+}
+
 - (NSAttributedString *)cardPriceAttrTextForPlan:(MCPlan *)plan large:(BOOL)large {
-    NSString *priceText = plan.price ?: @"";
-    NSString *full = [NSString stringWithFormat:@"¥%@", priceText];
+    NSString *full = [self displayPriceTextForPlan:plan];
     UIColor *mint = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
     CGFloat priceSize = large ? 72.38 : 54.0;
-    CGFloat unitSize = large ? 25.46 : 19.0;
     NSMutableAttributedString *attr = [[NSMutableAttributedString alloc] initWithString:full attributes:@{
         NSForegroundColorAttributeName: mint,
         NSFontAttributeName: [self membershipNeueFontOfSize:priceSize fallbackWeight:UIFontWeightRegular]
     }];
-    if (full.length > 0) {
-        [attr addAttribute:NSFontAttributeName value:[self membershipNeueFontOfSize:unitSize fallbackWeight:UIFontWeightRegular] range:NSMakeRange(0, 1)];
-    }
     return attr;
 }
 
@@ -1322,7 +1332,16 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     [self.preloadProductsRequest start];
 }
 
-/// 把 SKProduct.price 按 priceLocale 格式化后写回本地方案（仅数字部分，UI 仍统一加 ¥）。
+/// SKProduct 完整本地化价格（含货币符号，与 Apple 购买确认页一致）。
+- (NSString *)localizedPriceStringFromProduct:(SKProduct *)product {
+    if (!product) return nil;
+    NSNumberFormatter *formatter = [[NSNumberFormatter alloc] init];
+    formatter.numberStyle = NSNumberFormatterCurrencyStyle;
+    formatter.locale = product.priceLocale ?: [NSLocale currentLocale];
+    return [formatter stringFromNumber:product.price] ?: product.price.stringValue;
+}
+
+/// 把 SKProduct.price 按 priceLocale 格式化后写回本地方案（仅数字部分，兼容旧逻辑）。
 - (NSString *)numericPriceStringFromProduct:(SKProduct *)product {
     if (!product) return nil;
     NSNumberFormatter *formatter = [[NSNumberFormatter alloc] init];
@@ -1331,6 +1350,31 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     formatter.minimumFractionDigits = 0;
     formatter.maximumFractionDigits = 2;
     return [formatter stringFromNumber:product.price] ?: product.price.stringValue;
+}
+
+- (nullable NSString *)resolvedAppleProductIdForPlanIndex:(NSInteger)index {
+    NSArray<NSString *> *expectedPlanIds = @[ @"1", @"2", @"3", @"4" ];
+    NSString *selectedPlanId = (index >= 0 && index < (NSInteger)expectedPlanIds.count)
+        ? expectedPlanIds[index] : nil;
+    BOOL useRedeemDiscount = self.hasAppliedRedeemDiscount
+        && self.redeemAppleProductId.length > 0
+        && selectedPlanId.length > 0
+        && (self.redeemPlanId.length == 0 || [self.redeemPlanId isEqualToString:selectedPlanId]);
+    if (useRedeemDiscount) {
+        return [self.redeemAppleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    }
+    if (self.apiPlans.count == 0 || selectedPlanId.length == 0) return nil;
+    for (PNMemberPlan *p in self.apiPlans) {
+        if ([p.planId isEqualToString:selectedPlanId]) {
+            return [[p.appleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] copy];
+        }
+    }
+    return nil;
+}
+
+- (BOOL)isStoreKitPriceReadyForPlanIndex:(NSInteger)index {
+    NSString *pid = [self resolvedAppleProductIdForPlanIndex:index];
+    return pid.length > 0 && self.skProducts[pid] != nil;
 }
 
 - (void)applySKProductPricesToPlans:(NSArray<MCPlan *> *)plans {
@@ -1342,9 +1386,11 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
         PNMemberPlan *api = sorted[i];
         NSString *pid = [api.appleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         SKProduct *product = pid.length > 0 ? self.skProducts[pid] : nil;
+        NSString *localized = [self localizedPriceStringFromProduct:product];
         NSString *priceStr = [self numericPriceStringFromProduct:product];
-        if (priceStr.length == 0) continue;
+        if (localized.length == 0 || priceStr.length == 0) continue;
         MCPlan *local = plans[i];
+        local.localizedPrice = localized;
         local.price = priceStr;
         local.payPrice = priceStr;
     }
@@ -1352,6 +1398,7 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     if (self.hasAppliedRedeemDiscount && self.redeemAppleProductId.length > 0) {
         SKProduct *discountProduct = self.skProducts[self.redeemAppleProductId];
         NSString *discountStr = [self numericPriceStringFromProduct:discountProduct];
+        NSString *discountLocalized = [self localizedPriceStringFromProduct:discountProduct];
         if (discountStr.length > 0) {
             NSArray<NSString *> *expectedPlanIds = @[ @"1", @"2", @"3", @"4" ];
             NSInteger idx = -1;
@@ -1362,9 +1409,13 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
                 MCPlan *target = plans[idx];
                 if (target.originalPrice.length == 0) {
                     target.originalPrice = target.price;
+                    target.localizedOriginalPrice = target.localizedPrice;
                 }
                 target.price = discountStr;
                 target.payPrice = discountStr;
+                if (discountLocalized.length > 0) {
+                    target.localizedPrice = discountLocalized;
+                }
             }
         }
     }
@@ -1438,32 +1489,26 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 
 - (NSString *)displayTitleForPlan:(MCPlan *)plan {
     if ([plan.title isEqualToString:@"连续包月"]) return @"月度通行证";
-    if ([plan.title isEqualToString:@"连续包年"]) return @"赛季通行证";
+    if ([plan.title isEqualToString:@"连续包年"]) return @"赛季通行证（12个月）";
     if ([plan.title isEqualToString:@"永久权益"]) return @"终身会员";
     if ([plan.title isEqualToString:@"终身权益"]) return @"创始人会员";
     return @"会员方案";
 }
 
 - (NSAttributedString *)paymentButtonAttrTitleForPlan:(MCPlan *)plan {
-    NSString *pay = plan.payPrice.length ? plan.payPrice : plan.price;
+    NSString *pay = [self displayPriceTextForPlan:plan];
     // Apple 审核指南 3.1.2 要求：自动续期订阅的支付按钮文案必须明示价格 + 周期
-    // （如 "¥33/月"），不能只显示"¥33"。非续期商品（永久/创始人）不显示周期。
     NSString *period = [self subscriptionPeriodTextForPlan:plan];
     NSString *full;
     if (period.length > 0) {
-        full = [NSString stringWithFormat:@"确认协议并支付 ¥%@/%@", pay ?: @"", period];
+        full = [NSString stringWithFormat:@"确认协议并支付 %@/%@", pay ?: @"", period];
     } else {
-        full = [NSString stringWithFormat:@"确认协议并支付 ¥%@", pay ?: @""];
+        full = [NSString stringWithFormat:@"确认协议并支付 %@", pay ?: @""];
     }
-    NSMutableAttributedString *attr = [[NSMutableAttributedString alloc] initWithString:full attributes:@{
+    return [[NSAttributedString alloc] initWithString:full attributes:@{
         NSForegroundColorAttributeName: [UIColor whiteColor],
         NSFontAttributeName: [UIFont systemFontOfSize:12.57 weight:UIFontWeightSemibold]
     }];
-    NSRange currencyRange = [full rangeOfString:@"¥"];
-    if (currencyRange.location != NSNotFound) {
-        [attr addAttribute:NSFontAttributeName value:[UIFont systemFontOfSize:8 weight:UIFontWeightSemibold] range:currencyRange];
-    }
-    return attr;
 }
 
 /// 返回方案的续期周期文案（用于按钮和订阅信息标签）。
@@ -1482,14 +1527,33 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 /// 月/季/年订阅 → "¥33/月，按月自动续期，到期前 24 小时内扣费，可随时取消"
 /// 永久/创始人 → "¥748 一次性买断，永久有效"
 - (NSString *)subscriptionInfoTextForPlan:(MCPlan *)plan {
-    NSString *pay = plan.payPrice.length ? plan.payPrice : plan.price ?: @"";
+    NSString *pay = [self displayPriceTextForPlan:plan];
     NSString *period = [self subscriptionPeriodTextForPlan:plan];
     if (period.length > 0) {
-        return [NSString stringWithFormat:@"¥%@/%@，按%@自动续期，到期前24小时内扣费，可随时取消",
+        return [NSString stringWithFormat:@"%@/%@，按%@自动续期，到期前24小时内扣费，可随时取消",
                 pay, period, period];
     }
-    // 永久 / 创始人：一次性买断，不续期
-    return [NSString stringWithFormat:@"¥%@ 一次性买断，永久有效，无需续费", pay];
+    return [NSString stringWithFormat:@"%@ 一次性买断，永久有效，无需续费", pay];
+}
+
+- (void)updatePayButtonPresentationForPlan:(MCPlan *)plan {
+    if (![self isStoreKitPriceReadyForPlanIndex:self.currentIndex]) {
+        NSString *title = (self.preloadProductsRequest != nil || self.loadingRemoteData)
+            ? @"价格加载中..."
+            : @"暂无法获取价格，请稍后重试";
+        [self.payBtn setAttributedTitle:nil forState:UIControlStateNormal];
+        [self.payBtn setAttributedTitle:nil forState:UIControlStateDisabled];
+        [self.payBtn setTitle:title forState:UIControlStateNormal];
+        [self.payBtn setTitle:title forState:UIControlStateDisabled];
+        self.subscriptionInfoLabel.text = @"正在从 App Store 获取价格…";
+        return;
+    }
+    [self.payBtn setTitle:nil forState:UIControlStateNormal];
+    [self.payBtn setTitle:nil forState:UIControlStateDisabled];
+    NSAttributedString *attr = [self paymentButtonAttrTitleForPlan:plan];
+    [self.payBtn setAttributedTitle:attr forState:UIControlStateNormal];
+    [self.payBtn setAttributedTitle:attr forState:UIControlStateDisabled];
+    self.subscriptionInfoLabel.text = [self subscriptionInfoTextForPlan:plan];
 }
 
 /// 当前选中方案是否为永久/终身/创始人类型（非续期商品）。
@@ -1532,17 +1596,13 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 }
 
 - (NSAttributedString *)cardOriginalPriceAttrTextForPlan:(MCPlan *)plan large:(BOOL)large {
-    NSString *originalPrice = [self cardOriginalPriceTextForPlan:plan];
-    if (originalPrice.length == 0) return nil;
-    NSString *full = [NSString stringWithFormat:@"¥%@", originalPrice];
+    NSString *full = [self displayOriginalPriceTextForPlan:plan];
+    if (full.length == 0) return nil;
     CGFloat numberSize = large ? 16.0 : 13.0;
-    CGFloat unitSize = large ? 8.0 : 6.5;
     NSMutableAttributedString *attr = [[NSMutableAttributedString alloc] initWithString:full attributes:@{
         NSForegroundColorAttributeName: kMCDiscountHintGray,
         NSFontAttributeName: [self membershipNeueFontOfSize:numberSize fallbackWeight:UIFontWeightRegular]
     }];
-    [attr addAttribute:NSFontAttributeName value:[self membershipNeueFontOfSize:unitSize fallbackWeight:UIFontWeightRegular] range:NSMakeRange(0, 1)];
-    // 再次全量写死前景色，避免后续属性覆盖导致显示偏白。
     [attr addAttribute:NSForegroundColorAttributeName value:kMCDiscountHintGray range:NSMakeRange(0, full.length)];
     return attr;
 }
@@ -1735,11 +1795,18 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
             else if ([pid isEqualToString:@"2"]) discountPrice = @"188";
             else if ([pid isEqualToString:@"3"]) discountPrice = @"698";
         }
+        NSString *discountLocalized = [self localizedPriceStringFromProduct:discountProduct];
         void (^applyDiscount)(MCPlan *, NSString *) = ^(MCPlan *plan, NSString *price) {
             if (!plan || price.length == 0) return;
-            if (plan.originalPrice.length == 0) plan.originalPrice = plan.price;
+            if (plan.originalPrice.length == 0) {
+                plan.originalPrice = plan.price;
+                plan.localizedOriginalPrice = plan.localizedPrice;
+            }
             plan.price = price;
             plan.payPrice = price;
+            if (discountLocalized.length > 0) {
+                plan.localizedPrice = discountLocalized;
+            }
         };
         if ([pid isEqualToString:@"1"]) {
             applyDiscount(m, discountPrice);
@@ -1759,11 +1826,9 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     self.currentIndex = idx;
     MCPlan *plan = self.plans[idx];
     self.planTitleLabel.text = [self displayTitleForPlan:plan];
-    [self.payBtn setAttributedTitle:[self paymentButtonAttrTitleForPlan:plan] forState:UIControlStateNormal];
-    [self.payBtn setAttributedTitle:[self paymentButtonAttrTitleForPlan:plan] forState:UIControlStateDisabled];
-    // 订阅关键信息标签同步刷新（Apple 3.1.2 合规：续期频率 + 价格周期 + 取消方式）
-    self.subscriptionInfoLabel.text = [self subscriptionInfoTextForPlan:plan];
+    [self updatePayButtonPresentationForPlan:plan];
     self.pageControl.currentPage = idx;
+    [self updatePayButtonState];
 }
 
 - (void)reloadPlanCardsPreservingIndex {
@@ -2128,7 +2193,8 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     // 注意：不能把 payBtn.enabled 直接绑死在 agreementCheckBtn.selected 上，
     // 否则未勾选协议时按钮禁用、收不到 TouchUpInside，onTapPay 开头的
     // 「请先勾选协议」弹窗就永远走不到。这里只改透明度做视觉提示，点击拦截交给 onTapPay。
-    BOOL visuallyEnabled = self.agreementCheckBtn.selected && !self.payInFlight;
+    BOOL priceReady = [self isStoreKitPriceReadyForPlanIndex:self.currentIndex];
+    BOOL visuallyEnabled = self.agreementCheckBtn.selected && !self.payInFlight && priceReady;
     self.payBtn.enabled = YES; // 始终可点击，让 onTapPay 能统一处理校验逻辑
     self.payBtn.alpha = visuallyEnabled ? 1.0 : 0.55;
     // 同步禁用 / 启用系统侧滑返回手势，避免购买进行中用户从边缘滑动中断支付。
@@ -2166,6 +2232,13 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     // 同时拦截 restoreInFlight：restore 进行中再发起购买会让 SKPaymentQueue 状态混乱
     //（同时有 restore 和 payment 在跑），Apple 行为未定义。
     if (self.payInFlight || self.restoreInFlight) {
+        return;
+    }
+    if (![self isStoreKitPriceReadyForPlanIndex:self.currentIndex]) {
+        NSString *msg = (self.preloadProductsRequest != nil || self.loadingRemoteData)
+            ? @"正在从 App Store 获取价格，请稍后再试"
+            : @"暂无法获取 App Store 价格，请检查网络后重试";
+        [[LoadingManager sharedManager] showError:msg inView:self.view];
         return;
     }
     if (!self.agreementCheckBtn.selected) {
@@ -2347,9 +2420,9 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 - (void)request:(SKRequest *)request didFailWithError:(NSError *)error {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (request == self.preloadProductsRequest) {
-            // 预拉价失败：保留服务端/本地占位价，不打断购买入口
             self.preloadProductsRequest = nil;
             NSLog(@"[IAP] preload SKProducts failed: %@", error.localizedDescription);
+            [self refreshPlanInfoAtIndex:self.currentIndex];
             return;
         }
         [MBProgressHUD hideHUDForView:self.view animated:YES];
@@ -2418,9 +2491,10 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
             }
 
             case SKPaymentTransactionStateDeferred: {
-                // 等待家长审批等延迟状态，不做处理
                 dispatch_async(dispatch_get_main_queue(), ^{
                     [MBProgressHUD hideHUDForView:self.view animated:YES];
+                    self.payInFlight = NO;
+                    [self updatePayButtonState];
                     [[LoadingManager sharedManager] showError:@"购买待审批，请等待家长确认" inView:self.view];
                 });
                 break;

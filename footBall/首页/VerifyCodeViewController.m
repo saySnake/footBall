@@ -523,6 +523,7 @@ static const NSInteger kVCResendCountdownSeconds = 60;
 - (void)routeToLoginAfterDeactivate {
     [self stopCaretBlink];
     [self stopResendCountdown];
+    [[PNIAPObserver shared] stop];
     UIWindow *window = self.view.window;
     if (!window) {
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {

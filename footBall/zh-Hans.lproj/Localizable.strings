@@ -444,7 +444,8 @@
 "settings_logout_confirm" = "确认退出登录";
 "settings_delete_account" = "删除账户";
 "settings_delete_account_alert_title" = "提示";
-"settings_delete_account_alert_message" = "删除后将立即注销你的\n所有数据 并删除账户\n且无法撤回";
+"settings_delete_account_alert_message" = "删除后将立即注销你的所有数据并删除账户，且无法撤回。\n\n注销账号不会自动取消 Apple 订阅。如有自动续费，请先点击下方「管理 Apple 订阅」关闭后再删除。";
+"settings_manage_apple_subscription" = "管理 Apple 订阅";
 "settings_delete_account_confirm" = "确认";
 "settings_delete_account_no_phone" = "无法获取绑定手机号，请稍后重试";
 "verify_deactivate_title" = "验证手机号";
