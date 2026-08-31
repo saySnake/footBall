@@ -17,6 +17,7 @@
 #import "APIError.h"
 #import "PNIAPObserver.h"
 #import "PNIAPSK2Bridge.h"
+#import "LegalDocumentViewController.h"
 #import <MBProgressHUD/MBProgressHUD.h>
 
 #define kMCPageBg [UIColor colorWithRed:13/255.0 green:33/255.0 blue:34/255.0 alpha:1.0]
@@ -25,11 +26,10 @@
 #define kMCDiscountMint [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0]
 #define kMCDiscountHintGray [UIColor colorWithRed:203/255.0 green:203/255.0 blue:203/255.0 alpha:1.0]
 
-/// 订阅 / 隐私政策跳转 URL（App Store 审核要求自动续期订阅必须在购买页面提供可点击的条款链接）。
-/// TODO: 上架前替换为公司正式 URL（建议 OSS 静态页或官网聚合页）。
-static NSString *const kMCMembershipAgreementURL = @"https://passnomad.oss-cn-beijing.aliyuncs.com/agreement/membership.html";
-static NSString *const kMCPrivacyPolicyURL      = @"https://passnomad.oss-cn-beijing.aliyuncs.com/agreement/privacy.html";
-static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-beijing.aliyuncs.com/agreement/auto-renew.html";
+/// 订阅 / 隐私政策跳转（App Store 审核要求自动续期订阅必须在购买页面提供可点击的条款链接）。
+static NSString *const kMCPrivacyPolicyURL      = @"https://www.nomadfootball.cn/privacy/";
+static NSString *const kMCMembershipAgreementURL = @"nomad-legal://membership";
+static NSString *const kMCAutoRenewTermsURL    = @"nomad-legal://auto-renew";
 
 @interface MCPlan : NSObject
 @property (nonatomic, copy) NSString *title;
@@ -1615,7 +1615,7 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     }
     if (rAutoRenew.location != NSNotFound) {
         [m addAttributes:linkAttrs range:rAutoRenew];
-        [m addAttribute:NSLinkAttributeName value:kCAutoRenewTermsURL range:rAutoRenew];
+        [m addAttribute:NSLinkAttributeName value:kMCAutoRenewTermsURL range:rAutoRenew];
     }
     if (rManage.location != NSNotFound) {
         [m addAttributes:@{
@@ -1636,14 +1636,36 @@ static NSString *const kCAutoRenewTermsURL      = @"https://passnomad.oss-cn-bei
     [self presentViewController:safari animated:YES completion:nil];
 }
 
+- (void)openLegalDocumentForHost:(NSString *)host {
+    if (host.length == 0) return;
+    NSString *title = nil;
+    NSString *resourceName = nil;
+    if ([host isEqualToString:@"membership"]) {
+        title = @"会员服务协议";
+        resourceName = @"membership_agreement";
+    } else if ([host isEqualToString:@"auto-renew"]) {
+        title = @"自动续期服务条款";
+        resourceName = @"auto_renew_terms";
+    } else {
+        return;
+    }
+    LegalDocumentViewController *vc = [LegalDocumentViewController documentWithTitle:title resourceName:resourceName];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
 #pragma mark - UITextViewDelegate
 
 /// 拦截 UITextView 中链接的默认打开行为（系统默认会调起 Safari 跳出 App），
 /// 改为应用内 SFSafariViewController 打开，体验更连贯，也便于审核员直接查看条款。
 - (BOOL)textView:(UITextView *)textView shouldInteractWithURL:(NSURL *)URL inRange:(NSRange)characterRange interaction:(UITextItemInteraction)interaction {
-    if ([URL.absoluteString hasPrefix:@"http"]) {
+    NSString *scheme = URL.scheme.lowercaseString;
+    if ([scheme isEqualToString:@"nomad-legal"]) {
+        [self openLegalDocumentForHost:URL.host];
+        return NO;
+    }
+    if ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"]) {
         [self openAgreementURL:URL];
-        return NO; // 已自行处理，阻止系统默认行为
+        return NO;
     }
     return YES;
 }
