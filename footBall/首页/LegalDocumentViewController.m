@@ -132,6 +132,10 @@
 }
 
 - (void)onBack {
+    if (self.presentingViewController && self.navigationController.viewControllers.firstObject == self) {
+        [self dismissViewControllerAnimated:YES completion:nil];
+        return;
+    }
     [self.navigationController popViewControllerAnimated:YES];
 }
 

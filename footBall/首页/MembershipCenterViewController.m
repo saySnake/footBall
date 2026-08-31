@@ -27,9 +27,10 @@
 #define kMCDiscountHintGray [UIColor colorWithRed:203/255.0 green:203/255.0 blue:203/255.0 alpha:1.0]
 
 /// 订阅 / 隐私政策跳转（App Store 审核要求自动续期订阅必须在购买页面提供可点击的条款链接）。
-static NSString *const kMCPrivacyPolicyURL      = @"https://www.nomadfootball.cn/privacy/";
-static NSString *const kMCMembershipAgreementURL = @"nomad-legal://membership";
-static NSString *const kMCAutoRenewTermsURL    = @"nomad-legal://auto-renew";
+/// 协议/续期条款使用 https 占位链接触发 UITextView 链接回调，在应用内展示 Bundle 文案（勿用自定义 scheme，会被系统路由误处理）。
+static NSString *const kMCPrivacyPolicyURL       = @"https://www.nomadfootball.cn/privacy/";
+static NSString *const kMCMembershipAgreementURL = @"https://www.nomadfootball.cn/legal/membership";
+static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.cn/legal/auto-renew";
 
 @interface MCPlan : NSObject
 @property (nonatomic, copy) NSString *title;
@@ -1650,7 +1651,18 @@ static NSString *const kMCAutoRenewTermsURL    = @"nomad-legal://auto-renew";
         return;
     }
     LegalDocumentViewController *vc = [LegalDocumentViewController documentWithTitle:title resourceName:resourceName];
-    [self.navigationController pushViewController:vc animated:YES];
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
+    nav.modalPresentationStyle = UIModalPresentationFullScreen;
+    [self presentViewController:nav animated:YES completion:nil];
+}
+
+/// 解析应用内法律文档占位链接，如 /legal/membership
+- (nullable NSString *)legalDocumentKeyForURL:(NSURL *)URL {
+    if (![URL.host.lowercaseString isEqualToString:@"www.nomadfootball.cn"]) return nil;
+    NSString *path = URL.path.lowercaseString;
+    if ([path isEqualToString:@"/legal/membership"]) return @"membership";
+    if ([path isEqualToString:@"/legal/auto-renew"]) return @"auto-renew";
+    return nil;
 }
 
 #pragma mark - UITextViewDelegate
@@ -1658,11 +1670,12 @@ static NSString *const kMCAutoRenewTermsURL    = @"nomad-legal://auto-renew";
 /// 拦截 UITextView 中链接的默认打开行为（系统默认会调起 Safari 跳出 App），
 /// 改为应用内 SFSafariViewController 打开，体验更连贯，也便于审核员直接查看条款。
 - (BOOL)textView:(UITextView *)textView shouldInteractWithURL:(NSURL *)URL inRange:(NSRange)characterRange interaction:(UITextItemInteraction)interaction {
-    NSString *scheme = URL.scheme.lowercaseString;
-    if ([scheme isEqualToString:@"nomad-legal"]) {
-        [self openLegalDocumentForHost:URL.host];
+    NSString *legalKey = [self legalDocumentKeyForURL:URL];
+    if (legalKey.length) {
+        [self openLegalDocumentForHost:legalKey];
         return NO;
     }
+    NSString *scheme = URL.scheme.lowercaseString;
     if ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"]) {
         [self openAgreementURL:URL];
         return NO;
