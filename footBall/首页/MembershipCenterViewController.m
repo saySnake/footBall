@@ -18,6 +18,7 @@
 #import "PNIAPObserver.h"
 #import "PNIAPSK2Bridge.h"
 #import "LegalDocumentViewController.h"
+#import "LegalDocumentCache.h"
 #import <MBProgressHUD/MBProgressHUD.h>
 
 #define kMCPageBg [UIColor colorWithRed:13/255.0 green:33/255.0 blue:34/255.0 alpha:1.0]
@@ -53,7 +54,7 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 @end
 @implementation MCPlan @end
 
-@interface MembershipCenterViewController () <UIScrollViewDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, UITextViewDelegate>
+@interface MembershipCenterViewController () <UIScrollViewDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver>
 @property (nonatomic, strong) UIView *navBar;
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UIButton *backBtn;
@@ -196,6 +197,8 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     // 上次 App 被杀或断网导致服务端验证没回时，事务会停留在队列里，
     // 这里主动拉起后由 VC 走正常的 verifyPurchase 流程。
     [[PNIAPObserver shared] resumePendingTransactions];
+    // 预加载法律文档，避免点击协议链接时在主线程读盘卡顿
+    [LegalDocumentCache preloadResources:@[ @"membership_agreement", @"auto_renew_terms" ]];
 }
 
 - (void)updateTheme {
@@ -653,7 +656,8 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 
     self.agreementLabel = [[UITextView alloc] init];
     self.agreementLabel.editable = NO;
-    self.agreementLabel.selectable = YES;
+    // selectable=YES 会挂载长按/选择手势，导致链接点击明显延迟；改用手势即时识别 NSLink。
+    self.agreementLabel.selectable = NO;
     self.agreementLabel.scrollEnabled = NO;
     self.agreementLabel.userInteractionEnabled = YES;
     self.agreementLabel.backgroundColor = [UIColor clearColor];
@@ -662,11 +666,9 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     self.agreementLabel.font = [UIFont systemFontOfSize:11];
     self.agreementLabel.textColor = [UIColor colorWithWhite:0.72 alpha:1.0];
     self.agreementLabel.attributedText = [self agreementAttrText];
-    self.agreementLabel.linkTextAttributes = @{
-        NSForegroundColorAttributeName: kMCMint,
-        NSUnderlineStyleAttributeName: @(NSUnderlineStyleSingle)
-    };
-    self.agreementLabel.delegate = self;
+    UITapGestureRecognizer *agreementTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onAgreementLabelTapped:)];
+    agreementTap.cancelsTouchesInView = NO;
+    [self.agreementLabel addGestureRecognizer:agreementTap];
     [self.view addSubview:self.agreementLabel];
 
     // 协议区贴底：文案多行自适应，勾选框与首行顶对齐
@@ -1745,9 +1747,51 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
         return;
     }
     LegalDocumentViewController *vc = [LegalDocumentViewController documentWithTitle:title resourceName:resourceName];
-    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
-    nav.modalPresentationStyle = UIModalPresentationFullScreen;
-    [self presentViewController:nav animated:YES completion:nil];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (void)handleAgreementLinkURL:(NSURL *)URL {
+    if (!URL) return;
+    NSString *legalKey = [self legalDocumentKeyForURL:URL];
+    if (legalKey.length) {
+        [self openLegalDocumentForHost:legalKey];
+        return;
+    }
+    NSString *scheme = URL.scheme.lowercaseString;
+    if ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"]) {
+        [self openAgreementURL:URL];
+        return;
+    }
+    if ([URL.absoluteString isEqualToString:@"itms-apps://apps.apple.com/account/subscriptions"]) {
+        [[UIApplication sharedApplication] openURL:URL options:@{} completionHandler:nil];
+    }
+}
+
+- (void)onAgreementLabelTapped:(UITapGestureRecognizer *)gesture {
+    if (gesture.state != UIGestureRecognizerStateEnded) return;
+    UITextView *textView = self.agreementLabel;
+    if (!textView.attributedText.length) return;
+
+    CGPoint point = [gesture locationInView:textView];
+    point.x -= textView.textContainerInset.left;
+    point.y -= textView.textContainerInset.top;
+
+    NSUInteger charIndex = [textView.layoutManager characterIndexForPoint:point
+                                                          inTextContainer:textView.textContainer
+                                 fractionOfDistanceBetweenInsertionPoints:NULL];
+    if (charIndex >= textView.textStorage.length) return;
+
+    NSRange range = NSMakeRange(0, 0);
+    id linkValue = [textView.attributedText attribute:NSLinkAttributeName atIndex:charIndex effectiveRange:&range];
+    if (!linkValue) return;
+
+    NSURL *url = nil;
+    if ([linkValue isKindOfClass:[NSURL class]]) {
+        url = (NSURL *)linkValue;
+    } else if ([linkValue isKindOfClass:[NSString class]]) {
+        url = [NSURL URLWithString:(NSString *)linkValue];
+    }
+    [self handleAgreementLinkURL:url];
 }
 
 /// 解析应用内法律文档占位链接，如 /legal/membership
@@ -1757,24 +1801,6 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     if ([path isEqualToString:@"/legal/membership"]) return @"membership";
     if ([path isEqualToString:@"/legal/auto-renew"]) return @"auto-renew";
     return nil;
-}
-
-#pragma mark - UITextViewDelegate
-
-/// 拦截 UITextView 中链接的默认打开行为（系统默认会调起 Safari 跳出 App），
-/// 改为应用内 SFSafariViewController 打开，体验更连贯，也便于审核员直接查看条款。
-- (BOOL)textView:(UITextView *)textView shouldInteractWithURL:(NSURL *)URL inRange:(NSRange)characterRange interaction:(UITextItemInteraction)interaction {
-    NSString *legalKey = [self legalDocumentKeyForURL:URL];
-    if (legalKey.length) {
-        [self openLegalDocumentForHost:legalKey];
-        return NO;
-    }
-    NSString *scheme = URL.scheme.lowercaseString;
-    if ([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"]) {
-        [self openAgreementURL:URL];
-        return NO;
-    }
-    return YES;
 }
 
 - (void)buildPlanData {

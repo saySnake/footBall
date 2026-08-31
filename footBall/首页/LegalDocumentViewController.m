@@ -4,14 +4,14 @@
 //
 
 #import "LegalDocumentViewController.h"
+#import "LegalDocumentCache.h"
 #import <Masonry/Masonry.h>
 
 @interface LegalDocumentViewController ()
 @property (nonatomic, copy) NSString *documentTitle;
 @property (nonatomic, copy) NSString *resourceName;
 @property (nonatomic, strong) UILabel *navTitle;
-@property (nonatomic, strong) UIScrollView *scrollView;
-@property (nonatomic, strong) UILabel *contentLabel;
+@property (nonatomic, strong) UITextView *contentTextView;
 @end
 
 @implementation LegalDocumentViewController
@@ -20,6 +20,8 @@
     LegalDocumentViewController *vc = [[LegalDocumentViewController alloc] init];
     vc.documentTitle = title ?: @"";
     vc.resourceName = resourceName ?: @"";
+    vc.hidesBottomBarWhenPushed = YES;
+    vc.preloadedText = [LegalDocumentCache textForResource:resourceName];
     return vc;
 }
 
@@ -41,15 +43,14 @@
     UIButton *back = [UIButton buttonWithType:UIButtonTypeCustom];
     UIImage *backImg = [UIImage imageNamed:@"nav_back"];
     if (!backImg) backImg = [UIImage imageNamed:@"ad_left"];
-    if (!backImg && @available(iOS 13.0, *)) {
-        backImg = [UIImage systemImageNamed:@"arrow.left"];
+    if (@available(iOS 13.0, *)) {
+        if (!backImg) backImg = [UIImage systemImageNamed:@"arrow.left"];
     }
     if (backImg) {
         [back setImage:[backImg imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
         back.tintColor = [UIColor blackColor];
     }
     back.imageView.contentMode = UIViewContentModeScaleAspectFit;
-    back.adjustsImageWhenHighlighted = NO;
     [back addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
     [nav addSubview:back];
     [back mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -71,52 +72,42 @@
         make.trailing.lessThanOrEqualTo(nav).offset(-16);
     }];
 
-    self.scrollView = [UIScrollView new];
-    self.scrollView.backgroundColor = [UIColor whiteColor];
-    self.scrollView.showsVerticalScrollIndicator = YES;
-    [self.view addSubview:self.scrollView];
-    [self.scrollView mas_makeConstraints:^(MASConstraintMaker *make) {
+    self.contentTextView = [UITextView new];
+    self.contentTextView.editable = NO;
+    self.contentTextView.selectable = YES;
+    self.contentTextView.scrollEnabled = YES;
+    self.contentTextView.showsVerticalScrollIndicator = YES;
+    self.contentTextView.backgroundColor = [UIColor whiteColor];
+    self.contentTextView.textContainerInset = UIEdgeInsetsMake(16, 12, 24, 12);
+    self.contentTextView.textContainer.lineFragmentPadding = 0;
+    [self.view addSubview:self.contentTextView];
+    [self.contentTextView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(nav.mas_bottom);
         make.leading.trailing.equalTo(self.view);
         make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom);
-    }];
-
-    self.contentLabel = [UILabel new];
-    self.contentLabel.numberOfLines = 0;
-    self.contentLabel.textColor = [UIColor colorWithWhite:0.18 alpha:1.0];
-    self.contentLabel.font = [UIFont systemFontOfSize:14];
-    [self.scrollView addSubview:self.contentLabel];
-    [self.contentLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.scrollView).offset(16);
-        make.leading.equalTo(self.view).offset(16);
-        make.trailing.equalTo(self.view).offset(-16);
-        make.bottom.equalTo(self.scrollView).offset(-24);
     }];
 }
 
 - (void)updateLocalizedStrings {
     [super updateLocalizedStrings];
     self.navTitle.text = self.documentTitle;
-    self.contentLabel.attributedText = [self attributedBodyText:[self loadDocumentText]];
+    [self applyDocumentText:self.preloadedText ?: @""];
+    if (self.preloadedText.length == 0 && self.resourceName.length > 0) {
+        __weak typeof(self) weakSelf = self;
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+            NSString *text = [LegalDocumentCache textForResource:weakSelf.resourceName] ?: @"文档加载失败，请稍后重试。";
+            dispatch_async(dispatch_get_main_queue(), ^{
+                __strong typeof(weakSelf) self = weakSelf;
+                if (!self) return;
+                self.preloadedText = text;
+                [self applyDocumentText:text];
+            });
+        });
+    }
 }
 
-- (NSString *)loadDocumentText {
-    if (self.resourceName.length == 0) return @"";
-    NSBundle *bundle = [NSBundle mainBundle];
-    NSArray<NSString *> *subdirs = @[ @"Resources/Legal", @"Legal" ];
-    for (NSString *subdir in subdirs) {
-        NSString *path = [bundle pathForResource:self.resourceName ofType:@"txt" inDirectory:subdir];
-        if (path.length) {
-            NSString *text = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
-            if (text.length) return text;
-        }
-    }
-    NSString *path = [bundle pathForResource:self.resourceName ofType:@"txt"];
-    if (path.length) {
-        NSString *text = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
-        if (text.length) return text;
-    }
-    return @"文档加载失败，请稍后重试。";
+- (void)applyDocumentText:(NSString *)text {
+    self.contentTextView.attributedText = [self attributedBodyText:text];
 }
 
 - (NSAttributedString *)attributedBodyText:(NSString *)text {
@@ -132,10 +123,6 @@
 }
 
 - (void)onBack {
-    if (self.presentingViewController && self.navigationController.viewControllers.firstObject == self) {
-        [self dismissViewControllerAnimated:YES completion:nil];
-        return;
-    }
     [self.navigationController popViewControllerAnimated:YES];
 }
 
