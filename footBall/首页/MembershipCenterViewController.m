@@ -40,6 +40,8 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 @property (nonatomic, copy) NSString *payPrice;
 /// SKProduct 本地化完整价格（含货币符号，审核要求展示价=Apple 扣款价）
 @property (nonatomic, copy) NSString *localizedPrice;
+/// 货币符号（卡片 UI 小字号展示，数字部分用大字号）
+@property (nonatomic, copy) NSString *currencySymbol;
 /// 折扣前 SKProduct 本地化价格
 @property (nonatomic, copy) NSString *localizedOriginalPrice;
 /// 折扣前展示价（如 33/268/748）
@@ -1218,15 +1220,39 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     return plan.originalPrice.length > 0 ? plan.originalPrice : @"";
 }
 
-- (NSAttributedString *)cardPriceAttrTextForPlan:(MCPlan *)plan large:(BOOL)large {
-    NSString *full = [self displayPriceTextForPlan:plan];
-    UIColor *mint = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
+- (NSString *)currencySymbolFromProduct:(SKProduct *)product {
+    if (!product) return nil;
+    NSNumberFormatter *formatter = [[NSNumberFormatter alloc] init];
+    formatter.numberStyle = NSNumberFormatterCurrencyStyle;
+    formatter.locale = product.priceLocale ?: [NSLocale currentLocale];
+    return formatter.currencySymbol;
+}
+
+- (NSAttributedString *)cardPriceAttrTextWithCurrencySymbol:(NSString *)symbol
+                                                 numberText:(NSString *)numberText
+                                                      large:(BOOL)large
+                                                      color:(UIColor *)color {
+    NSString *currency = symbol.length > 0 ? symbol : @"¥";
+    NSString *number = numberText.length > 0 ? numberText : @"—";
+    NSString *full = [NSString stringWithFormat:@"%@%@", currency, number];
+    UIColor *textColor = color ?: [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
     CGFloat priceSize = large ? 72.38 : 54.0;
+    CGFloat unitSize = large ? 25.46 : 19.0;
     NSMutableAttributedString *attr = [[NSMutableAttributedString alloc] initWithString:full attributes:@{
-        NSForegroundColorAttributeName: mint,
+        NSForegroundColorAttributeName: textColor,
         NSFontAttributeName: [self membershipNeueFontOfSize:priceSize fallbackWeight:UIFontWeightRegular]
     }];
+    if (currency.length > 0) {
+        [attr addAttribute:NSFontAttributeName value:[self membershipNeueFontOfSize:unitSize fallbackWeight:UIFontWeightRegular]
+                     range:NSMakeRange(0, currency.length)];
+    }
     return attr;
+}
+
+- (NSAttributedString *)cardPriceAttrTextForPlan:(MCPlan *)plan large:(BOOL)large {
+    UIColor *mint = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
+    NSString *number = plan.price.length > 0 ? plan.price : plan.payPrice;
+    return [self cardPriceAttrTextWithCurrencySymbol:plan.currencySymbol numberText:number large:large color:mint];
 }
 
 - (void)loadRemoteData {
@@ -1391,6 +1417,7 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
         if (localized.length == 0 || priceStr.length == 0) continue;
         MCPlan *local = plans[i];
         local.localizedPrice = localized;
+        local.currencySymbol = [self currencySymbolFromProduct:product];
         local.price = priceStr;
         local.payPrice = priceStr;
     }
@@ -1596,13 +1623,20 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 }
 
 - (NSAttributedString *)cardOriginalPriceAttrTextForPlan:(MCPlan *)plan large:(BOOL)large {
-    NSString *full = [self displayOriginalPriceTextForPlan:plan];
-    if (full.length == 0) return nil;
+    NSString *number = [self cardOriginalPriceTextForPlan:plan];
+    if (number.length == 0) return nil;
+    NSString *currency = plan.currencySymbol.length > 0 ? plan.currencySymbol : @"¥";
+    NSString *full = [NSString stringWithFormat:@"%@%@", currency, number];
     CGFloat numberSize = large ? 16.0 : 13.0;
+    CGFloat unitSize = large ? 8.0 : 6.5;
     NSMutableAttributedString *attr = [[NSMutableAttributedString alloc] initWithString:full attributes:@{
         NSForegroundColorAttributeName: kMCDiscountHintGray,
         NSFontAttributeName: [self membershipNeueFontOfSize:numberSize fallbackWeight:UIFontWeightRegular]
     }];
+    if (currency.length > 0) {
+        [attr addAttribute:NSFontAttributeName value:[self membershipNeueFontOfSize:unitSize fallbackWeight:UIFontWeightRegular]
+                     range:NSMakeRange(0, currency.length)];
+    }
     [attr addAttribute:NSForegroundColorAttributeName value:kMCDiscountHintGray range:NSMakeRange(0, full.length)];
     return attr;
 }
@@ -1806,6 +1840,9 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
             plan.payPrice = price;
             if (discountLocalized.length > 0) {
                 plan.localizedPrice = discountLocalized;
+            }
+            if (discountProduct && plan.currencySymbol.length == 0) {
+                plan.currencySymbol = [self currencySymbolFromProduct:discountProduct];
             }
         };
         if ([pid isEqualToString:@"1"]) {
