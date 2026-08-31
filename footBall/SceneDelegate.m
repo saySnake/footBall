@@ -10,11 +10,6 @@
 #import "AuthManager.h"
 #import "ThemeManager.h"
 #import "ThemeObserverView.h"
-#ifdef DEBUG
-#import <DoraemonKit/DoraemonManager.h>
-#import "BVAPPDebugTool.h"
-#import "BVAPPEnvironmentHostManager.h"
-#endif
 #import "LoginChoiceViewController.h"
 #import "TeamSelectionViewController.h"
 #import "PNAppVersionManager.h"
@@ -62,8 +57,6 @@
         });
     }];
 
-#ifdef DEBUG
-#endif
 }
 
 - (void)installRootViewControllerIfNeeded {

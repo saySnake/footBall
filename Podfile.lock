@@ -15,25 +15,6 @@ PODS:
   - AFNetworking/UIKit (4.0.1):
     - AFNetworking/NSURLSession
   - AliyunOSSiOS (2.11.2)
-  - DoraemonKit (3.1.7):
-    - DoraemonKit/Core (= 3.1.7)
-  - DoraemonKit/Core (3.1.7):
-    - FMDB
-    - GCDWebServer
-    - GCDWebServer/WebDAV
-    - GCDWebServer/WebUploader
-  - FMDB (2.7.12):
-    - FMDB/standard (= 2.7.12)
-  - FMDB/Core (2.7.12)
-  - FMDB/standard (2.7.12):
-    - FMDB/Core
-  - GCDWebServer (3.5.4):
-    - GCDWebServer/Core (= 3.5.4)
-  - GCDWebServer/Core (3.5.4)
-  - GCDWebServer/WebDAV (3.5.4):
-    - GCDWebServer/Core
-  - GCDWebServer/WebUploader (3.5.4):
-    - GCDWebServer/Core
   - IQKeyboardManager (6.5.19)
   - libpag (4.5.27)
   - Masonry (1.1.0)
@@ -368,7 +349,6 @@ PODS:
 DEPENDENCIES:
   - AFNetworking
   - AliyunOSSiOS
-  - DoraemonKit
   - IQKeyboardManager
   - libpag
   - Masonry
@@ -385,9 +365,6 @@ SPEC REPOS:
   trunk:
     - AFNetworking
     - AliyunOSSiOS
-    - DoraemonKit
-    - FMDB
-    - GCDWebServer
     - IQKeyboardManager
     - libpag
     - Masonry
@@ -403,9 +380,6 @@ SPEC REPOS:
 SPEC CHECKSUMS:
   AFNetworking: 3bd23d814e976cd148d7d44c3ab78017b744cd58
   AliyunOSSiOS: 6d6b668b82ac0c0ea2313412bcb5530b42ec97ab
-  DoraemonKit: 0b45c9dc6ab34bd426a2782ee1bf7ab13492a60b
-  FMDB: 728731dd336af3936ce00f91d9d8495f5718a0e6
-  GCDWebServer: 2c156a56c8226e2d5c0c3f208a3621ccffbe3ce4
   IQKeyboardManager: c8665b3396bd0b79402b4c573eac345a31c7d485
   libpag: 0aef36fbe62197705bb5c279232d4af8ca5a2d94
   Masonry: 678fab65091a9290e40e2832a55e7ab731aad201
@@ -418,6 +392,6 @@ SPEC CHECKSUMS:
   YYCategories: 6bcd4314c6661a561410dce4a793379ebd306abd
   YYModel: 2a7fdd96aaa4b86a824e26d0c517de8928c04b30
 
-PODFILE CHECKSUM: 2ef801608e58930365b4de572117e25385774840
+PODFILE CHECKSUM: e8bfadb2cd4488451748a5c3f22a5d219dee283d
 
 COCOAPODS: 1.16.2

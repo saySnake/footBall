@@ -17,10 +17,6 @@
 #import "PagFilePreloader.h"
 #import "PNIAPObserver.h"
 
-#ifdef DEBUG
-#import <DoraemonKit/DoraemonManager.h>
-#endif
-
 @interface AppDelegate ()
 
 @end
@@ -41,7 +37,7 @@
     [[UITextView appearance] setTintColor:primaryColor];
 }
 
-// 重写 window 的 getter，返回 SceneDelegate 的 window（兼容 DoKit）
+// 重写 window 的 getter，返回 SceneDelegate 的 window（iOS 13+ 多 Scene）
 - (UIWindow *)window {
     if (@available(iOS 13.0, *)) {
         // iOS 13+ 使用 SceneDelegate
@@ -117,12 +113,6 @@
         NSLog(@"✅ 日志拦截器已配置（Debug模式）");
     #endif
     
-    // 初始化DoKit（仅在Debug模式下启用）
-    // 注意：DoKit 的初始化移到 SceneDelegate 中，通过 BVAPPDebugTool 统一管理
-#ifdef DEBUG
-    NSLog(@"✅ AppDelegate: DoKit 将在 SceneDelegate 中初始化");
-#endif
-
     // 全局 IAP 事务观察者：仅创建，start 放在 SceneDelegate 装配根 VC 时
     // （那时用户登录态已确定），避免未登录时把残留事务上报到服务端导致 401。
     [PNIAPObserver shared];

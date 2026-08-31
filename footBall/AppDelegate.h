@@ -9,8 +9,7 @@
 
 @interface AppDelegate : UIResponder <UIApplicationDelegate>
 
-/// Window 属性（用于兼容使用 SceneDelegate 的项目）
-/// DoKit 等库可能需要访问此属性
+/// Window 属性（iOS 13+ 多 Scene 时返回 keyWindow）
 @property (strong, nonatomic) UIWindow *window;
 
 @end
