@@ -20,9 +20,6 @@ target 'footBall' do
   pod 'SocketRocket'
   pod 'QMUIKit'
   pod 'AliyunOSSiOS'
-  # EasyDebug - 使用本地路径
-  pod 'easydebug', :configurations => ['Debug']
-  # pod 'easydebug', :path => './EasyDebug'
 
 end
 

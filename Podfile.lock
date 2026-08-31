@@ -22,19 +22,6 @@ PODS:
     - GCDWebServer
     - GCDWebServer/WebDAV
     - GCDWebServer/WebUploader
-  - easydebug (1.0.1.0):
-    - easydebug/Core (= 1.0.1.0)
-    - easydebug/CrashMonitor (= 1.0.1.0)
-    - easydebug/NetworkMonitor (= 1.0.1.0)
-    - easydebug/Performance (= 1.0.1.0)
-  - easydebug/Core (1.0.1.0):
-    - FMDB
-  - easydebug/CrashMonitor (1.0.1.0):
-    - easydebug/Core
-  - easydebug/NetworkMonitor (1.0.1.0):
-    - easydebug/Core
-  - easydebug/Performance (1.0.1.0):
-    - easydebug/Core
   - FMDB (2.7.12):
     - FMDB/standard (= 2.7.12)
   - FMDB/Core (2.7.12)
@@ -382,7 +369,6 @@ DEPENDENCIES:
   - AFNetworking
   - AliyunOSSiOS
   - DoraemonKit
-  - easydebug
   - IQKeyboardManager
   - libpag
   - Masonry
@@ -400,7 +386,6 @@ SPEC REPOS:
     - AFNetworking
     - AliyunOSSiOS
     - DoraemonKit
-    - easydebug
     - FMDB
     - GCDWebServer
     - IQKeyboardManager
@@ -419,7 +404,6 @@ SPEC CHECKSUMS:
   AFNetworking: 3bd23d814e976cd148d7d44c3ab78017b744cd58
   AliyunOSSiOS: 6d6b668b82ac0c0ea2313412bcb5530b42ec97ab
   DoraemonKit: 0b45c9dc6ab34bd426a2782ee1bf7ab13492a60b
-  easydebug: 5760636927f048d69c4535e15e1b934c858431a7
   FMDB: 728731dd336af3936ce00f91d9d8495f5718a0e6
   GCDWebServer: 2c156a56c8226e2d5c0c3f208a3621ccffbe3ce4
   IQKeyboardManager: c8665b3396bd0b79402b4c573eac345a31c7d485
@@ -434,6 +418,6 @@ SPEC CHECKSUMS:
   YYCategories: 6bcd4314c6661a561410dce4a793379ebd306abd
   YYModel: 2a7fdd96aaa4b86a824e26d0c517de8928c04b30
 
-PODFILE CHECKSUM: 71961f95b6e270f351f9087bc77a66ea26913e33
+PODFILE CHECKSUM: 2ef801608e58930365b4de572117e25385774840
 
 COCOAPODS: 1.16.2

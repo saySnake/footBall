@@ -19,8 +19,6 @@
 
 #ifdef DEBUG
 #import <DoraemonKit/DoraemonManager.h>
-#import <easydebug/EasyDebug.h>
-#import "EasyDebugPositionConfig.h"
 #endif
 
 @interface AppDelegate ()
@@ -123,15 +121,6 @@
     // 注意：DoKit 的初始化移到 SceneDelegate 中，通过 BVAPPDebugTool 统一管理
 #ifdef DEBUG
     NSLog(@"✅ AppDelegate: DoKit 将在 SceneDelegate 中初始化");
-    
-    // 初始化 EasyDebug
-    [EasyDebug shared].isOn = YES;
-    // 配置模块：网络监控 + 性能监控
-    EasyDebugModule modules = EasyDebugNetMonitor | EasyDebugPerformance;
-    [EasyDebug config:modules];
-    
-    
-    NSLog(@"✅ EasyDebug 已初始化");
 #endif
 
     // 全局 IAP 事务观察者：仅创建，start 放在 SceneDelegate 装配根 VC 时
