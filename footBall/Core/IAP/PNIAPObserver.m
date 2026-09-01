@@ -14,6 +14,10 @@
 @property (nonatomic, assign, getter=isMembershipCenterActive) BOOL membershipCenterActive;
 /// SK1 整本收据 base64（兜底路径用）
 - (NSString *)sk1ReceiptBase64;
+/// 上报 verifyPurchase，失败退避重试
+- (void)submitVerifyBody:(NSDictionary *)body
+             transaction:(SKPaymentTransaction *)transaction
+                 attempt:(NSInteger)attempt;
 @end
 
 @implementation PNIAPObserver
@@ -94,6 +98,10 @@
     }
 }
 
+/// 兜底上报失败时的重试次数：finish 之后 Apple 不再 re-deliver，
+/// 一次失败就 finish 等于把已扣款的单子直接丢给人工对账。
+static const NSInteger kPNIAPUploadMaxRetryCount = 2;
+
 - (void)uploadTransaction:(SKPaymentTransaction *)transaction {
     NSString *transactionId = transaction.transactionIdentifier ?: @"";
 
@@ -110,16 +118,7 @@
     void (^submitWithBody)(NSDictionary *) = ^(NSDictionary *extra) {
         NSMutableDictionary *body = [baseBody mutableCopy];
         if (extra) [body addEntriesFromDictionary:extra];
-        [[MembershipRequest shared] verifyPurchaseWithBody:body success:^(HTTPResponse * _Nullable responseObject) {
-            [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
-            NSLog(@"[IAP] 兜底事务上报成功: txnId=%@", transactionId);
-            [[NSNotificationCenter defaultCenter] postNotificationName:@"PNMembershipDidChangeNotification" object:nil];
-        } failure:^(NSError * _Nonnull error) {
-            // 上报失败：仍 finish 事务防止队列堆积（堆积超 Apple 阈值后 StoreKit 拒绝新支付）。
-            // 详细日志保留供客服对账兜底；用户下次进入会员中心可手动重试 restore。
-            [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
-            NSLog(@"[IAP][严重] 兜底事务上报失败已 finish，请人工对账: txnId=%@, err=%@", transactionId, error);
-        }];
+        [self submitVerifyBody:body transaction:transaction attempt:0];
     };
 
     // iOS 15+: 优先用 SK2 JWS 上报（与服务端 verifyViaJws 路径匹配，不依赖 .p8 配置）。
@@ -136,6 +135,35 @@
     } else {
         submitWithBody(@{ @"signedTransaction": [self sk1ReceiptBase64] });
     }
+}
+
+/// 上报 verifyPurchase，失败时退避重试；重试用尽才 finish 事务。
+- (void)submitVerifyBody:(NSDictionary *)body
+             transaction:(SKPaymentTransaction *)transaction
+                 attempt:(NSInteger)attempt {
+    NSString *transactionId = transaction.transactionIdentifier ?: @"";
+    [[MembershipRequest shared] verifyPurchaseWithBody:body success:^(HTTPResponse * _Nullable responseObject) {
+        [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
+        NSLog(@"[IAP] 兜底事务上报成功: txnId=%@", transactionId);
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"PNMembershipDidChangeNotification" object:nil];
+    } failure:^(NSError * _Nonnull error) {
+        // 弱网 / 服务端抖动先退避重试；重试期间事务保留在队列里，
+        // App 被杀也不会丢——下次启动 resumePendingTransactions 还能再兜一次。
+        if (attempt < kPNIAPUploadMaxRetryCount) {
+            NSTimeInterval delay = (attempt == 0) ? 2.0 : 5.0;
+            NSLog(@"[IAP] 兜底事务上报失败，%.0fs 后重试(%ld/%ld): txnId=%@",
+                  delay, (long)(attempt + 1), (long)kPNIAPUploadMaxRetryCount, transactionId);
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                [self submitVerifyBody:body transaction:transaction attempt:attempt + 1];
+            });
+            return;
+        }
+        // 重试仍失败：finish 事务防止队列堆积（堆积超 Apple 阈值后 StoreKit 拒绝新支付）。
+        // 详细日志保留供客服对账兜底；用户进入会员中心点「恢复购买」可自助补激活。
+        [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
+        NSLog(@"[IAP][严重] 兜底事务上报失败已 finish，请人工对账: txnId=%@, err=%@", transactionId, error);
+    }];
 }
 
 /// SK1 整本收据 base64（兜底路径，iOS 13/14 或 SK2 未命中时使用）

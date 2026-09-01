@@ -1313,26 +1313,35 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
                                                  numberText:(NSString *)numberText
                                                       large:(BOOL)large
                                                       color:(UIColor *)color {
-    NSString *currency = symbol.length > 0 ? symbol : @"¥";
-    NSString *number = numberText.length > 0 ? numberText : @"—";
-    NSString *full = [NSString stringWithFormat:@"%@%@", currency, number];
     UIColor *textColor = color ?: [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
     CGFloat priceSize = large ? 72.38 : 54.0;
     CGFloat unitSize = large ? 25.46 : 19.0;
+    // 价格未就绪：只给占位符，不带货币符号（「¥—」会被当成真实币种）
+    if (numberText.length == 0) {
+        return [[NSAttributedString alloc] initWithString:@"—" attributes:@{
+            NSForegroundColorAttributeName: textColor,
+            NSFontAttributeName: [self membershipNeueFontOfSize:priceSize fallbackWeight:UIFontWeightRegular]
+        }];
+    }
+    NSString *currency = symbol.length > 0 ? symbol : @"¥";
+    NSString *full = [NSString stringWithFormat:@"%@%@", currency, numberText];
     NSMutableAttributedString *attr = [[NSMutableAttributedString alloc] initWithString:full attributes:@{
         NSForegroundColorAttributeName: textColor,
         NSFontAttributeName: [self membershipNeueFontOfSize:priceSize fallbackWeight:UIFontWeightRegular]
     }];
-    if (currency.length > 0) {
-        [attr addAttribute:NSFontAttributeName value:[self membershipNeueFontOfSize:unitSize fallbackWeight:UIFontWeightRegular]
-                     range:NSMakeRange(0, currency.length)];
-    }
+    [attr addAttribute:NSFontAttributeName value:[self membershipNeueFontOfSize:unitSize fallbackWeight:UIFontWeightRegular]
+                 range:NSMakeRange(0, currency.length)];
     return attr;
 }
 
 - (NSAttributedString *)cardPriceAttrTextForPlan:(MCPlan *)plan large:(BOOL)large {
     UIColor *mint = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
-    NSString *number = plan.price.length > 0 ? plan.price : plan.payPrice;
+    // 卡片展示价同样必须等于 Apple 扣款价。localizedPrice 仅由 SKProduct 写入，
+    // 为空说明还没拿到 App Store 价格，此时展示写死的 33/268/748 会与实际扣款
+    // （尤其非人民币地区）不一致，是 3.1.2 的价格误导拒审点。
+    NSString *number = plan.localizedPrice.length > 0
+        ? (plan.price.length > 0 ? plan.price : plan.payPrice)
+        : nil;
     return [self cardPriceAttrTextWithCurrencySymbol:plan.currencySymbol numberText:number large:large color:mint];
 }
 
@@ -1411,14 +1420,27 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     [self reloadPlanCardsPreservingIndex];
 }
 
-- (void)mergeAPIPlansIntoPlans:(NSArray<MCPlan *> *)plans {
-    if (self.apiPlans.count == 0 || plans.count == 0) return;
+/// 取本地卡片对应的服务端方案：优先按 planId 精确匹配，匹配不到再退回排序后同 index。
+/// index 配对在服务端漏返某个 planId 时会把方案数据串到错误的卡片上（价格 / 商品 ID 全错）。
+- (nullable PNMemberPlan *)apiPlanForPlanId:(NSString *)planId fallbackIndex:(NSInteger)index {
+    if (self.apiPlans.count == 0) return nil;
+    if (planId.length > 0) {
+        for (PNMemberPlan *api in self.apiPlans) {
+            if ([api.planId isEqualToString:planId]) return api;
+        }
+    }
     NSArray<PNMemberPlan *> *sorted = [self.apiPlans sortedArrayUsingComparator:^NSComparisonResult(PNMemberPlan *a, PNMemberPlan *b) {
         return [a.planId compare:b.planId options:NSNumericSearch];
     }];
-    for (NSInteger i = 0; i < (NSInteger)sorted.count && i < (NSInteger)plans.count; i++) {
-        PNMemberPlan *api = sorted[i];
+    return (index >= 0 && index < (NSInteger)sorted.count) ? sorted[index] : nil;
+}
+
+- (void)mergeAPIPlansIntoPlans:(NSArray<MCPlan *> *)plans {
+    if (self.apiPlans.count == 0 || plans.count == 0) return;
+    for (NSInteger i = 0; i < (NSInteger)plans.count; i++) {
         MCPlan *local = plans[i];
+        PNMemberPlan *api = [self apiPlanForPlanId:local.planId fallbackIndex:i];
+        if (!api) continue;
         if (api.price.length > 0) {
             local.price = api.price;
             local.payPrice = api.price;
@@ -1441,16 +1463,14 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
         NSString *pid = [p.appleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         if (pid.length > 0) [ids addObject:pid];
     }
-    // 兑换码折扣商品：生效后预拉月/年/终身全部折扣 SKU
-    if (self.hasAppliedRedeemDiscount) {
-        for (NSString *planId in @[ @"1", @"2", @"3" ]) {
-            NSString *discountPid = [self discountAppleProductIdForPlanId:planId];
-            if (discountPid.length > 0) [ids addObject:discountPid];
-        }
-    } else {
-        NSString *redeemPid = [self.redeemAppleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        if (redeemPid.length > 0) [ids addObject:redeemPid];
+    // 兑换码折扣商品：只预拉兑换码实际授权方案的折扣 SKU
+    NSString *authorizedPlanId = self.redeemPlanId.length > 0 ? self.redeemPlanId : @"1";
+    if ([self shouldUseDiscountSKUForPlanId:authorizedPlanId]) {
+        NSString *discountPid = [self discountAppleProductIdForPlanId:authorizedPlanId];
+        if (discountPid.length > 0) [ids addObject:discountPid];
     }
+    NSString *redeemPid = [self.redeemAppleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (redeemPid.length > 0) [ids addObject:redeemPid];
     if (ids.count == 0) return;
 
     [self.preloadProductsRequest cancel];
@@ -1507,17 +1527,14 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 
 - (void)applySKProductPricesToPlans:(NSArray<MCPlan *> *)plans {
     if (plans.count == 0 || self.skProducts.count == 0) return;
-    NSArray<PNMemberPlan *> *sorted = [self.apiPlans sortedArrayUsingComparator:^NSComparisonResult(PNMemberPlan *a, PNMemberPlan *b) {
-        return [a.planId compare:b.planId options:NSNumericSearch];
-    }];
-    for (NSInteger i = 0; i < (NSInteger)sorted.count && i < (NSInteger)plans.count; i++) {
-        PNMemberPlan *api = sorted[i];
+    for (NSInteger i = 0; i < (NSInteger)plans.count; i++) {
+        MCPlan *local = plans[i];
+        PNMemberPlan *api = [self apiPlanForPlanId:local.planId fallbackIndex:i];
         NSString *pid = [api.appleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         SKProduct *product = pid.length > 0 ? self.skProducts[pid] : nil;
         NSString *localized = [self localizedPriceStringFromProduct:product];
         NSString *priceStr = [self numericPriceStringFromProduct:product];
         if (localized.length == 0 || priceStr.length == 0) continue;
-        MCPlan *local = plans[i];
         local.localizedPrice = localized;
         local.currencySymbol = [self currencySymbolFromProduct:product];
         local.price = priceStr;
@@ -1823,7 +1840,9 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 
 - (NSAttributedString *)cardOriginalPriceAttrTextForPlan:(MCPlan *)plan large:(BOOL)large {
     NSString *number = [self cardOriginalPriceTextForPlan:plan];
-    if (number.length == 0) return nil;
+    // 划线价只在拿到折扣前 SKProduct 价时展示（localizedOriginalPrice 仅由 SKProduct 写入），
+    // 否则会出现「$33 划线」这种把人民币标价套到外币上的假原价。
+    if (number.length == 0 || plan.localizedOriginalPrice.length == 0) return nil;
     NSString *currency = plan.currencySymbol.length > 0 ? plan.currencySymbol : @"¥";
     NSString *full = [NSString stringWithFormat:@"%@%@", currency, number];
     CGFloat numberSize = large ? 16.0 : 13.0;
@@ -2895,11 +2914,29 @@ static NSMutableSet<NSString *> *PNShownPurchaseSuccessTxnIds(void) {
     return set;
 }
 
+/// verifyPurchase 因网络/服务端抖动失败时的重试次数（finish 后 Apple 不再 re-deliver，
+/// 一次失败就 finish 等于把已扣款的单子丢给人工对账）。
+static const NSInteger kMCVerifyMaxRetryCount = 2;
+
+/// 该错误是否值得重试：业务错误（如兑换码无效、参数不合法）重试没有意义。
+static BOOL PNVerifyErrorWorthRetry(NSError *error) {
+    if (![error isKindOfClass:[APIError class]]) return YES; // 传输层错误
+    APIError *apiError = (APIError *)error;
+    return [apiError isNetworkError] || [apiError isServerError];
+}
+
 /// 实际上报 verifyPurchase 的统一入口（SK2 JWS 路径与 SK1 receipt 路径共用）
 /// @param purchasedPlanId 本次用户主动购买的方案（restore 补单传 nil，不弹「开通成功」）
 - (void)submitPurchaseVerification:(NSDictionary *)body
                        transaction:(SKPaymentTransaction *)transaction
                     purchasedPlanId:(NSString *)purchasedPlanId {
+    [self submitPurchaseVerification:body transaction:transaction purchasedPlanId:purchasedPlanId attempt:0];
+}
+
+- (void)submitPurchaseVerification:(NSDictionary *)body
+                       transaction:(SKPaymentTransaction *)transaction
+                    purchasedPlanId:(NSString *)purchasedPlanId
+                            attempt:(NSInteger)attempt {
     __weak typeof(self) weakSelf = self;
     BOOL showPurchaseSuccessUI = (purchasedPlanId.length > 0);
     NSString *txnId = transaction.transactionIdentifier ?: (body[@"transactionId"] ?: @"");
@@ -2965,10 +3002,25 @@ static NSMutableSet<NSString *> *PNShownPurchaseSuccessTxnIds(void) {
             [weakSelf presentViewController:alert animated:YES completion:nil];
         });
     } failure:^(NSError * _Nonnull error) {
-        // 服务端验证失败处理策略：
-        // - 仍要 finish 事务：保留事务不 finish 会让 StoreKit 队列堆积（Apple 阈值约 50 笔），
-        //   一旦超限所有新支付都会被 StoreKit 拒绝。改为 finish + 详细日志，由客服对账兜底。
-        // - 清理本地支付状态（payInFlight），否则用户再点支付会被拦截。
+        // 弱网 / 服务端抖动先退避重试，不要一次失败就 finish：
+        // finish 之后 Apple 不再 re-deliver，用户已扣款却只能靠 PENDING_VERIFY 人工对账。
+        // 重试期间事务保留在队列里，若 App 此时被杀，下次启动 PNIAPObserver 还能再兜一次。
+        if (attempt < kMCVerifyMaxRetryCount && PNVerifyErrorWorthRetry(error)) {
+            NSTimeInterval delay = (attempt == 0) ? 2.0 : 5.0;
+            NSLog(@"[IAP] 购买验证失败，%.0fs 后重试(%ld/%ld): txnId=%@, err=%@",
+                  delay, (long)(attempt + 1), (long)kMCVerifyMaxRetryCount, txnId, error);
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                [weakSelf submitPurchaseVerification:body
+                                         transaction:transaction
+                                     purchasedPlanId:purchasedPlanId
+                                             attempt:attempt + 1];
+            });
+            return;
+        }
+
+        // 重试仍失败：finish 事务避免队列堆积（Apple 阈值约 50 笔，超限后所有新支付被拒），
+        // 由服务端 PENDING_VERIFY 流水 + 用户自助「恢复购买」兜底。
         [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
         NSLog(@"[IAP][严重] 购买验证失败已 finish，请人工对账: txnId=%@, planId=%@, err=%@",
               transaction.transactionIdentifier ?: @"", purchasedPlanId ?: body[@"planId"], error);
@@ -2981,14 +3033,18 @@ static NSMutableSet<NSString *> *PNShownPurchaseSuccessTxnIds(void) {
                 NSLog(@"[IAP] verify 失败（不弹窗）gift=%d: %@", (int)weakSelf.showingGiftCode, error);
                 return;
             }
-            NSString *msg = @"购买成功，但服务器验证失败，请联系客服处理";
+            NSString *msg = @"购买成功，但服务器验证失败。可点「恢复购买」重新激活，仍失败请联系客服。";
             if ([error isKindOfClass:[APIError class]]) {
                 msg = [(APIError *)error displayMessageWithFallback:msg];
             }
             UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"验证失败"
                                                                            message:msg
                                                                     preferredStyle:UIAlertControllerStyleAlert];
-            [alert addAction:[UIAlertAction actionWithTitle:@"知道了" style:UIAlertActionStyleDefault handler:nil]];
+            // 首选给出自助出路：submitRestoredEntitlement 会用 SK2 权益重新走一遍激活
+            [alert addAction:[UIAlertAction actionWithTitle:@"恢复购买" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+                [weakSelf onTapRestore];
+            }]];
+            [alert addAction:[UIAlertAction actionWithTitle:@"知道了" style:UIAlertActionStyleCancel handler:nil]];
             [weakSelf presentViewController:alert animated:YES completion:nil];
         });
     }];
@@ -3035,14 +3091,20 @@ static NSMutableSet<NSString *> *PNShownPurchaseSuccessTxnIds(void) {
     __weak typeof(self) weakSelf = self;
     if ([PNIAPSK2Bridge isAvailable]) {
         [PNIAPSK2Bridge enumerateCurrentEntitlements:^(NSArray<PNIAPSK2Result *> *results) {
-            if (results.count > 0) {
-                NSLog(@"[IAP] restore 走 SK2 entitlements: %lu 笔", (unsigned long)results.count);
-                for (PNIAPSK2Result *item in results) {
-                    [weakSelf submitRestoredEntitlement:item];
-                }
+            // 必须按「实际上报成功的笔数」判断，不能用 results.count：
+            // 权益缺 transactionId / JWS 时 submitRestoredEntitlement 不会计数，
+            // finishOneRestore 永远不触发 → HUD 常驻且 restoreInFlight 卡在 YES，
+            // 之后连购买都会被 onTapPay 拦掉，只能杀进程。
+            NSInteger submitted = 0;
+            for (PNIAPSK2Result *item in results) {
+                if ([weakSelf submitRestoredEntitlement:item]) submitted += 1;
+            }
+            if (submitted > 0) {
+                NSLog(@"[IAP] restore 走 SK2 entitlements: %ld 笔", (long)submitted);
                 return;
             }
-            NSLog(@"[IAP] SK2 entitlements 为空，回退 SK1 restoreCompletedTransactions");
+            NSLog(@"[IAP] SK2 entitlements 无可上报项（%lu 笔），回退 SK1 restoreCompletedTransactions",
+                  (unsigned long)results.count);
             [[SKPaymentQueue defaultQueue] restoreCompletedTransactions];
         }];
     } else {
@@ -3050,12 +3112,13 @@ static NSMutableSet<NSString *> *PNShownPurchaseSuccessTxnIds(void) {
     }
 }
 
-/// 将 SK2 当前权益上报服务端（restore 优先；失败且能映射 planId 时再以购买路径补激活）
-- (void)submitRestoredEntitlement:(PNIAPSK2Result *)item {
+/// 将 SK2 当前权益上报服务端（restore 优先；失败且能映射 planId 时再以购买路径补激活）。
+/// @return 是否已计入本次 restore 并发出请求（NO 表示该权益无法上报，调用方需另寻兜底）
+- (BOOL)submitRestoredEntitlement:(PNIAPSK2Result *)item {
     NSString *transactionId = item.transactionId ?: @"";
     NSString *jws = item.jwsRepresentation ?: @"";
     if (transactionId.length == 0 || jws.length == 0) {
-        return;
+        return NO;
     }
     self.restoreTotalCount += 1;
 
@@ -3109,6 +3172,7 @@ static NSMutableSet<NSString *> *PNShownPurchaseSuccessTxnIds(void) {
             finishFail(error2);
         }];
     }];
+    return YES;
 }
 
 /// 用 apiPlans 把 Apple productId 反查为服务端 planId
@@ -3138,10 +3202,11 @@ static NSMutableSet<NSString *> *PNShownPurchaseSuccessTxnIds(void) {
             if ([PNIAPSK2Bridge isAvailable]) {
                 __weak typeof(self) weakSelf = self;
                 [PNIAPSK2Bridge enumerateCurrentEntitlements:^(NSArray<PNIAPSK2Result *> *results) {
-                    if (results.count > 0) {
-                        for (PNIAPSK2Result *item in results) {
-                            [weakSelf submitRestoredEntitlement:item];
-                        }
+                    NSInteger submitted = 0;
+                    for (PNIAPSK2Result *item in results) {
+                        if ([weakSelf submitRestoredEntitlement:item]) submitted += 1;
+                    }
+                    if (submitted > 0) {
                         return;
                     }
                     [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
