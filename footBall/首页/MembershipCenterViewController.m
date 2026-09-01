@@ -195,11 +195,9 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     [[SKPaymentQueue defaultQueue] addTransactionObserver:self];
     // 告知全局观察者：本 VC 已激活，事务由 VC 处理（避免双重上报/finish）
     [[PNIAPObserver shared] setMembershipCenterActive:YES];
-    // 进入会员中心时主动扫描残留事务（掉单恢复）。
-    // 解决 Apple 不会主动 re-deliver 已 Purchased 事务的问题：
-    // 上次 App 被杀或断网导致服务端验证没回时，事务会停留在队列里，
-    // 这里主动拉起后由 VC 走正常的 verifyPurchase 流程。
-    [[PNIAPObserver shared] resumePendingTransactions];
+    // 进入会员中心：静默消化队列里已 Purchased/Restored 的残留（沙箱续期 / 掉单），
+    // 避免未 finish 事务反复弹出 Apple 支付面板。
+    [self drainPendingStoreKitTransactionsSilently];
     // 预加载法律文档，避免点击协议链接时在主线程读盘卡顿
     [LegalDocumentCache preloadResources:@[ @"membership_agreement", @"auto_renew_terms" ]];
 }
@@ -221,8 +219,8 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     [super viewWillAppear:animated];
     [self refreshUserProfile];
     [[PNIAPObserver shared] setMembershipCenterActive:YES];
-    // 每次返回会员中心都扫描一次残留事务（应对被 pop 后回来、断网重连等场景）
-    [[PNIAPObserver shared] resumePendingTransactions];
+    // 每次返回都静默消化残留 Purchased/Restored，防止沙箱续期再次弹出 ¥33 支付面板
+    [self drainPendingStoreKitTransactionsSilently];
     // 重新进入时强制拉一次状态，确保头部到期日与支付按钮状态最新
     [self loadRemoteData];
 }
@@ -2421,10 +2419,12 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
                 }
                 [weakSelf applyMembershipActivationFromRedeemResult:result];
                 [weakSelf showRedeemDialogSuccessWithTitle:@"激活成功！" desc:desc autoHide:YES];
-                [weakSelf switchToGiftMode:NO];
+                // 免费激活后清掉残留 IAP 上下文，并静默消化队列，避免再弹 ¥33 支付面板
+                [weakSelf clearPendingIAPPurchaseContext];
+                [weakSelf drainPendingStoreKitTransactionsSilently];
+                // 保持当前页；不要强切订阅 Tab（会露出支付按钮，易被误认为还要付费）
                 [weakSelf loadRemoteDataWithForce:YES];
                 [weakSelf refreshMembershipStatusForce];
-                [weakSelf refreshRedeemBannerState];
                 return;
             }
 
@@ -2741,13 +2741,59 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 
 #pragma mark - SKPaymentTransactionObserver
 
+/// 清掉本页未完成的主动购买上下文（礼包免费开通 / 离开支付后残留）
+- (void)clearPendingIAPPurchaseContext {
+    self.payInFlight = NO;
+    self.pendingPlanId = nil;
+    self.pendingRedeemCode = nil;
+    self.hasAppliedRedeemDiscount = NO;
+    self.redeemAppleProductId = nil;
+    self.redeemPlanId = nil;
+    self.redeemOriginalPrice = nil;
+    self.redeemDiscountPrice = nil;
+    [self updatePayButtonState];
+}
+
+/// 静默消化队列中已 Purchased / Restored 的残留事务（沙箱续期、掉单补单）。
+/// 不发起新的 addPayment；Purchasing 态无法代码取消，只能等用户关掉系统面板。
+- (void)drainPendingStoreKitTransactionsSilently {
+    NSArray<SKPaymentTransaction *> *pending = [[SKPaymentQueue defaultQueue] transactions];
+    if (pending.count == 0) return;
+    NSUInteger purchased = 0;
+    NSUInteger purchasing = 0;
+    for (SKPaymentTransaction *txn in pending) {
+        switch (txn.transactionState) {
+            case SKPaymentTransactionStatePurchased:
+                purchased += 1;
+                [self handlePurchasedTransaction:txn];
+                break;
+            case SKPaymentTransactionStateRestored:
+                purchased += 1;
+                [self handleRestoredTransaction:txn];
+                break;
+            case SKPaymentTransactionStatePurchasing:
+                purchasing += 1;
+                break;
+            case SKPaymentTransactionStateFailed:
+                [[SKPaymentQueue defaultQueue] finishTransaction:txn];
+                break;
+            default:
+                break;
+        }
+    }
+    if (purchased > 0 || purchasing > 0) {
+        NSLog(@"[IAP] drainPending: purchased/restored=%lu purchasing=%lu (purchasing 需用户关掉系统面板)",
+              (unsigned long)purchased, (unsigned long)purchasing);
+    }
+}
+
 - (void)paymentQueue:(SKPaymentQueue *)queue updatedTransactions:(NSArray<SKPaymentTransaction *> *)transactions {
     for (SKPaymentTransaction *transaction in transactions) {
         switch (transaction.transactionState) {
             case SKPaymentTransactionStatePurchasing: {
-                // 礼包码页不展示购买 loading（多为队列残留，非本页发起）
+                // 仅用户点了支付才展示 loading；队列残留 / 沙箱续期的 Purchasing 不打扰
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    if (self.showingGiftCode) { return; }
+                    if (!self.payInFlight || self.showingGiftCode) { return; }
                     [MBProgressHUD showHUDAddedTo:self.view animated:YES];
                 });
                 break;
@@ -2830,8 +2876,11 @@ static NSMutableSet<NSString *> *PNSubmittedVerifyTxnIds(void) {
     }
     // StoreKit 会在 finish 前多次回调同一笔 Purchased；首笔成功后 pendingPlanId 已清空，
     // 若再次走「购买」路径会传空 planId → 服务端 @NotNull「planId不能为空」。
+    // 已提交过的 txn：必须 finish，否则残留在队列里，每次进会员中心都会被 StoreKit 再投递，
+    // 沙箱订阅场景下还会反复弹出 ¥33 支付确认面板。
     if ([PNSubmittedVerifyTxnIds() containsObject:transactionId]) {
-        NSLog(@"[IAP] 跳过重复 Purchased 回调: txnId=%@", transactionId);
+        NSLog(@"[IAP] 跳过重复 Purchased 并 finish: txnId=%@", transactionId);
+        [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
         return;
     }
     [PNSubmittedVerifyTxnIds() addObject:transactionId];
@@ -2841,16 +2890,14 @@ static NSMutableSet<NSString *> *PNSubmittedVerifyTxnIds(void) {
     // - 未命中：退回 SK1 appStoreReceiptURL base64
     // 本地立刻捕获 planId / redeemCode，避免异步回调时 pending 已被成功分支清空。
     //
-    // 关键：只有「本页点过支付」留下的 pendingPlanId 才算用户主动购买，才弹「开通成功」。
-    // 队列残留 / 重放事务即使能从 productId 反查出 planId，也一律走 restore 补单且不弹窗，
-    // 否则用户只停在礼包码 Tab 也会被延迟回调打断。
+    // 关键：只有「本页点过支付且 payInFlight」才算用户主动购买。
+    // pendingPlanId 残留但用户已去兑礼包码 / 离开页面时，一律静默 restore，避免误弹开通成功或支付面板副作用。
     NSString *pendingPlanId = [self.pendingPlanId copy] ?: @"";
     NSString *redeemCode = @"";
     if ([self canUsePendingRedeemCodeForPlanId:pendingPlanId]) {
         redeemCode = [self.pendingRedeemCode copy] ?: @"";
     }
-    // 仅「点过支付留下的 pending」算主动购买；礼包页即使还有 pending 也不弹开通成功
-    BOOL userInitiatedPurchase = (pendingPlanId.length > 0);
+    BOOL userInitiatedPurchase = (pendingPlanId.length > 0) && self.payInFlight && !self.showingGiftCode;
     NSString *planId = pendingPlanId;
     if (planId.length == 0) {
         NSString *productId = transaction.payment.productIdentifier ?: @"";
@@ -3451,7 +3498,9 @@ static BOOL PNVerifyErrorWorthRetry(NSError *error) {
                 weakSelf.giftSuccessLabel.text = @"兑换成功";
             }
             [weakSelf applyMembershipActivationFromRedeemResult:result];
-            [weakSelf switchToGiftMode:NO];
+            // 免费礼包激活后：清 IAP 残留，留在礼包成功页，避免切回订阅 Tab 再被沙箱弹出 ¥33
+            [weakSelf clearPendingIAPPurchaseContext];
+            [weakSelf drainPendingStoreKitTransactionsSilently];
             [weakSelf loadRemoteDataWithForce:YES];
             [weakSelf refreshMembershipStatusForce];
         });
