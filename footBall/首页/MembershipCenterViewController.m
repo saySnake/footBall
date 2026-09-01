@@ -128,9 +128,6 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 @property (nonatomic, copy) NSString *redeemPlanId;
 /// 待随 IAP /purchase 上报的兑换码（EXCHANGE_CODE / INVITE_CODE）
 @property (nonatomic, copy) NSString *pendingRedeemCode;
-/// 兑换接口返回的划线价/折扣价（SKProduct 未拉到时的展示兜底）
-@property (nonatomic, copy) NSString *redeemOriginalPrice;
-@property (nonatomic, copy) NSString *redeemDiscountPrice;
 /// 服务端返回的方案列表，用于获取 appleProductId 和 planId
 @property (nonatomic, strong) NSArray<PNMemberPlan *> *apiPlans;
 /// 当前会员状态
@@ -980,8 +977,14 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
         || [self isLifetimePlanId:planId];
 }
 
+/// 折扣 SKU 只能用于兑换码实际授权的那一个方案。
+/// 若放开到全部支持折扣的方案，用户拿月卡折扣码就能切到年卡买走折扣年卡，
+/// 而 canUsePendingRedeemCodeForPlanId 又不会带上 redeemCode，服务端无从校验资格。
 - (BOOL)shouldUseDiscountSKUForPlanId:(NSString *)planId {
-    return self.hasAppliedRedeemDiscount && [self planSupportsRedeemDiscount:planId];
+    if (!self.hasAppliedRedeemDiscount) return NO;
+    if (![self planSupportsRedeemDiscount:planId]) return NO;
+    NSString *authorizedPlanId = self.redeemPlanId.length > 0 ? self.redeemPlanId : @"1";
+    return [planId isEqualToString:authorizedPlanId];
 }
 
 - (BOOL)canUsePendingRedeemCodeForPlanId:(NSString *)planId {
@@ -1005,38 +1008,10 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     return fallback[planId];
 }
 
-- (NSString *)fallbackOriginalPriceForPlanId:(NSString *)planId {
-    NSDictionary<NSString *, NSString *> *fallback = @{
-        @"1": @"33", @"2": @"268", @"3": @"748",
-    };
-    return fallback[planId];
-}
-
-- (NSString *)fallbackDiscountPriceForPlanId:(NSString *)planId {
-    NSDictionary<NSString *, NSString *> *fallback = @{
-        @"1": @"22", @"2": @"188", @"3": @"698",
-    };
-    return fallback[planId];
-}
-
 - (BOOL)isPlan:(MCPlan *)plan matchingRedeemPlanId:(NSString *)redeemPlanId {
     if (!plan) return NO;
     NSString *targetId = redeemPlanId.length > 0 ? redeemPlanId : @"1";
     return [plan.planId isEqualToString:targetId];
-}
-
-- (NSString *)normalizedDecimalPriceString:(id)raw {
-    if ([raw isKindOfClass:NSString.class]) {
-        return [(NSString *)raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    }
-    if ([raw isKindOfClass:NSNumber.class]) {
-        double value = [(NSNumber *)raw doubleValue];
-        if (fabs(value - round(value)) < 0.001) {
-            return [NSString stringWithFormat:@"%.0f", value];
-        }
-        return [NSString stringWithFormat:@"%.2f", value];
-    }
-    return nil;
 }
 
 - (void)applyPaidRedeemResult:(PNRedeemResult *)result code:(NSString *)code {
@@ -1047,8 +1022,6 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     if (result.planId.length > 0) {
         self.redeemPlanId = result.planId;
     }
-    self.redeemOriginalPrice = [self normalizedDecimalPriceString:result.originalPrice];
-    self.redeemDiscountPrice = [self normalizedDecimalPriceString:result.discountPrice];
     [self reloadPlanCardsPreservingIndex];
     [self preloadAppStorePrices];
     [self refreshRedeemBannerState];
@@ -1570,9 +1543,35 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     PNMembershipStatus *status = [PNMembershipStatus new];
     status.isMember = YES;
     status.expireTime = result.expireTime;
+    status.isPermanent = (result.durationDays == 0 && result.expireTime.length == 0);
     status.nearExpiry = NO;
     self.membershipStatus = status;
     [self applyMembershipStatusToUI:status];
+}
+
+/// IAP verify 成功后立即刷新 banner（永久方案不依赖 status 二次拉取）
+- (void)applyMembershipActivationFromVerifyPayload:(id)raw purchasedPlanId:(NSString *)purchasedPlanId {
+    PNMembership *membership = [PNMembership yy_modelWithJSON:raw];
+    BOOL lifetimePlan = [self isPurchasedPlanLifetimeWithPlanId:purchasedPlanId];
+    PNMembershipStatus *status = [PNMembershipStatus new];
+    status.isMember = YES;
+    status.levelName = membership.levelName;
+    status.nearExpiry = NO;
+    if (lifetimePlan || membership.expireTime.length == 0) {
+        status.expireTime = nil;
+        status.isPermanent = YES;
+    } else {
+        status.expireTime = membership.expireTime;
+        status.isPermanent = NO;
+    }
+    self.membershipStatus = status;
+    [self applyMembershipStatusToUI:status];
+}
+
+- (BOOL)isPermanentMembershipStatus:(PNMembershipStatus *)status {
+    if (!status) return NO;
+    if (status.isPermanent) return YES;
+    return status.isMember && status.expireTime.length == 0;
 }
 
 /// 强制拉取会员状态（不受 loadRemoteData 防抖影响），用于兑换/支付成功后刷新。
@@ -1591,10 +1590,11 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 /// 根据会员状态更新 banner 文案
 - (void)applyMembershipStatusToUI:(PNMembershipStatus *)status {
     if (!status) return;
+    BOOL isPermanent = [self isPermanentMembershipStatus:status];
     // isMember=true 且 expireTime 非空：有限期会员（月/季/年）。
-    // expireTime=null：永久会员（duration_days=0），banner 显示"永久有效"。
+    // expireTime=null / isPermanent：永久会员，banner 显示"永久有效"。
     // Apple 3.1.2：永久会员不能显示具体到期日，否则审核会判定"伪造永久"。
-    if (status.isMember && status.expireTime.length > 0) {
+    if (status.isMember && !isPermanent && status.expireTime.length > 0) {
         self.bannerTitleLabel.text = [NSString stringWithFormat:@"会员有效期至 %@",
                                       [status.expireTime substringToIndex:MIN(10, status.expireTime.length)]];
         if (status.nearExpiry) {
@@ -1609,8 +1609,15 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
             self.bannerHintLabel.text = @"尊享全部会员权益";
             self.bannerHintLabel.textColor = kMCDiscountHintGray;
         }
-    } else if (status.isMember) {
+    } else if (status.isMember && isPermanent) {
         // 永久会员：expireTime=null（duration_days=0）。Apple 3.1.2：禁止显示具体到期日。
+        self.bannerTitleLabel.text = @"永久会员，永久有效";
+        self.bannerSubLabel.text = nil;
+        self.bannerSubLabel.textColor = [UIColor clearColor];
+        self.bannerHintLabel.text = @"尊享全部会员权益";
+        self.bannerHintLabel.textColor = kMCDiscountHintGray;
+    } else if (status.isMember) {
+        // 兜底：已是会员但缺少到期日字段，按永久展示
         self.bannerTitleLabel.text = @"永久会员，永久有效";
         self.bannerSubLabel.text = nil;
         self.bannerSubLabel.textColor = [UIColor clearColor];
@@ -1676,15 +1683,71 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     }];
 }
 
+/// 定位方案当前实际会购买的 SKProduct（折扣生效时为折扣 SKU）。
+- (nullable SKProduct *)skProductForPlan:(MCPlan *)plan {
+    if (!plan) return nil;
+    NSString *pid = nil;
+    if ([self shouldUseDiscountSKUForPlanId:plan.planId]) {
+        pid = [self discountAppleProductIdForPlanId:plan.planId];
+        if (pid.length == 0) pid = self.redeemAppleProductId;
+    } else {
+        for (PNMemberPlan *api in self.apiPlans) {
+            if ([api.planId isEqualToString:plan.planId ?: @""]) {
+                pid = api.appleProductId;
+                break;
+            }
+        }
+    }
+    pid = [pid stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    return pid.length > 0 ? self.skProducts[pid] : nil;
+}
+
+/// SKProductSubscriptionPeriod → 中文周期文案。
+- (NSString *)periodTextForUnit:(SKProductPeriodUnit)unit numberOfUnits:(NSUInteger)count {
+    if (count == 0) return @"";
+    switch (unit) {
+        case SKProductPeriodUnitDay:
+            if (count == 1) return @"天";
+            if (count == 7) return @"周";
+            return [NSString stringWithFormat:@"%lu天", (unsigned long)count];
+        case SKProductPeriodUnitWeek:
+            return count == 1 ? @"周" : [NSString stringWithFormat:@"%lu周", (unsigned long)count];
+        case SKProductPeriodUnitMonth:
+            if (count == 1) return @"月";
+            if (count == 3) return @"季";
+            if (count == 12) return @"年";
+            return [NSString stringWithFormat:@"%lu个月", (unsigned long)count];
+        case SKProductPeriodUnitYear:
+            return count == 1 ? @"年" : [NSString stringWithFormat:@"%lu年", (unsigned long)count];
+    }
+    return @"";
+}
+
 /// 返回方案的续期周期文案（用于按钮和订阅信息标签）。
 /// 按月续期 → "月"；按年续期 → "年"；永久/创始人 → ""（非续期商品）。
-/// Apple 3.1.2: 续期频率必须明示。
+/// Apple 3.1.2: 续期频率必须明示，且必须与实际扣款周期一致。
+/// 只认 SKProduct.subscriptionPeriod 与服务端 durationDays——标题文案由服务端 name
+/// 覆盖（见 mergeAPIPlansIntoPlans），把「连续包年（12个月）」判成按月续期会导致
+/// 按钮显示「¥268/月」，属于价格误导，直接拒审。
 - (NSString *)subscriptionPeriodTextForPlan:(MCPlan *)plan {
-    NSString *title = plan.title ?: @"";
-    if ([title containsString:@"月"]) return @"月";
-    if ([title containsString:@"年"]) return @"年";
-    if ([title containsString:@"季"]) return @"季";
-    // 永久 / 创始人 / 兑换码激活的方案：非自动续期，不显示周期
+    SKProduct *product = [self skProductForPlan:plan];
+    if (product) {
+        SKProductSubscriptionPeriod *period = product.subscriptionPeriod;
+        if (period && period.numberOfUnits > 0) {
+            return [self periodTextForUnit:period.unit numberOfUnits:period.numberOfUnits];
+        }
+        // 拉到了商品但无 subscriptionPeriod：非消耗型 / 消耗型，一次性买断
+        return @"";
+    }
+    // SKProduct 未就绪（正常不会走到，按钮此时显示「价格加载中」）：退回服务端时长
+    for (PNMemberPlan *api in self.apiPlans) {
+        if (![api.planId isEqualToString:plan.planId ?: @""]) continue;
+        NSInteger days = api.durationDays;
+        if (days <= 0) return @"";
+        if (days <= 31) return @"月";
+        if (days <= 100) return @"季";
+        return @"年";
+    }
     return @"";
 }
 
@@ -1727,8 +1790,8 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     NSInteger idx = self.currentIndex;
     if (idx < 0 || idx >= (NSInteger)self.plans.count) return NO;
     MCPlan *plan = self.plans[idx];
-    NSString *title = plan.title ?: @"";
-    return [title containsString:@"永久"] || [title containsString:@"终身"] || [title containsString:@"创始"];
+    // 与 subscriptionPeriodTextForPlan 保持同一判据：无续期周期即为一次性买断
+    return [self subscriptionPeriodTextForPlan:plan].length == 0;
 }
 
 /// 本次实际购买的方案是否为永久/终身/创始人类型（非续期商品）。
@@ -1745,14 +1808,14 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 }
 
 - (NSString *)cardHintTextForPlan:(MCPlan *)plan {
-    if (self.hasAppliedRedeemDiscount && [self planSupportsRedeemDiscount:plan.planId]) {
+    if ([self shouldUseDiscountSKUForPlanId:plan.planId]) {
         return @"限时优惠";
     }
     return plan.hint ?: @"";
 }
 
 - (NSString *)cardOriginalPriceTextForPlan:(MCPlan *)plan {
-    if (self.hasAppliedRedeemDiscount && [self planSupportsRedeemDiscount:plan.planId]) {
+    if ([self shouldUseDiscountSKUForPlanId:plan.planId]) {
         return plan.originalPrice ?: @"";
     }
     return @"";
@@ -1938,31 +2001,19 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 }
 
 - (void)applyRedeemDiscountToPlan:(MCPlan *)plan {
-    if (!plan || !self.hasAppliedRedeemDiscount) return;
-    if (![self planSupportsRedeemDiscount:plan.planId]) return;
+    if (!plan || ![self shouldUseDiscountSKUForPlanId:plan.planId]) return;
 
     NSString *discountProductId = [self discountAppleProductIdForPlanId:plan.planId];
     SKProduct *discountProduct = discountProductId.length > 0 ? self.skProducts[discountProductId] : nil;
+    // 折扣价与划线价都必须来自 SKProduct：服务端价或写死数字会在非人民币地区
+    // 变成「$33 划线 + $22」这类与 Apple 扣款不一致的假价格（3.1.2 / 2.3.1 拒审点）。
+    // 折扣 SKU 未就绪时保持原价展示，等 preloadAppStorePrices 回来再刷新。
     NSString *discountPrice = [self numericPriceStringFromProduct:discountProduct];
-    if (discountPrice.length == 0) {
-        if ([plan.planId isEqualToString:self.redeemPlanId ?: @""]) {
-            discountPrice = self.redeemDiscountPrice;
-        }
-        if (discountPrice.length == 0) {
-            discountPrice = [self fallbackDiscountPriceForPlanId:plan.planId];
-        }
-    }
     if (discountPrice.length == 0) return;
 
-    NSString *originalPrice = [self fallbackOriginalPriceForPlanId:plan.planId];
-    if ([plan.planId isEqualToString:self.redeemPlanId ?: @""] && self.redeemOriginalPrice.length > 0) {
-        originalPrice = self.redeemOriginalPrice;
-    }
-    if (originalPrice.length == 0) {
-        originalPrice = plan.price;
-    }
-    if (plan.originalPrice.length == 0) {
-        plan.originalPrice = originalPrice;
+    // localizedPrice 仅由 SKProduct 写入，非空即代表当前展示价是 Apple 真实价
+    if (plan.originalPrice.length == 0 && plan.localizedPrice.length > 0) {
+        plan.originalPrice = plan.price;
         plan.localizedOriginalPrice = plan.localizedPrice;
     }
     plan.price = discountPrice;
@@ -2337,8 +2388,6 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
                 weakSelf.pendingRedeemCode = nil;
                 weakSelf.redeemAppleProductId = nil;
                 weakSelf.redeemPlanId = nil;
-                weakSelf.redeemOriginalPrice = nil;
-                weakSelf.redeemDiscountPrice = nil;
                 NSMutableString *desc = [NSMutableString stringWithString:@"会员权益已激活"];
                 NSString *activateText = [weakSelf displayDateText:result.activateTime];
                 NSString *expireText = [weakSelf displayDateText:result.expireTime];
@@ -2712,8 +2761,6 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
                     self.hasAppliedRedeemDiscount = NO;
                     self.redeemAppleProductId = nil;
                     self.redeemPlanId = nil;
-                    self.redeemOriginalPrice = nil;
-                    self.redeemDiscountPrice = nil;
                     [self updatePayButtonState]; // 同步恢复侧滑返回手势
                     // 礼包码页不打扰用户（可能是后台残留事务失败）
                     // 此处在 dispatch_async block 内，不能用 break（不在 loop/switch 中），用 return 提前结束 block。
@@ -2864,8 +2911,9 @@ static NSMutableSet<NSString *> *PNShownPurchaseSuccessTxnIds(void) {
             [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
             weakSelf.payInFlight = NO;
             [weakSelf updatePayButtonState];
-            // 先刷新会员状态（到期日 banner）；不要紧接着调 refreshRedeemBannerState，
-            // 否则会把「会员有效期至 xxx」盖回「限时兑换码」。
+            id verifyRaw = responseObject.dataObject ?: responseObject.data;
+            [weakSelf applyMembershipActivationFromVerifyPayload:verifyRaw purchasedPlanId:purchasedPlanId];
+            // 再拉一次远端状态对账；勿调 refreshRedeemBannerState，会把到期日 banner 盖回兑换码文案
             [weakSelf loadRemoteDataWithForce:YES];
             [weakSelf refreshMembershipStatusForce];
             // 无论是否弹窗，成功后都清购买上下文，避免礼包页静默成功后 pending 残留再弹窗
@@ -2874,8 +2922,6 @@ static NSMutableSet<NSString *> *PNShownPurchaseSuccessTxnIds(void) {
             weakSelf.hasAppliedRedeemDiscount = NO;
             weakSelf.redeemAppleProductId = nil;
             weakSelf.redeemPlanId = nil;
-            weakSelf.redeemOriginalPrice = nil;
-            weakSelf.redeemDiscountPrice = nil;
             if (!showPurchaseSuccessUI) {
                 return;
             }
@@ -3323,8 +3369,6 @@ static NSMutableSet<NSString *> *PNShownPurchaseSuccessTxnIds(void) {
             weakSelf.pendingRedeemCode = nil;
             weakSelf.redeemAppleProductId = nil;
             weakSelf.redeemPlanId = nil;
-            weakSelf.redeemOriginalPrice = nil;
-            weakSelf.redeemDiscountPrice = nil;
             weakSelf.giftPromptLabel.hidden = YES;
             weakSelf.giftCodeTapAreaBtn.hidden = YES;
             weakSelf.giftRedeemBtn.hidden = YES;

@@ -40,6 +40,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) NSString *expireTime;
 /// 是否即将过期（如距到期 ≤3 天）
 @property (nonatomic, assign) BOOL nearExpiry;
+/// 是否永久会员（服务端 expireTime=null）
+@property (nonatomic, assign) BOOL isPermanent;
 @end
 
 @interface PNMemberBenefit : NSObject <YYModel>

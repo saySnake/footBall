@@ -39,6 +39,7 @@
     return @{
         @"isMember": @[ @"isMember", @"member", @"active" ],
         @"nearExpiry": @[ @"nearExpiry", @"near_expiry" ],
+        @"isPermanent": @[ @"isPermanent", @"is_permanent", @"permanent" ],
         @"levelName": @[ @"levelName", @"level_name" ],
         @"expireTime": @[ @"expireTime", @"expire_time" ],
     };
@@ -61,9 +62,22 @@
         self.nearExpiry = ([s isEqualToString:@"1"] || [s isEqualToString:@"true"] || [s isEqualToString:@"yes"]);
     }
 
-    // LocalDateTime 可能是 ISO 字符串，也可能被序列成数组 [y,m,d,h,m,s]
+    id rawPermanent = dic[@"isPermanent"] ?: dic[@"is_permanent"] ?: dic[@"permanent"];
+    if ([rawPermanent isKindOfClass:NSNumber.class]) {
+        self.isPermanent = [(NSNumber *)rawPermanent boolValue];
+    } else if ([rawPermanent isKindOfClass:NSString.class]) {
+        NSString *s = [(NSString *)rawPermanent lowercaseString];
+        self.isPermanent = ([s isEqualToString:@"1"] || [s isEqualToString:@"true"] || [s isEqualToString:@"yes"]);
+    }
+
+    // LocalDateTime 可能是 ISO 字符串，也可能被序列成数组 [y,m,d,h,m,s]；null 表示永久
     id rawExpire = dic[@"expireTime"] ?: dic[@"expire_time"];
-    if ([rawExpire isKindOfClass:NSString.class]) {
+    if (rawExpire == nil || rawExpire == (id)kCFNull || [rawExpire isKindOfClass:NSNull.class]) {
+        self.expireTime = nil;
+        if (!rawPermanent && self.isMember) {
+            self.isPermanent = YES;
+        }
+    } else if ([rawExpire isKindOfClass:NSString.class]) {
         NSString *s = [(NSString *)rawExpire stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         // "2026-09-28T20:54:14" → 展示用前 10 位即可，保留完整串给模型
         self.expireTime = s;
