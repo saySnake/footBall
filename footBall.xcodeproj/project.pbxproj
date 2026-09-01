@@ -221,7 +221,7 @@
 				CODE_SIGN_ENTITLEMENTS = footBall/footBall.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 1006;
 				DEVELOPMENT_TEAM = F649U4M8PK;
 				GCC_PREFIX_HEADER = "footBall/footBall-Prefix.pch";
 				GENERATE_INFOPLIST_FILE = YES;
@@ -265,9 +265,9 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = footBall/footBall.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 1006;
 				DEVELOPMENT_TEAM = F649U4M8PK;
 				GCC_PREFIX_HEADER = "footBall/footBall-Prefix.pch";
 				GENERATE_INFOPLIST_FILE = YES;
