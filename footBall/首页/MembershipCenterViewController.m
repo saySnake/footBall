@@ -860,7 +860,7 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
         NSForegroundColorAttributeName: [UIColor colorWithRed:173/255.0 green:173/255.0 blue:173/255.0 alpha:1.0],
         NSFontAttributeName: [UIFont systemFontOfSize:8 weight:UIFontWeightRegular]
     }];
-    // 支持邀请码（12 位字母数字）与原有兑换码（数字）
+    // 支持邀请码（12 位字母数字）、折扣码（含下划线）与原 5 位数字礼包码
     self.redeemInputField.keyboardType = UIKeyboardTypeASCIICapable;
     self.redeemInputField.autocapitalizationType = UITextAutocapitalizationTypeAllCharacters;
     self.redeemInputField.autocorrectionType = UITextAutocorrectionTypeNo;
@@ -973,6 +973,52 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     return [planId isEqualToString:@"4"];
 }
 
+/// 折扣码生效后，月/年/终身 VIP 三张卡展示折扣（创始人无折扣 SKU）
+- (BOOL)planSupportsRedeemDiscount:(NSString *)planId {
+    return [self isMonthlyPlanId:planId]
+        || [planId isEqualToString:@"2"]
+        || [self isLifetimePlanId:planId];
+}
+
+- (BOOL)shouldUseDiscountSKUForPlanId:(NSString *)planId {
+    return self.hasAppliedRedeemDiscount && [self planSupportsRedeemDiscount:planId];
+}
+
+- (BOOL)canUsePendingRedeemCodeForPlanId:(NSString *)planId {
+    if (!self.hasAppliedRedeemDiscount || self.pendingRedeemCode.length == 0) return NO;
+    if (self.redeemPlanId.length == 0) return [self isMonthlyPlanId:planId];
+    return [self.redeemPlanId isEqualToString:planId];
+}
+
+- (NSString *)discountAppleProductIdForPlanId:(NSString *)planId {
+    if (![self planSupportsRedeemDiscount:planId]) return nil;
+    for (PNMemberPlan *p in self.apiPlans) {
+        if (![p.planId isEqualToString:planId]) continue;
+        NSString *pid = [p.appleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if ([pid containsString:@".discount"]) return pid;
+    }
+    NSDictionary<NSString *, NSString *> *fallback = @{
+        @"1": @"nomad.iap.subscribe.month.discount",
+        @"2": @"nomad.iap.subscribe.year.discount",
+        @"3": @"nomad.iap.forever1.vip.discount",
+    };
+    return fallback[planId];
+}
+
+- (NSString *)fallbackOriginalPriceForPlanId:(NSString *)planId {
+    NSDictionary<NSString *, NSString *> *fallback = @{
+        @"1": @"33", @"2": @"268", @"3": @"748",
+    };
+    return fallback[planId];
+}
+
+- (NSString *)fallbackDiscountPriceForPlanId:(NSString *)planId {
+    NSDictionary<NSString *, NSString *> *fallback = @{
+        @"1": @"22", @"2": @"188", @"3": @"698",
+    };
+    return fallback[planId];
+}
+
 - (BOOL)isPlan:(MCPlan *)plan matchingRedeemPlanId:(NSString *)redeemPlanId {
     if (!plan) return NO;
     NSString *targetId = redeemPlanId.length > 0 ? redeemPlanId : @"1";
@@ -1003,10 +1049,6 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     }
     self.redeemOriginalPrice = [self normalizedDecimalPriceString:result.originalPrice];
     self.redeemDiscountPrice = [self normalizedDecimalPriceString:result.discountPrice];
-    NSInteger targetIndex = [self indexForPlanId:self.redeemPlanId];
-    if (targetIndex != NSNotFound) {
-        self.currentIndex = targetIndex;
-    }
     [self reloadPlanCardsPreservingIndex];
     [self preloadAppStorePrices];
     [self refreshRedeemBannerState];
@@ -1426,9 +1468,16 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
         NSString *pid = [p.appleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         if (pid.length > 0) [ids addObject:pid];
     }
-    // 兑换码折扣商品也一并拉价
-    NSString *redeemPid = [self.redeemAppleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if (redeemPid.length > 0) [ids addObject:redeemPid];
+    // 兑换码折扣商品：生效后预拉月/年/终身全部折扣 SKU
+    if (self.hasAppliedRedeemDiscount) {
+        for (NSString *planId in @[ @"1", @"2", @"3" ]) {
+            NSString *discountPid = [self discountAppleProductIdForPlanId:planId];
+            if (discountPid.length > 0) [ids addObject:discountPid];
+        }
+    } else {
+        NSString *redeemPid = [self.redeemAppleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (redeemPid.length > 0) [ids addObject:redeemPid];
+    }
     if (ids.count == 0) return;
 
     [self.preloadProductsRequest cancel];
@@ -1461,11 +1510,12 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     NSArray<NSString *> *expectedPlanIds = @[ @"1", @"2", @"3", @"4" ];
     NSString *selectedPlanId = (index >= 0 && index < (NSInteger)expectedPlanIds.count)
         ? expectedPlanIds[index] : nil;
-    BOOL useRedeemDiscount = self.hasAppliedRedeemDiscount
-        && self.redeemAppleProductId.length > 0
-        && selectedPlanId.length > 0
-        && (self.redeemPlanId.length == 0 || [self.redeemPlanId isEqualToString:selectedPlanId]);
+    BOOL useRedeemDiscount = [self shouldUseDiscountSKUForPlanId:selectedPlanId];
     if (useRedeemDiscount) {
+        NSString *discountPid = [self discountAppleProductIdForPlanId:selectedPlanId];
+        if (discountPid.length > 0) {
+            return discountPid;
+        }
         return [self.redeemAppleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     }
     if (self.apiPlans.count == 0 || selectedPlanId.length == 0) return nil;
@@ -1695,16 +1745,14 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 }
 
 - (NSString *)cardHintTextForPlan:(MCPlan *)plan {
-    if (self.hasAppliedRedeemDiscount && [self isPlan:plan matchingRedeemPlanId:self.redeemPlanId]) {
-        if ([self isMonthlyPlanId:plan.planId]) return @"限时优惠";
-        if ([self isFounderPlanId:plan.planId]) return plan.hint ?: @"";
-        return @"";
+    if (self.hasAppliedRedeemDiscount && [self planSupportsRedeemDiscount:plan.planId]) {
+        return @"限时优惠";
     }
     return plan.hint ?: @"";
 }
 
 - (NSString *)cardOriginalPriceTextForPlan:(MCPlan *)plan {
-    if (self.hasAppliedRedeemDiscount) {
+    if (self.hasAppliedRedeemDiscount && [self planSupportsRedeemDiscount:plan.planId]) {
         return plan.originalPrice ?: @"";
     }
     return @"";
@@ -1891,23 +1939,25 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 
 - (void)applyRedeemDiscountToPlan:(MCPlan *)plan {
     if (!plan || !self.hasAppliedRedeemDiscount) return;
-    if (![self isPlan:plan matchingRedeemPlanId:self.redeemPlanId]) return;
+    if (![self planSupportsRedeemDiscount:plan.planId]) return;
 
-    SKProduct *discountProduct = self.redeemAppleProductId.length > 0
-        ? self.skProducts[self.redeemAppleProductId] : nil;
+    NSString *discountProductId = [self discountAppleProductIdForPlanId:plan.planId];
+    SKProduct *discountProduct = discountProductId.length > 0 ? self.skProducts[discountProductId] : nil;
     NSString *discountPrice = [self numericPriceStringFromProduct:discountProduct];
     if (discountPrice.length == 0) {
-        discountPrice = self.redeemDiscountPrice;
-    }
-    if (discountPrice.length == 0) {
-        NSString *pid = self.redeemPlanId ?: @"1";
-        if ([pid isEqualToString:@"1"]) discountPrice = @"22";
-        else if ([pid isEqualToString:@"2"]) discountPrice = @"188";
-        else if ([pid isEqualToString:@"3"]) discountPrice = @"698";
+        if ([plan.planId isEqualToString:self.redeemPlanId ?: @""]) {
+            discountPrice = self.redeemDiscountPrice;
+        }
+        if (discountPrice.length == 0) {
+            discountPrice = [self fallbackDiscountPriceForPlanId:plan.planId];
+        }
     }
     if (discountPrice.length == 0) return;
 
-    NSString *originalPrice = self.redeemOriginalPrice;
+    NSString *originalPrice = [self fallbackOriginalPriceForPlanId:plan.planId];
+    if ([plan.planId isEqualToString:self.redeemPlanId ?: @""] && self.redeemOriginalPrice.length > 0) {
+        originalPrice = self.redeemOriginalPrice;
+    }
     if (originalPrice.length == 0) {
         originalPrice = plan.price;
     }
@@ -2108,26 +2158,60 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     self.redeemOverlayView.hidden = YES;
 }
 
+- (BOOL)isRedeemInputCharacter:(unichar)c {
+    return (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+}
+
+- (BOOL)isAllDecimalDigits:(NSString *)code {
+    if (code.length == 0) return NO;
+    for (NSUInteger i = 0; i < code.length; i++) {
+        unichar c = [code characterAtIndex:i];
+        if (c < '0' || c > '9') return NO;
+    }
+    return YES;
+}
+
+- (BOOL)isAlphanumericCode:(NSString *)code {
+    if (code.length == 0) return NO;
+    for (NSUInteger i = 0; i < code.length; i++) {
+        unichar c = [code characterAtIndex:i];
+        if (!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))) return NO;
+    }
+    return YES;
+}
+
 - (NSString *)normalizedRedeemInput:(NSString *)raw {
     NSString *trimmed = [raw ?: @"" stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     trimmed = [trimmed uppercaseString];
-    // 仅保留 A-Z / 0-9，兼容邀请码（12 位字母数字）与原兑换码
+    // 保留 A-Z / 0-9 / _，与服务端 member_redeem_code.code（最长 50）一致
     NSMutableString *code = [NSMutableString stringWithCapacity:trimmed.length];
     for (NSUInteger i = 0; i < trimmed.length; i++) {
         unichar c = [trimmed characterAtIndex:i];
-        if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+        if ([self isRedeemInputCharacter:c]) {
             [code appendFormat:@"%C", c];
         }
     }
-    if (code.length > 12) {
-        return [code substringToIndex:12];
+    static const NSUInteger kMaxRedeemCodeLength = 50;
+    if (code.length > kMaxRedeemCodeLength) {
+        return [code substringToIndex:kMaxRedeemCodeLength];
     }
     return [code copy];
 }
 
 - (BOOL)isRedeemCodeReadyToSubmit:(NSString *)code {
-    // 邀请码固定 12 位；历史兑换码多为 5 位数字
-    return code.length == 12 || code.length == 5;
+    if (code.length == 0) return NO;
+    // 历史礼包码：5 位数字
+    if (code.length == 5) return [self isAllDecimalDigits:code];
+    // 邀请码：12 位字母数字
+    if (code.length == 12) return [self isAlphanumericCode:code];
+    // 折扣码等命名码：如 MONTHLY_DISCOUNT（4~50 位，可含下划线）
+    if (code.length >= 4 && code.length <= 50) {
+        for (NSUInteger i = 0; i < code.length; i++) {
+            if (![self isRedeemInputCharacter:[code characterAtIndex:i]]) return NO;
+        }
+        return YES;
+    }
+    return NO;
 }
 
 - (void)onRedeemDialogInputChanged {
@@ -2223,7 +2307,7 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     NSString *code = [self normalizedRedeemInput:self.redeemInputField.text];
     self.redeemInputField.text = code;
     if (![self isRedeemCodeReadyToSubmit:code]) {
-        // 长度不符合（邀请码 12 位 / 历史兑换码 5 位）时给用户明确提示，
+        // 长度不符合（5 位礼包码 / 12 位邀请码 / 4~50 位折扣码）时给用户明确提示，
         // 而不是静默 return 让用户以为按钮坏了
         NSString *tip = code.length == 0
             ? (NSLocalizedString(@"redeem_code_empty", nil) ?: @"请输入兑换码")
@@ -2438,14 +2522,12 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     NSArray<NSString *> *expectedPlanIds = @[ @"1", @"2", @"3", @"4" ];
     NSString *selectedPlanId = (self.currentIndex >= 0 && self.currentIndex < (NSInteger)expectedPlanIds.count)
         ? expectedPlanIds[self.currentIndex] : nil;
-    BOOL useRedeemDiscount = self.hasAppliedRedeemDiscount
-        && self.redeemAppleProductId.length > 0
-        && selectedPlanId.length > 0
-        && (self.redeemPlanId.length == 0 || [self.redeemPlanId isEqualToString:selectedPlanId]);
+    BOOL useRedeemDiscount = [self shouldUseDiscountSKUForPlanId:selectedPlanId];
 
     if (useRedeemDiscount) {
-        appleProductId = self.redeemAppleProductId;
-        planId = self.redeemPlanId.length ? self.redeemPlanId : selectedPlanId;
+        NSString *discountPid = [self discountAppleProductIdForPlanId:selectedPlanId];
+        appleProductId = discountPid.length > 0 ? discountPid : self.redeemAppleProductId;
+        planId = selectedPlanId;
     } else if (self.apiPlans.count > 0) {
         NSString *expectedPlanId = selectedPlanId;
         PNMemberPlan *target = nil;
@@ -2697,7 +2779,10 @@ static NSMutableSet<NSString *> *PNSubmittedVerifyTxnIds(void) {
     // 队列残留 / 重放事务即使能从 productId 反查出 planId，也一律走 restore 补单且不弹窗，
     // 否则用户只停在礼包码 Tab 也会被延迟回调打断。
     NSString *pendingPlanId = [self.pendingPlanId copy] ?: @"";
-    NSString *redeemCode = [self.pendingRedeemCode copy] ?: @"";
+    NSString *redeemCode = @"";
+    if ([self canUsePendingRedeemCodeForPlanId:pendingPlanId]) {
+        redeemCode = [self.pendingRedeemCode copy] ?: @"";
+    }
     // 仅「点过支付留下的 pending」算主动购买；礼包页即使还有 pending 也不弹开通成功
     BOOL userInitiatedPurchase = (pendingPlanId.length > 0);
     NSString *planId = pendingPlanId;
@@ -2988,6 +3073,12 @@ static NSMutableSet<NSString *> *PNShownPurchaseSuccessTxnIds(void) {
         NSString *pid = [p.appleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         if ([pid isEqualToString:productId] && p.planId.length > 0) {
             return p.planId;
+        }
+    }
+    for (NSString *planId in @[ @"1", @"2", @"3" ]) {
+        NSString *discountPid = [self discountAppleProductIdForPlanId:planId];
+        if ([discountPid isEqualToString:productId]) {
+            return planId;
         }
     }
     return nil;
