@@ -111,6 +111,23 @@
     };
 }
 
+- (NSString *)normalizedDateTimeStringFromRaw:(id)raw {
+    if ([raw isKindOfClass:NSString.class]) {
+        return [(NSString *)raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    }
+    if ([raw isKindOfClass:NSArray.class] && [(NSArray *)raw count] >= 3) {
+        NSArray *a = (NSArray *)raw;
+        if ([(NSArray *)raw count] >= 6) {
+            return [NSString stringWithFormat:@"%04ld-%02ld-%02ldT%02ld:%02ld:%02ld",
+                    (long)[a[0] integerValue], (long)[a[1] integerValue], (long)[a[2] integerValue],
+                    (long)[a[3] integerValue], (long)[a[4] integerValue], (long)[a[5] integerValue]];
+        }
+        return [NSString stringWithFormat:@"%04ld-%02ld-%02ld",
+                (long)[a[0] integerValue], (long)[a[1] integerValue], (long)[a[2] integerValue]];
+    }
+    return nil;
+}
+
 - (BOOL)modelCustomTransformFromDictionary:(NSDictionary *)dic {
     if ([self.codeType isKindOfClass:NSString.class]) {
         self.codeType = [[self.codeType stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] uppercaseString];
@@ -124,10 +141,27 @@
     } else if ([rawPlanId isKindOfClass:NSString.class]) {
         self.planId = [rawPlanId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     }
+    id rawOriginal = dic[@"originalPrice"] ?: dic[@"original_price"];
+    if ([rawOriginal isKindOfClass:NSNumber.class]) {
+        self.originalPrice = [NSString stringWithFormat:@"%g", [(NSNumber *)rawOriginal doubleValue]];
+    }
+    id rawDiscount = dic[@"discountPrice"] ?: dic[@"discount_price"];
+    if ([rawDiscount isKindOfClass:NSNumber.class]) {
+        self.discountPrice = [NSString stringWithFormat:@"%g", [(NSNumber *)rawDiscount doubleValue]];
+    }
+    NSString *activate = [self normalizedDateTimeStringFromRaw:(dic[@"activateTime"] ?: dic[@"activate_time"])];
+    if (activate.length > 0) self.activateTime = activate;
+    NSString *expire = [self normalizedDateTimeStringFromRaw:(dic[@"expireTime"] ?: dic[@"expire_time"])];
+    if (expire.length > 0) self.expireTime = expire;
     // YYModel 对 BOOL 缺省可能是 NO；若后端未下发 needPayment，按 appleProductId 兜底
     id rawNeed = dic[@"needPayment"] ?: dic[@"need_payment"];
     if (rawNeed == nil) {
         self.needPayment = self.appleProductId.length > 0;
+    } else if ([rawNeed isKindOfClass:NSNumber.class]) {
+        self.needPayment = [(NSNumber *)rawNeed boolValue];
+    } else if ([rawNeed isKindOfClass:NSString.class]) {
+        NSString *s = [(NSString *)rawNeed lowercaseString];
+        self.needPayment = ([s isEqualToString:@"1"] || [s isEqualToString:@"true"] || [s isEqualToString:@"yes"]);
     }
     return YES;
 }
