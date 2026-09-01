@@ -2749,8 +2749,6 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     self.hasAppliedRedeemDiscount = NO;
     self.redeemAppleProductId = nil;
     self.redeemPlanId = nil;
-    self.redeemOriginalPrice = nil;
-    self.redeemDiscountPrice = nil;
     [self updatePayButtonState];
 }
 
