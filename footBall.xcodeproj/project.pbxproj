@@ -221,7 +221,7 @@
 				CODE_SIGN_ENTITLEMENTS = footBall/footBall.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1006;
+				CURRENT_PROJECT_VERSION = 1007;
 				DEVELOPMENT_TEAM = F649U4M8PK;
 				GCC_PREFIX_HEADER = "footBall/footBall-Prefix.pch";
 				GENERATE_INFOPLIST_FILE = YES;
@@ -267,7 +267,7 @@
 				CODE_SIGN_ENTITLEMENTS = footBall/footBall.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1006;
+				CURRENT_PROJECT_VERSION = 1007;
 				DEVELOPMENT_TEAM = F649U4M8PK;
 				GCC_PREFIX_HEADER = "footBall/footBall-Prefix.pch";
 				GENERATE_INFOPLIST_FILE = YES;
