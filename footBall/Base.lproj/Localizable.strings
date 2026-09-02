@@ -373,8 +373,8 @@
 "profile_my_stamps" = "我的邮票夹";
 "profile_id_verify" = "身份认证";
 "profile_membership_center" = "会员中心";
-"profile_membership_promo" = "限时兑换码";
-"profile_membership_hint" = "使用限时兑换码，解锁专属会员优惠";
+"profile_membership_promo" = "会员订阅";
+"profile_membership_hint" = "月度/赛季/终身方案，解锁全部会员权益";
 "profile_membership_coming_soon" = "会员功能即将开放，敬请期待";
 "redeem_code_empty" = "请输入兑换码";
 "redeem_code_format_invalid" = "兑换码格式不正确，请检查后重试";

@@ -26,6 +26,8 @@
 #define kMCMintBorder [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:0.90]
 #define kMCDiscountMint [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0]
 #define kMCDiscountHintGray [UIColor colorWithRed:203/255.0 green:203/255.0 blue:203/255.0 alpha:1.0]
+/// iPad 兼容模式下限制内容宽度，避免宽屏上控件拥挤难点
+static CGFloat const kMCMaxContentWidth = 430.f;
 
 /// 订阅 / 隐私政策跳转（App Store 审核要求自动续期订阅必须在购买页面提供可点击的条款链接）。
 /// 协议/续期条款使用 https 占位链接触发 UITextView 链接回调，在应用内展示 Bundle 文案（勿用自定义 scheme，会被系统路由误处理）。
@@ -57,6 +59,10 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 @implementation MCPlan @end
 
 @interface MembershipCenterViewController () <UIScrollViewDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver>
+@property (nonatomic, strong) UIView *layoutContentGuide;
+@property (nonatomic, strong) UIScrollView *mainScrollView;
+@property (nonatomic, strong) UIView *mainScrollContentView;
+@property (nonatomic, strong) UIView *bottomPanel;
 @property (nonatomic, strong) UIView *navBar;
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UIButton *backBtn;
@@ -248,7 +254,9 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
     self.bannerGradientLayer.frame = self.bannerCard.bounds;
-    self.redeemDialogGradientLayer.frame = self.redeemDialogView.bounds;
+    if (self.redeemDialogGradientLayer && self.redeemDialogView) {
+        self.redeemDialogGradientLayer.frame = self.redeemDialogView.bounds;
+    }
     if (self.contentGlassView && self.contentGlassHighlightLayer) {
         self.contentGlassHighlightLayer.frame = self.contentGlassView.bounds;
     }
@@ -261,7 +269,33 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     }
 }
 
+- (BOOL)mcIsPadLayout {
+    return UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad;
+}
+
+- (CGFloat)mcCardScrollHeight {
+    return self.mcIsPadLayout ? 236.f : 252.f;
+}
+
+- (CGFloat)mcLargeCardPriceFontSize {
+    return self.mcIsPadLayout ? 42.f : 52.f;
+}
+
+- (CGFloat)mcLargeCardPriceUnitFontSize {
+    return self.mcIsPadLayout ? 16.f : 20.f;
+}
+
 - (void)setupUI {
+    self.layoutContentGuide = [UIView new];
+    self.layoutContentGuide.backgroundColor = UIColor.clearColor;
+    [self.view addSubview:self.layoutContentGuide];
+    [self.layoutContentGuide mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.bottom.equalTo(self.view);
+        make.centerX.equalTo(self.view);
+        make.width.equalTo(self.view).priority(UILayoutPriorityDefaultHigh);
+        make.width.lessThanOrEqualTo(@(kMCMaxContentWidth));
+    }];
+
     self.navBar = [UIView new];
     self.navBar.backgroundColor = [UIColor clearColor];
     [self.view addSubview:self.navBar];
@@ -308,11 +342,30 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
         make.centerX.centerY.equalTo(self.navBar);
     }];
 
+    self.mainScrollView = [UIScrollView new];
+    self.mainScrollView.showsVerticalScrollIndicator = YES;
+    self.mainScrollView.alwaysBounceVertical = YES;
+    self.mainScrollView.backgroundColor = kMCPageBg;
+    self.mainScrollView.clipsToBounds = YES;
+    if (@available(iOS 11.0, *)) {
+        self.mainScrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+    }
+    [self.view addSubview:self.mainScrollView];
+
+    self.mainScrollContentView = [UIView new];
+    self.mainScrollContentView.backgroundColor = UIColor.clearColor;
+    [self.mainScrollView addSubview:self.mainScrollContentView];
+    [self.mainScrollContentView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.mainScrollView);
+        make.width.equalTo(self.layoutContentGuide);
+        make.centerX.equalTo(self.mainScrollView);
+    }];
+
     self.avatarWrap = [UIView new];
-    [self.view addSubview:self.avatarWrap];
+    [self.mainScrollContentView addSubview:self.avatarWrap];
     [self.avatarWrap mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.view).offset(20);
-        make.top.equalTo(self.navBar.mas_bottom).offset(20);
+        make.leading.equalTo(self.mainScrollContentView).offset(20);
+        make.top.equalTo(self.mainScrollContentView).offset(20);
         make.height.mas_equalTo(52);
     }];
     self.avatarView = [UIImageView new];
@@ -342,12 +395,12 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     self.bannerCard.layer.cornerRadius = 24;
     self.bannerCard.clipsToBounds = YES;
     self.bannerCard.backgroundColor = [UIColor colorWithWhite:0 alpha:0.55];
-    [self.view addSubview:self.bannerCard];
+    [self.mainScrollContentView addSubview:self.bannerCard];
     [self.bannerCard mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.view).offset(10);
-        make.trailing.equalTo(self.view).offset(-10);
+        make.leading.equalTo(self.mainScrollContentView).offset(10);
+        make.trailing.equalTo(self.mainScrollContentView).offset(-10);
         make.top.equalTo(self.avatarWrap.mas_bottom).offset(14);
-        make.height.mas_equalTo(82);
+        make.height.mas_equalTo(88);
     }];
     /// Figma 571:2648：linear 187.85° 黑 40% → 薄荷 40%
     self.bannerGradientLayer = [CAGradientLayer layer];
@@ -370,45 +423,38 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
         make.top.equalTo(self.bannerCard).offset(12);
     }];
     self.bannerSubLabel = [UILabel new];
-    self.bannerSubLabel.text = @"限时折扣码";
+    self.bannerSubLabel.text = @"开通会员";
     self.bannerSubLabel.textColor = kMCDiscountMint;
-    self.bannerSubLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
+    self.bannerSubLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
     [self.bannerCard addSubview:self.bannerSubLabel];
     [self.bannerSubLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(self.bannerTitleLabel);
-        make.top.equalTo(self.bannerTitleLabel.mas_bottom).offset(2);
+        make.top.equalTo(self.bannerTitleLabel.mas_bottom).offset(4);
+        make.trailing.lessThanOrEqualTo(self.bannerCard).offset(-16);
     }];
     self.bannerHintLabel = [UILabel new];
-    self.bannerHintLabel.text = @"使用限时折扣码，解锁专属会员优惠";
+    self.bannerHintLabel.text = @"解锁全部会员内容与专属权益";
     self.bannerHintLabel.textColor = kMCDiscountHintGray;
-    self.bannerHintLabel.font = [UIFont systemFontOfSize:8 weight:UIFontWeightLight];
+    self.bannerHintLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightRegular];
+    self.bannerHintLabel.numberOfLines = 2;
     [self.bannerCard addSubview:self.bannerHintLabel];
     [self.bannerHintLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.leading.equalTo(self.bannerTitleLabel);
-        make.top.equalTo(self.bannerSubLabel.mas_bottom).offset(2);
+        make.top.equalTo(self.bannerSubLabel.mas_bottom).offset(4);
+        make.trailing.lessThanOrEqualTo(self.bannerCard).offset(-16);
     }];
     self.redeemBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    self.redeemBtn.backgroundColor = [UIColor colorWithRed:40/255.0 green:93/255.0 blue:75/255.0 alpha:1.0];
-    self.redeemBtn.layer.cornerRadius = 12;
-    self.redeemBtn.titleLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightSemibold];
-    [self.redeemBtn setTitle:@"去兑换" forState:UIControlStateNormal];
-    [self.redeemBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    [self.redeemBtn addTarget:self action:@selector(onTapRedeemFromBanner) forControlEvents:UIControlEventTouchUpInside];
-    [self.bannerCard addSubview:self.redeemBtn];
-    [self.redeemBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(self.bannerCard).offset(-10);
-        make.bottom.equalTo(self.bannerCard).offset(-10);
-        make.size.mas_equalTo(CGSizeMake(62, 21));
-    }];
+    self.redeemBtn.hidden = YES;
+    self.redeemBtn.userInteractionEnabled = NO;
 
     self.segmentWrap = [UIView new];
     self.segmentWrap.backgroundColor = [UIColor clearColor];
     self.segmentWrap.clipsToBounds = NO;
-    [self.view addSubview:self.segmentWrap];
+    [self.mainScrollContentView addSubview:self.segmentWrap];
     [self.segmentWrap mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.bannerCard.mas_bottom).offset(14);
-        make.leading.equalTo(self.view).offset(0);
-        make.width.mas_equalTo(280);
+        make.leading.equalTo(self.mainScrollContentView).offset(0);
+        make.width.mas_equalTo(140);
         make.height.mas_equalTo(41);
     }];
     self.subscribeTabBtn = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -420,34 +466,27 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     [self.subscribeTabBtn addTarget:self action:@selector(onTapSubscribeTab) forControlEvents:UIControlEventTouchUpInside];
     [self.segmentWrap addSubview:self.subscribeTabBtn];
     [self.subscribeTabBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.top.bottom.equalTo(self.segmentWrap);
-        make.width.mas_equalTo(140);
+        make.edges.equalTo(self.segmentWrap);
     }];
     self.giftTabBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    self.giftTabBtn.backgroundColor = [UIColor blackColor];
-    self.giftTabBtn.layer.cornerRadius = 12;
-    self.giftTabBtn.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
-    self.giftTabBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-    [self.giftTabBtn setTitle:@"礼包码" forState:UIControlStateNormal];
-    [self.giftTabBtn addTarget:self action:@selector(onTapGiftTab) forControlEvents:UIControlEventTouchUpInside];
+    self.giftTabBtn.hidden = YES;
+    self.giftTabBtn.userInteractionEnabled = NO;
     [self.segmentWrap addSubview:self.giftTabBtn];
-    [self.giftTabBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.top.bottom.equalTo(self.segmentWrap);
-        make.width.mas_equalTo(140);
-    }];
 
     /// Figma 571:2613：Tab 下方主内容黑底
     self.contentPanelView = [UIView new];
     self.contentPanelView.backgroundColor = [UIColor blackColor];
     self.contentPanelView.userInteractionEnabled = NO;
-    [self.view insertSubview:self.contentPanelView belowSubview:self.segmentWrap];
+    [self.mainScrollView insertSubview:self.contentPanelView atIndex:0];
     [self.contentPanelView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.segmentWrap.mas_bottom);
-        make.leading.trailing.bottom.equalTo(self.view);
+        make.leading.trailing.equalTo(self.mainScrollContentView);
+        make.bottom.equalTo(self.mainScrollContentView);
     }];
 
     self.giftContainerView = [UIView new];
     self.giftContainerView.hidden = YES;
+    self.giftContainerView.userInteractionEnabled = NO;
     [self.view addSubview:self.giftContainerView];
     [self.giftContainerView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.segmentWrap.mas_bottom);
@@ -580,23 +619,25 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     self.planTitleLabel.textColor = [UIColor colorWithRed:220/255.0 green:1.0 blue:241/255.0 alpha:1.0];
     self.planTitleLabel.font = [UIFont systemFontOfSize:20.8 weight:UIFontWeightMedium];
     self.planTitleLabel.textAlignment = NSTextAlignmentCenter;
-    [self.view addSubview:self.planTitleLabel];
+    [self.mainScrollContentView addSubview:self.planTitleLabel];
     [self.planTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.segmentWrap.mas_bottom).offset(34);
-        make.centerX.equalTo(self.view);
+        make.centerX.equalTo(self.mainScrollContentView);
     }];
 
+    CGFloat cardScrollHeight = [self mcCardScrollHeight];
     self.cardScrollView = [UIScrollView new];
     self.cardScrollView.showsHorizontalScrollIndicator = NO;
     self.cardScrollView.delegate = self;
+    self.cardScrollView.clipsToBounds = YES;
     /// 卡片宽 210 + 间距 12 = 222，与屏宽不等，不能开启系统 paging
     self.cardScrollView.pagingEnabled = NO;
     self.cardScrollView.decelerationRate = UIScrollViewDecelerationRateFast;
-    [self.view addSubview:self.cardScrollView];
+    [self.mainScrollContentView addSubview:self.cardScrollView];
     [self.cardScrollView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.planTitleLabel.mas_bottom).offset(18);
-        make.leading.trailing.equalTo(self.view);
-        make.height.mas_equalTo(252);
+        make.leading.trailing.equalTo(self.mainScrollContentView);
+        make.height.mas_equalTo(cardScrollHeight);
     }];
     UISwipeGestureRecognizer *swipeLeft = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(onSwipePlan:)];
     swipeLeft.direction = UISwipeGestureRecognizerDirectionLeft;
@@ -639,21 +680,30 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     self.pageControl.pageIndicatorTintColor = [UIColor colorWithWhite:1 alpha:0.45];
     self.pageControl.currentPage = self.currentIndex;
     [self.pageControl addTarget:self action:@selector(onPageChanged:) forControlEvents:UIControlEventValueChanged];
-    [self.view addSubview:self.pageControl];
+    [self.mainScrollContentView addSubview:self.pageControl];
     [self.pageControl mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.cardScrollView.mas_bottom).offset(10);
-        make.centerX.equalTo(self.view);
+        make.centerX.equalTo(self.mainScrollContentView);
     }];
 
-    // 底部操作区（自下而上锚到安全区，避免小屏/全面屏贴底、协议挤在一起）
+    // 底部操作区与上方内容同 ScrollView，整页上下一起滚动
     CGFloat kMCBottomHInset = 24.0;
+
+    self.bottomPanel = [UIView new];
+    self.bottomPanel.backgroundColor = [UIColor clearColor];
+    [self.mainScrollContentView addSubview:self.bottomPanel];
+    [self.bottomPanel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.pageControl.mas_bottom).offset(20);
+        make.leading.trailing.equalTo(self.mainScrollContentView);
+        make.bottom.equalTo(self.mainScrollContentView).offset(-24);
+    }];
 
     self.agreementCheckBtn = [UIButton buttonWithType:UIButtonTypeCustom];
     self.agreementCheckBtn.layer.borderColor = [UIColor colorWithWhite:0.75 alpha:1.0].CGColor;
     self.agreementCheckBtn.layer.borderWidth = 1.2;
     self.agreementCheckBtn.layer.cornerRadius = 3;
     [self.agreementCheckBtn addTarget:self action:@selector(onToggleAgreement) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:self.agreementCheckBtn];
+    [self.bottomPanel addSubview:self.agreementCheckBtn];
 
     self.agreementLabel = [[UITextView alloc] init];
     self.agreementLabel.editable = NO;
@@ -670,16 +720,16 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     UITapGestureRecognizer *agreementTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onAgreementLabelTapped:)];
     agreementTap.cancelsTouchesInView = NO;
     [self.agreementLabel addGestureRecognizer:agreementTap];
-    [self.view addSubview:self.agreementLabel];
+    [self.bottomPanel addSubview:self.agreementLabel];
 
     // 协议区贴底：文案多行自适应，勾选框与首行顶对齐
     [self.agreementLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.view).offset(kMCBottomHInset + 22);
-        make.trailing.equalTo(self.view).offset(-kMCBottomHInset);
-        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-10);
+        make.leading.equalTo(self.bottomPanel).offset(kMCBottomHInset + 22);
+        make.trailing.equalTo(self.bottomPanel).offset(-kMCBottomHInset);
+        make.bottom.equalTo(self.bottomPanel);
     }];
     [self.agreementCheckBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.view).offset(kMCBottomHInset);
+        make.leading.equalTo(self.bottomPanel).offset(kMCBottomHInset);
         make.top.equalTo(self.agreementLabel.mas_top).offset(1);
         make.size.mas_equalTo(CGSizeMake(18, 18));
     }];
@@ -706,9 +756,9 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
                               forState:UIControlStateHighlighted];
     self.restoreBtn.contentEdgeInsets = UIEdgeInsetsMake(8, 16, 8, 16);
     [self.restoreBtn addTarget:self action:@selector(onTapRestore) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:self.restoreBtn];
+    [self.bottomPanel addSubview:self.restoreBtn];
     [self.restoreBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self.view);
+        make.centerX.equalTo(self.bottomPanel);
         make.bottom.equalTo(self.agreementLabel.mas_top).offset(-10);
         make.height.mas_equalTo(32);
     }];
@@ -721,10 +771,10 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     self.payBtn.titleLabel.minimumScaleFactor = 0.85;
     [self.payBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     [self.payBtn addTarget:self action:@selector(onTapPay) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:self.payBtn];
+    [self.bottomPanel addSubview:self.payBtn];
     [self.payBtn mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.leading.equalTo(self.view).offset(40);
-        make.trailing.equalTo(self.view).offset(-40);
+        make.leading.equalTo(self.bottomPanel).offset(40);
+        make.trailing.equalTo(self.bottomPanel).offset(-40);
         make.height.mas_equalTo(40);
         make.bottom.equalTo(self.restoreBtn.mas_top).offset(-6);
     }];
@@ -737,29 +787,27 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     self.subscriptionInfoLabel.numberOfLines = 2;
     self.subscriptionInfoLabel.adjustsFontSizeToFitWidth = YES;
     self.subscriptionInfoLabel.minimumScaleFactor = 0.85;
-    [self.view addSubview:self.subscriptionInfoLabel];
+    [self.bottomPanel addSubview:self.subscriptionInfoLabel];
     [self.subscriptionInfoLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self.view);
+        make.centerX.equalTo(self.bottomPanel);
+        make.top.equalTo(self.bottomPanel);
         make.bottom.equalTo(self.payBtn.mas_top).offset(-8);
-        make.leading.equalTo(self.view).offset(kMCBottomHInset);
-        make.trailing.equalTo(self.view).offset(-kMCBottomHInset);
+        make.leading.equalTo(self.bottomPanel).offset(kMCBottomHInset);
+        make.trailing.equalTo(self.bottomPanel).offset(-kMCBottomHInset);
+    }];
+
+    [self.mainScrollView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.navBar.mas_bottom);
+        make.leading.trailing.equalTo(self.view);
+        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom);
     }];
 
     [self refreshRedeemBannerState];
     [self applyPlanAtIndex:self.currentIndex animated:NO];
     [self updatePayButtonState];
     [self switchToGiftMode:NO];
-    [self setupRedeemDialog];
 
-    [self.view bringSubviewToFront:self.segmentWrap];
-    [self.view bringSubviewToFront:self.planTitleLabel];
-    [self.view bringSubviewToFront:self.cardScrollView];
-    [self.view bringSubviewToFront:self.pageControl];
-    [self.view bringSubviewToFront:self.subscriptionInfoLabel];
-    [self.view bringSubviewToFront:self.payBtn];
-    [self.view bringSubviewToFront:self.restoreBtn];
-    [self.view bringSubviewToFront:self.agreementCheckBtn];
-    [self.view bringSubviewToFront:self.agreementLabel];
+    [self.view bringSubviewToFront:self.mainScrollView];
 }
 
 - (void)setupRedeemDialog {
@@ -979,10 +1027,8 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 /// 若放开到全部支持折扣的方案，用户拿月卡折扣码就能切到年卡买走折扣年卡，
 /// 而 canUsePendingRedeemCodeForPlanId 又不会带上 redeemCode，服务端无从校验资格。
 - (BOOL)shouldUseDiscountSKUForPlanId:(NSString *)planId {
-    if (!self.hasAppliedRedeemDiscount) return NO;
-    if (![self planSupportsRedeemDiscount:planId]) return NO;
-    NSString *authorizedPlanId = self.redeemPlanId.length > 0 ? self.redeemPlanId : @"1";
-    return [planId isEqualToString:authorizedPlanId];
+    // App Store 3.1.1：不在 App 内通过自建兑换码解锁数字权益；折扣仅走 Apple Offer Codes。
+    return NO;
 }
 
 - (BOOL)canUsePendingRedeemCodeForPlanId:(NSString *)planId {
@@ -1095,8 +1141,8 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     }];
 
     NSArray<NSString *> *icons = plan.benefitIcons;
-    CGFloat lineStep = isLargeFounderPlan ? 28.2 : (large ? 29.34 : 22.03);
-    CGFloat lineTopOffset = (isLargeLifetimePlan || isLargeFounderPlan) ? 19.08 : (large ? 21.03 : 16.57);
+    CGFloat lineStep = isLargeFounderPlan ? 24.0 : (large ? 22.0 : 20.0);
+    CGFloat lineTopOffset = (isLargeLifetimePlan || isLargeFounderPlan) ? 14.0 : (large ? 16.0 : 14.0);
     CGFloat textLeading = large ? 53.54 : 40.15;
     CGFloat ringLeading = large ? 19.0 : 14.25;
     CGFloat ringSize = isLargeFounderPlan ? 24.0 : (large ? 25.01 : 18.75);
@@ -1108,15 +1154,17 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
         UILabel *line = [UILabel new];
         line.text = benefitText;
         line.textColor = [UIColor whiteColor];
-        line.font = [UIFont systemFontOfSize:(isLargeLifetimePlan ? 7.484 : (isLargeFounderPlan ? 8.71 : (large ? 7.53 : 5.62))) weight:UIFontWeightMedium];
-        line.numberOfLines = 1;
+        line.font = [UIFont systemFontOfSize:(isLargeLifetimePlan ? 8.5 : (isLargeFounderPlan ? 9.0 : (large ? 9.0 : 7.0))) weight:UIFontWeightMedium];
+        line.numberOfLines = 2;
+        line.adjustsFontSizeToFitWidth = YES;
+        line.minimumScaleFactor = 0.85;
         [card addSubview:line];
         [line mas_makeConstraints:^(MASConstraintMaker *make) {
             make.leading.equalTo(card).offset(textLeading);
             make.trailing.lessThanOrEqualTo(card).offset((isLargeLifetimePlan || isLargeFounderPlan) ? -15 : -8);
             make.top.equalTo(crownRow.mas_bottom).offset(lineTopOffset + i * lineStep);
         }];
-        if (isLargeFounderPlan && i == plan.benefits.count - 1) {
+        if (i == plan.benefits.count - 1) {
             lastBenefitLine = line;
         }
         UIView *ring = [UIView new];
@@ -1166,6 +1214,14 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
         }];
     }
 
+    UIView *priceRow = [UIView new];
+    priceRow.backgroundColor = UIColor.clearColor;
+    [card addSubview:priceRow];
+    [priceRow mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.leading.trailing.bottom.equalTo(card);
+        make.height.mas_equalTo(large ? 52.f : 42.f);
+    }];
+
     NSString *hintText = [self cardHintTextForPlan:plan];
     UILabel *hint = [UILabel new];
     hint.text = hintText.length ? hintText : nil;
@@ -1175,7 +1231,6 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     if (isLargeFounderPlan) {
         hintSize = 9.2;
     } else if (large && isMonthlyPlan) {
-        // Figma 兑换后「限时优惠」在月卡上字号更大。
         hintSize = 9.248;
     }
     hint.font = [UIFont systemFontOfSize:hintSize];
@@ -1192,11 +1247,11 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     [originPrice mas_makeConstraints:^(MASConstraintMaker *make) {
         make.trailing.equalTo(card).offset(isMonthlyPlan ? -12 : -10);
         if (large && isMonthlyPlan && !originPrice.hidden) {
-            make.bottom.equalTo(card).offset(-78);
+            make.bottom.equalTo(priceRow.mas_top).offset(-2);
         } else if (isLargeFounderPlan && !hint.hidden) {
             make.bottom.equalTo(hint.mas_top).offset(-1);
         } else {
-            make.bottom.equalTo(card).offset(large ? -79 : -58);
+            make.bottom.equalTo(priceRow.mas_top).offset(-2);
         }
     }];
     if (!originPrice.hidden) {
@@ -1220,12 +1275,7 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
             if (isLargeFounderPlan && lastBenefitLine) {
                 make.centerY.equalTo(lastBenefitLine);
             } else {
-                CGFloat hintBottom = -58;
-                if (large) {
-                    if (isMonthlyPlan) hintBottom = -82;
-                    else hintBottom = -78;
-                }
-                make.bottom.equalTo(card).offset(hintBottom);
+                make.bottom.equalTo(priceRow.mas_top).offset(-2);
             }
         }
     }];
@@ -1234,12 +1284,21 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
     price.attributedText = [self cardPriceAttrTextForPlan:plan large:large];
     price.textColor = [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
     price.textAlignment = NSTextAlignmentRight;
-    [card addSubview:price];
+    price.numberOfLines = 1;
+    price.adjustsFontSizeToFitWidth = YES;
+    price.minimumScaleFactor = 0.65;
+    price.baselineAdjustment = UIBaselineAdjustmentAlignCenters;
+    [priceRow addSubview:price];
     [price mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.trailing.equalTo(card).offset(isMonthlyPlan ? -12 : -10);
-        make.bottom.equalTo(card).offset(8);
+        make.trailing.equalTo(priceRow).offset(isMonthlyPlan ? -12 : -10);
+        make.leading.greaterThanOrEqualTo(priceRow).offset(8);
+        make.centerY.equalTo(priceRow);
     }];
-    /// 月度通行证「限时优惠」需要显示在价格上层，避免被大号金额遮挡
+    if (lastBenefitLine) {
+        [lastBenefitLine mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.bottom.lessThanOrEqualTo(priceRow.mas_top).offset(-6);
+        }];
+    }
     if (!hint.hidden) {
         [card bringSubviewToFront:hint];
     }
@@ -1312,8 +1371,8 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
                                                       large:(BOOL)large
                                                       color:(UIColor *)color {
     UIColor *textColor = color ?: [UIColor colorWithRed:175/255.0 green:255/255.0 blue:224/255.0 alpha:1.0];
-    CGFloat priceSize = large ? 72.38 : 54.0;
-    CGFloat unitSize = large ? 25.46 : 19.0;
+    CGFloat priceSize = large ? [self mcLargeCardPriceFontSize] : 40.0;
+    CGFloat unitSize = large ? [self mcLargeCardPriceUnitFontSize] : 15.0;
     // 价格未就绪：只给占位符，不带货币符号（「¥—」会被当成真实币种）
     if (numberText.length == 0) {
         return [[NSAttributedString alloc] initWithString:@"—" attributes:@{
@@ -1461,14 +1520,6 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
         NSString *pid = [p.appleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         if (pid.length > 0) [ids addObject:pid];
     }
-    // 兑换码折扣商品：只预拉兑换码实际授权方案的折扣 SKU
-    NSString *authorizedPlanId = self.redeemPlanId.length > 0 ? self.redeemPlanId : @"1";
-    if ([self shouldUseDiscountSKUForPlanId:authorizedPlanId]) {
-        NSString *discountPid = [self discountAppleProductIdForPlanId:authorizedPlanId];
-        if (discountPid.length > 0) [ids addObject:discountPid];
-    }
-    NSString *redeemPid = [self.redeemAppleProductId stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if (redeemPid.length > 0) [ids addObject:redeemPid];
     if (ids.count == 0) return;
 
     [self.preloadProductsRequest cancel];
@@ -1615,7 +1666,7 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
         if (status.nearExpiry) {
             self.bannerSubLabel.text = @"即将到期，续费享优惠";
             self.bannerSubLabel.textColor = [UIColor colorWithRed:1.0 green:0.8 blue:0.2 alpha:1.0];
-            self.bannerHintLabel.text = @"使用限时兑换码，解锁专属会员优惠";
+            self.bannerHintLabel.text = @"续费后可继续享受全部会员权益";
             self.bannerHintLabel.textColor = kMCDiscountHintGray;
         } else {
             // 会员且非临期：清掉兑换码副标题，避免仍显示「限时兑换码」
@@ -1858,15 +1909,9 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 }
 
 - (void)refreshRedeemBannerState {
-    if (self.hasAppliedRedeemDiscount) {
-        self.bannerSubLabel.text = @"限时折扣码";
-        self.bannerHintLabel.text = @"使用限时折扣码，解锁专属会员优惠";
-        [self.redeemBtn setTitle:@"去兑换" forState:UIControlStateNormal];
-    } else {
-        self.bannerSubLabel.text = @"限时兑换码";
-        self.bannerHintLabel.text = @"使用限时兑换码，解锁专属会员优惠";
-        [self.redeemBtn setTitle:@"去兑换" forState:UIControlStateNormal];
-    }
+    if (self.membershipStatus.isMember) return;
+    self.bannerSubLabel.text = @"开通会员";
+    self.bannerHintLabel.text = @"解锁全部会员内容与专属权益";
     self.bannerSubLabel.textColor = kMCDiscountMint;
     self.bannerHintLabel.textColor = kMCDiscountHintGray;
 }
@@ -2195,7 +2240,7 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 }
 
 - (void)onTapRedeemFromBanner {
-    [self showRedeemDialog];
+    // App Store 3.1.1：已移除应用内兑换码入口。
 }
 
 - (void)onTapSubscribeTab {
@@ -2203,22 +2248,11 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 }
 
 - (void)onTapGiftTab {
-    [self switchToGiftMode:YES];
+    // App Store 3.1.1：已移除礼包码 Tab。
 }
 
 - (void)showRedeemDialog {
-    self.redeemDialogShowingSuccess = NO;
-    [self.view bringSubviewToFront:self.redeemOverlayView];
-    self.redeemOverlayView.hidden = NO;
-    self.redeemInputField.text = @"";
-    self.redeemHelpLabel.hidden = YES;
-    self.redeemInputWrapView.hidden = NO;
-    self.redeemDialogTicketIconView.hidden = NO;
-    self.redeemSuccessWrapView.hidden = YES;
-    self.redeemSuccessTitleLabel.hidden = YES;
-    self.redeemSuccessDescLabel.hidden = YES;
-    [self updateRedeemDialogForInput];
-    [self.redeemInputField becomeFirstResponder];
+    // App Store 3.1.1：已移除应用内兑换码弹窗。
 }
 
 - (void)hideRedeemDialog {
@@ -2355,6 +2389,8 @@ static NSString *const kMCAutoRenewTermsURL      = @"https://www.nomadfootball.c
 }
 
 - (void)onTapRedeemDialogConfirm {
+    // App Store 3.1.1：已移除应用内兑换码入口。
+    return;
     // IAP 硬约束：兑换码激活/折扣购买都需登录态（服务端用 userId 关联会员/兑换码使用记录）
     if (![AuthManager sharedManager].isLoggedIn) {
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"请先登录"
@@ -3441,6 +3477,8 @@ static BOOL PNVerifyErrorWorthRetry(NSError *error) {
 }
 
 - (void)onRedeemGiftCode {
+    // App Store 3.1.1：已移除应用内礼包码入口。
+    return;
     // IAP 硬约束：礼包码激活会员同样需登录态
     if (![AuthManager sharedManager].isLoggedIn) {
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"请先登录"

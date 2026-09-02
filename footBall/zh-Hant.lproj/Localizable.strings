@@ -373,8 +373,8 @@
 "profile_my_stamps" = "我的郵票夾";
 "profile_id_verify" = "身份認證";
 "profile_membership_center" = "會員中心";
-"profile_membership_promo" = "限時兌換碼";
-"profile_membership_hint" = "使用限時兌換碼，解鎖專屬會員優惠";
+"profile_membership_promo" = "會員訂閱";
+"profile_membership_hint" = "月度/賽季/終身方案，解鎖全部會員權益";
 "profile_membership_coming_soon" = "會員功能即將開放，敬請期待";
 "redeem_code_empty" = "請輸入兌換碼";
 "redeem_code_format_invalid" = "兌換碼格式不正確，請檢查後重試";

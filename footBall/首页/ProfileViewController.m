@@ -434,8 +434,10 @@ static BOOL _isProfileDeleteAccountKey(NSString *key) {
     self.contentWrap = [UIView new];
     [self.scrollView addSubview:self.contentWrap];
     [self.contentWrap mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.edges.equalTo(self.scrollView);
-        make.width.equalTo(self.scrollView);
+        make.top.bottom.equalTo(self.scrollView);
+        make.centerX.equalTo(self.scrollView);
+        make.width.equalTo(self.scrollView).priority(UILayoutPriorityDefaultHigh);
+        make.width.lessThanOrEqualTo(@430);
     }];
 
     // 头部深色区（Figma：顶到底部轻微渐变）

@@ -373,8 +373,8 @@
 "profile_my_stamps" = "My Stamp Album";
 "profile_id_verify" = "Identity Verification";
 "profile_membership_center" = "Membership";
-"profile_membership_promo" = "Limited-time code";
-"profile_membership_hint" = "Use a limited-time code to unlock member offers.";
+"profile_membership_promo" = "Membership plans";
+"profile_membership_hint" = "Monthly, season, or lifetime — unlock full member benefits.";
 "profile_membership_coming_soon" = "Membership is coming soon.";
 "redeem_code_empty" = "Please enter a redemption code";
 "redeem_code_format_invalid" = "The redemption code format is invalid. Please check and try again.";
